@@ -1,0 +1,83 @@
+# FPL Mission Control — QA gate (fpl/ only; the fitness app at the repo root has its own harness)
+# CLAUDE.md K1: every push runs qa/; red blocks merge. Every step fails the job on a non-zero exit,
+# and the final step fails the job if the literal "FAIL" appears anywhere in the combined suite log.
+#
+# Browser note: the CI runner has no /opt/pw-browsers, so Playwright's Chromium is installed here
+# before the browser suites. qa/harness.cjs launch() must fall back to Playwright's default browser
+# when /opt/pw-browsers/chromium does not exist (CONTRACT.md §8; ERRORS.md E-027 note).
+name: fpl-gate
+
+on:
+  push:
+    paths:
+      - "fpl/**"
+      - ".github/workflows/gate.yml"
+  pull_request:
+    paths:
+      - "fpl/**"
+      - ".github/workflows/gate.yml"
+
+defaults:
+  run:
+    working-directory: fpl
+    shell: bash   # GitHub runs an explicit bash as `bash -eo pipefail`, so a suite failing behind `tee` still fails the step
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GATE_LOG: ${{ github.workspace }}/gate.log
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: fpl/package-lock.json
+
+      - name: Install (npm ci)
+        run: npm ci 2>&1 | tee -a "$GATE_LOG"
+
+      - name: TDZ check
+        run: node qa/tdz_check.cjs app/FPL_Mission_Control.jsx 2>&1 | tee -a "$GATE_LOG"
+
+      - name: esbuild syntax gate (real bundle)
+        run: npx esbuild app/FPL_Mission_Control.jsx --bundle --loader:.jsx=jsx --outfile=/tmp/mc.js 2>&1 | tee -a "$GATE_LOG"
+
+      - name: verify.sh (live reconciliation + invariants)
+        run: bash qa/verify.sh 2>&1 | tee -a "$GATE_LOG"
+
+      - name: unit_engine
+        run: node qa/unit_engine.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      - name: Install Playwright Chromium (runner has no /opt/pw-browsers)
+        run: npx playwright install --with-deps chromium 2>&1 | tee -a "$GATE_LOG"
+
+      - name: smoke
+        run: node qa/smoke.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      - name: smoke_wk
+        run: node qa/smoke_wk.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      - name: realistic
+        run: node qa/realistic.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      - name: buttons
+        run: node qa/buttons.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      - name: mc_full 3000
+        run: node --stack-size=4000 qa/mc_full.cjs 3000 2>&1 | tee -a "$GATE_LOG"
+
+      - name: mc_all
+        run: node qa/mc_all.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      - name: No "FAIL" in the combined log
+        if: always()
+        run: |
+          if [ ! -s "$GATE_LOG" ]; then echo "gate log missing or empty"; exit 1; fi
+          if grep -n "FAIL" "$GATE_LOG"; then
+            echo "literal FAIL found in the combined suite log"; exit 1
+          fi
+          echo "no FAIL in combined log"

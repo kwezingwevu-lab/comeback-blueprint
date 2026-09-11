@@ -6,3 +6,4 @@ Single-file HTML fitness app for Kwezi (Johannesburg). `dist/ComebackBlueprint.h
 - Build: `python3 build.py` (src → dist). Test: `bash qa/run.sh` (157 Chromium checks at last run), then `node qa/webkit.js` (15 Safari-engine checks; needs `npm run webkit`, plus `npx playwright install-deps webkit` on Linux).
 - From the iPhone: `IPHONE.md` (cloud sessions via GitHub; the phone only steers).
 - Memory: `LEDGER.md` (user's standing rules), `CHANGELOG.md`, `LEARNINGS.md`.
+- Sibling project: `fpl/README.md` (FPL Mission Control; separate app, separate QA, not covered by this file).

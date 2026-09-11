@@ -116,3 +116,9 @@ Never edit `dist/` directly. Never use `re.sub` with replacements containing `\u
 - Calendar auto-refresh helper: a script that re-scrapes RaceSpace/Peak Timing and diffs `RACES_12M` for the human to approve.
 - Peak-week countdown notifications via the Shortcut route.
 - A "coach export": weekly summary as text for a real coach or physio.
+
+## 10. Sibling project: FPL Mission Control (fpl/)
+
+- A separate app lives in `fpl/` (FPL Mission Control, v87); nothing in this file's fitness protocol applies to it.
+- It is governed by `fpl/CLAUDE.md` (its master prompt) and `fpl/ERRORS.md` (its append-only error ledger), with `fpl/CONTRACT.md` fixing names and shapes.
+- Its QA runs from `fpl/` (`npm run qa`); its CI is `.github/workflows/gate.yml`, which only triggers on `fpl/**` changes.
