@@ -1,6 +1,7 @@
 # CHANGELOG.md — what has shipped (newest first)
 
 ## 2026-09-11 (pre-Day-1)
+- 2026-09-11: Added sibling project fpl/ (FPL Mission Control v87); fitness app unchanged.
 - Bundle unpacked to the repository root (first cloud session from the phone route); zip removed. `dist/` rebuilt and confirmed byte-identical to the shipped file. Chromium suite 157/157. New `qa/webkit.js` Safari-engine acceptance (15/15: boot, eight views, storage mirrors, restore across reload) with 390×844 screenshots; both harnesses made offline-deterministic (fonts answered locally, reload awaited). App unchanged.
 - IPHONE.md v2: phone-first numbered steps (GitHub app creates the repo; Safari uploads the zip; Claude Code unpacks; GitHub Pages runs it, public-vs-Pro stated). Earlier: verified cloud-session route from the Claude iOS app (Code tab → New Session → GitHub repo); .gitignore; CLAUDE.md §2b. App unchanged (157/157).
 - Minimal rest days: Friday = active recovery by default (CTA, Today card, template, Extras header); deload-week Friday = full rest; sleep rule reclaims Friday; rest doctrine in the Guide. Suite: 157/157.
