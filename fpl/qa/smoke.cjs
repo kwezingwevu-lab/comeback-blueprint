@@ -94,6 +94,15 @@ async function main() {
   const htmlLive = H.buildPage({ inlineData: gw4Running() });
   const browser = await H.launch();
 
+  // E-027: Playwright 1.63 looks for Chromium build 1243 while the sandbox carries 1194, so
+  // launch() pins executablePath to /opt/pw-browsers/chromium when it exists and falls back
+  // to Playwright's own install on the CI runner. Either way a real browser must be running
+  // before a single UI claim is made, and the suite says which one it got.
+  H.assert("E027-harness-launched-a-real-chromium-and-says-which-build",
+    !!browser && browser.isConnected() && /^\d+\.\d+/.test(String(browser.version())),
+    "chromium " + (browser ? browser.version() : "no browser") + " via " +
+      (require("fs").existsSync(H.CHROMIUM_PATH) ? H.CHROMIUM_PATH + " (preinstalled)" : "the Playwright default install"));
+
   const pageErrors = [];
   function watch(p) {
     p.on("pageerror", function (e) { pageErrors.push(String(e && e.message ? e.message : e)); });
@@ -159,7 +168,7 @@ async function main() {
       const first = root.querySelector(".landing, .section, .card");
       const sec = root.querySelector(".section");
       return {
-        mode: root.getAttribute("data-mode"), tab: root.getAttribute("data-tab"),
+        mode: root.getAttribute("data-mode"), tab: root.getAttribute("data-view"),
         landing: !!root.querySelector(".landing"), boundary: root.querySelectorAll(".boundary").length,
         firstIsLanding: !!first && first.classList.contains("landing"),
         beforeSections: !sec || !!(first && (first.compareDocumentPosition(sec) & Node.DOCUMENT_POSITION_FOLLOWING)),
@@ -179,7 +188,7 @@ async function main() {
     const tabWords = {}, tabSecs = {};
     for (const t of TABS) {
       await page.click('[data-testid="tab-' + t + '"]');
-      await page.waitForFunction(function (id) { const r = document.querySelector(".mc-root"); return r && r.getAttribute("data-tab") === id; }, t, { timeout: 10000 });
+      await page.waitForFunction(function (id) { const r = document.querySelector(".mc-root"); return r && r.getAttribute("data-view") === id; }, t, { timeout: 10000 });
       const r = await page.evaluate(function () {
         const root = document.querySelector(".mc-root");
         return {
@@ -310,6 +319,24 @@ async function main() {
     H.assert("E025-zero-hex-colour-literals-in-rendered-markup", colour.hex.length === 0,
       colour.hex.length ? "found " + colour.hex.join(", ") : "none outside the single <style> block");
 
+    /* The page shipped a second <style> in the HTML shell carrying --bg and --text again as
+       raw hex, outside the token definitions and free to drift from them. Exactly one style
+       block in the rendered document may carry hex, and it has to be the app's own. */
+    const sheets = await page.evaluate(function () {
+      return Array.prototype.map.call(document.querySelectorAll("style"), function (st) {
+        const t = st.textContent || "";
+        return {
+          hex: Array.from(new Set(t.match(/#[0-9a-fA-F]{3,8}\b/g) || [])).length,
+          inRoot: !!st.closest(".mc-root"),
+          head: t.replace(/\s+/g, " ").slice(0, 48)
+        };
+      });
+    });
+    const hexSheets = sheets.filter(function (x) { return x.hex > 0; });
+    H.assert("exactly-one-style-block-in-the-page-carries-hex-colour",
+      hexSheets.length === 1 && hexSheets[0].inRoot,
+      sheets.length + " style blocks, hex counts [" + sheets.map(function (x) { return x.hex + (x.inRoot ? " in .mc-root" : " in the shell"); }).join(", ") + "]");
+
     // ---------------------------------------------------------- 6. tabs and horizontal scroll
 
     const tabGeom = await page.evaluate(function () {
@@ -324,6 +351,19 @@ async function main() {
       tabGeom.length === 7 && spread <= 1 &&
       tabGeom.every(function (t, i) { return t.id === TABS[i] && t.testid === "tab-" + TABS[i] && !!t.aria; }),
       tabGeom.length + " tabs [" + tabGeom.map(function (t) { return t.id + " " + t.w + "px"; }).join(", ") + "], width spread " + spread.toFixed(1) + "px");
+
+    /* data-tab belongs to the seven tab buttons and to nothing else (CONTRACT §7). The root
+       carried it too, so the page exposed eight of them with "command" twice; the root's
+       current tab is data-view now. */
+    const tagged = await page.evaluate(function () {
+      return Array.prototype.map.call(document.querySelectorAll("[data-tab]"), function (e) {
+        return { id: e.getAttribute("data-tab"), tabi: /\btabi\b/.test(e.getAttribute("class") || "") };
+      });
+    });
+    H.assert("exactly-seven-elements-carry-data-tab",
+      tagged.length === 7 && tagged.every(function (t) { return t.tabi; }) &&
+        tagged.map(function (t) { return t.id; }).join(",") === TABS.join(","),
+      tagged.length + " elements carry data-tab: " + tagged.map(function (t) { return t.id + (t.tabi ? "" : " (not a tab button)"); }).join(", "));
 
     const scrolls = [];
     for (const w of [360, 390]) {
@@ -376,7 +416,7 @@ async function main() {
     const guide = await page.evaluate(function () {
       const root = document.querySelector(".mc-root");
       const s = root.querySelector('.section[data-section="lab-guide"]');
-      return { tab: root.getAttribute("data-tab"), open: s ? s.querySelector(".sec-h").getAttribute("aria-expanded") : null, chars: s ? s.innerText.trim().length : 0, menu: root.querySelectorAll(".menu").length };
+      return { tab: root.getAttribute("data-view"), open: s ? s.querySelector(".sec-h").getAttribute("aria-expanded") : null, chars: s ? s.innerText.trim().length : 0, menu: root.querySelectorAll(".menu").length };
     });
     H.assert("playbook-guide-renders-from-the-header-menu",
       guide.tab === "lab" && guide.open === "true" && guide.chars > 300 && guide.menu === 0,
@@ -531,7 +571,7 @@ async function main() {
     const snapBefore = await page.evaluate(function () {
       const root = document.querySelector(".mc-root");
       return {
-        mode: root.getAttribute("data-mode"), tab: root.getAttribute("data-tab"),
+        mode: root.getAttribute("data-mode"), tab: root.getAttribute("data-view"),
         secs: Array.prototype.map.call(root.querySelectorAll(".section"), function (s) { return s.getAttribute("data-section") + ":" + s.querySelector(".sec-h").getAttribute("aria-expanded"); })
       };
     });
@@ -541,7 +581,7 @@ async function main() {
     const snapAfter = await page.evaluate(function () {
       const root = document.querySelector(".mc-root");
       return {
-        mode: root.getAttribute("data-mode"), tab: root.getAttribute("data-tab"),
+        mode: root.getAttribute("data-mode"), tab: root.getAttribute("data-view"),
         secs: Array.prototype.map.call(root.querySelectorAll(".section"), function (s) { return s.getAttribute("data-section") + ":" + s.querySelector(".sec-h").getAttribute("aria-expanded"); })
       };
     });
@@ -589,6 +629,52 @@ async function main() {
       "shipped snapshot has current_event " + LIVE.current_event + " and next_event " + LIVE.next_event +
       "; at " + LIVE_NOW + " the landing reads «" + staleLanding.replace(/\s+/g, " ").slice(0, 90) + "»");
 
+    // ---------------------------------------------------------- 15. copy once the deadline has passed
+    //
+    // hoursText returned the bare word "closed" and every call site appended its own suffix,
+    // so from 12:30Z on the Saturday the header read "closed to deadline" and the landing
+    // "closed left, nobody flagged". Every countdown phrase is complete at its call site now.
+
+    // 13:00Z on the Saturday is inside the live window, so the landing shows live points and
+    // only the header prints a countdown; 09:00Z on the Tuesday is past the last kick-off, so
+    // the landing is back and prints one too. Both times are walked, on all seven tabs.
+    const POST_DEADLINE = ["2026-09-12T13:00:00Z", "2026-09-15T09:00:00Z"];
+    const brokenCopy = [];
+    const headerPost = {};
+    let lateLanding = "";
+    for (const when of POST_DEADLINE) {
+      await fresh({ html: html, mode: "full", now: when });
+      for (const t of TABS) {
+        await page.click('[data-testid="tab-' + t + '"]');
+        await page.waitForFunction(function (id) { const r = document.querySelector(".mc-root"); return r && r.getAttribute("data-view") === id; }, t, { timeout: 10000 });
+        await openAllSections(page);
+        await page.waitForTimeout(160);
+        const seen = await page.evaluate(function () {
+          const root = document.querySelector(".mc-root");
+          const st = root.querySelector('[data-testid="status"]');
+          return { text: root.innerText.replace(/\s+/g, " "), status: st ? st.innerText.replace(/\s+/g, " ") : "" };
+        });
+        headerPost[when] = seen.status;
+        const m = seen.text.match(/closed (to deadline|left)/i);
+        if (m) brokenCopy.push(when + " " + t + " «" + seen.text.slice(Math.max(0, seen.text.indexOf(m[0]) - 40), seen.text.indexOf(m[0]) + 44) + "»");
+      }
+      if (when === POST_DEADLINE[1]) {
+        // The tab loop ends on Lab; the landing only renders on Command in full mode.
+        await page.click('[data-testid="tab-command"]');
+        await page.waitForTimeout(200);
+        lateLanding = (await landingText(page)).replace(/\s+/g, " ");
+      }
+    }
+    H.assert("no-half-sentence-copy-once-the-deadline-has-passed", brokenCopy.length === 0,
+      brokenCopy.length ? brokenCopy.join(" | ")
+        : "neither " + POST_DEADLINE.join(" nor ") + " rendered \"closed to deadline\" or \"closed left\" on any of the seven tabs");
+    H.assert("the-header-says-the-deadline-is-closed-in-a-whole-phrase",
+      POST_DEADLINE.every(function (w) { return /deadline closed/.test(headerPost[w] || ""); }),
+      POST_DEADLINE.map(function (w) { return w + " «" + (headerPost[w] || "") + "»"; }).join(" · "));
+    H.assert("the-landing-deadline-panel-reads-as-a-sentence-after-the-deadline",
+      /closed, (nobody flagged|\d+ flagged)/.test(lateLanding),
+      "landing at " + POST_DEADLINE[1] + ": «" + lateLanding.slice(0, 150) + "»");
+
     // ---------------------------------------------------------- 15. D3 block (E-012)
 
     const squad = LIVE.picks["3"].picks.map(function (p) { return p.element; });
@@ -635,6 +721,41 @@ async function main() {
     H.assert("E012-D3-confirming-the-API-squad-clears-the-block",
       afterConfirm.blocks === 0 && afterConfirm.rows > 0,
       afterConfirm.blocks + " blocks left, plan-tx renders " + afterConfirm.rows + " move rows: «" + afterConfirm.text + "»");
+
+    // ---------------------------------------------------------- E-060 the lock drives the answer everywhere
+
+    {
+      const lockShots = {};
+      for (const locked of [false, true]) {
+        const lc = await browser.newContext({ viewport: { width: 390, height: 844 } });
+        const lp = await lc.newPage();
+        await H.open(lp, {
+          mode: "full", tab: "command", now: NOW, html: html,
+          ui: { mode: "full", tab: "command", open: {}, reveals: locked ? { "wc-lock": true } : {} }
+        });
+        lockShots[locked ? "locked" : "pure"] = await lp.evaluate(function () {
+          const l = document.querySelector(".landing");
+          const names = l ? l.querySelector(".names") : null;
+          const t = l ? l.innerText : "";
+          const m = t.match(/Captain\s+([^,]+),\s*vice\s+([^.]+)\./);
+          return {
+            fifteen: names ? names.innerText.replace(/\s+/g, " ").trim() : "",
+            captain: m ? m[1].trim() : "",
+            vice: m ? m[2].trim() : "",
+            words: t.trim().split(/\s+/).length
+          };
+        });
+        await lc.close();
+      }
+      const a = lockShots.pure, b = lockShots.locked;
+      H.assert("locking-the-premiums-changes-the-landing-fifteen-and-keeps-a-captain",
+        a.fifteen !== "" && b.fifteen !== "" && a.fifteen !== b.fifteen &&
+          a.captain !== "" && a.captain !== "\u2014" && b.captain !== "" && b.captain !== "\u2014" &&
+          b.vice !== "" && b.vice !== "\u2014" && a.words < 110 && b.words < 110,
+        "rule-pure: captain " + a.captain + ", vice " + a.vice + ", " + a.words + " words · locked: captain " +
+          b.captain + ", vice " + b.vice + ", " + b.words + " words · the two fifteens " +
+          (a.fifteen === b.fifteen ? "are identical (the lock did nothing)" : "differ"));
+    }
 
     // ---------------------------------------------------------- close
 

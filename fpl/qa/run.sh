@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # qa/run.sh — the full gate (CONTRACT §8, CLAUDE.md H1/H3).
 #
-#   tdz → esbuild → build → verify → unit_engine → smoke → smoke_wk → realistic
-#       → buttons → mc_full 3000 → mc_all
+#   tdz (self-test + sources) → esbuild → build → tdz (built app) → verify → unit_engine
+#       → smoke → smoke_wk → realistic → buttons → mc_full 3000 → mc_all
 #
 # Prints ALL PASS only when every step passed. A suite file that does not exist yet is a
 # clear FAIL line naming the missing file, never a crash — the suites are written by
@@ -87,19 +87,22 @@ sh_suite() {
 
 # ---------------------------------------------------------------- 1. TDZ
 
+# The sources only. The assembled app is scanned AFTER the build (step 4) — scanning it here
+# would scan the PREVIOUS build's file and report a verdict on code that is about to be
+# replaced (E-053).
 tdz() {
   local targets=()
   [ -f "$ENGINE" ] && targets+=("$ENGINE")
   [ -f "$UI" ] && targets+=("$UI")
-  [ -f "$APP" ] && targets+=("$APP")
   if [ ${#targets[@]} -eq 0 ]; then
     echo "no source files to scan"
     return 1
   fi
+  node qa/tdz_check.cjs --self-test || return 1
   node qa/tdz_check.cjs "${targets[@]}"
 }
 if [ -f qa/tdz_check.cjs ]; then
-  step "tdz_check" tdz
+  step "tdz_check (self-test + sources)" tdz
 else
   STEPS=$((STEPS + 1)); hr; echo "STEP $STEPS · tdz_check"
   echo "FAIL tdz_check — qa/tdz_check.cjs does not exist"
@@ -131,7 +134,26 @@ build_step() {
 }
 step "build (build.cjs → app/ + dist/)" build_step
 
-# ---------------------------------------------------------------- 4-11. the suites
+# ---------------------------------------------------------------- 4. TDZ on the built app
+
+# E-053: the assembled file is what ships and what every browser suite loads, so it is scanned
+# here, after build.cjs has just written it — never before.
+tdz_built() {
+  if [ ! -f "$APP" ]; then
+    echo "$APP was not produced by the build step"
+    return 1
+  fi
+  node qa/tdz_check.cjs "$APP"
+}
+if [ -f qa/tdz_check.cjs ]; then
+  step "tdz_check (freshly built app)" tdz_built
+else
+  STEPS=$((STEPS + 1)); hr; echo "STEP $STEPS · tdz_check (freshly built app)"
+  echo "FAIL tdz_check (freshly built app) — qa/tdz_check.cjs does not exist"
+  record_fail "tdz_check built (missing qa/tdz_check.cjs)"
+fi
+
+# ---------------------------------------------------------------- 5-12. the suites
 
 sh_suite qa/verify.sh
 node_suite qa/unit_engine.cjs

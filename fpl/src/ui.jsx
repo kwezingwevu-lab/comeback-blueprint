@@ -194,12 +194,31 @@ function sastText(iso) {
   const hh = String(d.getUTCHours()).padStart(2, "0"), mm = String(d.getUTCMinutes()).padStart(2, "0");
   return days[d.getUTCDay()] + " " + hh + ":" + mm;
 }
+/* hoursText is a magnitude and never a state: it says how long, and each call site says
+   what that length is. Returning the bare word "closed" from here put "closed to deadline"
+   in the header and "closed left, nobody flagged" on the landing the moment a deadline
+   passed, because every call site appended its own suffix. The three phrases below are
+   complete on their own. */
 function hoursText(h) {
   if (h === null || h === undefined || !isFinite(h)) return "—";
-  if (h < 0) return "closed";
-  if (h < 1) return Math.max(1, Math.round(h * 60)) + "min";
-  if (h < 48) return Math.round(h) + "h";
-  return Math.round(h / 24) + "d";
+  const a = Math.abs(h);
+  if (a < 1) return Math.max(1, Math.round(a * 60)) + "min";
+  if (a < 48) return Math.round(a) + "h";
+  return Math.round(a / 24) + "d";
+}
+function deadlineLine(h) {
+  if (h === null || h === undefined || !isFinite(h)) return "deadline unknown";
+  return h < 0 ? "deadline closed" : hoursText(h) + " to deadline";
+}
+function leftLine(h) {
+  if (h === null || h === undefined || !isFinite(h)) return "time unknown";
+  return h < 0 ? "closed" : hoursText(h) + " left";
+}
+/* Age is elapsed time and has no closed state: a snapshot stamped ahead of the clock is
+   simply fresh. */
+function ageText(h) {
+  if (h === null || h === undefined || !isFinite(h)) return "—";
+  return h < 0 ? "fresh" : hoursText(h);
 }
 function gwProgress(ctx) {
   try {
@@ -322,10 +341,39 @@ function seedState(live) {
   return sanitiseState(st);
 }
 
+/* C1 rule 6 keeps anyone at or above 60% rival ownership out of the wildcard solver, so
+   the engine's fifteen can differ from the fifteen the manager wrote down almost wholesale.
+   Shipping that difference without naming the rule that caused it is the silent
+   reprogramming the standing rules forbid, so the landing carries one line: the rule, and
+   the two heaviest exclusions, with their numbers. The full pricing is on the Plan tab. */
+function andList(names) {
+  const a = (Array.isArray(names) ? names : [])
+    .filter(function (v) { return typeof v === "string" ? v !== "" : (typeof v === "number" && isFinite(v)); })
+    .map(String);
+  if (!a.length) return "";
+  if (a.length === 1) return a[0];
+  return a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+}
+function writtenConflict(ctx, ids) {
+  try {
+    const w15 = writtenFifteen({ written: WEEKLY.classic ? WEEKLY.classic.wildcard15 : [] });
+    if (!w15.length || !Array.isArray(ids) || !ids.length) return null;
+    const shown = {};
+    ids.forEach(function (id) { shown[id] = true; });
+    const missing = w15.filter(function (id) { return !shown[id]; });
+    if (!missing.length) return null;
+    const dropped = missing
+      .filter(function (id) { return convergenceRisk(id, ctx).risk; })
+      .map(function (id) { return { id: id, name: nameOf(ctx, id), own: rivalOwnMax(id, ctx).max }; })
+      .sort(function (a, b) { return b.own - a.own; });
+    return { differ: missing.length, ruled: dropped.length, dropped: dropped.slice(0, 2) };
+  } catch (e) { return null; }
+}
+
 /* buildPlan turns the engine's answers into the one decision the landing shows. */
-function buildPlan(ctx) {
+function buildPlan(ctx, premLocked) {
   if (!ctx || typeof ctx !== "object") ctx = { ok: false };
-  const plan = { kind: "hold", gw: ctx.nextEvent, deadline: ctx.deadline, hours: ctx.hoursToDeadline, tp: null, wc: null, timing: null, ids: [], capId: null, viceId: null, formation: "", flags: [], cost: 0, bank: 0, livePts: null, chipUsed: false, agree: true, why: [] };
+  const plan = { kind: "hold", gw: ctx.nextEvent, deadline: ctx.deadline, hours: ctx.hoursToDeadline, tp: null, wc: null, timing: null, ids: [], capId: null, viceId: null, formation: "", flags: [], cost: 0, bank: 0, livePts: null, chipUsed: false, agree: true, conflict: null, locked: false, locks: [], why: [] };
   try {
     if (!ctx.ok) { plan.kind = "nodata"; return plan; }
     plan.livePts = livePointsNow(ctx);
@@ -341,12 +389,28 @@ function buildPlan(ctx) {
       plan.agree = five >= WC_TRIGGER;
       if (plan.agree) {
         plan.wc = wildcardSolver(ctx, {});
+        if (premLocked) {
+          const wo = wildcardOptions(ctx, { written: WEEKLY.classic ? WEEKLY.classic.wildcard15 : [] });
+          if (wo && wo.ok && wo.locked && wo.locked.ok && wo.locked.ids.length === 15) {
+            const lx = Array.isArray(wo.locked.xi) ? wo.locked.xi : [];
+            plan.wc = {
+              ok: true, ids: wo.locked.ids, cost: wo.locked.cost, bank: wo.locked.bank,
+              score: wo.locked.objective,
+              xi: { ids: lx, capId: wo.locked.captain, viceId: wo.locked.vice, formation: wo.locked.formation, score: wo.locked.objective },
+              model: "TS", alt: null, disagreement: null, relaxed: false, reasons: wo.locked.reasons || [], budget: wo.budget
+            };
+            plan.locked = true;
+            plan.locks = wo.locks || [];
+            plan.writtenDiffer = wo.deltas && wo.deltas.writtenVsLocked ? wo.deltas.writtenVsLocked.playersDiffer : null;
+          }
+        }
         if (plan.wc.ok) {
           plan.kind = "wildcard";
           plan.ids = plan.wc.ids; plan.cost = plan.wc.cost; plan.bank = plan.wc.bank;
           plan.capId = plan.wc.xi ? plan.wc.xi.capId : null;
           plan.viceId = plan.wc.xi ? plan.wc.xi.viceId : null;
           plan.formation = plan.wc.xi ? plan.wc.xi.formation : "";
+          plan.conflict = writtenConflict(ctx, plan.ids);
           plan.why.push("Five gameweeks of squad deficit come to " + one(five) + " points against a trigger of " + WC_TRIGGER + ".");
         }
       } else {
@@ -551,6 +615,19 @@ function GwActionCard(props) {
         </div>
       ) : null}
 
+      {plan.kind === "wildcard" && plan.locked ? (
+        <div className="panel">
+          <div className="panel-k">Premiums locked</div>
+          <div className="panel-v">{andList(plan.locks.map(function (l) { return l.web_name; }))} {plan.locks.length === 1 ? "is" : "are"} back in against rule six{plan.writtenDiffer ? ", and " + plan.writtenDiffer + " of your written fifteen still differ" : ""}. The Plan tab prices all three fifteens.</div>
+        </div>
+      ) : null}
+      {plan.kind === "wildcard" && !plan.locked && plan.conflict && plan.conflict.dropped.length ? (
+        <div className="panel">
+          <div className="panel-k">Not your written fifteen</div>
+          <div className="panel-v">The convergence rule drops {plan.conflict.dropped.map(function (d) { return d.name + " (" + pc(d.own) + " rival-owned)"; }).join(" and ")}. The Plan tab prices all three fifteens.</div>
+        </div>
+      ) : null}
+
       {plan.kind === "transfers" ? (
         <div className="panel">
           <div className="panel-k">In order</div>
@@ -568,11 +645,12 @@ function GwActionCard(props) {
 
       <div className="panel">
         <div className="panel-k">{gw} deadline</div>
-        <div className="panel-v"><b>{hoursText(plan.hours)}</b> left{plan.flags.length ? ", " + plan.flags.length + " flagged" : ", nobody flagged"}.</div>
+        <div className="panel-v"><b>{leftLine(plan.hours)}</b>{plan.flags.length ? ", " + plan.flags.length + " flagged" : ", nobody flagged"}.</div>
       </div>
 
       <Reveal id="ld-why" label="Why" open={!!rev["ld-why"]} onToggle={onRev}>
         {plan.kind === "wildcard" ? <div>{plan.why.join(" ")} The solver runs under the xG fixture model and again under the goals model; the fifteen above is equal-or-better under both, and the gap between them is noise.</div> : null}
+        {plan.kind === "wildcard" && plan.conflict ? <div>Rule six of the six keeps anyone at or above 60% rival ownership out of the solver, so {plan.conflict.differ} of the fifteen you wrote down are not in this one. The rule guards your rank in six mini-leagues against a field that already owns those players; it is not a points rule. Three fifteens, priced, on the Plan tab shows what it costs and lets you lock them back in.</div> : null}
         {plan.kind === "transfers" ? <div>Best plan worth {one(plan.tp.value)} expected points over five gameweeks, margin {two(plan.tp.margin)} over the next genuinely different plan, confidence {plan.tp.confidence}.</div> : null}
         {plan.kind === "hold" ? <div>{plan.tp.reasons.join(" ") || "No swap gains more than four expected points over five gameweeks."}</div> : null}
         <div>Captaincy is the highest expected-value attacker in the XI, flagged players excluded.</div>
@@ -602,7 +680,7 @@ function Header(props) {
         <h1 data-testid="title">FPL Mission Control</h1>
         <div className="status" data-testid="status">
           <span><b>{"GW" + ctx.nextEvent}</b></span>
-          <span>{hoursText(ctx.hoursToDeadline)} to deadline</span>
+          <span>{deadlineLine(ctx.hoursToDeadline)}</span>
           <span>FT {ctx.ft}</span>
           <span>{money(ctx.bank)} bank</span>
           <span>{APP_VERSION}</span>
@@ -684,7 +762,7 @@ function TabCommand(props) {
         <KV k="Squad matches the API" v={ctx.block.block ? "no" : "yes"} tone={ctx.block.block ? "out" : "go"} />
         <KV k="Flags on the fifteen" v={flagList(ctx, ctx.squadIds).length} />
         <KV k="Free transfers" v={ctx.ft} />
-        <KV k="Snapshot age" v={hoursText((ctx.now - msOf(ctx.live.fetched_at)) / 3600000).replace("min", " min")} />
+        <KV k="Snapshot age" v={ageText((ctx.now - msOf(ctx.live.fetched_at)) / 3600000).replace("min", " min")} />
         <div className="dim">Every number on this screen is recomputed from the snapshot each time it draws. <Tier k="T0" /></div>
       </Section>
 
@@ -732,6 +810,19 @@ function TabPlan(props) {
   const capIds = wcXi || bestXI(ctx.squadIds, ctx).ids;
   const cap = sec("plan-cap") ? captainPick(capIds, ctx) : null;
   const tim = sec("plan-time") ? (plan.timing || wildcardTiming(ctx)) : null;
+  const premLocked = !!(ui.reveals && ui.reveals["wc-lock"]);
+  /* Three priced fifteens cost two solver runs, so they are computed once per snapshot and
+     only while the panel is open: without the memo every click on the tab paid for them again. */
+  const optsOpen = sec("plan-opts") && !hidden;
+  const wcOpts = React.useMemo(function () {
+    return optsOpen ? wildcardOptions(ctx, { written: WEEKLY.classic ? WEEKLY.classic.wildcard15 : [] }) : null;
+  }, [optsOpen, ctx]);
+  const optRows = wcOpts && wcOpts.ok
+    ? [{ key: "pure", v: wcOpts.pure }, { key: "locked", v: wcOpts.locked }, { key: "written", v: wcOpts.written }].filter(function (r) { return r.v && r.v.ok; })
+    : [];
+  const headKey = premLocked ? "locked" : "pure";
+  const headRow = optRows.filter(function (r) { return r.key === headKey; })[0] || optRows[0] || null;
+  const priced = wcOpts && wcOpts.ok && wcOpts.pure && wcOpts.pure.ok && wcOpts.locked && wcOpts.locked.ok && wcOpts.written && wcOpts.written.ok;
   const fb = WEEKLY.classic.fallback || { moves: [] };
   const fbCost = (WEEKLY.classic.wildcard15 || []).reduce(function (s, id) { return s + (ctx.els[id] ? Number(ctx.els[id].now_cost) : 0); }, 0);
   return (
@@ -773,12 +864,61 @@ function TabPlan(props) {
             {wc.bank > 30 ? <div className="note note-w">{money(wc.bank)} is left unspent: nothing in the pool that fits three per club, the convergence rule and the starts test improved the fifteen.</div> : null}
             {wc.disagreement ? <div className="note">{wc.disagreement.note}</div> : null}
             {wc.relaxed ? <div className="note note-w">Eligibility was relaxed to fill the squad: {wc.relaxations.join("; ")}</div> : null}
+            {premLocked ? <div className="note note-w">The premiums are locked, so this fifteen and the one on the landing card are the locked solve. Unlock to go back to the rule-pure answer.</div> : null}
             <Reveal id="pl-wc-how" label="How it was built" open={!!rev["pl-wc-how"]} onToggle={on.rev}>
               <div>Greedy seed on five-week xP per million, then one-swap and two-swap local search, under 2-5-5-3, the selling value, three per club and the convergence rule. Run again under the goals model; the fifteen shipped is equal-or-better under both.</div>
             </Reveal>
             <div className="dim"><Tier k="model" /> solver · <Tier k="T0" /> prices</div>
           </div>
         ) : <div className="note note-a">The solver could not build a legal fifteen from the snapshot.</div>}
+        </Guard>
+      </Section>
+
+      <Section id="plan-opts" title="Three fifteens, priced" open={sec("plan-opts")} onToggle={on.sec}>
+        <Guard ctx={ctx} onConfirm={props.onConfirm} where="plan-opts">
+        {hidden ? <div className="note note-w">Matches are running. Transfer panels come back when the last whistle goes.</div> : optRows.length ? (
+          <div>
+            <div className="tbl">
+              <Row head cols="minmax(0,1fr) 50px 58px 50px">
+                <span>Fifteen</span><span className="rt">Weekly</span><span className="rt">Cost</span><span className="rt">Bank</span>
+              </Row>
+              {optRows.map(function (r) {
+                return (
+                  <Row key={r.key} cols="minmax(0,1fr) 50px 58px 50px">
+                    <span className="nm" style={{ whiteSpace: "normal" }}>{r.v.label} {r.key === headKey ? <span className="tag tag-e">yours</span> : null}</span>
+                    <span className="rt">{two(r.v.weekly)}</span>
+                    <span className="rt">{money(r.v.cost)}</span>
+                    <span className="rt dim">{money(r.v.bank)}</span>
+                  </Row>
+                );
+              })}
+            </div>
+            <button className="btn" data-testid="wc-lock" aria-pressed={premLocked ? "true" : "false"} onClick={function () { on.rev("wc-lock"); }}>
+              {premLocked ? "Unlock the premiums" : "Lock the premiums in"}
+            </button>
+            {headRow ? <KV k="Working answer" v={headRow.v.label + ", " + headRow.v.formation + ", captain " + (headRow.v.captain ? nameOf(ctx, headRow.v.captain) : "—")} /> : null}
+            {headRow ? <div className="names" style={{ whiteSpace: "normal" }}>{headRow.v.ids.map(function (id) { return nameOf(ctx, id); }).join(", ")}</div> : null}
+            {priced && wcOpts.deltas.lockedVsPure ? (
+              <KV k="Locking changes" v={wcOpts.deltas.lockedVsPure.playersDiffer + " of the fifteen, " + money(wcOpts.deltas.lockedVsPure.cost) + " more spent"} />
+            ) : null}
+            {priced && wcOpts.deltas.writtenVsPure ? (
+              <KV k="Written plan differs by" v={wcOpts.deltas.writtenVsPure.playersDiffer + " of the fifteen"} />
+            ) : null}
+            {priced ? (
+              <div className="note note-w">
+                On this snapshot the locked fifteen is worth {two(Math.abs(wcOpts.locked.weekly - wcOpts.pure.weekly))} points a week {wcOpts.locked.weekly >= wcOpts.pure.weekly ? "more" : "less"} than the rule-pure one and spends {money(Math.abs(wcOpts.locked.cost - wcOpts.pure.cost))} {wcOpts.locked.cost >= wcOpts.pure.cost ? "more" : "less"} of the budget, so rule six costs expected points here. That is a finding, not a licence to drop the rule: it exists to protect your rank in six mini-leagues against a field that already owns those players. Your written fifteen scores {two(Math.abs(wcOpts.pure.weekly - wcOpts.written.weekly))} a week {wcOpts.written.weekly >= wcOpts.pure.weekly ? "more" : "less"} than the rule-pure one.
+              </div>
+            ) : null}
+            {wcOpts.locks.length
+              ? <div className="dim">Rule six holds {wcOpts.locks.length} of the written fifteen out of the solver: {wcOpts.locks.map(function (l) { return l.web_name + " " + pc(l.rivalOwn); }).join(", ")}.</div>
+              : <div className="dim">Nobody in the written fifteen is 60% rival-owned, so the rule and the plan agree and all three are the same solve.</div>}
+            <Reveal id="pl-opt-how" label="How the three compare" open={!!rev["pl-opt-how"]} onToggle={on.rev}>
+              {optRows.map(function (r) { return <div key={"how-" + r.key}>{r.v.label}: {r.v.how}.</div>; })}
+              <div>All three are scored under one five-week objective and the same legality test, so the columns are comparable. Whichever one you take, the other two stay on this screen.</div>
+            </Reveal>
+            <div className="dim"><Tier k="model" /> one objective, one legality test · <Tier k="T0" /> prices, rival picks</div>
+          </div>
+        ) : <div className="note note-a">The three fifteens could not be priced from this snapshot{wcOpts && wcOpts.reasons.length ? ": " + wcOpts.reasons.join("; ") : "."}</div>}
         </Guard>
       </Section>
 
@@ -1116,7 +1256,7 @@ function TabDraft(props) {
       )}
 
       <Section id="df-waivers" title="Waivers" open={sec("df-waivers")} onToggle={on.sec}>
-        <KV k={"GW" + ctx.nextEvent + " waivers process"} v={ctx.draft.waiversTime ? sastText(ctx.draft.waiversTime) + ", " + hoursText(wHours) + " left" : "unknown"} tone={wHours !== null && wHours < 6 ? "out" : ""} />
+        <KV k={"GW" + ctx.nextEvent + " waivers process"} v={ctx.draft.waiversTime ? sastText(ctx.draft.waiversTime) + ", " + leftLine(wHours) : "unknown"} tone={wHours !== null && wHours < 6 ? "out" : ""} />
         {checked.map(function (c) {
           return (
             <Row key={c.key} cols="22px minmax(0,1fr) 46px">
@@ -1247,6 +1387,36 @@ function TabChips(props) {
 
 /* ------------------------------------------------------------------ tab: lab */
 
+/* tournament() averages Spearman over the transitions it scored and does not publish the
+   per-transition figures. Running the same engine function over each prefix of the finished
+   gameweeks gives the running mean after i transitions, and i x mean_i minus (i-1) x
+   mean_(i-1) recovers transition i exactly, because that average is arithmetic. No model is
+   recomputed here: every number comes back from the engine. */
+function tourTransitions(live) {
+  const out = [];
+  try {
+    if (!live || typeof live !== "object" || !live.gw || typeof live.gw !== "object") return out;
+    const keys = Object.keys(live.gw).map(Number).filter(function (n) { return isFinite(n); }).sort(function (a, b) { return a - b; });
+    if (keys.length < 2) return out;
+    let prev = null;
+    for (let i = 1; i < keys.length; i++) {
+      const sub = {};
+      for (let j = 0; j <= i; j++) sub[String(keys[j])] = live.gw[String(keys[j])];
+      const t = tournament(Object.assign({}, live, { gw: sub }));
+      const row = { label: keys[i - 1] + " to " + keys[i], rho: {} };
+      const means = {};
+      t.models.forEach(function (m) {
+        const p = prev && prev[m.key] !== null && prev[m.key] !== undefined ? prev[m.key] : 0;
+        row.rho[m.key] = m.spearman === null ? null : i * m.spearman - (i - 1) * p;
+        means[m.key] = m.spearman;
+      });
+      prev = means;
+      out.push(row);
+    }
+  } catch (e) { return out; }
+  return out;
+}
+
 function TabLab(props) {
   const ctx = props.ctx, ui = props.ui, on = props.on, state = props.state, rf = props.refresh;
   const sec = function (id) { return openOf(ui, "lab", id); };
@@ -1257,11 +1427,22 @@ function TabLab(props) {
   const json = JSON.stringify(state, null, 2);
   const bars = tour ? tour.models.slice().sort(function (a, b) { return (b.spearman || 0) - (a.spearman || 0); }) : [];
   const chart = bars.filter(function (m) { return m.spearman !== null; }).map(function (m) { return { name: m.name, rho: Number((m.spearman || 0).toFixed(3)) }; });
+  const trans = tour ? tourTransitions(ctx.live) : [];
+  const scored = bars.filter(function (m) { return m.spearman !== null; });
+  const lead4 = scored.slice(0, 4);
+  const spread = lead4.length > 1 ? lead4[0].spearman - lead4[lead4.length - 1].spearman : 0;
+  const swing = trans.length > 1 ? scored.reduce(function (mx, m) {
+    const vals = trans.map(function (t) { return t.rho[m.key]; }).filter(function (v) { return v !== null && v !== undefined; });
+    if (vals.length < 2) return mx;
+    const d = Math.max.apply(null, vals) - Math.min.apply(null, vals);
+    return d > mx ? d : mx;
+  }, 0) : 0;
+  const transCols = "minmax(0,1fr) repeat(" + Math.max(1, trans.length) + ", 56px)";
   return (
     <div>
       <Section id="lab-data" title="Data" open={sec("lab-data")} onToggle={on.sec}>
         <KV k="Snapshot taken" v={sastText(ctx.live.fetched_at) + " SAST"} />
-        <KV k="Age" v={hoursText((ctx.now - msOf(ctx.live.fetched_at)) / 3600000)} />
+        <KV k="Age" v={ageText((ctx.now - msOf(ctx.live.fetched_at)) / 3600000)} />
         <KV k="Next event" v={"GW" + ctx.nextEvent + ", " + sastText(ctx.deadline) + " SAST"} />
         <KV k="Finished gameweeks" v={ctx.finishedGws.join(", ") || "none"} />
         <KV k="Players, teams, fixtures" v={ctx.elList.length + ", " + ctx.teamList.length + ", " + ctx.fixtures.length} />
@@ -1312,7 +1493,30 @@ function TabLab(props) {
               </div>
               <div>Rank correlation against what actually happened, averaged over the scored transitions. Higher is better.</div>
             </Reveal>
+            {trans.length ? (
+              <div className="tbl">
+                <Row head cols={transCols}>
+                  <span>Per transition</span>
+                  {trans.map(function (t) { return <span key={t.label} className="rt">{t.label}</span>; })}
+                </Row>
+                {bars.map(function (m) {
+                  return (
+                    <Row key={"tr-" + m.key} cols={transCols}>
+                      <span className="nm">{m.name}</span>
+                      {trans.map(function (t) {
+                        const v = t.rho[m.key];
+                        return <span key={t.label} className="rt">{v === null || v === undefined ? "—" : two(v)}</span>;
+                      })}
+                    </Row>
+                  );
+                })}
+              </div>
+            ) : null}
+            <div className="note note-w">
+              {tour.transitions} transition{tour.transitions === 1 ? "" : "s"} is not a verdict. The four leading models sit inside {two(spread)} of one another{trans.length > 1 ? ", while a single model moves as much as " + two(swing) + " between the two transitions" : ""}, so the order in this table is not decision-grade in either direction: it is no evidence that component xP is the best model and none that it is not. It also disagrees with the figures the plan carries from version 86, where BPS rate led at 0.148 and component xP was last at 0.032. Nothing here promotes anything. The gate needs three transitions and still answers not yet, and component xP stays barred from driving a recommendation on its record of three last places until a fresh walk forward says otherwise.
+            </div>
             <div className="note">{tour.note}</div>
+            <div className="dim">{tour.maeNote}</div>
             <div className="dim">Eight models score the next gameweek from data up to the last one. Promotion needs three transitions ahead, so the leader here drives nothing yet. <Tier k="model" /></div>
           </div>
         ) : null}
@@ -1454,7 +1658,8 @@ export default function App() {
   const [simLeague, setSimLeague] = React.useState(0);
 
   const ctx = React.useMemo(function () { return buildCtx(live, state, now); }, [live, state, now]);
-  const plan = React.useMemo(function () { return buildPlan(ctx); }, [ctx]);
+  const premLocked = !!(boot.ui && boot.ui.reveals && boot.ui.reveals["wc-lock"]);
+  const plan = React.useMemo(function () { return buildPlan(ctx, premLocked); }, [ctx, premLocked]);
 
   const setUi = boot.setUi, setState = boot.setState;
   const on = React.useMemo(function () {
@@ -1598,7 +1803,7 @@ export default function App() {
   };
 
   return (
-    <div className="mc-root" data-tokens={TOKENS.length} data-mode={ui.mode} data-tab={ui.tab} data-gw={ctx.nextEvent}>
+    <div className="mc-root" data-tokens={TOKENS.length} data-mode={ui.mode} data-view={ui.tab} data-gw={ctx.nextEvent}>
       <style>{STYLE}</style>
       <Header ctx={ctx} onRefresh={onRefresh} onMenu={function () { setMenuOpen(!menuOpen); }} menuOpen={menuOpen} busy={busy} />
       {busy ? <div className="refbar" data-testid="refbar"><i /></div> : null}

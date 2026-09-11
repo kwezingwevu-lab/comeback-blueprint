@@ -809,8 +809,62 @@ inv("I75", "wildcard timing returns finite horizons and a grid", 3, function (u)
   return badRow.length ? bad("non-finite horizon") : (Array.isArray(t.grid) ? OK : bad("no grid"));
 });
 
+inv("I117", "the wildcard fifteen is a one-swap local optimum over the whole pool (E-038)", 2, function (u) {
+  const r = wc(u);
+  if (!r.ok) return OK;
+  const lo = E.wcLocalOptimum(r.ids, u.ctx, {});
+  if (!lo.ok) return OK;                                   // no eligible pool in this universe
+  return lo.optimal ? OK : bad(lo.improvements.length + " swaps improve it, best " + lo.bestGain.toFixed(3) + ": " + lo.reason);
+});
+inv("I110", "wcFeasible agrees with legal15 whenever a fifteen is complete", 3, function (u) {
+  const r = wc(u);
+  if (!r.ok) return OK;
+  const W = E.wcSetup(u.ctx, {}, "TS");
+  if (!W.ok) return OK;
+  const f = E.wcFeasible(r.ids, u.ctx, W);
+  const L = E.legal15(r.ids, u.ctx.els, W.budget);
+  // wcFeasible is the stricter of the two (it adds the ≤2-incoming-per-club guard), so it may
+  // never pass a fifteen that legal15 rejects.
+  return (!f || L.ok) ? OK : bad("wcFeasible passed a fifteen legal15 rejects: " + L.reasons.join(" | "));
+});
+inv("I111", "wildcardOptions never changes the solver's own answer or rule C1.6 (E-036)", 1, function (u) {
+  const r = wc(u);
+  if (!r.ok) return OK;
+  const o = E.wildcardOptions(u.ctx, { written: u.squad });
+  if (!o.ok) return OK;
+  const same = o.pure.ids.slice().sort(function (a, b) { return a - b; }).join(",") === r.ids.slice().sort(function (a, b) { return a - b; }).join(",");
+  const clean = o.pure.ids.filter(function (id) { return E.rivalOwnMax(id, u.ctx).max >= 0.60; }).length === 0;
+  const derived = o.locks.every(function (l) { return u.squad.indexOf(l.id) >= 0 && E.convergenceRisk(l.id, u.ctx).risk === true; });
+  return (same && clean && derived) ? OK : bad("pure matches solver " + same + ", pure clean " + clean + ", locks derived " + derived);
+});
+inv("I112", "the transfer order always ends with the captain and then the vice (C2 step 5, E-037)", 8, function (u) {
+  const r = tp(u);
+  if (r.blocked || r.captain === null) return OK;
+  const o = r.order;
+  if (o.length < 2) return bad("order has " + o.length + " steps with captain " + r.captain);
+  const last = o[o.length - 1], prev = o[o.length - 2];
+  const stepsRun = o.every(function (x, i) { return x.step === i + 1; });
+  const sellsFirst = o.filter(function (x) { return x.action === "sell"; }).every(function (x, i) { return o.indexOf(x) === i; });
+  return (prev.action === "captain" && prev.id === r.captain && last.action === "vice" && stepsRun && sellsFirst) ? OK
+    : bad("order tail " + prev.action + "/" + last.action + ", steps run " + stepsRun + ", sells first " + sellsFirst);
+});
+inv("I113", "ftAvailable gives the same answer from the history object and from its rows (E-045)", 40, function (u) {
+  const gws = ri(2, 12), cur = [], chips = [];
+  for (let g = 1; g <= gws; g++) cur.push({ event: g, event_transfers: ri(0, 4), event_transfers_cost: ri(0, 2) * 4 });
+  if (RNG() < 0.4) { const ev = ri(2, gws); chips.push({ name: RNG() < 0.5 ? "wildcard" : "freehit", event: ev }); cur[ev - 1].event_transfers = ri(6, 15); cur[ev - 1].event_transfers_cost = 0; }
+  const h = { current: cur, chips: chips };
+  const a = E.ftAvailable(h, gws), b = E.ftAvailable(cur, gws, chips);
+  const c = chips.length ? a : E.ftAvailable(cur, gws);
+  return (a === b && a === c) ? OK : bad("object " + a + ", rows+chips " + b + ", rows " + c + " over " + gws + " gameweeks");
+});
+
 /* --- Monte Carlo ---------------------------------------------------------- */
 
+inv("I114", "mcSquad never reports fewer than the hundred-draw floor (E-046)", 20, function (u) {
+  if (!u.xi.ids.length) return OK;
+  const r = E.mcSquad(u.squad, u.xi.capId, u.ctx, rpick([0, -1, -1e9, 1, 3, NaN]), ri(1, 1e6), u.xi.viceId);
+  return (Number.isInteger(r.iters) && r.iters >= 100) ? OK : bad("iters " + r.iters);
+});
 inv("I76", "mcSquad quantiles come back ordered", 3, function (u) {
   if (!u.xi.ids.length) return OK;
   const r = E.mcSquad(u.squad, u.xi.capId, u.ctx, 40, ri(1, 1e6), u.xi.viceId);
@@ -1051,6 +1105,24 @@ inv("I107", "every xp entry carries a probability and a non-negative expectation
 inv("I108", "flagInfo agrees with isFlagged on every element", 60, function (u) {
   const el = rpick(u.elements);
   return E.flagInfo(el).flagged === E.isFlagged(el) ? OK : bad("id " + el.id + " flagInfo " + E.flagInfo(el).flagged + " isFlagged " + E.isFlagged(el));
+});
+inv("I115", "tournament MAEs stay inside one order of magnitude of each other (E-047)", 20, function (u) {
+  const t = E.tournament(u.snap);
+  const scored = t.models.filter(function (m) { return m.mae !== null; });
+  if (scored.length < 2) return OK;
+  const vals = scored.map(function (m) { return m.mae; });
+  const lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  if (!(lo > 0)) return OK;                                 // a perfect model scores zero: nothing to compare
+  return hi <= 10 * lo ? OK : bad("MAE spread " + lo.toFixed(2) + " to " + hi.toFixed(2) + " (ratio " + (hi / lo).toFixed(1) + ")");
+});
+inv("I116", "fxMult answers 1 for a non-fixture argument and says it is unresolved (E-043)", 40, function (u) {
+  const f = rpick(u.snap.fixtures);
+  if (!f) return OK;
+  const byId = E.fxMultInfo(f.id, f.team_h, u.ctx.TS);
+  const byObj = E.fxMultInfo(f, f.team_h, u.ctx.TS);
+  if (byId.resolved !== false || byId.mult !== 1) return bad("a fixture id resolved: " + JSON.stringify(byId));
+  if (byObj.resolved !== true) return bad("a fixture object did not resolve: " + JSON.stringify(byObj));
+  return E.fxMult(f, f.team_h, u.ctx.TS) === byObj.mult ? OK : bad("fxMult and fxMultInfo disagree");
 });
 
 const ENGINE_SRC = fs.readFileSync(path.join(ROOT, "src", "engine.js"), "utf8");

@@ -388,6 +388,34 @@ else
   else bad "esbuild-syntax-gate" "$(printf '%s' "$es_out" | head -3 | tr '\n' ' ')"; fi
 fi
 
+# I13 · every import written in src/ui.jsx survives into the assembled file
+# The assembler lifts the imports off the top of src/ui.jsx and stops collecting at the first
+# statement that is not one, so an import added further down the file used to be dropped in
+# silence. build.cjs throws on that now; this invariant proves the built file against the source.
+ui_imports="$(grep -c '^import ' src/ui.jsx 2>/dev/null || echo 0)"
+app_imports="$(grep -c '^import ' "$APP" 2>/dev/null || echo 0)"
+missing_imports="$(grep '^import ' src/ui.jsx 2>/dev/null | while IFS= read -r line; do grep -qxF "$line" "$APP" || printf '%s ' "$line"; done)"
+if [ "$ui_imports" -gt 0 ] && [ "$app_imports" -eq "$ui_imports" ] && [ -z "$missing_imports" ]; then
+  ok "every-ui-import-survives-the-assembler" "$ui_imports import lines in src/ui.jsx, all $app_imports present in $APP"
+else
+  bad "every-ui-import-survives-the-assembler" "src/ui.jsx has $ui_imports, $APP has $app_imports; missing: ${missing_imports:-none}"
+fi
+
+# I14 · exactly one <style> block in dist/index.html, and it carries no hex colour
+# The shell used to repeat --bg and --text as raw hex outside the token definitions, where they
+# were free to drift (CONTRACT §7 allows hex only inside those definitions).
+if [ ! -f "$DIST" ]; then
+  bad "dist-shell-style-block-has-no-hex" "$DIST does not exist"
+else
+  shell_styles="$(grep -o '<style>' "$DIST" | wc -l | tr -d ' ')"
+  shell_hex="$(grep -o '<style>[^<]*</style>' "$DIST" | grep -o '#[0-9a-fA-F]\{3,8\}' | head -5 | tr '\n' ' ')"
+  if [ "$shell_styles" = "1" ] && [ -z "$shell_hex" ]; then
+    ok "dist-shell-style-block-has-no-hex" "1 style block in the shell, no hex literal in it"
+  else
+    bad "dist-shell-style-block-has-no-hex" "$shell_styles style blocks; hex found: ${shell_hex:-none}"
+  fi
+fi
+
 # ---------------------------------------------------------------- verdict
 
 echo "------------------------------------------------------------"

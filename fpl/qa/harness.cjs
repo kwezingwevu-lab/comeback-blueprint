@@ -6,9 +6,13 @@
  *                                        app/FPL_Mission_Control.jsx, React from fpl/node_modules)
  *   launch()                           → Playwright Chromium browser
  *   open(page, {mode,state,ui,now,mocks}) → seeds storage + __NOW__ before load, then navigates
+ *                                        and WAITS for .mc-root; throws when the app never
+ *                                        mounts (pass allowNoMount:true to opt out and read
+ *                                        page.mcMounted yourself) — E-052
  *   visibleText(page)                  → innerText of .mc-root (never textContent)
  *   assert(name, cond, detail)         → prints "PASS name" / "FAIL name — detail"
  *   done(suite)                        → prints "SUITE <name> <pass>/<total>", exits 1 on any FAIL
+ *                                        and on a total of 0 (a suite that asserted nothing) — E-052
  *   appPath, appMissing(), requireApp() → app-file guards (the UI is built in parallel)
  *   PAGE_URL, counts()
  *
@@ -53,6 +57,13 @@ function counts() {
 
 function done(suite) {
   const total = pass + fail;
+  // A suite that threw before its first assert used to reach here with 0/0 and exit 0 — a
+  // green line for a suite that proved nothing (E-052). Zero assertions is a failure.
+  if (total === 0) {
+    console.log("FAIL " + String(suite) + " — the suite recorded no assertions at all (it threw or returned before its first check); 0/0 is not a pass");
+    console.log("SUITE " + String(suite) + " 0/0");
+    process.exit(1);
+  }
   console.log("SUITE " + String(suite) + " " + pass + "/" + total);
   if (fail > 0) process.exit(1);
   return total;
@@ -254,10 +265,26 @@ async function open(page, opts) {
   }
 
   await page.goto(PAGE_URL, { waitUntil: "load" });
+  // E-052: the .mc-root timeout used to be caught and discarded, so a page that never mounted
+  // was handed to the suite as if it had opened and every later assertion measured an empty
+  // document. open() now fails loudly. A suite that deliberately opens a page which cannot
+  // mount passes {allowNoMount: true} and reads page.mcMounted itself.
+  page.mcMounted = false;
   try {
     await page.waitForSelector(".mc-root", { timeout: o.timeout === undefined ? 15000 : o.timeout });
+    page.mcMounted = true;
   } catch (e) {
-    // Leave the diagnosis to the suite: it can read visibleText / the boundary itself.
+    let detail = "";
+    try {
+      detail = await page.evaluate(function () {
+        const root = document.getElementById("root");
+        const body = document.body ? (document.body.innerText || "").trim().slice(0, 200) : "";
+        return "#root " + (root ? "present, " + root.childElementCount + " children" : "missing") + (body ? "; body text: " + body : "; body empty");
+      });
+    } catch (e2) { detail = "page could not be read (" + (e2 && e2.message ? String(e2.message).split("\n")[0] : String(e2)) + ")"; }
+    if (o.allowNoMount === true) return page;
+    throw new Error("harness: the app never mounted — .mc-root did not appear within " +
+      (o.timeout === undefined ? 15000 : o.timeout) + "ms (" + detail + ")");
   }
   return page;
 }

@@ -45,7 +45,11 @@
  * xP (E1)
  *   shrunkPps(el)                   → number (K=4, position priors)
  *   pStart(el, gwStats)             → probability [0,1]
- *   fxMult(fixture, teamId, TS)     → multiplier (1 when the team is not in the fixture)
+ *   fxMult(fixture, teamId, TS)     → multiplier (1 when the team is not in the fixture, and 1
+ *                                     when the argument is not a fixture object at all — ask
+ *                                     fxMultInfo which of the two it was)
+ *   fxMultInfo(fixture, teamId, TS) → {mult, resolved, reason}: resolved=false means the 1 is the
+ *                                     unresolved default, not a computed multiplier (E-043)
  *   xp1(el, ctx) / xp5(el, ctx)     → number (cached in ctx.xp)
  *   xp1With(el, ctx, tsKey) / xp5With(el, ctx, tsKey)  → number under "TS" or "TS_GOALS"
  *   xp5FromMults(el, pstart, mults) → number (worked example: 5.23 × 0.875 × 3.557 = 16.3)
@@ -71,9 +75,25 @@
  *   sellCandidates(squad, ctx)      → [{id, web_name, reason, forced, konsa}]
  *   transferProtocol(state, ctx)    → {moves[], order[], captain, vice, value, margin, confidence,
  *                                      hits, k, bankAfter, forced[], alternatives[], reasons[], blocked}
+ *                                      order is sells, then buys, then the captain and vice steps,
+ *                                      on every path that reaches an eleven — hold included (E-037)
  *   wildcardSolver(ctx, opts)       → {ok, ids, xi, cost, bank, score, model, alt, disagreement,
- *                                      relaxed, relaxations[], reasons[]}
- *   wildcardTiming(ctx)             → {gw, weeklyGap, swapsNeeded, horizons[], grid[], breakeven, note}
+ *                                      relaxed, relaxations[], reasons[], steps, spend}
+ *   wcSetup(ctx, opts, tsKey)       → {ok, budget, pool, cands, cheap, minCost, locks, lockSet,
+ *                                      current, relaxed, relaxations[], reasons[]} — the pool,
+ *                                      windows and budget the solver and its audit both use
+ *   wcFeasible(ids, ctx, W)         → boolean (B3 + ≤3/club + ≤2 incoming/club + budget lookahead)
+ *   wcCost(ids, ctx)                → tenths
+ *   wcLocalOptimum(ids, ctx, opts)  → {ok, optimal, checked, dearerTried, bestGain, bank,
+ *                                      improvements[], reason} — no legal single swap over the
+ *                                      whole pool improves the fifteen (the acceptance criterion)
+ *   wildcardOptions(ctx, opts)      → {ok, pure, locked, written, locks[], deltas, budget, note}
+ *                                      the three priced answers to the C1.6 conflict; opts.written
+ *                                      supplies the manager’s fifteen when no WEEKLY block is in
+ *                                      scope. Changes neither the solver default nor rule C1.6.
+ *   wildcardTiming(ctx)             → {gw, weeklyGap, swapsNeeded, horizons[], grid[], breakeven,
+ *                                      saturated:{saturates, weeks, gw, note}, note} — both
+ *                                      horizons include their end gameweek (E-042)
  *   chipWindows(live)               → {doubles[], blanks[], recommendation, nextEvent}
  *   chipRegret(chip, ctx, opts)     → {chip, useNow, bestLater, laterEvent, regretUse, regretHold, verdict, note}
  *   draftWaivers(state, ctx)        → [{priority, out, in, outName, inName, evOut, evIn, gain, why}]
@@ -83,7 +103,10 @@
  * Squad / state
  *   sanitiseState(raw)              → state (§6 shape; cap 15, dedupe on id; never throws)
  *   detectSquadChange(stateSquadIds, picks) → {changed, added[], removed[], block}
- *   ftAvailable(history, currentEvent) → integer 1..5
+ *   ftAvailable(history, currentEvent, chips?) → integer 1..5. Accepts the history object or its
+ *                                      rows array and gives the SAME answer either way: chips come
+ *                                      from the object, from the third argument, or are inferred
+ *                                      from a gameweek that used more free transfers than the cap
  *   sellPrice(now, purchase)        → tenths (purchase + floor(rise/2); falls follow now)
  *   bankAfter(state, moves, els)    → tenths (raw)
  *
@@ -92,14 +115,22 @@
  *   simFixture(fixture, ctx, rng)   → {h, a} shared goals draw
  *   simPlayer(el, ctx, rng, draw?)  → points (may be negative)
  *   mcSquad(ids, capId, ctx, iters, seed, viceId?) → {mean, sd, q10, q50, q90, iters}
+ *                                      iters is floored at MC_MIN_ITERS (100): one draw is not a
+ *                                      distribution and is never reported as one (E-046)
  *   mcLeague(ctx, leagueId, opts)   → {leagueId, direction, rankBand, currentRank, medianRank, pWin|null, …}
  *
  * Tournament (E5)
- *   tournament(live)                → {models:[{key,name,spearman,mae,transitions}], leader, promotable, transitions}
+ *   tournament(live)                → {models:[{key,name,spearman,mae,maeRaw,maeScale,
+ *                                      maeCalibrated,transitions}], leader, promotable,
+ *                                      transitions, maeUnits:"points", maeNote} — MAE is rescaled
+ *                                      into points before it is compared across models (E-047)
+ *   calibrateToPoints(pred, actual) → {scale, calibrated, pred[]}
  *   spearman(a, b) / mae(a, b)      → numbers
  *
  * Refresh (D4)
  *   parseJson(text)                 → object (throws with the real message)
+ *   stripFences(text)               → string with an opening and a closing fence line removed and
+ *                                     nothing touched in between (E-044)
  *   pickText(contentBlocks)         → string (only type==="text", any order)
  *   blockTypes(contentBlocks)       → string listing block types seen
  *   refreshRequest(cfg)             → {model, max_tokens:4000, tools:[{type,name:"web_search"}], messages}
@@ -142,6 +173,7 @@ var WC_MIN_PSTART = 0.75;
 var WC_BENCH_WEIGHT = 0.15;
 var WC_TRIGGER = 20;
 var MC_MIN_GWS_FOR_PWIN = 8;
+var MC_MIN_ITERS = 100;
 var TOURNAMENT_PROMOTE_AT = 3;
 var FT_CAP = 5;
 var REFRESH_MAX_TOKENS = 4000;
@@ -177,6 +209,9 @@ function clamp(v, lo, hi) {
   return v < lo ? lo : (v > hi ? hi : v);
 }
 function isObj(x) { return !!x && typeof x === "object" && !Array.isArray(x); }
+// A name for a value that is safe to put in a message: never the literal "undefined", which
+// a returned string is not allowed to contain (it reads as a bug even when it is the truth).
+function kindOf(x) { return x === null ? "null" : (x === undefined ? "missing" : (Array.isArray(x) ? "array" : typeof x)); }
 function arr(x) { return Array.isArray(x) ? x : []; }
 function errMsg(e) {
   if (e && e.message) return String(e.message);
@@ -201,10 +236,14 @@ function uniq(list) { var seen = {}, out = []; arr(list).forEach(function (v) { 
 function sum(list, f) { var s = 0; var g = typeof f === "function" ? f : null; arr(list).forEach(function (v, i) { s += num(g ? g(v, i) : v, 0); }); return s; }
 function sortNum(a, b) { return a - b; }
 function quantile(sorted, q) {
+  // E-055 (recurrence of E-031): the two endpoints used to be read straight off the array, so a
+  // list of anything but numbers came back as a STRING — "[object Object]NaN" — from the helper
+  // that produces mcSquad's q10/q50/q90, which are rendered.
   sorted = arr(sorted); q = clamp(q, 0, 1);
   if (!sorted.length) return 0;
   var pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
-  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+  var a = num(sorted[lo], 0), b = num(sorted[hi], 0);
+  return a + (b - a) * (pos - lo);
 }
 function nowMs(now) {
   if (now === undefined || now === null) return 0;
@@ -415,14 +454,23 @@ function pStart(el, gwStats) {
   p *= flagInfo(el).factor;
   return clamp(p, 0, 1);
 }
-function fxMult(fixture, teamId, TS) {
-  if (!isObj(fixture)) return 1;
-  var t = num(teamId, NaN); if (!isFinite(t)) return 1;
+function fxMultInfo(fixture, teamId, TS) {
+  // E-043: fxMult takes a FIXTURE OBJECT (H2 names this trap). Handed a fixture id it has nothing
+  // to look up, returns the neutral 1, and every xp1/xp5 quietly falls back to the shrunk
+  // baseline with no sign that anything went wrong. fxMult keeps the neutral answer — teamMults
+  // sums over real fixtures and relies on it — and this companion says whether that 1 was
+  // computed from a fixture or is the unresolved default. Callers and suites read `resolved`.
+  var res = { mult: 1, resolved: false, reason: "" };
+  if (!isObj(fixture)) { res.reason = "not a fixture object (" + kindOf(fixture) + "): fxMult needs the fixture itself, not its id"; return res; }
+  var t = num(teamId, NaN);
+  if (!isFinite(t)) { res.reason = "team id is not a number (" + kindOf(teamId) + ")"; return res; }
   var h = num(fixture.team_h, NaN), a = num(fixture.team_a, NaN);
-  if (t === h) return tsMult(t, a, true, TS);
-  if (t === a) return tsMult(t, h, false, TS);
-  return 1;
+  if (t === h) { res.mult = tsMult(t, a, true, TS); res.resolved = true; res.reason = "home"; return res; }
+  if (t === a) { res.mult = tsMult(t, h, false, TS); res.resolved = true; res.reason = "away"; return res; }
+  res.reason = "team " + t + " is not in this fixture";
+  return res;
 }
+function fxMult(fixture, teamId, TS) { return fxMultInfo(fixture, teamId, TS).mult; }
 function teamMults(teamId, ctx, tsKey) {
   var out = [0, 0, 0, 0, 0];
   if (!okCtx(ctx)) return out;
@@ -946,40 +994,43 @@ function transferProtocol(state, ctx) {
       });
     }
     plans.sort(function (a, b) { return b.value - a.value || a.k - b.k; });
+    // E-037: `order` is built on ONE path. The no-plan branch used to return early with the
+    // captain and the vice set but the execution order empty, so a hold week handed the manager
+    // an empty list of steps. C2 step 5 wants sells first and the captain and vice steps last on
+    // every path that reaches an eleven — hold included.
+    var newSquad = squad;
     if (!plans.length) {
       res.confidence = forced.length ? "LOW" : "hold";
       res.reasons.push(forced.length ? "forced sells exist but no legal replacement passed every gate (budget, club cap, convergence, starts)" : "no swap clears the sell rule (gain > 4 xp5 or a forced sell)");
-      var bx0 = bestXI(squad, ctx); res.captain = bx0.capId; res.vice = bx0.viceId;
-      return res;
-    }
-    var best = plans[0];
+    } else {
+      var best = plans[0];
     // E-008: "genuinely different" is the SET of players out and the SET of players in, sorted —
     // the same two swaps paired the other way round is the same plan, and reporting it as the
     // runner-up is what produced "margin 0.00 LOW". The margin and the alternatives panel both
     // use this key, so the panel can never show the shipped plan back to the manager.
-    var planKey = function (p) { return p.outs.slice().sort(sortNum).join(",") + ">" + p.ins.slice().sort(sortNum).join(","); };
-    var bestKey = planKey(best);
-    var different = plans.slice(1).filter(function (p) { return planKey(p) !== bestKey; });
-    var alt = different.length ? different[0] : null;
-    res.margin = alt ? best.value - alt.value : best.value;
-    res.value = best.value; res.hits = best.hits; res.k = best.k; res.bankAfter = best.bankAfter;
-    res.alternatives = different.slice(0, 3).map(function (p) { return { value: p.value, k: p.k, hits: p.hits, moves: p.moves.map(function (m) { return { out: m.out, in: m.in, outName: m.outName, inName: m.inName, gain: m.gain }; }) }; });
-    var hasForced = best.moves.some(function (m) { return m.forced; });
-    if (res.margin >= MARGIN_HIGH) res.confidence = "HIGH";
-    else if (res.margin >= MARGIN_MED) res.confidence = "MED";
-    else res.confidence = hasForced ? "LOW" : "hold";
-    if (res.confidence === "hold" && best.value <= 0) res.reasons.push("best plan does not beat holding");
-    var ship = res.confidence !== "hold";
-    if (!ship && hasForced) ship = true;
-    var newSquad = squad;
-    if (ship) {
-      res.moves = best.moves;
-      newSquad = squad.filter(function (id) { return best.outs.indexOf(id) < 0; }).concat(best.ins);
-      best.moves.forEach(function (m, i) { res.order.push({ step: i + 1, action: "sell", id: m.out, name: m.outName, price: m.priceOut }); });
-      best.moves.forEach(function (m, i) { res.order.push({ step: best.moves.length + i + 1, action: "buy", id: m.in, name: m.inName, price: m.priceIn }); });
-    } else {
-      res.reasons.push("margin " + res.margin.toFixed(2) + " below " + MARGIN_MED + " — hold; best plan kept in alternatives");
-      res.alternatives.unshift({ value: best.value, k: best.k, hits: best.hits, moves: best.moves.map(function (m) { return { out: m.out, in: m.in, outName: m.outName, inName: m.inName, gain: m.gain }; }) });
+      var planKey = function (p) { return p.outs.slice().sort(sortNum).join(",") + ">" + p.ins.slice().sort(sortNum).join(","); };
+      var bestKey = planKey(best);
+      var different = plans.slice(1).filter(function (p) { return planKey(p) !== bestKey; });
+      var alt = different.length ? different[0] : null;
+      res.margin = alt ? best.value - alt.value : best.value;
+      res.value = best.value; res.hits = best.hits; res.k = best.k; res.bankAfter = best.bankAfter;
+      res.alternatives = different.slice(0, 3).map(function (p) { return { value: p.value, k: p.k, hits: p.hits, moves: p.moves.map(function (m) { return { out: m.out, in: m.in, outName: m.outName, inName: m.inName, gain: m.gain }; }) }; });
+      var hasForced = best.moves.some(function (m) { return m.forced; });
+      if (res.margin >= MARGIN_HIGH) res.confidence = "HIGH";
+      else if (res.margin >= MARGIN_MED) res.confidence = "MED";
+      else res.confidence = hasForced ? "LOW" : "hold";
+      if (res.confidence === "hold" && best.value <= 0) res.reasons.push("best plan does not beat holding");
+      var ship = res.confidence !== "hold";
+      if (!ship && hasForced) ship = true;
+      if (ship) {
+        res.moves = best.moves;
+        newSquad = squad.filter(function (id) { return best.outs.indexOf(id) < 0; }).concat(best.ins);
+        best.moves.forEach(function (m, i) { res.order.push({ step: i + 1, action: "sell", id: m.out, name: m.outName, price: m.priceOut }); });
+        best.moves.forEach(function (m, i) { res.order.push({ step: best.moves.length + i + 1, action: "buy", id: m.in, name: m.inName, price: m.priceIn }); });
+      } else {
+        res.reasons.push("margin " + res.margin.toFixed(2) + " below " + MARGIN_MED + " — hold; best plan kept in alternatives");
+        res.alternatives.unshift({ value: best.value, k: best.k, hits: best.hits, moves: best.moves.map(function (m) { return { out: m.out, in: m.in, outName: m.outName, inName: m.inName, gain: m.gain }; }) });
+      }
     }
     var bx = bestXI(newSquad, ctx);
     res.captain = bx.capId; res.vice = bx.viceId; res.xi = bx.ids; res.formation = bx.formation;
@@ -1024,88 +1075,200 @@ function wcPool(ctx, opts, position) {
   }
   return { ids: [], level: 3, exhausted: true };
 }
-function wcSolve(ctx, opts, tsKey) {
-  var out = { ok: false, ids: [], cost: 0, score: -1e9, relaxed: false, relaxations: [], reasons: [] };
+function wcCost(ids, ctx) {
+  if (!okCtx(ctx)) return 0;
+  return sum(arr(ids), function (x) { var el = ctx.els[idOf(x)]; return el ? num(el.now_cost, 0) : 0; });
+}
+function wcSetup(ctx, opts, tsKey) {
+  // One place builds the eligible pool, the candidate windows, the locks and the budget that the
+  // wildcard search AND any audit of its answer have to share. It used to be inline in wcSolve,
+  // so a check of the returned fifteen could only ever test its own private copy of the rules.
+  var out = { ok: false, budget: BUDGET_TENTHS, pool: {}, cands: {}, cheap: {}, minCost: {}, locks: [], lockSet: {}, current: {}, relaxed: false, relaxations: [], reasons: [] };
   if (!okCtx(ctx) || !Array.isArray(ctx.elList) || !Array.isArray(ctx.squadIds)) { out.reasons.push("no usable context"); return out; }
   if (!isObj(opts)) opts = {};
-  var budget = num(opts.budget, ctx.budget || BUDGET_TENTHS);
-  var locks = uniq(idList(opts.locks)).filter(function (id) { return ctx.els[id]; });
-  var current = {}; ctx.squadIds.forEach(function (id) { current[id] = true; });
-  var pool = {}, cands = {};
+  var key = tsKey === "TS_GOALS" ? "TS_GOALS" : "TS";
+  out.budget = num(opts.budget, ctx.budget || BUDGET_TENTHS);
+  out.locks = uniq(idList(opts.locks)).filter(function (id) { return ctx.els[id]; });
+  out.locks.forEach(function (id) { out.lockSet[id] = true; });
+  ctx.squadIds.forEach(function (id) { out.current[id] = true; });
   var levelNames = ["3 of 3 starts and P(start) >= 0.75", "2 of 3 starts and P(start) >= 0.5", "any start this season", "status available only"];
   [1, 2, 3, 4].forEach(function (t) {
     var p = wcPool(ctx, opts, t);
-    if (p.exhausted) { out.reasons.push(POS_NAME[t] + ": pool cannot fill the position"); }
+    if (p.exhausted) out.reasons.push(POS_NAME[t] + ": pool cannot fill the position");
     if (p.level > 0) { out.relaxed = true; out.relaxations.push(POS_NAME[t] + ": fewer than " + (SQUAD_SHAPE[t] + 2) + " players meet 3 of 3 starts and P(start) >= 0.75; relaxed to " + levelNames[p.level]); }
-    pool[t] = p.ids.slice().sort(function (a, b) { return xp5With(ctx.els[b], ctx, tsKey) - xp5With(ctx.els[a], ctx, tsKey); });
-    cands[t] = pool[t].slice(0, 30);
-    locks.forEach(function (id) { if (elType(ctx.els[id]) === t && cands[t].indexOf(id) < 0) cands[t].unshift(id); });
+    out.pool[t] = p.ids.slice().sort(function (a, b) { return xp5With(ctx.els[b], ctx, key) - xp5With(ctx.els[a], ctx, key); });
+    out.cands[t] = out.pool[t].slice(0, 30);
+    out.locks.forEach(function (id) { if (elType(ctx.els[id]) === t && out.cands[t].indexOf(id) < 0) out.cands[t].unshift(id); });
+    out.cheap[t] = out.pool[t].slice().sort(function (a, b) { return num(ctx.els[a].now_cost, 0) - num(ctx.els[b].now_cost, 0); }).slice(0, 8);
+    out.minCost[t] = out.pool[t].length ? Math.min.apply(null, out.pool[t].map(function (id) { return num(ctx.els[id].now_cost, 0); })) : 999;
   });
-  if (out.reasons.length) return out;
-  var cost = function (ids) { return sum(ids, function (id) { return num(ctx.els[id].now_cost, 0); }); };
-  var minCost = {}; [1, 2, 3, 4].forEach(function (t) { minCost[t] = pool[t].length ? Math.min.apply(null, pool[t].map(function (id) { return num(ctx.els[id].now_cost, 0); })) : 999; });
-  function feasible(ids) {
-    if (uniq(ids).length !== ids.length) return false;
-    var pc = posCounts(ids, ctx.els);
-    for (var t = 1; t <= 4; t++) if (pc[t] > SQUAD_SHAPE[t]) return false;
-    var cc = clubCounts(ids, ctx.els); for (var c in cc) if (cc[c] > MAX_PER_CLUB) return false;
-    var inc = clubCounts(ids.filter(function (id) { return !current[id]; }), ctx.els); for (var c2 in inc) if (inc[c2] > MAX_INCOMING_PER_CLUB) return false;
-    var remaining = 0; for (var t2 = 1; t2 <= 4; t2++) remaining += (SQUAD_SHAPE[t2] - pc[t2]) * minCost[t2];
-    return cost(ids) + remaining <= budget;
-  }
+  out.ok = out.reasons.length === 0;
+  return out;
+}
+function wcFeasible(ids, ctx, W) {
+  // B3 plus C3: 2-5-5-3 never exceeded, <=3 from a club, <=2 incoming from a club (E-009), and
+  // enough budget left to fill the empty slots at the cheapest price in the pool.
+  if (!Array.isArray(ids) || !okCtx(ctx) || !isObj(W)) return false;
+  if (uniq(ids).length !== ids.length) return false;
+  var pc = posCounts(ids, ctx.els);
+  if (pc.unknown > 0) return false;
+  for (var t = 1; t <= 4; t++) if (pc[t] > SQUAD_SHAPE[t]) return false;
+  var cc = clubCounts(ids, ctx.els); for (var c in cc) if (cc[c] > MAX_PER_CLUB) return false;
+  var cur = isObj(W.current) ? W.current : {};
+  var inc = clubCounts(ids.filter(function (id) { return !cur[id]; }), ctx.els); for (var c2 in inc) if (inc[c2] > MAX_INCOMING_PER_CLUB) return false;
+  var mc = isObj(W.minCost) ? W.minCost : {};
+  var remaining = 0; for (var t2 = 1; t2 <= 4; t2++) remaining += (SQUAD_SHAPE[t2] - pc[t2]) * num(mc[t2], 999);
+  return wcCost(ids, ctx) + remaining <= num(W.budget, BUDGET_TENTHS);
+}
+function wcSolve(ctx, opts, tsKey) {
+  var out = { ok: false, ids: [], cost: 0, score: -1e9, steps: 0, spend: null, relaxed: false, relaxations: [], reasons: [] };
+  if (!okCtx(ctx) || !Array.isArray(ctx.elList) || !Array.isArray(ctx.squadIds)) { out.reasons.push("no usable context"); return out; }
+  if (!isObj(opts)) opts = {};
+  var W = wcSetup(ctx, opts, tsKey);
+  out.relaxed = W.relaxed; out.relaxations = W.relaxations.slice();
+  if (!W.ok) { out.reasons = W.reasons.slice(); return out; }
+  var budget = W.budget, pool = W.pool, cands = W.cands, cheap = W.cheap, locks = W.locks, lockSet = W.lockSet;
+  function feasible(list) { return wcFeasible(list, ctx, W); }
+  function obj(list) { return wcObjective(list, ctx, tsKey); }
+  function priceOf(id) { return num(ctx.els[id].now_cost, 0); }
   // greedy seed by xp5/price
   var ids = locks.slice();
   if (!feasible(ids)) { out.reasons.push("locks are not jointly legal within the budget"); return out; }
   var ratio = [];
-  [1, 2, 3, 4].forEach(function (t) { pool[t].forEach(function (id) { if (ids.indexOf(id) < 0) ratio.push({ id: id, r: xp5With(ctx.els[id], ctx, tsKey) / Math.max(1, num(ctx.els[id].now_cost, 0)) }); }); });
+  [1, 2, 3, 4].forEach(function (t) { pool[t].forEach(function (id) { if (ids.indexOf(id) < 0) ratio.push({ id: id, r: xp5With(ctx.els[id], ctx, tsKey) / Math.max(1, priceOf(id)) }); }); });
   ratio.sort(function (a, b) { return b.r - a.r; });
   ratio.forEach(function (c) { if (ids.length >= 15) return; var tryIds = ids.concat([c.id]); if (feasible(tryIds)) ids = tryIds; });
   if (ids.length < 15) { out.reasons.push("greedy seed could not fill 15 within the budget"); return out; }
-  var lockSet = {}; locks.forEach(function (id) { lockSet[id] = true; });
-  var score = wcObjective(ids, ctx, tsKey);
-  var maxPasses = clamp(intOf(opts.maxPasses, 12), 0, 60);
-  for (var pass = 0; pass < maxPasses; pass++) {
-    var improved = false, bestGain = 1e-9, bestIds = null;
-    // 1-swap
+  var score = obj(ids);
+  // E-038: the local search used to stop after twelve improvements and only ever looked at the
+  // top thirty candidates per position, so "nothing better exists" really meant "nothing better
+  // inside the window, if twelve steps were enough". The 1-swap pass now runs to a fixed point
+  // over the WHOLE eligible pool; the 2-swap pass keeps its top-12 window because it is
+  // quadratic; and a spend-the-bank pair step sells one player down to fund a dearer upgrade
+  // elsewhere, which is the only move that can turn an idle bank into points. What comes back is
+  // a 1-swap local optimum by construction, and wcLocalOptimum is the proof of it.
+  var stepCap = clamp(intOf(opts.maxPasses, 300), 0, 4000);
+  var steps = 0, spendTried = 0;
+  function step1() {
+    var bestIds = null, bestGain = 1e-9;
     for (var i = 0; i < ids.length; i++) {
       if (lockSet[ids[i]]) continue;
-      var t = elType(ctx.els[ids[i]]);
-      for (var j = 0; j < cands[t].length; j++) {
-        var c = cands[t][j]; if (ids.indexOf(c) >= 0) continue;
+      var p = pool[elType(ctx.els[ids[i]])] || [];
+      for (var j = 0; j < p.length; j++) {
+        var c = p[j]; if (ids.indexOf(c) >= 0) continue;
         var trial = ids.slice(); trial[i] = c;
         if (!feasible(trial)) continue;
-        var s = wcObjective(trial, ctx, tsKey);
-        if (s - score > bestGain) { bestGain = s - score; bestIds = trial; }
+        var sc = obj(trial);
+        if (sc - score > bestGain) { bestGain = sc - score; bestIds = trial; }
       }
     }
-    if (bestIds) { ids = bestIds; score += bestGain; improved = true; continue; }
-    // 2-swap (top-12 candidates per position)
+    return bestIds ? { ids: bestIds, gain: bestGain } : null;
+  }
+  function step2() {
+    var bestIds = null, bestGain = 1e-9;
     for (var a = 0; a < ids.length && !bestIds; a++) {
       if (lockSet[ids[a]]) continue;
-      var ta = elType(ctx.els[ids[a]]), ca = cands[ta].slice(0, 12);
+      var ca = (cands[elType(ctx.els[ids[a]])] || []).slice(0, 12);
       for (var b = a + 1; b < ids.length && !bestIds; b++) {
         if (lockSet[ids[b]]) continue;
-        var tb = elType(ctx.els[ids[b]]), cb = cands[tb].slice(0, 12);
+        var cb = (cands[elType(ctx.els[ids[b]])] || []).slice(0, 12);
         for (var x = 0; x < ca.length; x++) {
           if (ids.indexOf(ca[x]) >= 0) continue;
           for (var y = 0; y < cb.length; y++) {
             if (ids.indexOf(cb[y]) >= 0 || cb[y] === ca[x]) continue;
             var tr = ids.slice(); tr[a] = ca[x]; tr[b] = cb[y];
             if (!feasible(tr)) continue;
-            var s2 = wcObjective(tr, ctx, tsKey);
+            var s2 = obj(tr);
             if (s2 - score > bestGain) { bestGain = s2 - score; bestIds = tr; }
           }
         }
       }
     }
-    if (bestIds) { ids = bestIds; score += bestGain; improved = true; }
-    if (!improved) break;
+    return bestIds ? { ids: bestIds, gain: bestGain } : null;
   }
-  out.ok = true; out.ids = ids; out.cost = cost(ids); out.score = score;
+  function stepSpend() {
+    var bestIds = null, bestGain = 1e-9;
+    for (var a = 0; a < ids.length && !bestIds; a++) {
+      if (lockSet[ids[a]]) continue;
+      var down = cheap[elType(ctx.els[ids[a]])] || [];
+      for (var b = 0; b < ids.length && !bestIds; b++) {
+        if (b === a || lockSet[ids[b]]) continue;
+        var up = (cands[elType(ctx.els[ids[b]])] || []).slice(0, 10);
+        for (var x = 0; x < down.length; x++) {
+          if (ids.indexOf(down[x]) >= 0 || priceOf(down[x]) >= priceOf(ids[a])) continue;
+          for (var y = 0; y < up.length; y++) {
+            if (ids.indexOf(up[y]) >= 0 || up[y] === down[x] || priceOf(up[y]) <= priceOf(ids[b])) continue;
+            var tr = ids.slice(); tr[a] = down[x]; tr[b] = up[y];
+            if (!feasible(tr)) continue;
+            spendTried++;
+            var s3 = obj(tr);
+            if (s3 - score > bestGain) { bestGain = s3 - score; bestIds = tr; }
+          }
+        }
+      }
+    }
+    return bestIds ? { ids: bestIds, gain: bestGain } : null;
+  }
+  var moved = true, m1, m2, m3;
+  while (moved && steps < stepCap) {
+    moved = false;
+    while (steps < stepCap) {
+      m1 = step1(); if (!m1) break;
+      ids = m1.ids; score += m1.gain; steps++; moved = true;
+    }
+    if (steps >= stepCap) break;
+    m2 = step2();
+    if (m2) { ids = m2.ids; score += m2.gain; steps++; moved = true; continue; }
+    m3 = stepSpend();
+    if (m3) { ids = m3.ids; score += m3.gain; steps++; moved = true; }
+  }
+  var spent = wcCost(ids, ctx), left = Math.trunc(num(budget, 0) - spent);
+  out.ok = true; out.ids = ids; out.cost = spent; out.score = score; out.steps = steps;
+  out.spend = { bank: left, pairsTried: spendTried, note: left <= 0 ? "the whole budget is spent" : "no legal swap and no funded upgrade inside the eligible pool raises the objective, so " + left + " tenths stay in the bank" };
   return out;
 }
+function wcLocalOptimum(ids, ctx, opts) {
+  // The only honest acceptance criterion for a local search: a returned fifteen is a local
+  // optimum when no single legal swap against the WHOLE eligible pool raises the objective.
+  // Same pool, same feasibility and same objective as wcSolve, because they come from wcSetup.
+  var res = { ok: false, optimal: false, checked: 0, dearerTried: 0, bestGain: 0, bank: 0, improvements: [], reason: "" };
+  try {
+    var o = isObj(opts) ? opts : {};
+    var tsKey = o.model === "TS_GOALS" ? "TS_GOALS" : "TS";
+    if (!okCtx(ctx)) { res.reason = "no context"; return res; }
+    var list = uniq(idList(ids)).filter(function (id) { return ctx.els[id]; });
+    if (list.length !== 15) { res.reason = "a fifteen is needed, got " + list.length + " known players"; return res; }
+    var W = wcSetup(ctx, o, tsKey);
+    if (!W.ok) { res.reason = W.reasons.join("; ") || "no eligible pool"; return res; }
+    res.bank = Math.trunc(num(W.budget, 0) - wcCost(list, ctx));
+    var score = wcObjective(list, ctx, tsKey);
+    var found = [];
+    for (var i = 0; i < list.length; i++) {
+      if (W.lockSet[list[i]]) continue;
+      var p = arr(W.pool[elType(ctx.els[list[i]])]);
+      for (var j = 0; j < p.length; j++) {
+        var c = p[j]; if (list.indexOf(c) >= 0) continue;
+        var trial = list.slice(); trial[i] = c;
+        if (!wcFeasible(trial, ctx, W)) continue;
+        res.checked++;
+        if (num(ctx.els[c].now_cost, 0) > num(ctx.els[list[i]].now_cost, 0)) res.dearerTried++;
+        var g = wcObjective(trial, ctx, tsKey) - score;
+        if (g > 1e-9) found.push({ out: list[i], outName: elName(list[i], ctx), in: c, inName: elName(c, ctx), gain: g });
+      }
+    }
+    found.sort(function (a, b) { return b.gain - a.gain; });
+    res.improvements = found.slice(0, 5);
+    res.bestGain = found.length ? found[0].gain : 0;
+    res.optimal = found.length === 0;
+    res.ok = true;
+    res.reason = found.length
+      ? found.length + " legal single swaps raise the objective; the best is worth " + found[0].gain.toFixed(3)
+      : res.checked + " legal single swaps were tested and none raises the objective" + (res.bank > 0 ? ", including " + res.dearerTried + " dearer players the " + res.bank + " tenths in the bank could pay for" : "");
+  } catch (e) { res.reason = "engine error: " + errMsg(e); }
+  return res;
+}
 function wildcardSolver(ctx, opts) {
-  var res = { ok: false, ids: [], xi: null, cost: 0, bank: 0, score: 0, model: "TS", alt: null, disagreement: null, relaxed: false, relaxations: [], reasons: [], budget: 0 };
+  var res = { ok: false, ids: [], xi: null, cost: 0, bank: 0, score: 0, model: "TS", alt: null, disagreement: null, relaxed: false, relaxations: [], reasons: [], budget: 0, steps: 0, spend: null };
   try {
     if (!okCtx(ctx)) { res.reasons.push("no context"); return res; }
     var o = isObj(opts) ? opts : {};
@@ -1124,13 +1287,105 @@ function wildcardSolver(ctx, opts) {
       res.disagreement = { playersDiffer: differ, main: { ts: mainTs, goals: mainGoals }, alt: { ts: altTs, goals: altGoals }, mainDominates: mainGoals >= altGoals - 1e-9, note: differ === 0 ? "both fixture models agree on the fifteen" : (mainGoals >= altGoals - 1e-9 ? "xG squad is equal-or-better under both models" : "the goals model prefers " + differ + " different players; treat the gap as noise — xG drives, goals explain") };
     }
     res.ok = true; res.ids = chosen.ids; res.cost = chosen.cost; res.bank = budget - chosen.cost; res.score = chosen.score; res.model = model;
+    res.steps = chosen.steps; res.spend = chosen.spend;
     res.xi = bestXI(chosen.ids, ctx);
     var L = legal15(chosen.ids, ctx.els, budget); if (!L.ok) { res.ok = false; res.reasons = res.reasons.concat(L.reasons); }
   } catch (e) { res.ok = false; res.reasons.push("engine error: " + errMsg(e)); }
   return res;
 }
+function elName(id, ctx) {
+  var el = okCtx(ctx) ? ctx.els[id] : null;
+  var n = el && el.web_name !== undefined && el.web_name !== null ? String(el.web_name) : "";
+  if (n !== "") return n;
+  var v = idOf(id);
+  return isFinite(v) ? "player " + v : "unknown player";
+}
+function writtenFifteen(opts) {
+  // The written plan lives in the WEEKLY block, which is assembled after the engine in the
+  // shipped file. Callers may hand it in (opts.written); when they do not, and a weekly block is
+  // in scope, it is read from there. Required either way — the engine never invents a fifteen.
+  var given = uniq(idList(isObj(opts) ? opts.written : null));
+  if (given.length) return given;
+  try {
+    if (typeof WEEKLY !== "undefined" && isObj(WEEKLY) && isObj(WEEKLY.classic)) return uniq(idList(WEEKLY.classic.wildcard15));
+  } catch (e) { /* the engine also runs standalone, with no weekly block in scope */ }
+  return [];
+}
+function wildcardOptions(ctx, opts) {
+  // C1 rule 6 keeps anyone at or above 60% rival ownership out of the solver. When the manager's
+  // own written fifteen contains such players, the rule and the plan disagree, and the app has to
+  // be able to show the disagreement priced rather than silently shipping one side of it. This
+  // returns all three fifteens under one objective; it changes neither wildcardSolver's default
+  // answer nor rule C1.6.
+  var res = { ok: false, pure: null, locked: null, written: null, locks: [], deltas: null, budget: 0, model: "TS", note: "", reasons: [] };
+  try {
+    if (!okCtx(ctx)) { res.reasons.push("no context"); return res; }
+    var o = isObj(opts) ? opts : {};
+    var budget = num(o.budget, ctx.budget || BUDGET_TENTHS);
+    res.budget = budget;
+    var decaySum = sum(DECAY) || 1;
+    var w15 = writtenFifteen(o).filter(function (id) { return ctx.els[id]; });
+    // Derived, never a list of ids: the convergent players the written plan itself contains.
+    var lockIds = w15.filter(function (id) { return convergenceRisk(id, ctx).risk; });
+    res.locks = lockIds.map(function (id) {
+      var r = rivalOwnMax(id, ctx);
+      return { id: id, web_name: elName(id, ctx), rivalOwn: r.max, league: r.league, now_cost: num(ctx.els[id].now_cost, 0) };
+    });
+    function variant(label, list, how) {
+      var v = { label: label, how: how, ok: false, ids: [], cost: 0, bank: 0, objective: 0, weekly: 0, xi: [], formation: "", captain: null, vice: null, legal: false, reasons: [] };
+      var ids = uniq(idList(list)).filter(function (id) { return ctx.els[id]; });
+      v.ids = ids;
+      if (ids.length !== 15) { v.reasons.push(label + " is " + ids.length + " known players, not fifteen"); return v; }
+      var L = legal15(ids, ctx.els, budget);
+      v.legal = L.ok; v.cost = L.cost; v.bank = Math.trunc(budget - L.cost);
+      if (!L.ok) v.reasons = v.reasons.concat(L.reasons);
+      v.objective = wcObjective(ids, ctx, "TS");
+      v.weekly = v.objective / decaySum;
+      var bx = bestXI(ids, ctx);
+      v.xi = bx.ids; v.formation = bx.formation; v.captain = bx.capId; v.vice = bx.viceId;
+      v.ok = true;
+      return v;
+    }
+    function gap(a, b) {
+      if (!a || !b || !a.ok || !b.ok) return null;
+      var onlyA = a.ids.filter(function (id) { return b.ids.indexOf(id) < 0; });
+      var onlyB = b.ids.filter(function (id) { return a.ids.indexOf(id) < 0; });
+      return {
+        objective: a.objective - b.objective, weekly: a.weekly - b.weekly,
+        cost: a.cost - b.cost, bank: a.bank - b.bank, playersDiffer: onlyA.length,
+        gained: onlyA.map(function (id) { return { id: id, web_name: elName(id, ctx), now_cost: num(ctx.els[id].now_cost, 0) }; }),
+        given: onlyB.map(function (id) { return { id: id, web_name: elName(id, ctx), now_cost: num(ctx.els[id].now_cost, 0) }; })
+      };
+    }
+    var pureSolve = wildcardSolver(ctx, { budget: budget, both: false, relax: o.relax, exclude: o.exclude, maxPasses: o.maxPasses });
+    if (!pureSolve.ok) { res.reasons = res.reasons.concat(pureSolve.reasons); return res; }
+    res.pure = variant("rule-pure", pureSolve.ids, "solved with C1 rule 6 in force: nobody at or above 60% rival ownership");
+    var lockedSolve = lockIds.length ? wildcardSolver(ctx, { budget: budget, both: false, locks: lockIds, relax: o.relax, exclude: o.exclude, maxPasses: o.maxPasses }) : pureSolve;
+    if (lockedSolve.ok) {
+      res.locked = variant("premiums locked", lockedSolve.ids, lockIds.length
+        ? "same solve with " + lockIds.map(function (id) { return elName(id, ctx); }).join(", ") + " locked in — the convergent players the written plan already carries"
+        : "no convergent player in the written fifteen, so this is the rule-pure solve");
+    } else {
+      res.reasons = res.reasons.concat(lockedSolve.reasons);
+    }
+    res.written = variant("written plan", w15, w15.length ? "the manager's own fifteen, scored under the same objective" : "no written fifteen was supplied");
+    res.deltas = {
+      lockedVsPure: gap(res.locked, res.pure),
+      writtenVsPure: gap(res.written, res.pure),
+      writtenVsLocked: gap(res.written, res.locked)
+    };
+    var d = res.deltas.lockedVsPure;
+    res.note = lockIds.length === 0
+      ? "No player in the written fifteen is 60% rival-owned, so the rule and the plan agree and all three fifteens are the same solve."
+      : "Rule C1.6 keeps " + lockIds.length + " of the written fifteen out of the solver (" + res.locks.map(function (l) { return l.web_name + " " + Math.round(l.rivalOwn * 100) + "%"; }).join(", ") +
+        "). Locking them in is worth " + (d ? (d.objective >= 0 ? "+" : "") + d.objective.toFixed(2) + " over five gameweeks and spends " + (d.cost >= 0 ? "" : "") + d.cost + " tenths more" : "a figure the solver could not produce") +
+        ". The rule protects mini-league rank against the field; the points say the opposite. Both are on the table, priced.";
+    res.ok = true;
+  } catch (e) { res.reasons.push("engine error: " + errMsg(e)); }
+  return res;
+}
 function wildcardTiming(ctx) {
-  var res = { gw: 0, weeklyGap: 0, swapsNeeded: 0, currentWeekly: 0, bestWeekly: 0, horizons: [], grid: [], breakeven: { byGw19: null, byGw38: null }, wcTrigger: WC_TRIGGER, sumDeficit5: 0, note: "" };
+  var res = { gw: 0, weeklyGap: 0, swapsNeeded: 0, currentWeekly: 0, bestWeekly: 0, horizons: [], grid: [], breakeven: { byGw19: null, byGw38: null }, wcTrigger: WC_TRIGGER, sumDeficit5: 0, saturated: { saturates: false, weeks: 0, gw: 0, note: "" }, note: "" };
   try {
     if (!okCtx(ctx)) return res;
     res.gw = ctx.nextEvent;
@@ -1145,8 +1400,23 @@ function wildcardTiming(ctx) {
     res.sumDeficit5 = Math.max(0, wc.score - curObj);
     var perFix = res.swapsNeeded ? res.weeklyGap / res.swapsNeeded : 0;
     function sumDeficit(T, mult) { var s = 0; for (var t = 0; t < T; t++) s += Math.max(0, res.weeklyGap * mult - t * perFix * mult); return s; }
-    var toGw19 = Math.max(0, 19 - ctx.nextEvent), toGw38 = Math.max(0, 38 - ctx.nextEvent + 1);
+    // E-042: the two headline horizons were a gameweek out of step with each other — the GW19
+    // window excluded GW19 while the GW38 window included GW38 — and then printed the same total
+    // with nothing to say why. Both windows are inclusive of their end gameweek now, and
+    // `saturated` names the gameweek after which the deficit stops growing because the free
+    // transfers have already made every swap. Two equal totals are a property, not a coincidence.
+    var toGw19 = Math.max(0, 19 - ctx.nextEvent + 1), toGw38 = Math.max(0, 38 - ctx.nextEvent + 1);
     [5, toGw19, toGw38].forEach(function (T, i) { res.horizons.push({ label: ["5 GWs", "to GW19 (set 1 expiry)", "to GW38"][i], weeks: T, gw: ctx.nextEvent + T - 1, sumDeficit: sumDeficit(T, 1) }); });
+    var satWeeks = perFix > 1e-12 ? Math.ceil(res.weeklyGap / perFix - 1e-9) : 0;
+    if (!isFinite(satWeeks) || satWeeks < 0) satWeeks = 0;
+    res.saturated = {
+      saturates: satWeeks > 0 && satWeeks <= toGw38,
+      weeks: satWeeks,
+      gw: satWeeks > 0 ? res.gw + satWeeks - 1 : res.gw,
+      note: satWeeks > 0
+        ? "The deficit stops growing after GW" + (res.gw + satWeeks - 1) + ": by then the free transfers have made all " + res.swapsNeeded + " swaps at one a week, so every horizon past that gameweek reports the same total."
+        : "Current squad and wildcard squad are the same fifteen, so there is no deficit to accumulate."
+    };
     [0.5, 0.75, 1, 1.25, 1.5].forEach(function (m) {
       [0, 10, 20, 30, 45, 60].forEach(function (later) {
         res.grid.push({ deficitMult: m, laterValue: later, nowAdvantageBy: { gw19: sumDeficit(toGw19, m) - later, gw38: sumDeficit(toGw38, m) - later } });
@@ -1366,17 +1636,24 @@ function detectSquadChange(stateSquadIds, picks) {
   } catch (e) { res.changed = true; res.block = true; }
   return res;
 }
-function ftAvailable(history, currentEvent) {
+function ftAvailable(history, currentEvent, chips) {
+  // E-045: the chips list was only ever read from the object form, so ftAvailable(history, n) and
+  // ftAvailable(history.current, n) answered differently on the same data and neither said so.
+  // Chips now reach this function three ways and the two shapes agree: from the object, from an
+  // explicit third argument, and — when neither is given — inferred from the rows themselves,
+  // because using more free transfers in one gameweek than the cap of five allows can only be a
+  // wildcard or a free hit week.
   try {
     var src = isObj(history) && Array.isArray(history.current) ? history.current : history;
     var rows = arr(src).filter(isObj).map(function (r) { return { event: intOf(r.event, 0), t: Math.max(0, intOf(r.event_transfers, 0)), cost: Math.max(0, intOf(r.event_transfers_cost, 0)) }; }).filter(function (r) { return r.event > 0; }).sort(function (a, b) { return a.event - b.event; });
-    var chips = {}; arr(isObj(history) ? history.chips : null).forEach(function (c) { if (isObj(c) && (c.name === "wildcard" || c.name === "freehit")) chips[intOf(c.event, 0)] = true; });
+    var chipSrc = Array.isArray(chips) ? chips : (isObj(history) ? history.chips : null);
+    var chipWeeks = {}; arr(chipSrc).forEach(function (c) { if (isObj(c) && (c.name === "wildcard" || c.name === "freehit")) chipWeeks[intOf(c.event, 0)] = true; });
     var cur = intOf(currentEvent, rows.length ? rows[rows.length - 1].event : 0);
     var ft = 1;
     rows.forEach(function (r) {
       if (r.event < 2 || r.event > cur) return;
-      if (chips[r.event]) { ft = Math.min(FT_CAP, ft + 1); return; }
       var freeUsed = Math.max(0, r.t - Math.floor(r.cost / HIT_COST));
+      if (chipWeeks[r.event] || freeUsed > FT_CAP) { ft = Math.min(FT_CAP, ft + 1); return; }
       ft = Math.min(FT_CAP, Math.max(0, ft - freeUsed) + 1);
     });
     return clamp(ft, 1, FT_CAP);
@@ -1435,9 +1712,20 @@ function salvageJson(s) {
   }
   return null;
 }
+function stripFences(text) {
+  // E-044: the fence strip was global, so it ran INSIDE the JSON string values too and ate the
+  // whitespace after each fence — '{"news":"a ``` b"}' came back as {"news":"a b"}. D4 payloads
+  // carry news text, which is exactly where a stray fence turns up. Only a fence that opens the
+  // reply and a fence that closes it are markup; anything between them is content.
+  if (typeof text !== "string") return "";
+  var s = text.trim();
+  s = s.replace(/^```[a-zA-Z0-9_.+-]*[ \t]*(\r?\n|$)/, "");
+  s = s.replace(/(\r?\n|^)[ \t]*```[ \t]*$/, "");
+  return s.trim();
+}
 function parseJson(text) {
   if (typeof text !== "string") throw new Error("parseJson: expected a string, got " + (text === null ? "null" : typeof text));
-  var s = text.replace(/```[a-zA-Z]*\s*/g, "").replace(/```/g, "").trim();
+  var s = stripFences(text);
   var a = s.indexOf("{");
   if (a < 0) throw new Error("parseJson: no JSON object in the reply (" + s.length + " chars: \"" + s.slice(0, 60).replace(/\s+/g, " ") + "\")");
   var b = s.lastIndexOf("}");
@@ -1663,7 +1951,10 @@ function mcSquad(ids, capId, ctx, iters, seed, viceId) {
     if (!okCtx(ctx)) return res;
     var so = squadOrder(ids, capId, ctx); if (!so) return res;
     var vice = num(viceId, NaN); if (!isFinite(vice) || so.xi.indexOf(vice) < 0) vice = null;
-    var n = clamp(intOf(iters, 1000), 1, 20000), R = mulberry32(intOf(seed, 1));
+    // E-046: iters 0 or negative used to become a single draw reported with the full shape of a
+    // converged distribution — mean, sd 0, and three identical quantiles. The count is floored at
+    // MC_MIN_ITERS so one draw can never be presented as a distribution.
+    var n = clamp(intOf(iters, 1000), MC_MIN_ITERS, 20000), R = mulberry32(intOf(seed, 1));
     var all = so.xi.concat(so.bench), totals = [];
     for (var i = 0; i < n; i++) {
       var draws = fixtureDraws(ctx, R), sims = {};
@@ -1756,14 +2047,33 @@ function mae(a, b) {
     return c ? s / c : 0;
   } catch (e) { return 0; }
 }
+function calibrateToPoints(pred, actual) {
+  // E-047: MAE is only comparable across models when every predictor is in the same units. BPS
+  // per 90 runs about ten times points per 90, so the raw column ranked units, not accuracy
+  // (bps_rate 11.23 against component_xp 2.43 on the GW4 snapshot). Each predictor is rescaled by
+  // mean(points) / mean(prediction) over the gameweek it was fitted on before the MAE is taken.
+  // Spearman is scale-invariant and is left exactly as it was.
+  var res = { scale: 1, calibrated: false, pred: arr(pred).slice() };
+  var p = arr(pred), a = arr(actual), n = Math.min(p.length, a.length), sp = 0, sa = 0, c = 0;
+  for (var i = 0; i < n; i++) {
+    var u = num(p[i], NaN), v = num(a[i], NaN);
+    if (isFinite(u) && isFinite(v)) { sp += u; sa += v; c++; }
+  }
+  if (!c || Math.abs(sp) < 1e-9) return res;                       // a zero mean cannot be scaled
+  var k = sa / sp;
+  if (!isFinite(k) || k <= 0) return res;
+  res.scale = k; res.calibrated = true;
+  res.pred = p.map(function (x) { return num(x, 0) * k; });
+  return res;
+}
 function tournament(live) {
-  var res = { models: TOURNAMENT_MODELS.map(function (m) { return { key: m.key, name: m.name, spearman: null, mae: null, transitions: 0 }; }), leader: null, promotable: false, transitions: 0, note: "" };
+  var res = { models: TOURNAMENT_MODELS.map(function (m) { return { key: m.key, name: m.name, spearman: null, mae: null, maeRaw: null, maeScale: null, maeCalibrated: false, transitions: 0 }; }), leader: null, promotable: false, transitions: 0, maeUnits: "points", maeNote: "", note: "" };
   try {
     if (!isObj(live) || !isObj(live.gw)) { res.note = "no finished gameweeks in the snapshot"; return res; }
     var keys = Object.keys(live.gw).map(function (k) { return num(k, NaN); }).filter(isFinite).sort(sortNum);
     var types = {}; arr(live.elements).forEach(function (el) { if (isObj(el)) types[el.id] = elType(el); });
     var acc = {};                                                       // cumulative per element
-    var scores = {}; TOURNAMENT_MODELS.forEach(function (m) { scores[m.key] = { rho: [], mae: [] }; });
+    var scores = {}; TOURNAMENT_MODELS.forEach(function (m) { scores[m.key] = { rho: [], mae: [], raw: [], scale: [], uncal: 0 }; });
     for (var i = 0; i < keys.length; i++) {
       var g = keys[i], rows = isObj(live.gw[g]) && isObj(live.gw[g].elements) ? live.gw[g].elements : {};
       if (i > 0) {
@@ -1780,7 +2090,15 @@ function tournament(live) {
           preds.ict_rate.push(ict); preds.bps_rate.push(bps); preds.blend.push((seasonMean + shrunk + bps / 10) / 3); preds.component_xp.push(component);
           actual.push(num(row[2], 0));
         });
-        if (actual.length >= 10) TOURNAMENT_MODELS.forEach(function (m) { scores[m.key].rho.push(spearman(preds[m.key], actual)); scores[m.key].mae.push(mae(preds[m.key], actual)); });
+        if (actual.length >= 10) TOURNAMENT_MODELS.forEach(function (m) {
+          var S = scores[m.key];
+          S.rho.push(spearman(preds[m.key], actual));
+          var cal = calibrateToPoints(preds[m.key], actual);
+          S.mae.push(mae(cal.pred, actual));
+          S.raw.push(mae(preds[m.key], actual));
+          S.scale.push(cal.scale);
+          if (!cal.calibrated) S.uncal++;
+        });
       }
       Object.keys(rows).forEach(function (id) {
         var row = rows[id]; if (!Array.isArray(row)) return;
@@ -1790,7 +2108,16 @@ function tournament(live) {
       });
       Object.keys(acc).forEach(function (id) { if (!rows[id]) acc[id].last = 0; });
     }
-    res.models.forEach(function (m) { var s = scores[m.key]; m.transitions = s.rho.length; if (s.rho.length) { m.spearman = sum(s.rho) / s.rho.length; m.mae = sum(s.mae) / s.mae.length; } });
+    res.models.forEach(function (m) {
+      var s = scores[m.key]; m.transitions = s.rho.length;
+      if (!s.rho.length) return;
+      m.spearman = sum(s.rho) / s.rho.length;
+      m.mae = sum(s.mae) / s.mae.length;
+      m.maeRaw = sum(s.raw) / s.raw.length;
+      m.maeScale = sum(s.scale) / s.scale.length;
+      m.maeCalibrated = s.uncal === 0;
+    });
+    res.maeNote = "MAE is reported in points: each predictor is rescaled by mean(points) / mean(prediction) over the gameweek it was fitted on, so the column ranks accuracy and not units. maeRaw keeps the unscaled figure. Spearman needs no rescaling.";
     res.transitions = Math.max.apply(null, [0].concat(res.models.map(function (m) { return m.transitions; })));
     var ranked = res.models.filter(function (m) { return m.spearman !== null; }).sort(function (a, b) { return b.spearman - a.spearman || a.mae - b.mae; });
     res.leader = ranked.length ? ranked[0].key : null;
@@ -1805,19 +2132,20 @@ function tournament(live) {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     ENGINE_VERSION: ENGINE_VERSION, SCORING: SCORING, REFRESH_PAIRS: REFRESH_PAIRS, DECAY: DECAY, PRIOR_PPS: PRIOR_PPS, FORMATIONS: FORMATIONS, SQUAD_SHAPE: SQUAD_SHAPE, POS_NAME: POS_NAME, TOURNAMENT_MODELS: TOURNAMENT_MODELS,
-    num: num, intOf: intOf, clamp: clamp, isObj: isObj, arr: arr, errMsg: errMsg, okCtx: okCtx, idOf: idOf, idList: idList, elMap: elMap, elType: elType, uniq: uniq, sum: sum, sortNum: sortNum, quantile: quantile, nowMs: nowMs, combos: combos,
+    num: num, intOf: intOf, clamp: clamp, isObj: isObj, kindOf: kindOf, arr: arr, errMsg: errMsg, okCtx: okCtx, idOf: idOf, idList: idList, elMap: elMap, elType: elType, uniq: uniq, sum: sum, sortNum: sortNum, quantile: quantile, nowMs: nowMs, combos: combos,
     rowStat: rowStat, pointsFor: pointsFor, draftScoring: draftScoring, gwPoints: gwPoints,
     clubCounts: clubCounts, posCounts: posCounts, legal15: legal15, legalXI: legalXI, formationOf: formationOf,
-    shrunkPps: shrunkPps, flagInfo: flagInfo, isFlagged: isFlagged, statsFor: statsFor, pStart: pStart, fxMult: fxMult, teamMults: teamMults, xp5FromMults: xp5FromMults, xp1With: xp1With, xp5With: xp5With, xp1: xp1, xp5: xp5,
+    shrunkPps: shrunkPps, flagInfo: flagInfo, isFlagged: isFlagged, statsFor: statsFor, pStart: pStart, fxMult: fxMult, fxMultInfo: fxMultInfo, teamMults: teamMults, xp5FromMults: xp5FromMults, xp1With: xp1With, xp5With: xp5With, xp1: xp1, xp5: xp5,
     teamStrength: teamStrength, tsEntry: tsEntry, tsXg: tsXg, tsMult: tsMult, tsPcs: tsPcs, overUnderTags: overUnderTags, runAvg: runAvg,
     elementGwStats: elementGwStats, rivalPickShares: rivalPickShares, rivalOwn: rivalOwn, capShare: capShare, rivalOwnMax: rivalOwnMax, convergenceRisk: convergenceRisk, classify: classify,
     gamePhase: gamePhase, buildCtx: buildCtx,
     tierOf: tierOf, pickXI: pickXI, captainPick: captainPick, bestXI: bestXI, benchOrder: benchOrder, sellCandidates: sellCandidates, transferProtocol: transferProtocol,
-    wcObjective: wcObjective, wcPool: wcPool, wcSolve: wcSolve, wildcardSolver: wildcardSolver, wildcardTiming: wildcardTiming, chipWindows: chipWindows, chipRegret: chipRegret,
+    wcObjective: wcObjective, wcPool: wcPool, wcCost: wcCost, wcSetup: wcSetup, wcFeasible: wcFeasible, wcSolve: wcSolve, wcLocalOptimum: wcLocalOptimum,
+    wildcardSolver: wildcardSolver, elName: elName, writtenFifteen: writtenFifteen, wildcardOptions: wildcardOptions, wildcardTiming: wildcardTiming, chipWindows: chipWindows, chipRegret: chipRegret,
     draftEl: draftEl, draftEV: draftEV, draftWaivers: draftWaivers, watchlistAudit: watchlistAudit, draftXI: draftXI,
     sanitiseState: sanitiseState, detectSquadChange: detectSquadChange, ftAvailable: ftAvailable, sellPrice: sellPrice, bankAfter: bankAfter,
-    openClosers: openClosers, salvageJson: salvageJson, parseJson: parseJson, blocksOf: blocksOf, pickText: pickText, blockTypes: blockTypes, refreshRequest: refreshRequest, applyRefresh: applyRefresh,
+    openClosers: openClosers, salvageJson: salvageJson, stripFences: stripFences, parseJson: parseJson, blocksOf: blocksOf, pickText: pickText, blockTypes: blockTypes, refreshRequest: refreshRequest, applyRefresh: applyRefresh,
     mulberry32: mulberry32, rngOf: rngOf, poisson: poisson, binomial: binomial, posRates: posRates, playerRates: playerRates, likelyXI: likelyXI, simFixture: simFixture, simPlayerDetail: simPlayerDetail, simPlayer: simPlayer, fixtureDraws: fixtureDraws, entryPoints: entryPoints, squadOrder: squadOrder, mcSquad: mcSquad, mcLeague: mcLeague,
-    ranksOf: ranksOf, spearman: spearman, mae: mae, tournament: tournament
+    ranksOf: ranksOf, spearman: spearman, mae: mae, calibrateToPoints: calibrateToPoints, tournament: tournament
   };
 }

@@ -441,6 +441,69 @@ check("DRAFT-scoring-keeps-bonus", function () {
   return { ok: D[3].bonus === 1, detail: "draft MID bonus multiplier = " + D[3].bonus };
 });
 
+// E-043: fxMult takes a FIXTURE OBJECT. Handed an id it returns the neutral 1 and every xp
+// silently falls back to the shrunk baseline. fxMultInfo is the way to tell the two apart.
+check("XP-fxMult-answers-from-a-fixture-object-and-not-from-a-fixture-id", function () {
+  const fxs = SYN.fixtures.filter(function (f) { return f.event === 4; });
+  const live = fxs.filter(function (f) { return Math.abs(E.fxMult(f, f.team_h, CTX.TS) - 1) > 1e-6; })[0];
+  if (!live) return { ok: false, detail: "no GW4 fixture in the synthetic snapshot has a multiplier away from 1" };
+  const byObj = E.fxMult(live, live.team_h, CTX.TS);
+  const byId = E.fxMult(live.id, live.team_h, CTX.TS);
+  return { ok: Math.abs(byObj - 1) > 1e-6 && byId === 1, detail: "fixture " + live.id + ": object → " + r4(byObj) + ", id → " + byId + " (the neutral default)" };
+});
+check("XP-fxMultInfo-marks-the-neutral-answer-as-unresolved", function () {
+  const fx = SYN.fixtures.filter(function (f) { return f.event === 4; })[0];
+  const good = E.fxMultInfo(fx, fx.team_h, CTX.TS);
+  const byId = E.fxMultInfo(fx.id, fx.team_h, CTX.TS);
+  const away = E.fxMultInfo(fx, fx.team_a, CTX.TS);
+  const other = E.fxMultInfo(fx, 999, CTX.TS);
+  const ok = good.resolved === true && good.reason === "home" && away.resolved === true && away.reason === "away" &&
+    byId.resolved === false && byId.mult === 1 && /not a fixture object/.test(byId.reason) &&
+    other.resolved === false && other.mult === 1 && /not in this fixture/.test(other.reason);
+  return { ok: ok, detail: "object → resolved " + good.resolved + " (" + good.reason + "); id → resolved " + byId.resolved + " (" + byId.reason + "); team not in the fixture → " + other.reason };
+});
+
+// E1 again, but on the two functions the whole app actually calls. Every recommendation is a
+// comparison of xp5 values, so the formula is asserted element by element against the published
+// definition rather than through a single worked example.
+check("XP-xp5-is-shrunkPps-times-P(start)-times-the-decayed-fixture-run-for-every-element", function () {
+  const bad = [];
+  CTX.elList.forEach(function (el) {
+    const mults = E.teamMults(el.team, CTX, "TS");
+    const p = E.pStart(el, CTX.gwStats);
+    const shrunk = E.shrunkPps(el);
+    let acc = 0;
+    for (let k = 0; k < 5; k++) acc += E.DECAY[k] * mults[k];
+    const want = shrunk * p * acc;
+    const got = E.xp5(el, CTX);
+    if (!close(got, want, 1e-9)) bad.push(el.id + ": " + r4(got) + " vs " + r4(want));
+  });
+  const spread = CTX.elList.map(function (el) { return E.xp5(el, CTX); });
+  const lo = Math.min.apply(null, spread), hi = Math.max.apply(null, spread);
+  return { ok: bad.length === 0 && hi > lo && lo >= 0,
+    detail: bad.length ? bad.slice(0, 3).join("; ") : CTX.elList.length + " elements reconcile to shrunk × P(start) × Σ decay·mult; xp5 spread " + r2(lo) + " to " + r2(hi) };
+});
+check("XP-xp1-is-the-next-fixture-only-and-is-zero-on-a-blank-gameweek", function () {
+  const bad = [];
+  CTX.elList.forEach(function (el) {
+    const want = E.shrunkPps(el) * E.teamMults(el.team, CTX, "TS")[0] * E.pStart(el, CTX.gwStats);
+    if (!close(E.xp1(el, CTX), want, 1e-9)) bad.push(String(el.id));
+  });
+  // Take team 3's GW4 fixture away: xp1 must go to zero for its players while xp5 survives on
+  // the four gameweeks that remain.
+  const V = JSON.parse(JSON.stringify(SYN));
+  V.fixtures = V.fixtures.filter(function (f) { return !(f.event === 4 && (f.team_h === 3 || f.team_a === 3)); });
+  const ctxB = E.buildCtx(V, SYN_STATE, SYN_NOW);
+  const blanked = ctxB.elList.filter(function (el) { return el.team === 3; });
+  const stillOne = blanked.filter(function (el) { return E.xp1(el, ctxB) !== 0; });
+  const lostFive = blanked.filter(function (el) { return !(E.xp5(el, ctxB) > 0); });
+  const playing = ctxB.elList.filter(function (el) { return el.team === 1 && E.xp1(el, ctxB) > 0; });
+  return { ok: bad.length === 0 && blanked.length === 6 && stillOne.length === 0 && lostFive.length === 0 && playing.length > 0,
+    detail: bad.length ? "formula mismatch on " + bad.slice(0, 3).join(",") :
+      blanked.length + " team-3 players blank in GW4 → xp1 " + (stillOne.length ? stillOne.length + " non-zero" : "all zero") +
+      ", xp5 still positive for " + (blanked.length - lostFive.length) + " of them; team 1 still plays (" + playing.length + " with xp1 > 0)" };
+});
+
 // ================================================================ B3 — legal15 / legalXI
 
 const OK15 = SYN_SQUAD.slice();
@@ -584,6 +647,39 @@ check("FT-banks-to-a-cap-of-5", function () {
   const v = E.ftAvailable({ current: cur, chips: [] }, 12);
   return { ok: v === 5, detail: "ftAvailable after 12 untouched gameweeks = " + v + ", expected 5" };
 });
+// E-045: the two accepted shapes used to answer differently, because the chips list was only
+// ever read from the object. These three calls must agree, and the array form is what the app
+// hands in when it has already unwrapped the history.
+check("FT-the-object-and-the-rows-array-agree-on-a-chip-week", function () {
+  const h = {
+    current: [{ event: 1, event_transfers: 0, event_transfers_cost: 0 },
+              { event: 2, event_transfers: 11, event_transfers_cost: 0 },
+              { event: 3, event_transfers: 0, event_transfers_cost: 0 }],
+    chips: [{ name: "wildcard", event: 2 }]
+  };
+  const a = E.ftAvailable(h, 3), b = E.ftAvailable(h.current, 3), c = E.ftAvailable(h.current, 3, h.chips);
+  return { ok: a === 3 && b === 3 && c === 3, detail: "object " + a + " · rows array " + b + " · rows array with chips " + c + " (a chip week consumes no free transfer, so 3)" };
+});
+check("FT-the-two-shapes-agree-over-two-hundred-generated-histories", function () {
+  let seed = 4242;
+  const rnd = function () { seed = (seed * 1103515245 + 12345) >>> 0; return seed / 4294967296; };
+  const ri = function (lo, hi) { return lo + Math.floor(rnd() * (hi - lo + 1)); };
+  let explicitBad = 0, noChipBad = 0, withChips = 0, firstBad = "";
+  for (let n = 0; n < 200; n++) {
+    const gws = ri(2, 12), cur = [], chips = [];
+    for (let g = 1; g <= gws; g++) {
+      const t = ri(0, 4), cost = t > 1 && rnd() < 0.5 ? (t - 1) * 4 : 0;
+      cur.push({ event: g, event_transfers: t, event_transfers_cost: cost });
+    }
+    if (rnd() < 0.4) { const ev = ri(2, gws); chips.push({ name: rnd() < 0.5 ? "wildcard" : "freehit", event: ev }); cur[ev - 1].event_transfers = ri(6, 15); cur[ev - 1].event_transfers_cost = 0; }
+    const h = { current: cur, chips: chips };
+    const a = E.ftAvailable(h, gws), c = E.ftAvailable(cur, gws, chips);
+    if (a !== c) { explicitBad++; if (!firstBad) firstBad = "explicit chips disagree at gw " + gws + ": " + a + " vs " + c; }
+    if (chips.length) withChips++;
+    else { const b = E.ftAvailable(cur, gws); if (a !== b) { noChipBad++; if (!firstBad) firstBad = "chip-free history disagrees at gw " + gws + ": " + a + " vs " + b; } }
+  }
+  return { ok: explicitBad === 0 && noChipBad === 0, detail: "200 histories (" + withChips + " with a chip): " + explicitBad + " disagreements when the chips are passed, " + noChipBad + " on chip-free histories" + (firstBad ? " — " + firstBad : "") };
+});
 check("FT-junk-history-returns-1-not-a-throw", function () {
   return { ok: E.ftAvailable(null, 3) === 1 && E.ftAvailable({ current: "x" }, 3) === 1, detail: "null → " + E.ftAvailable(null, 3) + ", junk → " + E.ftAvailable({ current: "x" }, 3) };
 });
@@ -593,6 +689,18 @@ check("FT-junk-history-returns-1-not-a-throw", function () {
 check("REFRESH-parseJson-strips-code-fences", function () {
   const v = E.parseJson("```json\n{\"a\":1,\"b\":[1,2]}\n```");
   return { ok: v && v.a === 1 && v.b.length === 2, detail: JSON.stringify(v) };
+});
+// E-044: the fence strip used to be global, so it ran inside JSON string values and ate the
+// whitespace after each fence. D4 payloads carry news text, which is where a stray fence lands.
+check("REFRESH-parseJson-keeps-a-code-fence-that-sits-inside-a-string-value", function () {
+  const v = E.parseJson('{"news":"a ``` b"}');
+  return { ok: v && v.news === "a ``` b", detail: "news came back as " + JSON.stringify(v && v.news) + ", expected \"a ``` b\"" };
+});
+check("REFRESH-stripFences-only-touches-the-opening-and-the-closing-fence", function () {
+  const a = E.stripFences("```json\n{\"a\":1}\n```");
+  const b = E.stripFences('{"news":"x ``` y"}');
+  const c = E.stripFences("```\n{\"a\":1}");
+  return { ok: a === '{"a":1}' && b === '{"news":"x ``` y"}' && c === '{"a":1}', detail: "fenced → " + a + " · inline fence → " + b + " · unclosed fence → " + c };
 });
 check("REFRESH-parseJson-ignores-prose-around-the-object", function () {
   const v = E.parseJson("Sure — here is what I found for GW4.\n{\"elements\":[{\"id\":1,\"status\":\"a\"}]}\nLet me know if you need more.");
@@ -862,7 +970,30 @@ check("CAP-flagged-star-is-not-captain-on-the-real-synthetic-context", function 
   return { ok: xi.capId !== 22 && (!star || star.eligible === false), detail: "capId " + xi.capId + "; element 22 in the XI = " + (xi.ids.indexOf(22) >= 0) + ", eligible = " + (star ? star.eligible : "not in XI") };
 });
 
+// C1 rule 3. The sweep over the synthetic fifteen alone cannot fail: no player in it starts at
+// P(start) < 0.5, so the loop body never runs and the check passes whatever pickXI does. The
+// rule only means something when the two signals disagree, so the control below puts the
+// highest-scoring player in the game at P(start) 0.30 and asks for him to be benched anyway —
+// then flips only his P(start) to 0.90 and asks for the opposite answer.
 check("XI-never-starts-a-sub-0.5-player-ahead-of-a-0.75-one", function () {
+  const rows = function (starP) {
+    const out = [
+      { id: 1, name: "GK1", type: 1, team: 1, pts: 30, starts: 3, xp1: 3, pstart: 0.9 },
+      { id: 2, name: "GK2", type: 1, team: 2, pts: 20, starts: 3, xp1: 2, pstart: 0.9 }
+    ];
+    for (let i = 0; i < 5; i++) out.push({ id: 10 + i, name: "D" + i, type: 2, team: 1 + i, pts: 30, starts: 3, xp1: 4, pstart: 0.9 });
+    out.push({ id: 20, name: "DoubtStar", type: 3, team: 1, pts: 90, starts: 3, xp1: 20, pstart: starP, status: starP < 0.5 ? "d" : "a", chance: starP < 0.5 ? 30 : null });
+    for (let i = 1; i < 5; i++) out.push({ id: 20 + i, name: "M" + i, type: 3, team: i, pts: 30, starts: 3, xp1: 5, pstart: 0.9 });
+    for (let i = 0; i < 3; i++) out.push({ id: 30 + i, name: "F" + i, type: 4, team: i + 1, pts: 30, starts: 3, xp1: 5, pstart: 0.9 });
+    return out;
+  };
+  const doubt = rows(0.30), fit = rows(0.90);
+  const ids = doubt.map(function (r) { return r.id; });
+  const benched = E.bestXI(ids, stubCtx(doubt));
+  const started = E.bestXI(ids, stubCtx(fit));
+  const ctrlOk = benched.ids.indexOf(20) < 0 && started.ids.indexOf(20) >= 0 &&
+    E.legalXI(benched.ids, stubCtx(doubt).els).ok && E.legalXI(started.ids, stubCtx(fit).els).ok;
+  // …and the same property, swept over the real synthetic fifteen.
   const xi = E.bestXI(SYN_SQUAD, CTX);
   const bench = SYN_SQUAD.filter(function (id) { return xi.ids.indexOf(id) < 0; });
   const bad = [];
@@ -873,7 +1004,10 @@ check("XI-never-starts-a-sub-0.5-player-ahead-of-a-0.75-one", function () {
       if (CTX.xp[b].pstart >= 0.75 && CTX.els[b].element_type === CTX.els[id].element_type) bad.push(id + " (" + r2(p) + ") started over " + b + " (" + r2(CTX.xp[b].pstart) + ")");
     });
   });
-  return { ok: bad.length === 0, detail: bad.join("; ") || "no violation" };
+  return { ok: ctrlOk && bad.length === 0,
+    detail: "control: the 20-point midfielder at P(start) 0.30 is " + (benched.ids.indexOf(20) < 0 ? "benched" : "STARTED (" + benched.formation + ")") +
+      " and the same man at 0.90 is " + (started.ids.indexOf(20) >= 0 ? "started" : "BENCHED") +
+      "; synthetic fifteen violations: " + (bad.join("; ") || "none") };
 });
 check("XI-returns-a-legal-formation", function () {
   const xi = E.bestXI(SYN_SQUAD, CTX);
@@ -895,6 +1029,34 @@ check("BENCH-order-excludes-the-goalkeeper", function () {
   const order = E.benchOrder(SYN_SQUAD, xi.ids, CTX);
   const gk = order.filter(function (id) { return CTX.els[id].element_type === 1; });
   return { ok: gk.length === 0 && order.length === 3, detail: "bench order " + order.join(",") + " (goalkeepers found: " + gk.length + ")" };
+});
+
+// ---------------------------------------------------------------- sellCandidates (C1 rule 1)
+
+check("SELL-candidates-name-the-dead-and-the-unavailable-and-nobody-else", function () {
+  const list = E.sellCandidates([34, 22, 3, 16, 2, 9], CTX);
+  const by = {}; list.forEach(function (s) { by[s.id] = s; });
+  const dead = by[34], flagged = by[22], konsa = by[3];
+  const ok = list.length === 3 &&
+    dead && dead.forced === true && /no starts in the last 3/.test(dead.reason) &&
+    flagged && flagged.forced === true && /status d/.test(flagged.reason) && /75/.test(flagged.reason) &&
+    konsa && konsa.forced === false && konsa.konsa === true &&
+    !by[16] && !by[2] && !by[9];
+  return { ok: ok, detail: list.map(function (s) { return s.id + (s.forced ? " FORCED" : " protected") + " (" + s.reason + ")"; }).join(" · ") +
+    "; three fit regulars (16, 2, 9) are absent" };
+});
+check("SELL-E010-a-returning-starter-is-listed-as-protected-never-as-a-forced-sell", function () {
+  // Konsa: element 3 did not start GW1 or GW2 and started GW3. starts_last3 is 1, so he is not
+  // a forced sell — and the entry that names him must say so, or the transfer protocol has no
+  // way to keep him. A universe where the rule is dropped would return him as forced.
+  const gs = CTX.gwStats[3];
+  const rec = E.sellCandidates([3], CTX)[0];
+  const plan = E.transferProtocol(SYN_STATE, CTX);
+  const soldHim = plan.moves.filter(function (m) { return m.out === 3; });
+  const ok = gs.starts_last3 === 1 && gs.startedLast === true && gs.konsa === true &&
+    rec && rec.forced === false && rec.konsa === true && soldHim.length === 0;
+  return { ok: ok, detail: "element 3: starts in the last three = " + gs.starts_last3 + ", started the last match = " + gs.startedLast +
+    ", konsa = " + gs.konsa + " → " + (rec ? (rec.forced ? "FORCED" : "protected") : "not listed") + "; the protocol sold him " + soldHim.length + " times" };
 });
 
 // ---------------------------------------------------------------- transfers (C2)
@@ -932,14 +1094,25 @@ check("TP-never-leaves-a-negative-bank", function () {
   return { ok: TP.bankAfter >= 0, detail: "bankAfter = " + TP.bankAfter + " tenths (bank in " + TP.bank + ")" };
 });
 check("TP-margin-is-measured-against-a-genuinely-different-plan-E008", function () {
-  const bestIns = TP.moves.map(function (m) { return m.in; }).sort(function (a, b) { return a - b; }).join(",");
-  const bestOuts = TP.moves.map(function (m) { return m.out; }).sort(function (a, b) { return a - b; }).join(",");
-  const same = TP.alternatives.filter(function (alt) {
-    const ins = alt.moves.map(function (m) { return m.in; }).sort(function (a, b) { return a - b; }).join(",");
-    const outs = alt.moves.map(function (m) { return m.out; }).sort(function (a, b) { return a - b; }).join(",");
-    return ins === bestIns && outs === bestOuts;
-  });
-  return { ok: same.length === 0 && TP.margin >= 0, detail: "alternatives identical to the shipped plan: " + same.length + "; margin " + r2(TP.margin) };
+  // `margin >= 0` is true by construction (the plans are sorted by value), so the old
+  // assertion could not fail for the reason its name gives. What can fail is the identity:
+  // the margin has to be the shipped plan's value minus the value of the best plan that is
+  // genuinely different, and the alternatives panel has to be free of duplicates under the
+  // same key. Measure the key here, independently of the engine.
+  const key = function (moves) {
+    return moves.map(function (m) { return m.out; }).sort(function (a, b) { return a - b; }).join(",") + ">" +
+           moves.map(function (m) { return m.in; }).sort(function (a, b) { return a - b; }).join(",");
+  };
+  if (!TP.moves.length) return { ok: false, detail: "the fixture shipped no plan, so the margin has nothing to be measured against" };
+  if (!TP.alternatives.length) return { ok: false, detail: "no alternative was ranked, so the margin cannot be shown to be measured against one" };
+  const bestKey = key(TP.moves);
+  const same = TP.alternatives.filter(function (alt) { return key(alt.moves) === bestKey; });
+  const keys = TP.alternatives.map(function (alt) { return key(alt.moves); });
+  const dupes = keys.filter(function (k, i) { return keys.indexOf(k) !== i; });
+  const expect = TP.value - TP.alternatives[0].value;
+  const ok = same.length === 0 && dupes.length === 0 && TP.margin > 0 && close(TP.margin, expect, 1e-9);
+  return { ok: ok, detail: "shipped " + bestKey + " (value " + r2(TP.value) + "); best genuinely different " + keys[0] + " (value " + r2(TP.alternatives[0].value) +
+    ") → margin should be " + r2(expect) + ", engine says " + r2(TP.margin) + "; duplicates in the panel " + dupes.length + ", panel copies of the shipped plan " + same.length };
 });
 check("TP-confidence-follows-the-2.0-and-0.8-thresholds", function () {
   const m = TP.margin, c = TP.confidence;
@@ -961,10 +1134,51 @@ check("TP-captain-and-vice-are-the-last-two-steps", function () {
   const ok = actions.length >= 2 && actions[actions.length - 2] === "captain" && actions[actions.length - 1] === "vice";
   return { ok: ok, detail: actions.join(" → ") };
 });
+// C1 rule 1, with a fixture that can actually break it. The base synthetic plan is driven by a
+// FORCED sell, so it carries no optional move at all and "no optional move has a gain ≤ 4" was
+// true of an empty list. CTX_OPT removes both forced sells (element 34 becomes a fit but weak
+// starter, element 22 loses its flag), which leaves the protocol nothing to ship but optional
+// upgrades — and leaves 20-odd legal sub-4 upgrades on the table for it to refuse.
+const SYN_OPT = (function () {
+  const V = JSON.parse(JSON.stringify(SYN));
+  ["1", "2", "3"].forEach(function (g) {
+    const row = V.gw[g].elements[28].slice();
+    row[2] = 4;                                                   // three starts, four points a week
+    V.gw[g].elements[34] = row;
+  });
+  V.elements.forEach(function (el) {
+    if (el.id === 34) { el.total_points = 12; el.minutes = 270; el.starts = 3; }
+    if (el.id === 22) { el.status = "a"; el.chance = null; el.news = ""; }
+  });
+  return V;
+})();
+const CTX_OPT = E.buildCtx(SYN_OPT, SYN_STATE, SYN_NOW);
+const TP_OPT = E.transferProtocol(SYN_STATE, CTX_OPT);
+
 check("TP-an-optional-sell-needs-a-five-week-gain-above-4", function () {
-  const optional = TP.moves.filter(function (m) { return !m.forced; });
-  const bad = optional.filter(function (m) { return m.gain <= 4; });
-  return { ok: bad.length === 0, detail: optional.length + " optional moves; gains " + optional.map(function (m) { return r2(m.gain); }).join(",") };
+  const forced = E.sellCandidates(SYN_SQUAD, CTX_OPT).filter(function (s) { return s.forced; });
+  const optional = TP_OPT.moves.filter(function (m) { return !m.forced; });
+  const shippedBad = optional.filter(function (m) { return m.gain <= 4; });
+  // every alternative the panel ranked is held to the same rule
+  const altBad = [];
+  TP_OPT.alternatives.forEach(function (a) { a.moves.forEach(function (m) { if (m.gain <= 4) altBad.push(m.out + "→" + m.in + " " + r2(m.gain)); }); });
+  // the opportunity the rule declines: legal same-position upgrades worth more than 0 and at most 4
+  const subFour = [];
+  SYN_SQUAD.forEach(function (o) {
+    CTX_OPT.elList.forEach(function (c) {
+      if (SYN_SQUAD.indexOf(c.id) >= 0 || c.element_type !== CTX_OPT.els[o].element_type) return;
+      const g = CTX_OPT.xp[c.id].xp5 - CTX_OPT.xp[o].xp5;
+      if (g > 0 && g <= 4) subFour.push(o + "→" + c.id);
+    });
+  });
+  const shippedPairs = TP_OPT.moves.map(function (m) { return m.out + "→" + m.in; })
+    .concat(TP_OPT.alternatives.reduce(function (acc, a) { return acc.concat(a.moves.map(function (m) { return m.out + "→" + m.in; })); }, []));
+  const leaked = subFour.filter(function (p) { return shippedPairs.indexOf(p) >= 0; });
+  const ok = forced.length === 0 && optional.length === TP_OPT.moves.length && optional.length >= 1 &&
+    shippedBad.length === 0 && altBad.length === 0 && subFour.length > 0 && leaked.length === 0;
+  return { ok: ok, detail: "no forced sells (" + forced.length + "); " + optional.length + " optional move(s) at gains " +
+    optional.map(function (m) { return r2(m.gain); }).join(",") + "; " + subFour.length +
+    " legal sub-4 upgrades existed and " + leaked.length + " reached a plan; alternatives below the threshold: " + altBad.length };
 });
 check("TP-blocks-every-recommendation-on-a-squad-mismatch-D3", function () {
   const changed = JSON.parse(JSON.stringify(SYN));
@@ -1044,6 +1258,37 @@ check("TP3-at-FT-2-the-third-move-costs-a-minus-4-hit", function () {
   return { ok: r.ft === 2 && r.k <= 3 && r.hits === Math.max(0, r.k - 2) * 4, detail: "ft=" + r.ft + " k=" + r.k + " hits=" + r.hits };
 });
 
+// ---------------------------------------------------------------- E-037: the execution order
+
+// C2 step 5: sells first, captain and vice last. The no-plan path used to return an empty order.
+// A context whose element list holds nothing but the squad has no buy candidates at all, so the
+// protocol reaches "hold" with no plan to rank — the exact branch that used to return early.
+const CTX_NOPOOL = E.buildCtx(SYN, SYN_STATE, SYN_NOW);
+CTX_NOPOOL.elList = CTX_NOPOOL.elList.filter(function (el) { return CTX_NOPOOL.squadIds.indexOf(el.id) >= 0; });
+const TPH = E.transferProtocol(SYN_STATE, CTX_NOPOOL);
+
+check("TP-the-hold-path-still-lists-the-captain-and-the-vice-as-steps", function () {
+  const o = TPH.order;
+  const ok = TPH.moves.length === 0 && o.length === 2 &&
+    o[0].action === "captain" && o[1].action === "vice" &&
+    o[0].id === TPH.captain && o[1].id === TPH.vice && TPH.captain !== null &&
+    o[0].step === 1 && o[1].step === 2;
+  return { ok: ok, detail: "moves " + TPH.moves.length + " · confidence " + TPH.confidence + " · order [" + o.map(function (x) { return x.action + " " + x.id; }).join(", ") + "] · captain " + TPH.captain + " vice " + TPH.vice };
+});
+check("TP-the-shipping-path-ends-its-order-with-the-captain-then-the-vice", function () {
+  const o = TP.order;
+  if (o.length < 2) return { ok: false, detail: "order has " + o.length + " steps" };
+  const sells = o.filter(function (x) { return x.action === "sell"; });
+  const buys = o.filter(function (x) { return x.action === "buy"; });
+  const lastTwo = o.slice(-2);
+  const sellsFirst = sells.every(function (x, i) { return o.indexOf(x) === i; });
+  const stepsRun = o.every(function (x, i) { return x.step === i + 1; });
+  const ok = lastTwo[0].action === "captain" && lastTwo[1].action === "vice" &&
+    lastTwo[0].id === TP.captain && lastTwo[1].id === TP.vice &&
+    sells.length === TP.moves.length && buys.length === TP.moves.length && sellsFirst && stepsRun;
+  return { ok: ok, detail: o.map(function (x) { return x.step + " " + x.action + " " + x.id; }).join(" · ") };
+});
+
 // ---------------------------------------------------------------- wildcard
 
 const WC = E.wildcardSolver(CTX, {});
@@ -1058,8 +1303,178 @@ check("WC-solver-excludes-convergent-players", function () {
   return { ok: bad.length === 0, detail: "convergent picks: " + bad.join(",") };
 });
 
+// E-038 acceptance test: a local search has only one honest claim to make — that no single legal
+// swap improves what it returned. wcLocalOptimum re-scans the WHOLE eligible pool with the
+// solver's own feasibility (wcSetup/wcFeasible), so it cannot be a private copy of the rules.
+check("WC-the-returned-fifteen-is-a-one-swap-local-optimum", function () {
+  if (!WC.ok) return { ok: false, detail: "solver not ok" };
+  const lo = E.wcLocalOptimum(WC.ids, CTX, {});
+  return { ok: lo.ok && lo.optimal === true && lo.checked > 0, detail: lo.reason + " (" + lo.checked + " swaps tested, bank " + lo.bank + " tenths)" };
+});
+check("WC-the-local-optimum-test-fails-on-a-deliberately-worsened-fifteen", function () {
+  // A check that cannot fail proves nothing: worsen the squad by one legal swap and the same
+  // function must report the fifteen as improvable, naming the swap back.
+  if (!WC.ok) return { ok: false, detail: "solver not ok" };
+  const W = E.wcSetup(CTX, {}, "TS");
+  if (!W.ok) return { ok: false, detail: "wcSetup: " + W.reasons.join("; ") };
+  const base = E.wcObjective(WC.ids, CTX, "TS");
+  let worse = null, dropped = null, brought = null;
+  for (let i = 0; i < WC.ids.length && !worse; i++) {
+    const t = CTX.els[WC.ids[i]].element_type;
+    const pool = W.pool[t] || [];
+    for (let j = pool.length - 1; j >= 0; j--) {
+      if (WC.ids.indexOf(pool[j]) >= 0) continue;
+      const trial = WC.ids.slice(); trial[i] = pool[j];
+      if (!E.wcFeasible(trial, CTX, W)) continue;
+      if (E.wcObjective(trial, CTX, "TS") < base - 1e-6) { worse = trial; dropped = WC.ids[i]; brought = pool[j]; break; }
+    }
+  }
+  if (!worse) return { ok: false, detail: "no legal worsening swap exists in the synthetic pool — the control cannot be run" };
+  const lo = E.wcLocalOptimum(worse, CTX, {});
+  const namesBack = lo.improvements.some(function (m) { return m.out === brought && m.in === dropped; });
+  return { ok: lo.ok && lo.optimal === false && lo.bestGain > 0 && namesBack, detail: "swapped " + dropped + " out for " + brought + ": optimal=" + lo.optimal + ", best gain " + r4(lo.bestGain) + ", swap back named=" + namesBack };
+});
+check("WC-wildcardOptions-leaves-the-solver-default-exactly-where-it-was", function () {
+  const opt = E.wildcardOptions(CTX, { written: SYN_SQUAD });
+  if (!opt.ok) return { ok: false, detail: "wildcardOptions: " + opt.reasons.join("; ") };
+  const same = opt.pure.ids.slice().sort(function (a, b) { return a - b; }).join(",") === WC.ids.slice().sort(function (a, b) { return a - b; }).join(",");
+  const shapes = ["pure", "locked", "written"].every(function (k) { return opt[k] && Array.isArray(opt[k].ids); });
+  return { ok: same && shapes && opt.written.ok === true, detail: "pure matches wildcardSolver: " + same + " · three variants present: " + shapes + " · written scored: " + opt.written.ok };
+});
+check("WC-wildcardOptions-locks-only-what-the-written-plan-and-the-ownership-data-both-say", function () {
+  // Derived, never a list of ids: the locks are exactly written15 ∩ convergent.
+  const written = SYN_SQUAD;
+  const opt = E.wildcardOptions(CTX, { written: written });
+  if (!opt.ok) return { ok: false, detail: "wildcardOptions: " + opt.reasons.join("; ") };
+  const want = written.filter(function (id) { return E.convergenceRisk(id, CTX).risk; }).sort(function (a, b) { return a - b; });
+  const got = opt.locks.map(function (l) { return l.id; }).sort(function (a, b) { return a - b; });
+  const inSolve = opt.locked.ok ? want.every(function (id) { return opt.locked.ids.indexOf(id) >= 0; }) : false;
+  return { ok: want.join(",") === got.join(",") && inSolve, detail: "convergent players inside the written fifteen: [" + want.join(",") + "], locks returned [" + got.join(",") + "], all present in the locked solve: " + inSolve };
+});
+
+// ---------------------------------------------------------------- E-042: wildcard timing
+
+const TIM = E.wildcardTiming(CTX);
+check("TIMING-both-headline-horizons-include-their-own-end-gameweek", function () {
+  const g19 = TIM.horizons.filter(function (h) { return /GW19/.test(h.label); })[0];
+  const g38 = TIM.horizons.filter(function (h) { return /GW38/.test(h.label); })[0];
+  if (!g19 || !g38) return { ok: false, detail: "horizons: " + TIM.horizons.map(function (h) { return h.label; }).join(", ") };
+  const ok = g19.weeks === 19 - TIM.gw + 1 && g38.weeks === 38 - TIM.gw + 1 && g19.gw === 19 && g38.gw === 38;
+  return { ok: ok, detail: "from GW" + TIM.gw + ": GW19 window " + g19.weeks + " weeks ending GW" + g19.gw + ", GW38 window " + g38.weeks + " weeks ending GW" + g38.gw };
+});
+check("TIMING-two-equal-horizons-are-explained-by-saturation-not-left-as-a-coincidence", function () {
+  const g19 = TIM.horizons.filter(function (h) { return /GW19/.test(h.label); })[0];
+  const g38 = TIM.horizons.filter(function (h) { return /GW38/.test(h.label); })[0];
+  const equal = Math.abs(g19.sumDeficit - g38.sumDeficit) < 1e-9;
+  const sat = TIM.saturated;
+  if (!equal) return { ok: sat && typeof sat.note === "string", detail: "horizons differ (" + r2(g19.sumDeficit) + " vs " + r2(g38.sumDeficit) + "); saturation flag " + (sat ? sat.saturates : "missing") };
+  const ok = sat.saturates === true && sat.weeks === TIM.swapsNeeded && sat.gw === TIM.gw + TIM.swapsNeeded - 1 && sat.gw <= g19.gw && /stops growing/.test(sat.note);
+  return { ok: ok, detail: "both horizons read " + r2(g19.sumDeficit) + "; saturates at GW" + sat.gw + " after " + sat.weeks + " weekly swaps (" + TIM.swapsNeeded + " needed)" };
+});
+
+// ---------------------------------------------------------------- chips (C1 rule 5)
+
+// The synthetic fixture list is one fixture per team per gameweek, so there is no window in it
+// at all — that is the honest "nothing scheduled" answer and it is asserted as such. SYN_CHIP
+// then gives team 1 and team 2 a second GW5 fixture and takes team 1 and team 3 out of GW6, so
+// the detector has one real double and one real blank to find.
+const SYN_CHIP = (function () {
+  const V = JSON.parse(JSON.stringify(SYN));
+  V.fixtures.push({ id: 999, event: 5, team_h: 1, team_a: 2, team_h_difficulty: 3, team_a_difficulty: 3,
+    finished: false, started: false, kickoff_time: "2026-08-16T14:00:00Z", team_h_score: null, team_a_score: null });
+  V.fixtures = V.fixtures.filter(function (f) { return !(f.event === 6 && f.team_h === 1 && f.team_a === 3); });
+  return V;
+})();
+const CTX_CHIP = E.buildCtx(SYN_CHIP, SYN_STATE, SYN_NOW);
+
+check("CHIPS-no-double-and-no-blank-is-reported-as-nothing-scheduled-not-as-a-recommendation", function () {
+  const w = E.chipWindows(SYN);
+  const ok = w.doubles.length === 0 && w.blanks.length === 0 && w.nextEvent === 4 &&
+    w.recommendation.bb === null && w.recommendation.tc === null && w.recommendation.fh === null &&
+    /No double or blank/.test(w.recommendation.note);
+  return { ok: ok, detail: "doubles " + w.doubles.length + " blanks " + w.blanks.length + " · bb=" + w.recommendation.bb +
+    " tc=" + w.recommendation.tc + " fh=" + w.recommendation.fh + " · " + w.recommendation.note };
+});
+check("CHIPS-a-real-double-and-a-real-blank-are-found-in-the-right-gameweeks", function () {
+  const w = E.chipWindows(SYN_CHIP);
+  const dbl = w.doubles[0], blk = w.blanks[0];
+  const ok = w.doubles.length === 1 && w.blanks.length === 1 &&
+    dbl.event === 5 && dbl.teams.slice().sort(function (a, b) { return a - b; }).join(",") === "1,2" && dbl.n === 2 && dbl.confirmed === true &&
+    blk.event === 6 && blk.teams.slice().sort(function (a, b) { return a - b; }).join(",") === "1,3" && blk.n === 2 &&
+    w.recommendation.bb === 5 && w.recommendation.tc === 5 && w.recommendation.fh === 6;
+  return { ok: ok, detail: "double GW" + dbl.event + " teams [" + dbl.teams.join(",") + "], blank GW" + blk.event + " teams [" + blk.teams.join(",") +
+    "] → BB GW" + w.recommendation.bb + ", TC GW" + w.recommendation.tc + ", FH GW" + w.recommendation.fh };
+});
+check("CHIPS-chipRegret-prices-a-double-at-twice-the-single-week-and-says-hold", function () {
+  const tcNow = E.chipRegret("TC", CTX);
+  const tcLater = E.chipRegret("TC", CTX_CHIP);
+  const bbLater = E.chipRegret("BB", CTX_CHIP);
+  const ok = tcNow.laterEvent === null && tcNow.verdict === "no window" && tcNow.regretUse === 0 && tcNow.regretHold > 0 &&
+    tcLater.laterEvent === 5 && close(tcLater.bestLater, 2 * tcLater.useNow, 1e-9) &&
+    close(tcLater.regretUse, tcLater.useNow, 1e-9) && tcLater.regretHold === 0 && tcLater.verdict === "hold" &&
+    bbLater.laterEvent === 5 && close(bbLater.bestLater, 2 * bbLater.useNow, 1e-9) && bbLater.verdict === "hold";
+  return { ok: ok, detail: "no window: TC verdict " + tcNow.verdict + " (regret of holding " + r2(tcNow.regretHold) + ") · with the GW5 double: TC now " +
+    r2(tcLater.useNow) + " vs later " + r2(tcLater.bestLater) + " → " + tcLater.verdict + "; BB now " + r2(bbLater.useNow) + " vs later " + r2(bbLater.bestLater) };
+});
+check("CHIPS-chipRegret-names-an-unknown-chip-instead-of-scoring-it", function () {
+  const junk = E.chipRegret("TRIPLE_WILDCARD", CTX);
+  const empty = E.chipRegret("", CTX);
+  return { ok: junk.verdict === "no window" && /unknown chip/.test(junk.note) && junk.useNow === 0 && /unknown chip/.test(empty.note),
+    detail: "unknown chip → verdict " + junk.verdict + ", note " + junk.note };
+});
+
 // ================================================================ strength, rivals, MC, tournament
 
+const TSR = E.teamStrength(SYN);
+check("TS-teamStrength-shrinks-att-and-def-towards-1-with-K-6-on-the-snapshot-xG", function () {
+  // Independent recomputation of E2 straight from the snapshot: Lbar = Σ xGF / Σ games,
+  // att = w·(xGF/g ÷ Lbar) + (1−w), w = g/(g+6).
+  const acc = {};
+  SYN.teams.forEach(function (t) { acc[t.id] = { g: 0, xgf: 0, xga: 0 }; });
+  const fxById = {}; SYN.fixtures.forEach(function (f) { fxById[f.id] = f; });
+  Object.keys(SYN.gw).forEach(function (k) {
+    const fxg = SYN.gw[k].fixture_xg;
+    Object.keys(fxg).forEach(function (fid) {
+      const f = fxById[fid], v = fxg[fid];
+      acc[f.team_h].g++; acc[f.team_h].xgf += v.h; acc[f.team_h].xga += v.a;
+      acc[f.team_a].g++; acc[f.team_a].xgf += v.a; acc[f.team_a].xga += v.h;
+    });
+  });
+  let sx = 0, sg = 0;
+  TEAMS.forEach(function (t) { sx += acc[t].xgf; sg += acc[t].g; });
+  const Lbar = sx / sg;
+  const bad = [];
+  TEAMS.forEach(function (t) {
+    const w = acc[t].g / (acc[t].g + 6);
+    const att = w * ((acc[t].xgf / acc[t].g) / Lbar) + (1 - w);
+    const def = w * ((acc[t].xga / acc[t].g) / Lbar) + (1 - w);
+    if (!close(TSR.TS[t].att, att, 1e-9) || !close(TSR.TS[t].def, def, 1e-9) || TSR.TS[t].g !== acc[t].g) bad.push("team " + t);
+  });
+  // xG and goals are two different tables, and they must not be the same numbers (E-011).
+  const same = TEAMS.every(function (t) { return close(TSR.TS[t].def, TSR.TS_GOALS[t].def, 1e-9); });
+  const bestDef = TEAMS.slice().sort(function (a, b) { return TSR.TS[a].def - TSR.TS[b].def; })[0];
+  const bestDefGoals = TEAMS.slice().sort(function (a, b) { return TSR.TS_GOALS[a].def - TSR.TS_GOALS[b].def; })[0];
+  return { ok: bad.length === 0 && close(TSR.Lbar, Lbar, 1e-9) && !same,
+    detail: bad.length ? "mismatch on " + bad.join(", ") : "Lbar " + r4(TSR.Lbar) + " (K=6, 3 games each); best defence on xG = team " + bestDef +
+      ", on goals = team " + bestDefGoals + "; the two tables are not the same numbers" };
+});
+check("TS-tsXg-is-Lbar-times-att-times-def-times-the-home-or-away-factor", function () {
+  const bad = [];
+  TEAMS.forEach(function (t) {
+    TEAMS.forEach(function (o) {
+      if (t === o) return;
+      const h = E.tsXg(t, o, true, TSR.TS), a = E.tsXg(t, o, false, TSR.TS);
+      const wantH = TSR.Lbar * TSR.TS[t].att * TSR.TS[o].def * 1.10;
+      const wantA = TSR.Lbar * TSR.TS[t].att * TSR.TS[o].def * 0.90;
+      if (!close(h, wantH, 1e-9) || !close(a, wantA, 1e-9) || !close(h / a, 1.10 / 0.90, 1e-9)) bad.push(t + " v " + o);
+    });
+  });
+  // An unknown team falls back to the neutral 1/1 entry rather than NaN.
+  const unknown = E.tsXg(999, 998, true, TSR.TS);
+  const ok = bad.length === 0 && isFinite(unknown) && unknown > 0;
+  return { ok: ok, detail: bad.length ? "mismatch on " + bad.slice(0, 3).join(", ") :
+    "30 ordered pairs reconcile to Lbar·att·def·(1.10 home / 0.90 away); unknown teams fall back to " + r4(unknown) + " not NaN" };
+});
 check("TS-tsPcs-is-strictly-inside-0-and-1", function () {
   const bad = [];
   TEAMS.forEach(function (t) {
@@ -1127,6 +1542,24 @@ const MC_A = E.mcSquad(SYN_SQUAD, XI_FOR_MC.capId, CTX, 400, 12345, XI_FOR_MC.vi
 const MC_B = E.mcSquad(SYN_SQUAD, XI_FOR_MC.capId, CTX, 400, 12345, XI_FOR_MC.viceId);
 const MC_C = E.mcSquad(SYN_SQUAD, XI_FOR_MC.capId, CTX, 400, 999, XI_FOR_MC.viceId);
 
+// E-055: quantile is the helper behind q10/q50/q90, and those three numbers are rendered.
+check("MC-quantile-always-returns-a-number-never-a-concatenated-string-E055", function () {
+  const objects = []; for (let i = 0; i < 40; i++) objects.push({ a: i });
+  const cases = [
+    ["a 40-element array of objects with a function for q", E.quantile(objects, function () {})],
+    ["an array of non-numeric strings", E.quantile(["a", "b", "c"], 0.5)],
+    ["a mixed array", E.quantile([1, null, undefined, 3], 0.5)],
+    ["an empty array", E.quantile([], 0.5)],
+    ["junk in place of the array", E.quantile("nonsense", 0.5)]
+  ];
+  const bad = cases.filter(function (c) { return typeof c[1] !== "number" || !isFinite(c[1]); });
+  // …and the arithmetic is untouched for real numbers, including numeric strings from the API.
+  const good = close(E.quantile([1, 2, 3, 4], 0.5), 2.5, 1e-12) && E.quantile([1, 2, 3, 4], 0) === 1 &&
+    E.quantile([1, 2, 3, 4], 1) === 4 && close(E.quantile(["1", "2", "3", "4"], 0.5), 2.5, 1e-12);
+  return { ok: bad.length === 0 && good,
+    detail: bad.length ? bad.map(function (c) { return c[0] + " → " + JSON.stringify(c[1]); }).join("; ")
+      : cases.length + " junk shapes all return a finite number; [1,2,3,4] still gives 1 / 2.5 / 4 at q 0 / 0.5 / 1" };
+});
 check("MC-squad-quantiles-are-ordered-q10-q50-q90", function () {
   return { ok: MC_A.q10 <= MC_A.q50 && MC_A.q50 <= MC_A.q90 && MC_A.iters === 400, detail: "q10 " + MC_A.q10 + " ≤ q50 " + MC_A.q50 + " ≤ q90 " + MC_A.q90 + " over " + MC_A.iters + " iterations" };
 });
@@ -1139,12 +1572,32 @@ check("MC-squad-moves-when-the-seed-changes", function () {
 check("MC-squad-mean-and-sd-are-finite-and-sd-is-positive", function () {
   return { ok: isFinite(MC_A.mean) && isFinite(MC_A.sd) && MC_A.sd > 0, detail: "mean " + r2(MC_A.mean) + " sd " + r2(MC_A.sd) };
 });
+// E-046: iters 0 or negative used to come back as one draw dressed as a distribution —
+// sd 0 and three identical quantiles under the same field names a converged run uses.
+check("MC-squad-never-presents-a-single-draw-as-a-distribution", function () {
+  const z = E.mcSquad(SYN_SQUAD, XI_FOR_MC.capId, CTX, 0, 1, XI_FOR_MC.viceId);
+  const neg = E.mcSquad(SYN_SQUAD, XI_FOR_MC.capId, CTX, -5, 1, XI_FOR_MC.viceId);
+  const flat = function (r) { return r.sd === 0 && r.q10 === r.q50 && r.q50 === r.q90; };
+  const ok = z.iters >= 100 && neg.iters >= 100 && !flat(z) && !flat(neg) && z.iters === neg.iters;
+  return { ok: ok, detail: "iters 0 → " + z.iters + " draws (sd " + r2(z.sd) + ", q10/q50/q90 " + r2(z.q10) + "/" + r2(z.q50) + "/" + r2(z.q90) + "); iters -5 → " + neg.iters + " draws" };
+});
 check("MC-simPlayer-may-be-negative-and-that-is-correct", function () {
   // Cards and own goals exist; a suite that forbids a negative is the bug, not the engine.
-  const rng = E.mulberry32(3);
-  let min = Infinity;
-  for (let i = 0; i < 4000; i++) min = Math.min(min, E.simPlayer(CTX.els[16], CTX, rng));
-  return { ok: isFinite(min), detail: "lowest simulated score over 4000 draws = " + min };
+  // The old assertion was isFinite(min) alone, which passes unchanged against a sampler that
+  // clamps at zero — it proved nothing about the name. The claim is that a negative score is
+  // REACHABLE, so the check draws until it sees one and says where it came from.
+  const rng = E.mulberry32(7);
+  let min = Infinity, minId = null, negatives = 0, draws = 0;
+  SYN_SQUAD.forEach(function (id) {
+    for (let i = 0; i < 3000; i++) {
+      const v = E.simPlayer(CTX.els[id], CTX, rng);
+      draws++;
+      if (v < 0) negatives++;
+      if (v < min) { min = v; minId = id; }
+    }
+  });
+  return { ok: isFinite(min) && min < 0 && negatives > 0,
+    detail: negatives + " negative scores in " + draws + " draws over the fifteen; lowest " + min + " (element " + minId + ") — a sampler clamped at zero fails this" };
 });
 check("MC-league-reports-no-win-probability-below-8-gameweeks", function () {
   const r = E.mcLeague(CTX, 900, { iters: 200, seed: 5 });
@@ -1173,6 +1626,28 @@ check("TOURNAMENT-leader-is-one-of-the-eight", function () {
   const keys = TOUR.models.map(function (m) { return m.key; });
   return { ok: TOUR.leader !== null && keys.indexOf(TOUR.leader) >= 0, detail: "leader " + TOUR.leader };
 });
+// E-047: MAE is only comparable when every predictor is in points units.
+check("TOURNAMENT-calibrateToPoints-puts-a-ten-times-predictor-back-into-points", function () {
+  const actual = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const pred = actual.map(function (v) { return v * 10; });
+  const c = E.calibrateToPoints(pred, actual);
+  const rawMae = E.mae(pred, actual), calMae = E.mae(c.pred, actual);
+  return { ok: c.calibrated === true && close(c.scale, 0.1, 1e-9) && close(calMae, 0, 1e-9) && rawMae > 40,
+    detail: "scale " + r4(c.scale) + " · MAE raw " + r2(rawMae) + " → calibrated " + r2(calMae) };
+});
+check("TOURNAMENT-calibrateToPoints-refuses-to-scale-a-zero-mean-predictor", function () {
+  const c = E.calibrateToPoints([0, 0, 0, 0], [1, 2, 3, 4]);
+  const d = E.calibrateToPoints([-1, -2, -3], [1, 2, 3]);
+  return { ok: c.calibrated === false && c.scale === 1 && d.calibrated === false && d.scale === 1,
+    detail: "zero mean → calibrated " + c.calibrated + " scale " + c.scale + "; negative mean → calibrated " + d.calibrated + " scale " + d.scale };
+});
+check("TOURNAMENT-the-reported-MAEs-are-inside-one-order-of-magnitude-of-each-other", function () {
+  const m = TOUR.models.filter(function (x) { return x.mae !== null; });
+  if (m.length < 2) return { ok: false, detail: "only " + m.length + " scored models" };
+  const vals = m.map(function (x) { return x.mae; });
+  const lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  return { ok: lo > 0 && hi <= 10 * lo, detail: "MAE spread " + r2(lo) + " to " + r2(hi) + " (ratio " + r2(hi / lo) + ", gate 10) · units " + TOUR.maeUnits };
+});
 check("TOURNAMENT-spearman-of-a-perfect-ranking-is-1", function () {
   return { ok: close(E.spearman([1, 2, 3, 4, 5], [10, 20, 30, 40, 50]), 1, 1e-9) && close(E.spearman([1, 2, 3, 4, 5], [50, 40, 30, 20, 10]), -1, 1e-9), detail: "perfect " + E.spearman([1, 2, 3, 4, 5], [10, 20, 30, 40, 50]) + ", inverted " + E.spearman([1, 2, 3, 4, 5], [50, 40, 30, 20, 10]) };
 });
@@ -1190,6 +1665,75 @@ check("E026-synthetic-draft-ids-differ-and-the-code-join-is-the-truth", function
     if (byId && byId.code === classic.code) bad.push(id + ": id join accidentally correct — the fixture is wrong");
   });
   return { ok: bad.length === 0, detail: bad.join("; ") || shifted.length + " shifted draft ids all resolve by code" };
+});
+
+// The check above guards the MAP (ctx.draft.byCode) and nothing else, so an id join inside
+// draftEl — the one function every draft consumer goes through — used to pass the whole suite
+// (E-048). These four drive the consumers: draftEl itself, then draftWaivers, watchlistAudit
+// and draftXI, each on codes whose draft id is NOT the classic id.
+
+const SYN_SHIFTED = [4, 11, 17, 22, 30].map(function (id) { return 500000 + id; });
+const SYN_ROSTER = [1, 7, 2, 3, 8, 9, 14, 4, 16, 17, 22, 34, 6, 12, 30].map(function (id) { return 500000 + id; });
+const SYN_DRAFT_STATE = (function () {
+  const st = JSON.parse(JSON.stringify(SYN_STATE));
+  st.draft = { league_id: null, roster: SYN_ROSTER, watchlist: [500004, 500034, 500016, 999999] };
+  return st;
+})();
+
+check("E026-draftEl-joins-on-code-so-both-halves-are-the-same-footballer", function () {
+  const bad = [];
+  SYN_SHIFTED.forEach(function (code) {
+    const rec = E.draftEl(code, CTX);
+    if (!rec) { bad.push(code + ": draftEl returned null"); return; }
+    if (!rec.classic || !rec.draft) { bad.push(code + ": one half missing (classic " + !!rec.classic + ", draft " + !!rec.draft + ")"); return; }
+    if (rec.classic.code !== code || rec.draft.code !== code) bad.push(code + ": the two halves carry different codes");
+    if (rec.classic.id === rec.draft.id) bad.push(code + ": the fixture is wrong — the ids do not differ");
+    if (rec.id !== rec.classic.id) bad.push(code + ": rec.id is not the CLASSIC id");
+    if (rec.web_name !== CTX.els[rec.classic.id].web_name) bad.push(code + ": name does not match the classic row");
+    // the join an id-keyed implementation would make
+    if (CTX.els[code] || CTX.draft.els[code]) bad.push(code + ": a code is also a valid id here — the fixture cannot separate the two joins");
+  });
+  return { ok: bad.length === 0, detail: bad.join("; ") ||
+    SYN_SHIFTED.length + " shifted codes resolve to one player in both systems; keying the element tables by the CODE resolves nothing at all" };
+});
+check("E026-draftWaivers-claims-are-named-and-priced-off-the-code-join", function () {
+  const claims = E.draftWaivers(SYN_DRAFT_STATE, CTX);
+  const forced = claims.filter(function (c) { return c.forced; });
+  const upgrades = claims.filter(function (c) { return !c.forced; });
+  const named = claims.filter(function (c) {
+    const o = E.draftEl(c.out, CTX), i = E.draftEl(c.in, CTX);
+    return o && i && o.web_name === c.outName && i.web_name === c.inName;
+  });
+  const shiftedTouched = claims.filter(function (c) { return SYN_SHIFTED.indexOf(c.out) >= 0 || SYN_SHIFTED.indexOf(c.in) >= 0; });
+  const sortedWithin = function (list) { return list.every(function (c, i) { return i === 0 || list[i - 1].gain >= c.gain - 1e-9; }); };
+  const forcedFirst = claims.every(function (c, i) { return !c.forced || i < forced.length; });
+  const ok = claims.length >= 2 && forced.length >= 2 && named.length === claims.length &&
+    shiftedTouched.length >= 1 && forcedFirst && sortedWithin(forced) && sortedWithin(upgrades) &&
+    claims.every(function (c, i) { return c.priority === i + 1; }) &&
+    forced.some(function (c) { return c.out === 500034 && /no starts/.test(c.why); }) &&
+    forced.some(function (c) { return c.out === 500022 && /unavailable/.test(c.why); });
+  return { ok: ok, detail: claims.map(function (c) { return c.priority + ") " + c.outName + "→" + c.inName + " " + r2(c.gain) + (c.forced ? " forced" : "") ; }).join(" · ") +
+    "; " + shiftedTouched.length + " of them involve a shifted code" };
+});
+check("E026-watchlistAudit-resolves-shifted-codes-and-applies-the-three-start-rule", function () {
+  const res = E.watchlistAudit([500004, 500034, 500016, 999999], CTX);
+  const d = {}; res.detail.forEach(function (x) { d[x.code] = x; });
+  const ok = res.keep.join(",") === "500004,500016" && res.drop.join(",") === "500034" && res.unknown.join(",") === "999999" &&
+    d[500004].id === 4 && d[500004].starts_last3 === 3 && d[500004].verdict === "KEEP" &&
+    d[500034].starts_last3 === 0 && d[500034].verdict === "DROP" && d[999999].verdict === "unknown";
+  return { ok: ok, detail: res.detail.map(function (x) { return x.code + "→" + (x.id === undefined ? "unresolved" : "id " + x.id) + " " + x.verdict + " (" + x.starts_last3 + " starts)"; }).join(" · ") };
+});
+check("E026-draftXI-picks-a-legal-eleven-from-a-roster-of-codes", function () {
+  const xi = E.draftXI(SYN_ROSTER, CTX);
+  const ids = xi.codes.map(function (c) { return E.draftEl(c, CTX).classic.id; });
+  const shapes = E.FORMATIONS.map(function (f) { return f.join("-"); });
+  const ok = xi.ids.length === 11 && xi.codes.length === 11 && ids.join(",") === xi.ids.join(",") &&
+    shapes.indexOf(xi.formation) >= 0 && E.legalXI(xi.ids, CTX.els).ok &&
+    xi.codes.every(function (c) { return SYN_ROSTER.indexOf(c) >= 0; }) &&
+    xi.codes.filter(function (c) { return SYN_SHIFTED.indexOf(c) >= 0; }).length >= 1 &&
+    xi.bench.length === 4 && xi.codes.indexOf(500034) < 0;
+  return { ok: ok, detail: xi.formation + " from codes [" + xi.codes.join(",") + "] → ids [" + xi.ids.join(",") + "]; bench " + xi.bench.length +
+    ", shifted codes in the eleven " + xi.codes.filter(function (c) { return SYN_SHIFTED.indexOf(c) >= 0; }).length + ", the dead man (500034) is out" };
 });
 
 // ================================================================ live snapshot
@@ -1247,6 +1791,57 @@ if (!LIVE) {
   console.log("buildCtx: ok=" + LCTX.ok + " · " + buildMs + " ms · next_event GW" + LCTX.nextEvent +
     " · deadline " + LCTX.deadline + " · " + (LCTX.hoursToDeadline === null ? "n/a" : r2(LCTX.hoursToDeadline)) + " h to deadline" +
     " · phase " + LCTX.phase + " · FT " + LCTX.ft + " · bank " + LCTX.bank + " · budget " + LCTX.budget + " tenths · block " + LCTX.block.block);
+
+  // ------------------------------------------------------------ E-026 / E-048 on the real 655
+  // The map check earlier proves the two tables can be joined. These prove that the join the
+  // CONSUMERS make is the code one: draftEl and the three functions built on it, driven over
+  // the 59 codes whose draft id belongs to a different footballer in the classic game.
+  const L_BYCODE = {}, L_BYID = {};
+  LIVE.elements.forEach(function (e) { L_BYCODE[e.code] = e; L_BYID[e.id] = e; });
+  const L_SHIFTED = LIVE.draft.elements.filter(function (d) { const c = L_BYCODE[d.code]; return c && c.id !== d.id; });
+
+  check("E026-draftEl-resolves-every-shifted-code-to-one-player-while-the-id-join-lands-on-another", function () {
+    const bad = [], collisions = [];
+    L_SHIFTED.forEach(function (d) {
+      const rec = E.draftEl(d.code, LCTX);
+      if (!rec || !rec.classic || !rec.draft) { bad.push(d.code + ": draftEl returned " + (rec ? "half a record" : "null")); return; }
+      if (rec.classic.code !== d.code || rec.draft.code !== d.code) bad.push(d.code + ": halves disagree");
+      if (rec.classic.id !== L_BYCODE[d.code].id) bad.push(d.code + ": wrong classic id " + rec.classic.id);
+      if (rec.web_name !== L_BYCODE[d.code].web_name) bad.push(d.code + ": wrong name " + rec.web_name);
+      const other = LCTX.els[d.id];                 // what an id join would have found
+      if (other && other.code !== d.code) collisions.push({ code: d.code, name: rec.web_name, draftId: d.id, classicId: rec.classic.id, other: other.web_name });
+      if (LCTX.els[d.code]) bad.push(d.code + ": a code is also a live element id — the control is unsound");
+    });
+    const ex = collisions[0];
+    return { ok: bad.length === 0 && L_SHIFTED.length === 59 && collisions.length >= 1,
+      detail: bad.length ? bad.slice(0, 3).join("; ") :
+        L_SHIFTED.length + " shifted codes all resolve to the same player in both systems; " + collisions.length +
+        " of them would land on a DIFFERENT player under an id join — e.g. " + ex.name + " (code " + ex.code + ", draft id " + ex.draftId +
+        ", classic id " + ex.classicId + ") would come back as " + ex.other };
+  });
+  check("E026-watchlistAudit-and-draftXI-and-draftWaivers-all-resolve-the-shifted-codes", function () {
+    const need = { 1: 2, 2: 5, 3: 5, 4: 3 };
+    const roster = [];
+    L_SHIFTED.slice().sort(function (a, b) { return L_BYCODE[b.code].total_points - L_BYCODE[a.code].total_points; })
+      .forEach(function (d) { const t = L_BYCODE[d.code].element_type; if (need[t] > 0) { need[t]--; roster.push(d.code); } });
+    if (roster.length !== 15) return { ok: false, detail: "only " + roster.length + " shifted players available to build a 2-5-5-3 roster" };
+    const audit = E.watchlistAudit(roster, LCTX);
+    const xi = E.draftXI(roster, LCTX);
+    const st = JSON.parse(JSON.stringify(LSTATE || {}));
+    st.draft = { league_id: null, roster: roster, watchlist: roster };
+    const claims = E.draftWaivers(st, LCTX);
+    const auditOk = audit.unknown.length === 0 && audit.keep.length + audit.drop.length === 15 &&
+      audit.detail.every(function (x) { return x.id === L_BYCODE[x.code].id && x.name === L_BYCODE[x.code].web_name; });
+    const xiOk = xi.ids.length === 11 && E.legalXI(xi.ids, LCTX.els).ok &&
+      xi.codes.every(function (c, i) { return L_BYCODE[c] && L_BYCODE[c].id === xi.ids[i]; });
+    const claimsOk = claims.length >= 1 && claims.every(function (c) {
+      return L_BYCODE[c.out] && L_BYCODE[c.in] && L_BYCODE[c.out].web_name === c.outName && L_BYCODE[c.in].web_name === c.inName;
+    });
+    return { ok: auditOk && xiOk && claimsOk,
+      detail: "roster of 15 shifted-code players → watchlist " + audit.keep.length + " KEEP / " + audit.drop.length + " DROP / " +
+        audit.unknown.length + " unknown; draftXI " + xi.formation + " (" + xi.ids.length + " ids, legal " + E.legalXI(xi.ids, LCTX.els).ok + "); " +
+        claims.length + " waiver claims, all named off the classic row" };
+  });
 
   const tags = E.overUnderTags(LIVE);
   const hull = tags.filter(function (t) { return t.short_name === "HUL"; })[0];
@@ -1329,11 +1924,114 @@ if (!LIVE) {
     return { ok: bad.length === 0, detail: "convergent picks: " + bad.map(function (id) { return LCTX.els[id].web_name + " " + r2(E.rivalOwnMax(id, LCTX).max); }).join(", ") || "none" };
   });
 
+  // E-038 acceptance test on the real 655-player pool.
+  const t2 = Date.now();
+  const llo = lwc.ok ? E.wcLocalOptimum(lwc.ids, LCTX, {}) : { ok: false, optimal: false, checked: 0, reason: "solver not ok" };
+  const loMs = Date.now() - t2;
+  console.log("local-optimum audit: " + llo.checked + " legal single swaps tested in " + loMs + " ms · optimal " + llo.optimal +
+    " · bank " + llo.bank + " tenths · solver took " + lwc.steps + " improving steps");
+  check("LIVE-wildcardSolver-returns-a-one-swap-local-optimum-over-the-whole-pool", function () {
+    return { ok: llo.ok && llo.optimal === true && llo.checked > 100, detail: llo.reason };
+  });
+
+  // E-036/E-039 (C1 rule 6 against the written plan): all three fifteens, priced, under one
+  // objective. wildcardOptions must not move the solver's own answer.
+  if (WEEKLY && WEEKLY.classic && Array.isArray(WEEKLY.classic.wildcard15)) {
+    const t3 = Date.now();
+    const lopt = E.wildcardOptions(LCTX, { written: WEEKLY.classic.wildcard15 });
+    const optMs = Date.now() - t3;
+    if (!lopt.ok) {
+      check("LIVE-wildcardOptions-prices-all-three-fifteens", function () { return { ok: false, detail: lopt.reasons.join("; ") }; });
+    } else {
+      console.log("wildcardOptions (" + optMs + " ms): locks " + (lopt.locks.map(function (l) { return l.web_name + " " + Math.round(l.rivalOwn * 100) + "%"; }).join(", ") || "none"));
+      ["pure", "locked", "written"].forEach(function (k) {
+        const v = lopt[k];
+        console.log("  " + k.padEnd(8) + " cost " + v.cost + " bank " + v.bank + " · objective " + r2(v.objective) + " (weekly " + r2(v.weekly) + ") · " + v.formation + " · legal " + v.legal);
+      });
+      const dl = lopt.deltas.lockedVsPure, dw = lopt.deltas.writtenVsPure;
+      console.log("  locked − pure: " + (dl ? r2(dl.objective) + " objective, " + dl.cost + " tenths, " + dl.playersDiffer + " players" : "n/a") +
+        " · written − pure: " + (dw ? r2(dw.objective) + " objective, " + dw.cost + " tenths, " + dw.playersDiffer + " players" : "n/a"));
+      console.log("  " + lopt.note);
+      check("LIVE-wildcardOptions-prices-all-three-fifteens", function () {
+        const ok = ["pure", "locked", "written"].every(function (k) { return lopt[k] && lopt[k].ok === true && lopt[k].legal === true && lopt[k].ids.length === 15 && isFinite(lopt[k].objective); });
+        return { ok: ok, detail: ["pure", "locked", "written"].map(function (k) { return k + " ok=" + lopt[k].ok + " legal=" + lopt[k].legal + " cost=" + lopt[k].cost; }).join(" · ") };
+      });
+      check("LIVE-wildcardOptions-derives-its-locks-from-the-written-plan-and-the-ownership-data", function () {
+        const want = WEEKLY.classic.wildcard15.filter(function (id) { return LCTX.els[id] && E.convergenceRisk(id, LCTX).risk; }).sort(function (a, b) { return a - b; });
+        const got = lopt.locks.map(function (l) { return l.id; }).sort(function (a, b) { return a - b; });
+        const held = lopt.locked.ok && want.every(function (id) { return lopt.locked.ids.indexOf(id) >= 0; });
+        return { ok: want.length > 0 && want.join(",") === got.join(",") && held,
+          detail: want.length + " of the written fifteen are 60%+ rival-owned (" + want.map(function (id) { return LCTX.els[id].web_name; }).join(", ") + "); locks " + (want.join(",") === got.join(",") ? "match" : "DO NOT match: " + got.join(",")) + "; all held in the locked solve: " + held };
+      });
+      check("LIVE-wildcardOptions-does-not-move-the-default-solver-answer-or-rule-C1.6", function () {
+        const same = lopt.pure.ids.slice().sort(function (a, b) { return a - b; }).join(",") === (lwc.ids || []).slice().sort(function (a, b) { return a - b; }).join(",");
+        const pureClean = lopt.pure.ids.filter(function (id) { return E.rivalOwnMax(id, LCTX).max >= 0.60; }).length === 0;
+        return { ok: same && pureClean, detail: "pure fifteen identical to wildcardSolver: " + same + "; rule-pure solve still carries no convergent player: " + pureClean };
+      });
+      check("LIVE-wildcardOptions-locked-solve-spends-more-of-the-bank-than-the-rule-pure-solve", function () {
+        const d = lopt.deltas.lockedVsPure;
+        if (!d) return { ok: false, detail: "no locked/pure delta" };
+        return { ok: d.cost > 0 && lopt.locked.bank < lopt.pure.bank && d.playersDiffer > 0,
+          detail: "pure leaves " + lopt.pure.bank + " tenths idle at objective " + r2(lopt.pure.objective) + "; locking the convergent premiums spends " + d.cost + " tenths more, leaves " + lopt.locked.bank + ", and is worth " + r2(d.objective) + " over five gameweeks across " + d.playersDiffer + " players" };
+      });
+    }
+  }
+
+  const ltim = E.wildcardTiming(LCTX);
+  console.log("timing: " + ltim.horizons.map(function (h) { return h.label + " (" + h.weeks + " wks to GW" + h.gw + ") " + r2(h.sumDeficit); }).join(" · "));
+  console.log("  " + ltim.saturated.note);
+  check("LIVE-timing-horizons-both-include-their-end-gameweek-and-saturation-is-named", function () {
+    const g19 = ltim.horizons.filter(function (h) { return /GW19/.test(h.label); })[0];
+    const g38 = ltim.horizons.filter(function (h) { return /GW38/.test(h.label); })[0];
+    const inclusive = g19 && g38 && g19.gw === 19 && g38.gw === 38 && g19.weeks === 19 - ltim.gw + 1 && g38.weeks === 38 - ltim.gw + 1;
+    const equal = g19 && g38 && Math.abs(g19.sumDeficit - g38.sumDeficit) < 1e-9;
+    const explained = !equal || (ltim.saturated.saturates === true && ltim.saturated.gw === ltim.gw + ltim.swapsNeeded - 1);
+    return { ok: inclusive && explained, detail: "GW19 window " + (g19 ? g19.weeks : "?") + " weeks to GW" + (g19 ? g19.gw : "?") + ", GW38 window " + (g38 ? g38.weeks : "?") + " weeks to GW" + (g38 ? g38.gw : "?") + "; equal totals " + equal + ", saturates at GW" + ltim.saturated.gw };
+  });
+
   const ltour = E.tournament(LIVE);
-  console.log("tournament: leader " + ltour.leader + " · " + ltour.transitions + " transitions · promotable " + ltour.promotable);
-  console.log("  " + ltour.models.map(function (m) { return m.key + " ρ=" + (m.spearman === null ? "n/a" : r4(m.spearman)) + " MAE=" + (m.mae === null ? "n/a" : r2(m.mae)); }).join("\n  "));
+  console.log("tournament: leader " + ltour.leader + " · " + ltour.transitions + " transitions · promotable " + ltour.promotable + " · MAE in " + ltour.maeUnits);
+  console.log("  " + ltour.models.map(function (m) { return m.key + " ρ=" + (m.spearman === null ? "n/a" : r4(m.spearman)) + " MAE=" + (m.mae === null ? "n/a" : r2(m.mae)) + " (raw " + (m.maeRaw === null ? "n/a" : r2(m.maeRaw)) + " × " + (m.maeScale === null ? "n/a" : r4(m.maeScale)) + ")"; }).join("\n  "));
+  check("LIVE-tournament-MAEs-are-inside-one-order-of-magnitude-of-each-other", function () {
+    const scored = ltour.models.filter(function (m) { return m.mae !== null; });
+    const vals = scored.map(function (m) { return m.mae; });
+    const lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    const raws = scored.map(function (m) { return m.maeRaw; });
+    const rlo = Math.min.apply(null, raws), rhi = Math.max.apply(null, raws);
+    return { ok: scored.length === 8 && lo > 0 && hi <= 10 * lo,
+      detail: "calibrated spread " + r2(lo) + "–" + r2(hi) + " (ratio " + r2(hi / lo) + "); raw spread " + r2(rlo) + "–" + r2(rhi) + " (ratio " + r2(rhi / rlo) + ")" };
+  });
+  check("LIVE-the-BPS-rate-model-is-the-one-the-rescaling-moves", function () {
+    const bps = ltour.models.filter(function (m) { return m.key === "bps_rate"; })[0];
+    const cxp = ltour.models.filter(function (m) { return m.key === "component_xp"; })[0];
+    if (!bps || bps.mae === null || !cxp || cxp.mae === null) return { ok: false, detail: "bps_rate or component_xp not scored" };
+    return { ok: bps.maeRaw / bps.mae > 3 && bps.maeScale < 0.5 && Math.abs(bps.mae - cxp.mae) < 1 && cxp.maeRaw / cxp.mae < 1.5,
+      detail: "bps_rate MAE " + r2(bps.maeRaw) + " raw → " + r2(bps.mae) + " in points (scale " + r4(bps.maeScale) + "); component_xp " + r2(cxp.maeRaw) + " → " + r2(cxp.mae) + " (scale " + r4(cxp.maeScale) + ")" };
+  });
   check("LIVE-tournament-has-eight-models-and-is-not-promotable-yet", function () {
     return { ok: ltour.models.length === 8 && ltour.transitions === 2 && ltour.promotable === false, detail: ltour.models.length + " models · " + ltour.transitions + " transitions · promotable " + ltour.promotable + " (gate is 3, GW5 earliest)" };
+  });
+  // E-054: CLAUDE.md Part M and data/weekly.js both carry a written tournament leader
+  // ("bps_rate", recorded at v86). The engine recomputes the walk-forward from the snapshot and
+  // does not agree. The written value is a note, never an input — the app has to report what it
+  // computed, and neither model may drive anything until the promotion gate opens at GW5.
+  check("LIVE-the-tournament-leader-is-computed-from-the-snapshot-not-read-from-the-written-plan", function () {
+    let written = null;
+    try {
+      const wsrc = fs.readFileSync(path.join(ROOT, "data", "weekly.js"), "utf8");
+      const m = /tournament:\s*\{[^}]*leader:\s*"([a-z_0-9]+)"/.exec(wsrc);
+      written = m ? m[1] : null;
+    } catch (e) { written = null; }
+    const keys = ltour.models.map(function (m) { return m.key; });
+    // Recompute the ranking here, from the engine's own per-model Spearman, and check the
+    // engine's leader is that argmax — not the written string.
+    const scored = ltour.models.filter(function (m) { return m.spearman !== null; });
+    const top = scored.slice().sort(function (a, b) { return b.spearman - a.spearman; })[0];
+    const ok = written !== null && keys.indexOf(written) >= 0 && top && ltour.leader === top.key &&
+      ltour.promotable === false && ltour.transitions < 3;
+    return { ok: ok, detail: "written plan says " + written + "; the snapshot computes " + ltour.leader + " (ρ " + r4(top ? top.spearman : NaN) + ")" +
+      (written === ltour.leader ? " — they agree today" : " — they disagree, and the computed one is what the engine reports") +
+      "; promotable " + ltour.promotable + " at " + ltour.transitions + " transitions (gate 3)" };
   });
   check("LIVE-deadline-is-read-from-is_next-never-hard-coded", function () {
     const nextEv = LIVE.events.filter(function (e) { return e.is_next; })[0];

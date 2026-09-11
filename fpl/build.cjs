@@ -30,18 +30,29 @@ const M = {
 };
 
 /* The import lines have to stay at the top of an ES module, so they are lifted off
-   src/ui.jsx and everything else follows the data blocks. */
+   src/ui.jsx and everything else follows the data blocks. Collection stops at the first
+   statement that is not an import, which is why an import written further down the file
+   would be dropped silently: the body is scanned afterwards and a late import throws with
+   its line number instead. (The old code also tested for an import inside the branch that
+   had already established the line was blank or a comment, which could never be true.) */
 function splitImports(src) {
   const lines = src.split("\n");
   const imports = [];
   let i = 0;
   for (; i < lines.length; i++) {
     const t = lines[i].trim();
-    if (t === "" || t.startsWith("//")) { if (t.startsWith("import ")) imports.push(lines[i]); continue; }
+    if (t === "" || t.startsWith("//")) continue;
     if (t.startsWith("import ")) { imports.push(lines[i]); continue; }
     break;
   }
-  return { imports: imports, rest: lines.slice(i).join("\n") };
+  const rest = lines.slice(i);
+  for (let k = 0; k < rest.length; k++) {
+    if (rest[k].trim().startsWith("import ")) {
+      throw new Error("src/ui.jsx line " + (i + k + 1) + " is an import after the first statement: " +
+        rest[k].trim().slice(0, 80) + " — move it to the top of the file; the assembler would otherwise drop it");
+    }
+  }
+  return { imports: imports, rest: rest.join("\n") };
 }
 
 function jsLiteral(obj) {
@@ -138,7 +149,12 @@ function page(js) {
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">",
     "<meta name=\"color-scheme\" content=\"dark\">",
     "<title>FPL Mission Control " + APP_VERSION + "</title>",
-    "<style>html,body{margin:0;padding:0;background:#0b0e13;color:#e9eef6}#root{min-height:100vh}</style>",
+    /* CONTRACT §7 allows hex only inside the token definitions, which live in the app's own
+       single <style> block. This shell block therefore carries no colour at all: it would be a
+       second, unwatched copy of --bg and --text, free to drift from the tokens. The dark canvas
+       before React mounts comes from the color-scheme meta above, and .mc-root paints var(--bg)
+       over the full viewport the moment it renders. */
+    "<style>html,body{margin:0;padding:0}#root{min-height:100vh}</style>",
     "</head>",
     "<body>",
     "<div id=\"root\"></div>",

@@ -21,6 +21,7 @@
 "use strict";
 
 const path = require("path");
+const fs = require("fs");
 const H = require(path.join(__dirname, "harness.cjs"));
 
 const ROOT = path.resolve(__dirname, "..");
@@ -61,8 +62,16 @@ const CTX = E.buildCtx(LIVE, seedState(), NOW);
 const ENGINE_15 = (function () {
   try { const wc = E.wildcardSolver(CTX, {}); return wc && wc.ok ? wc.ids : []; } catch (e) { return []; }
 })();
+const LOCKED_15 = (function () {
+  try {
+    const wsrc = fs.readFileSync(path.join(ROOT, "data", "weekly.js"), "utf8");
+    const WEEKLY = new Function(wsrc + "; return WEEKLY;")();
+    const wo = E.wildcardOptions(CTX, { written: WEEKLY && WEEKLY.classic ? WEEKLY.classic.wildcard15 : [] });
+    return wo && wo.ok && wo.locked && wo.locked.ok ? wo.locked.ids : [];
+  } catch (e) { return []; }
+})();
 const PREFERRED = {};
-ENGINE_15.concat(SAVED).forEach(function (id) { PREFERRED[id] = true; });
+ENGINE_15.concat(LOCKED_15).concat(SAVED).forEach(function (id) { PREFERRED[id] = true; });
 
 function resolveName(name) {
   const c = NAME_IDS[name];
@@ -129,7 +138,7 @@ async function restore(page, mode, tab) {
   }
   if (await page.$(".menu")) { await page.click('[data-testid="menu"]'); }
   if (mode === "full") {
-    const t = await page.getAttribute(".mc-root", "data-tab");
+    const t = await page.getAttribute(".mc-root", "data-view");
     if (t !== tab) { await page.click('[data-testid="tab-' + tab + '"]'); await page.waitForTimeout(120); }
     await openAllSections(page);
   }
@@ -344,7 +353,7 @@ async function main() {
     const before = await page.evaluate(function () {
       const root = document.querySelector(".mc-root");
       return {
-        tab: root.getAttribute("data-tab"),
+        tab: root.getAttribute("data-view"),
         secs: Array.prototype.map.call(root.querySelectorAll(".section"), function (s) { return s.getAttribute("data-section") + ":" + s.querySelector(".sec-h").getAttribute("aria-expanded"); })
       };
     });
@@ -357,7 +366,7 @@ async function main() {
     const after = await page.evaluate(function () {
       const root = document.querySelector(".mc-root");
       return {
-        tab: root.getAttribute("data-tab"), mode: root.getAttribute("data-mode"),
+        tab: root.getAttribute("data-view"), mode: root.getAttribute("data-mode"),
         boundary: root.querySelectorAll(".boundary").length,
         secs: Array.prototype.map.call(root.querySelectorAll(".section"), function (s) { return s.getAttribute("data-section") + ":" + s.querySelector(".sec-h").getAttribute("aria-expanded"); })
       };

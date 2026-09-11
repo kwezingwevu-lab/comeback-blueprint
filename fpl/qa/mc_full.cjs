@@ -391,14 +391,15 @@ const TS = CTX.TS;
 const CODES = SQUAD.map(function (id) { return 500000 + id; });
 const CONTENT = [{ type: "server_tool_use", name: "web_search" }, { type: "web_search_tool_result", content: [] }, { type: "text", text: "{\"elements\":[]}" }];
 
+const WCW = F("wcSetup")(CTX, {}, "TS");                  // the solver's own pool/feasibility bundle
 const VALID = {
-  num: [3.5, 0], intOf: [3.7, 0], clamp: [5, 0, 10], isObj: [{}], arr: [[1, 2]], errMsg: [new Error("x")], okCtx: [CTX],
+  num: [3.5, 0], intOf: [3.7, 0], clamp: [5, 0, 10], isObj: [{}], kindOf: [{}], arr: [[1, 2]], errMsg: [new Error("x")], okCtx: [CTX],
   idOf: [{ id: 4 }], idList: [SQUAD], elMap: [SNAP.elements], elType: [EL], uniq: [[1, 1, 2]], sum: [[1, 2, 3]],
   sortNum: [1, 2], quantile: [[1, 2, 3, 4, 5], 0.5], nowMs: [NOW], combos: [[1, 2, 3, 4], 2],
   rowStat: [SNAP.gw["1"].elements[16], 2, "pts", 0], pointsFor: [STATS_ROW, 3], draftScoring: [SNAP], gwPoints: [SNAP.picks["3"].picks, SNAP.gw["3"]],
   clubCounts: [SQUAD, CTX.els], posCounts: [SQUAD, CTX.els], legal15: [SQUAD, CTX.els, 1000], legalXI: [XI.ids, CTX.els], formationOf: [XI.ids, CTX.els],
   shrunkPps: [EL], flagInfo: [EL], isFlagged: [EL], statsFor: [EL, CTX], pStart: [EL, { games: 3, starts: 3, everBenched: false }],
-  fxMult: [FIXTURE1, 1, TS], teamMults: [1, CTX, "TS"], xp5FromMults: [EL, 0.875, [1.1, 0.95, 1.05, 0.9, 1.0]],
+  fxMult: [FIXTURE1, 1, TS], fxMultInfo: [FIXTURE1, 1, TS], teamMults: [1, CTX, "TS"], xp5FromMults: [EL, 0.875, [1.1, 0.95, 1.05, 0.9, 1.0]],
   xp1With: [EL, CTX, "TS"], xp5With: [EL, CTX, "TS"], xp1: [EL, CTX], xp5: [EL, CTX],
   teamStrength: [SNAP], tsEntry: [TS, 1], tsXg: [1, 2, true, TS], tsMult: [1, 2, true, TS], tsPcs: [1, 2, true, TS],
   overUnderTags: [SNAP], runAvg: [1, SNAP.fixtures, 5], elementGwStats: [SNAP],
@@ -406,19 +407,21 @@ const VALID = {
   gamePhase: [SNAP, NOW], buildCtx: [SNAP, STATE, NOW],
   tierOf: [EL, CTX], pickXI: [SQUAD, CTX], captainPick: [XI.ids, CTX], bestXI: [SQUAD, CTX], benchOrder: [SQUAD, XI.ids, CTX],
   sellCandidates: [STATE.squad, CTX], transferProtocol: [STATE, CTX],
-  wcObjective: [SQUAD, CTX, "TS"], wcPool: [CTX, {}, 3], wcSolve: [CTX, {}, "TS"], wildcardSolver: [CTX, {}], wildcardTiming: [CTX],
+  wcObjective: [SQUAD, CTX, "TS"], wcPool: [CTX, {}, 3], wcCost: [SQUAD, CTX], wcSetup: [CTX, {}, "TS"], wcFeasible: [SQUAD, CTX, WCW],
+  wcSolve: [CTX, {}, "TS"], wcLocalOptimum: [SQUAD, CTX, {}], wildcardSolver: [CTX, {}],
+  elName: [16, CTX], writtenFifteen: [{ written: SQUAD }], wildcardOptions: [CTX, { written: SQUAD }], wildcardTiming: [CTX],
   chipWindows: [SNAP], chipRegret: ["bench_boost", CTX, {}],
   draftEl: [500016, CTX], draftEV: [CTX.draft && CTX.draft.byCode ? CTX.draft.byCode[500016] : null, CTX],
   draftWaivers: [STATE, CTX], watchlistAudit: [CODES, CTX], draftXI: [CODES, CTX],
   sanitiseState: [STATE], detectSquadChange: [SQUAD, SNAP.picks["3"].picks], ftAvailable: [SNAP.history, 3], sellPrice: [47, 45], bankAfter: [STATE, [{ out: 34, in: 11 }], CTX.els],
-  openClosers: ['{"a":[1,2'], salvageJson: ['{"a":[1,2'], parseJson: ['{"a":1}'], blocksOf: [{ content: CONTENT }], pickText: [CONTENT], blockTypes: [CONTENT],
+  openClosers: ['{"a":[1,2'], salvageJson: ['{"a":[1,2'], stripFences: ["```json\n{\"a\":1}\n```"], parseJson: ['{"a":1}'], blocksOf: [{ content: CONTENT }], pickText: [CONTENT], blockTypes: [CONTENT],
   refreshRequest: [{ pair: "sonnet46", nextEvent: 4 }], applyRefresh: [{ live: SNAP }, { elements: [{ id: 1, status: "d", chance: 75 }] }],
   mulberry32: [7], rngOf: [7], poisson: [1.4, mulberry32(3)], binomial: [10, 0.3, mulberry32(4)],
   posRates: [CTX], playerRates: [EL, CTX], likelyXI: [1, CTX], simFixture: [FIXTURE1, CTX, mulberry32(5)],
   simPlayerDetail: [EL, CTX, mulberry32(6)], simPlayer: [EL, CTX, mulberry32(7)], fixtureDraws: [CTX, mulberry32(8)],
   entryPoints: [XI.ids, BENCH, XI.capId, XI.viceId, {}, CTX], squadOrder: [SQUAD, XI.capId, CTX],
   mcSquad: [SQUAD, XI.capId, CTX, 30, 11, XI.viceId], mcLeague: [CTX, 900, { iters: 30, seed: 3 }],
-  ranksOf: [[3, 1, 2]], spearman: [[1, 2, 3], [2, 1, 3]], mae: [[1, 2, 3], [2, 1, 3]], tournament: [SNAP]
+  ranksOf: [[3, 1, 2]], spearman: [[1, 2, 3], [2, 1, 3]], mae: [[1, 2, 3], [2, 1, 3]], calibrateToPoints: [[10, 20, 30], [1, 2, 3]], tournament: [SNAP]
 };
 
 // Slot budgets: how many arguments to offer each function. Declared length, but never zero for
@@ -433,7 +436,7 @@ function arityOf(fn, name) {
 // Expensive functions: the huge-number junk kind in an iteration-count slot would make each call
 // run the engine's 20 000-iteration cap. They keep the valid iteration count in that slot; every
 // other slot still takes junk, and P04 still times every call.
-const ITER_SLOT = { mcSquad: 3, mcLeague: -1, wcSolve: -1 };
+const ITER_SLOT = { mcSquad: 3, mcLeague: -1, wcSolve: -1, wildcardOptions: -1, wcLocalOptimum: -1 };
 
 // ---------------------------------------------------------------- 6. inspection helpers
 
@@ -448,7 +451,7 @@ const TENTH_KEYS = ["cost", "now_cost", "bank", "bankafter", "budget", "purchase
 // its cap is the input list minus the eleven (4 for a real fifteen, and stricter than a flat 4
 // whenever the caller passed fewer than fifteen).
 const CAPS = { squad: 15, xi: 11, moves: 3, order: 8, models: 8, claims: 20, alternatives: 3, reasons: 60, relaxations: 12 };
-const IDS_CAP = { bestXI: 11, pickXI: 11, wildcardSolver: 15, sanitiseState: 15 };
+const IDS_CAP = { bestXI: 11, pickXI: 11, wildcardSolver: 15, wildcardOptions: 15, sanitiseState: 15 };
 
 function walk(v, visit) {
   let nodes = 0;
