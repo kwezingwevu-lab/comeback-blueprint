@@ -4,7 +4,8 @@
  * Rules of this file: top-level function declarations only; no React, no DOM, no
  * imports, no Date.now() inside pure functions (pass `now` in). Every function is
  * total — bad input yields a safe empty result — except parseJson and applyRefresh,
- * which throw by specification (D4). ep_this / ep_next are never read.
+ * which throw by specification (D4). The API's two opaque expected-points fields are
+ * never read (D1 bans them; verify.sh greps the assembled file for their names).
  *
  * Most decision functions take a `ctx` built once by buildCtx(live, state, now).
  * Prices are in tenths (integers). Ids are classic FPL element ids; draft players are
@@ -117,6 +118,7 @@ var POS_NAME = { 1: "GKP", 2: "DEF", 3: "MID", 4: "FWD" };
 var SQUAD_SHAPE = { 1: 2, 2: 5, 3: 5, 4: 3 };
 var FORMATIONS = [[3, 4, 3], [3, 5, 2], [4, 3, 3], [4, 4, 2], [4, 5, 1], [5, 2, 3], [5, 3, 2], [5, 4, 1]];
 var PRIOR_PPS = { 1: 3.2, 2: 3.4, 3: 3.9, 4: 3.8 };
+var BINOMIAL_MAX_N = 5000;
 var SHRINK_K = 4;
 var TS_K = 6;
 var HOME_ADV = 1.10;
@@ -166,10 +168,27 @@ function num(x, d) {
   return isFinite(v) ? v : (d === undefined ? 0 : d);
 }
 function intOf(x, d) { var v = num(x, NaN); return isFinite(v) ? Math.trunc(v) : (d === undefined ? 0 : d); }
-function clamp(v, lo, hi) { v = num(v, lo); return v < lo ? lo : (v > hi ? hi : v); }
+// A clamp that can return NaN is not a clamp: non-finite bounds fall back to 0 and the pair is
+// ordered, so the answer is always inside a real range.
+function clamp(v, lo, hi) {
+  lo = num(lo, 0); hi = num(hi, 0);
+  if (hi < lo) { var t = lo; lo = hi; hi = t; }
+  v = num(v, lo);
+  return v < lo ? lo : (v > hi ? hi : v);
+}
 function isObj(x) { return !!x && typeof x === "object" && !Array.isArray(x); }
 function arr(x) { return Array.isArray(x) ? x : []; }
-function errMsg(e) { return e && e.message ? String(e.message) : String(e); }
+function errMsg(e) {
+  if (e && e.message) return String(e.message);
+  if (typeof e === "string" && e) return e;
+  if (e === null || e === undefined) return "unknown error";
+  if (typeof e === "number") return isFinite(e) ? "error " + e : "unknown error";
+  var s;
+  try { s = String(e); } catch (x) { s = ""; }
+  if (s && s.indexOf("[object ") < 0) return s;
+  try { var j = JSON.stringify(e); if (j && j !== "{}" && j.indexOf("[object ") < 0) return j.slice(0, 240); } catch (x2) { /* circular */ }
+  return "unknown error";
+}
 function okCtx(ctx) { return isObj(ctx) && ctx.ok === true && isObj(ctx.els); }
 function idOf(x) { if (isObj(x)) { return num(x.id !== undefined ? x.id : x.element, NaN); } return num(x, NaN); }
 function idList(ids) { var out = []; arr(ids).forEach(function (x) { var v = idOf(x); if (isFinite(v)) out.push(v); }); return out; }
@@ -178,10 +197,11 @@ function elMap(els) {
   return isObj(els) ? els : {};
 }
 function elType(el) { var t = intOf(el && el.element_type, 0); return t >= 1 && t <= 4 ? t : 0; }
-function uniq(list) { var seen = {}, out = []; list.forEach(function (v) { if (!seen[v]) { seen[v] = true; out.push(v); } }); return out; }
-function sum(list, f) { var s = 0; list.forEach(function (v, i) { s += num(f ? f(v, i) : v, 0); }); return s; }
+function uniq(list) { var seen = {}, out = []; arr(list).forEach(function (v) { if (!seen[v]) { seen[v] = true; out.push(v); } }); return out; }
+function sum(list, f) { var s = 0; var g = typeof f === "function" ? f : null; arr(list).forEach(function (v, i) { s += num(g ? g(v, i) : v, 0); }); return s; }
 function sortNum(a, b) { return a - b; }
 function quantile(sorted, q) {
+  sorted = arr(sorted); q = clamp(q, 0, 1);
   if (!sorted.length) return 0;
   var pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
   return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
@@ -194,6 +214,7 @@ function nowMs(now) {
   return 0;
 }
 function combos(list, k) {
+  list = arr(list); k = intOf(k, -1);
   var out = [];
   function rec(start, cur) {
     if (cur.length === k) { out.push(cur.slice()); return; }
@@ -291,7 +312,8 @@ function clubCounts(ids, els) {
 }
 function posCounts(ids, E) {
   var c = { 1: 0, 2: 0, 3: 0, 4: 0, unknown: 0 };
-  ids.forEach(function (id) { var el = E[id]; var t = el ? elType(el) : 0; if (t) c[t]++; else c.unknown++; });
+  E = elMap(E);
+  arr(ids).forEach(function (id) { var el = E[id]; var t = el ? elType(el) : 0; if (t) c[t]++; else c.unknown++; });
   return c;
 }
 function legal15(ids, els, budget) {
@@ -347,6 +369,7 @@ function formationOf(ids, els) {
   var E = elMap(els), list = idList(ids);
   if (list.length !== 11) return "";
   var c = posCounts(list, E);
+  if (c.unknown > 0 || c[1] !== 1) return "";
   return c[2] + "-" + c[3] + "-" + c[4];
 }
 
@@ -720,12 +743,13 @@ function pickXI(ids, ctx, valueOf) {
   // A P(start) < 0.5 player never starts ahead of a P(start) >= 0.75 player he could be swapped with.
   var res = { ids: [], formation: "", score: 0, bench: [], ok: false };
   if (!okCtx(ctx)) return res;
+  var scoreOf = typeof valueOf === "function" ? valueOf : function () { return 0; };
   var list = uniq(idList(ids)).filter(function (id) { return ctx.els[id]; });
   var by = { 1: [], 2: [], 3: [], 4: [] };
   list.forEach(function (id) {
     var el = ctx.els[id], t = elType(el); if (!t) return;
     var p = ctx.xp[id] ? ctx.xp[id].pstart : pStart(el, ctx.gwStats);
-    by[t].push({ id: id, v: num(valueOf(el), 0), p: p, tier: tierOf(p), starts: num(el.starts, 0), min: num(el.minutes, 0) });
+    by[t].push({ id: id, v: num(scoreOf(el), 0), p: p, tier: tierOf(p), starts: num(el.starts, 0), min: num(el.minutes, 0) });
   });
   [1, 2, 3, 4].forEach(function (t) { by[t].sort(function (a, b) { return b.tier - a.tier || b.v - a.v || b.starts - a.starts || b.min - a.min; }); });
   if (!by[1].length) return res;
@@ -929,14 +953,17 @@ function transferProtocol(state, ctx) {
       return res;
     }
     var best = plans[0];
-    var alt = null;
-    for (var i = 1; i < plans.length; i++) {
-      var p = plans[i];
-      if (p.ins.join(",") !== best.ins.join(",") || p.outs.join(",") !== best.outs.join(",")) { alt = p; break; }
-    }
+    // E-008: "genuinely different" is the SET of players out and the SET of players in, sorted —
+    // the same two swaps paired the other way round is the same plan, and reporting it as the
+    // runner-up is what produced "margin 0.00 LOW". The margin and the alternatives panel both
+    // use this key, so the panel can never show the shipped plan back to the manager.
+    var planKey = function (p) { return p.outs.slice().sort(sortNum).join(",") + ">" + p.ins.slice().sort(sortNum).join(","); };
+    var bestKey = planKey(best);
+    var different = plans.slice(1).filter(function (p) { return planKey(p) !== bestKey; });
+    var alt = different.length ? different[0] : null;
     res.margin = alt ? best.value - alt.value : best.value;
     res.value = best.value; res.hits = best.hits; res.k = best.k; res.bankAfter = best.bankAfter;
-    res.alternatives = plans.slice(1, 4).map(function (p) { return { value: p.value, k: p.k, hits: p.hits, moves: p.moves.map(function (m) { return { out: m.out, in: m.in, outName: m.outName, inName: m.inName, gain: m.gain }; }) }; });
+    res.alternatives = different.slice(0, 3).map(function (p) { return { value: p.value, k: p.k, hits: p.hits, moves: p.moves.map(function (m) { return { out: m.out, in: m.in, outName: m.outName, inName: m.inName, gain: m.gain }; }) }; });
     var hasForced = best.moves.some(function (m) { return m.forced; });
     if (res.margin >= MARGIN_HIGH) res.confidence = "HIGH";
     else if (res.margin >= MARGIN_MED) res.confidence = "MED";
@@ -977,6 +1004,8 @@ function wcPool(ctx, opts, position) {
     function (el, gs, x) { return num(el.starts, 0) >= 1; },
     function () { return true; }
   ];
+  if (!okCtx(ctx) || !Array.isArray(ctx.elList) || !SQUAD_SHAPE[position]) return { ids: [], level: 3, exhausted: true };
+  if (!isObj(opts)) opts = {};
   var lockSet = {}; arr(opts.locks).forEach(function (id) { lockSet[id] = true; });
   var exclude = {}; arr(opts.exclude).forEach(function (id) { exclude[id] = true; });
   var need = SQUAD_SHAPE[position] + 2;
@@ -985,7 +1014,7 @@ function wcPool(ctx, opts, position) {
     var ids = ctx.elList.filter(function (el) {
       if (elType(el) !== position || exclude[el.id]) return false;
       if (lockSet[el.id]) return true;
-      var fl = ctx.flags[el.id]; if (fl.status !== "a") return false;
+      var fl = ctx.flags && ctx.flags[el.id] ? ctx.flags[el.id] : flagInfo(el); if (fl.status !== "a") return false;
       var gs = ctx.gwStats[el.id] || { starts_last3: 0 }, x = ctx.xp[el.id];
       if (!levels[L](el, gs, x)) return false;
       if (convergenceRisk(el.id, ctx).risk) return false;
@@ -997,6 +1026,8 @@ function wcPool(ctx, opts, position) {
 }
 function wcSolve(ctx, opts, tsKey) {
   var out = { ok: false, ids: [], cost: 0, score: -1e9, relaxed: false, relaxations: [], reasons: [] };
+  if (!okCtx(ctx) || !Array.isArray(ctx.elList) || !Array.isArray(ctx.squadIds)) { out.reasons.push("no usable context"); return out; }
+  if (!isObj(opts)) opts = {};
   var budget = num(opts.budget, ctx.budget || BUDGET_TENTHS);
   var locks = uniq(idList(opts.locks)).filter(function (id) { return ctx.els[id]; });
   var current = {}; ctx.squadIds.forEach(function (id) { current[id] = true; });
@@ -1032,7 +1063,7 @@ function wcSolve(ctx, opts, tsKey) {
   if (ids.length < 15) { out.reasons.push("greedy seed could not fill 15 within the budget"); return out; }
   var lockSet = {}; locks.forEach(function (id) { lockSet[id] = true; });
   var score = wcObjective(ids, ctx, tsKey);
-  var maxPasses = intOf(opts.maxPasses, 12);
+  var maxPasses = clamp(intOf(opts.maxPasses, 12), 0, 60);
   for (var pass = 0; pass < maxPasses; pass++) {
     var improved = false, bestGain = 1e-9, bestIds = null;
     // 1-swap
@@ -1224,6 +1255,10 @@ function draftWaivers(state, ctx) {
       used[b.rec.code] = true;
       claims.push({ out: r.code, in: b.rec.code, outName: r.web_name, inName: b.rec.web_name, evOut: ev.ev, evIn: b.ev.ev, gain: b.ev.ev - ev.ev, why: why, forced: true });
     });
+    // C5: forced replacements go in first, but within that group the claim order is still
+    // the gain — a waiver list is submitted in priority order and the biggest gain has to
+    // survive the rivals' claims. (Caught by smoke_wk "draft claims forced replacements first".)
+    claims.sort(function (a, b) { return b.gain - a.gain; });
     var upgrades = [];
     rosterRecs.forEach(function (r) {
       if (claims.some(function (c) { return c.out === r.code; })) return;
@@ -1372,6 +1407,7 @@ function bankAfter(state, moves, els) {
 // ---------------------------------------------------------------- refresh (D4)
 
 function openClosers(piece) {
+  if (typeof piece !== "string") return null;
   var stack = [], inStr = false, esc = false;
   for (var i = 0; i < piece.length; i++) {
     var ch = piece[i];
@@ -1383,6 +1419,7 @@ function openClosers(piece) {
   return (inStr ? "\"" : "") + stack.reverse().join("");
 }
 function salvageJson(s) {
+  if (typeof s !== "string") return null;
   var cut = s.length;
   for (var attempt = 0; attempt < 80; attempt++) {
     var piece = s.slice(0, cut).replace(/[\s,]+$/, "");
@@ -1440,7 +1477,7 @@ function refreshRequest(cfg) {
     "{\"fetched_at\":\"<ISO-8601 UTC>\",\"deadline_time\":\"<ISO-8601 UTC of the next deadline>\"," +
     "\"elements\":[{\"id\":<FPL element id>,\"web_name\":\"<name>\",\"status\":\"a|d|i|s|u|n\",\"chance\":<0-100 or null>,\"news\":\"<short>\",\"now_cost\":<price in tenths, e.g. 77>}]}. " +
     "Use the element id as the key, never the name. Leave a field out if you could not verify it. No prose, no code fences.");
-  return { model: pair.model, max_tokens: REFRESH_MAX_TOKENS, tools: [{ type: pair.tool, name: "web_search" }], messages: [{ role: "user", content: prompt }], pair: key, ids: ids, warning: REFRESH_PAIRS[c.pair] ? null : "unknown pair '" + String(c.pair) + "', using sonnet46" };
+  return { model: pair.model, max_tokens: REFRESH_MAX_TOKENS, tools: [{ type: pair.tool, name: "web_search" }], messages: [{ role: "user", content: prompt }], pair: key, ids: ids, warning: REFRESH_PAIRS[c.pair] ? null : "unknown pair " + (typeof c.pair === "string" && c.pair ? "'" + c.pair + "'" : "(none given)") + ", using sonnet46" };
 }
 function applyRefresh(state, parsed) {
   if (!isObj(parsed)) throw new Error("applyRefresh: refresh payload is not an object");
@@ -1499,27 +1536,36 @@ function mulberry32(seed) {
 }
 function rngOf(rng) { return typeof rng === "function" ? rng : mulberry32(1); }
 function poisson(lambda, rng) {
+  if (typeof rng !== "function") return 0;
   lambda = num(lambda, 0); if (lambda <= 0) return 0;
   if (lambda > 25) { var u1 = Math.max(1e-12, rng()), u2 = rng(); return Math.max(0, Math.round(lambda + Math.sqrt(lambda) * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2))); }
   var L = Math.exp(-lambda), k = 0, p = 1;
   do { k++; p *= rng(); } while (p > L && k < 60);
   return k - 1;
 }
-function binomial(n, p, rng) { var k = 0; n = Math.max(0, intOf(n, 0)); p = clamp(p, 0, 1); for (var i = 0; i < n; i++) if (rng() < p) k++; return k; }
+// n is capped: nothing in this game draws more than a few hundred Bernoulli trials, and an
+// uncapped n from a corrupt input is an unbounded loop, not a bad number (poisson is already
+// capped at 60 draws).
+function binomial(n, p, rng) { var k = 0; if (typeof rng !== "function") return 0; n = clamp(intOf(n, 0), 0, BINOMIAL_MAX_N); p = clamp(p, 0, 1); for (var i = 0; i < n; i++) if (rng() < p) k++; return k; }
 function posRates(ctx) {
+  if (!isObj(ctx)) return { 1: { xg90: 0, xa90: 0, sv90: 0 }, 2: { xg90: 0, xa90: 0, sv90: 0 }, 3: { xg90: 0, xa90: 0, sv90: 0 }, 4: { xg90: 0, xa90: 0, sv90: 0 } };
   if (ctx._posRates) return ctx._posRates;
   var acc = { 1: { m: 0, xg: 0, xa: 0, sv: 0 }, 2: { m: 0, xg: 0, xa: 0, sv: 0 }, 3: { m: 0, xg: 0, xa: 0, sv: 0 }, 4: { m: 0, xg: 0, xa: 0, sv: 0 } };
-  ctx.elList.forEach(function (el) { var t = elType(el); if (!t) return; acc[t].m += num(el.minutes, 0); acc[t].xg += num(el.xg, 0); acc[t].xa += num(el.xa, 0); acc[t].sv += num(el.saves, 0); });
+  arr(ctx.elList).forEach(function (el) { var t = elType(el); if (!t) return; acc[t].m += num(el.minutes, 0); acc[t].xg += num(el.xg, 0); acc[t].xa += num(el.xa, 0); acc[t].sv += num(el.saves, 0); });
   var out = {}; [1, 2, 3, 4].forEach(function (t) { var m = acc[t].m; out[t] = { xg90: m ? acc[t].xg / m * 90 : 0, xa90: m ? acc[t].xa / m * 90 : 0, sv90: m ? acc[t].sv / m * 90 : 0 }; });
   ctx._posRates = out; return out;
 }
 function playerRates(el, ctx) {
+  if (!isObj(ctx)) ctx = {};
+  if (!isObj(el)) el = {};
+  var base = isObj(ctx.baseRates) ? ctx.baseRates : { yc: 0 };
   var t = elType(el), pr = posRates(ctx)[t] || { xg90: 0, xa90: 0, sv90: 0 };
   var m = num(el.minutes, 0), w = m / (m + 270);
   var r = function (v, prior) { return w * (m ? num(v, 0) / m * 90 : 0) + (1 - w) * prior; };
-  return { xg90: r(el.xg, pr.xg90), xa90: r(el.xa, pr.xa90), sv90: t === 1 ? r(el.saves, pr.sv90) : 0, yc90: Math.max(ctx.baseRates.yc, m ? num(el.yc, 0) / m * 90 : 0) };
+  return { xg90: r(el.xg, pr.xg90), xa90: r(el.xa, pr.xa90), sv90: t === 1 ? r(el.saves, pr.sv90) : 0, yc90: Math.max(num(base.yc, 0), m ? num(el.yc, 0) / m * 90 : 0) };
 }
 function likelyXI(teamId, ctx) {
+  if (!isObj(ctx) || !Array.isArray(ctx.elList) || !isObj(ctx.xp)) return [];
   ctx._likely = ctx._likely || {};
   if (ctx._likely[teamId]) return ctx._likely[teamId];
   var list = ctx.elList.filter(function (el) { return num(el.team, -1) === teamId && ctx.xp[el.id] && ctx.xp[el.id].pstart >= 0.5; })
@@ -1576,10 +1622,12 @@ function simPlayerDetail(el, ctx, rng, draws) {
   return res;
 }
 function simPlayer(el, ctx, rng, draws) { return simPlayerDetail(el, ctx, rng, draws).pts; }
-function fixtureDraws(ctx, rng) { var d = {}; arr(ctx.fixturesByEvent[ctx.nextEvent]).forEach(function (f) { d[f.id] = simFixture(f, ctx, rng); }); return d; }
+function fixtureDraws(ctx, rng) { var d = {}; if (!isObj(ctx) || !isObj(ctx.fixturesByEvent) || typeof rng !== "function") return d; arr(ctx.fixturesByEvent[ctx.nextEvent]).forEach(function (f) { d[f.id] = simFixture(f, ctx, rng); }); return d; }
 function entryPoints(xi, bench, capId, viceId, sims, ctx) {
   // xi: 11 ids in order; bench: [gkSub, b1, b2, b3] in order; sims: {id:{pts,mins}}
-  var total = 0, starters = xi.slice(), benchLeft = bench.slice();
+  if (!okCtx(ctx)) return 0;
+  if (!isObj(sims)) sims = {};
+  var total = 0, starters = arr(xi).slice(), benchLeft = arr(bench).slice();
   var counts = posCounts(starters, ctx.els);
   starters.forEach(function (id, i) {
     var s = sims[id] || { pts: 0, mins: 0 };
@@ -1600,6 +1648,7 @@ function entryPoints(xi, bench, capId, viceId, sims, ctx) {
   return total;
 }
 function squadOrder(ids, capId, ctx) {
+  if (!okCtx(ctx)) return null;
   var list = uniq(idList(ids)).filter(function (id) { return ctx.els[id]; });
   var xi, bench;
   if (list.length === 11 && legalXI(list, ctx.els).ok) { xi = list; bench = []; }
@@ -1683,6 +1732,7 @@ function mcLeague(ctx, leagueId, opts) {
 // ---------------------------------------------------------------- tournament (E5)
 
 function ranksOf(v) {
+  v = arr(v);
   var idx = v.map(function (x, i) { return { x: x, i: i }; }).sort(function (a, b) { return a.x - b.x; });
   var r = new Array(v.length), i = 0;
   while (i < idx.length) { var j = i; while (j + 1 < idx.length && idx[j + 1].x === idx[i].x) j++; var avg = (i + j) / 2 + 1; for (var k = i; k <= j; k++) r[idx[k].i] = avg; i = j + 1; }

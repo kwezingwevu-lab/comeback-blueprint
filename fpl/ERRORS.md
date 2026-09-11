@@ -179,3 +179,57 @@ RULE: launch with executablePath /opt/pw-browsers/chromium, never run playwright
 TEST: harness.cjs launch (pending)
 
 Note (E-027, contract edit, 11 Sep 2026): the CI runner has no `/opt/pw-browsers`. `.github/workflows/gate.yml` runs `npx playwright install --with-deps chromium` before the browser suites, and CONTRACT.md §8 now carries one added sentence requiring `qa/harness.cjs` `launch()` to fall back to Playwright's default Chromium when `/opt/pw-browsers/chromium` does not exist. The sandbox rule above is unchanged: never run `playwright install` in the sandbox.
+
+### E-028 · v87 · transfer panels stayed open while GW4 was being played
+CAUSE: `inLiveWindow()` in `src/ui.jsx` keyed the live window on the snapshot's `current_event`. A snapshot pulled on the Friday still says `current_event: 3` all through Saturday, so with `now` between the GW4 deadline (2026-09-12T12:30Z) and the last GW4 kick-off the app measured GW3's window, found it long past, and kept showing "Play Wildcard 1", the transfer list, the wildcard fifteen and the fallback moves — the one thing CLAUDE.md C6 and CONTRACT §7 forbid on a match day.
+CAUGHT: qa/smoke.cjs LIVE-window checks, written against CONTRACT §7 (the engine's own `gamePhase()` had it right all along; only the UI helper was wrong)
+RULE: the live window comes from the clock — the last event whose deadline has passed, with at least one of its fixtures unfinished — never from `current_event`; `plan.kind === "live"` hides every panel that instructs a transfer (`plan-tx`, `plan-wc`, `plan-fb`)
+TEST: smoke "LIVE-window-landing-shows-live-points-and-no-transfer-instruction", "LIVE-window-hides-every-transfer-panel", "LIVE-window-is-keyed-on-the-clock-not-on-the-snapshot-current_event"
+
+### E-029 · v87 · a reload test that could never pass
+CAUSE: `qa/harness.cjs` `open()` installs its storage seed with `page.addInitScript`, which re-runs on every navigation. A suite that seeded `mode` and then reloaded had `mc_ui` rewritten to `{mode}` alone before the app booted, so the saved tab was always lost and the persistence gate read as a UI defect that was not there. `addInitScript` also accumulates across `open()` calls on one page, and `localStorage` is shared inside a BrowserContext.
+CAUGHT: qa/smoke.cjs persistence check failing against a UI that passed the same steps by hand
+RULE: a reload test seeds nothing — it drives the real controls and lets the app write its own `mc_ui`; every scenario gets its own `BrowserContext`, never a reused page
+TEST: smoke "E002-E022-saved-tab-and-open-sections-survive-a-reload", "reveals-survive-a-reload"
+
+### E-030 · v87 · nineteen engine helpers threw on junk input although the file promises totality
+CAUSE: `src/engine.js` opens with "every function is total — bad input yields a safe empty result — except parseJson and applyRefresh". Nineteen helpers did not honour it: `uniq`, `sum` (both the list and the callback), `quantile`, `combos`, `posCounts`, `openClosers`, `salvageJson`, `poisson`, `binomial`, `posRates`, `playerRates`, `likelyXI`, `fixtureDraws`, `entryPoints`, `squadOrder`, `wcPool`, `wcSolve`, `ranksOf` and `pickXI` read `.forEach`, `.length`, `ctx.els` or a callback straight off the argument. A corrupt `mc_state` restored from storage reaches `sanitiseState` and then these helpers; the same class of gap produced E-003.
+CAUGHT: qa/mc_full.cjs property group P01, first run — 48 of 155 top-level functions threw on the 20 junk kinds
+RULE: a guard clause is part of the signature: list arguments go through `arr()`, element tables through `elMap()`, contexts through `okCtx()`, callbacks through `typeof x === "function"`, and an rng that is not a function returns the zero draw
+TEST: mc_full P01 (nothing throws) over every extracted top-level function
+
+### E-031 · v87 · "undefined", "NaN" and "[object Object]" rendered into user-visible strings
+CAUSE: `errMsg` fell through to `String(e)` for a non-Error throw, `refreshRequest` interpolated a missing pair as `unknown pair 'undefined'`, `nameOf`/`codeName` built `"id undefined"` and `"code NaN"`, and `Section`/`Reveal` built `data-testid="sec-undefined"`. Every one of those reaches the screen — the refresh error line is shown verbatim by contract (§7, first 140 characters).
+CAUGHT: qa/mc_full.cjs property group P07
+RULE: no string the app can render is ever built by concatenating an unchecked value; the fallback names what is missing in words
+TEST: mc_full P07 (no returned string contains undefined / NaN / [object Object])
+
+### E-032 · v87 · formationOf invented a shape out of players it could not resolve
+CAUSE: `formationOf(ids, els)` counted unresolved ids into `posCounts().unknown` and still returned `c[2] + "-" + c[3] + "-" + c[4]`, so eleven ids against an empty element table produced "0-0-0" — a formation that does not exist, and one the eleven-player gate would have rejected.
+CAUGHT: qa/mc_full.cjs property group P17
+RULE: "" is the documented answer for anything that is not a readable eleven with exactly one goalkeeper
+TEST: mc_full P17, mc_all I14/I15
+
+### E-033 · v87 · the alternatives panel could show the shipped transfer plan back to the manager
+CAUSE: `transferProtocol` measured the margin against the first plan whose `ins`/`outs` arrays differed *in order* (`p.ins.join(",") !== best.ins.join(",")`). Two swaps paired the other way round — out A→in X, out B→in Y versus out A→in Y, out B→in X — are the same plan, so it could be counted as the runner-up (margin 0.00) and `alternatives` (a raw `plans.slice(1,4)`) could list it a second time. This is the display half of E-008, which the RULE had only closed for the margin.
+CAUGHT: qa/mc_all.cjs invariant I64 over randomly generated universes (the fixed synthetic squad in unit_engine never produced the collision)
+RULE: "genuinely different" is the sorted SET of ids out and the sorted SET of ids in; the margin and the alternatives list both use that one key
+TEST: mc_all I64, unit_engine "TP-margin-is-measured-against-a-genuinely-different-plan-E008"
+
+### E-034 · v87 · two draft claims could share one React key
+CAUSE: `checkClaims` in `src/ui.jsx` built each row's key as `String(c.out) + "-" + String(c.in)`. A malformed claim (no codes) gives every such row the key `"undefined-undefined"`, so React reconciles two different claims onto one row — and the same two values were printed to the screen as `"code undefined"`.
+CAUGHT: qa/mc_full.cjs property group P07
+RULE: a list key is the row's own position in the written order, never a concatenation of values that may be missing; names on screen go through `codeName`/`nameOf`, which say "unknown player" when they cannot resolve one
+TEST: mc_full P07
+
+### E-035 · v87 · an unbounded loop in the Monte Carlo sampler
+CAUSE: `binomial(n, p, rng)` in `src/engine.js` took its trial count straight off the argument (`n = Math.max(0, intOf(n, 0))`) and then looped `n` times. A corrupt or absurd count — `1e308`, `Infinity`, `Number.MAX_SAFE_INTEGER` — is not a wrong answer, it is a hang: the app stops responding with no error and no way back. `poisson` was already bounded at 60 draws; `wcSolve`'s `maxPasses` had the same open shape.
+CAUGHT: qa/mc_full.cjs — the 25 000-iteration release run stopped producing output. The fuzz suite cannot time out a synchronous loop from inside the same thread, so an unbounded loop shows up as a suite that never finishes, not as a P04 failure. That is the signal.
+RULE: every loop bound that comes from an argument is clamped at the top of the function — `BINOMIAL_MAX_N` 5000 for Bernoulli trials, 60 passes for the wildcard local search, the existing 20 000 for `mcSquad`/`mcLeague`
+TEST: mc_all I109 (binomial and poisson terminate on an absurd count), mc_full P04
+
+### E-036 · v87 · clamp returned NaN
+CAUSE: `clamp(v, lo, hi)` coerced only `v` (`v = num(v, lo)`) and compared it against `lo`/`hi` as given. A non-finite bound made every comparison false and the "clamped" value came back as NaN — from the one helper the engine uses to guarantee a range (`clamp(p, 0, 1)` for probabilities, `clamp(intOf(iters, 1000), 1, 20000)` for the Monte Carlo iteration cap).
+CAUGHT: qa/mc_full.cjs property group P05, only at the 25 000-iteration release count — the 3 000-iteration dev count never drew the (junk value, NaN low bound) pair. The release count earns its place.
+RULE: clamp coerces all three arguments, orders the pair, and always returns a number inside a real range
+TEST: mc_full P05 at 25 000 iterations
