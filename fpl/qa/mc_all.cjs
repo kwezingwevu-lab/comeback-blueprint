@@ -50,9 +50,10 @@ let failCount = 0;
 const failures = [];
 const stats = {};        // invariant id → {name, run, failed}
 
-function report(inv, ok, detail) {
-  const s = stats[inv.id] || (stats[inv.id] = { name: inv.name, run: 0, failed: 0 });
+function report(inv, ok, detail, tag) {
+  const s = stats[inv.id] || (stats[inv.id] = { name: inv.name, run: 0, failed: 0, seen: Object.create(null), universes: 0 });
   s.run++;
+  if (tag !== undefined && s.seen[tag] === undefined) { s.seen[tag] = 1; s.universes++; }
   if (ok) return;
   s.failed++;
   failCount++;
@@ -211,6 +212,64 @@ function makeUniverse(gwN, clubs, tag) {
     refresh: { pair: "sonnet46", last: null }
   };
 
+  // Roughly half the universes carry a draft league, so the real free-agent path (C5 · F2)
+  // is fuzzed as well as the no-league fallback. Two teams get a full 2/5/5/3 fifteen, and
+  // two to four seats are left empty — league 100 really does have one (entry_id null).
+  if (clubs >= 6 && RNG() < 0.5) {
+    const byType = { 1: [], 2: [], 3: [], 4: [] };
+    shuffle(elements.slice()).forEach(function (e) { byType[e.element_type].push(e.code); });
+    const QUOTA = { 1: 2, 2: 5, 3: 5, 4: 3 };
+    const playing = 2, empty = ri(2, 4);
+    const entries = [], rosters = {}, ownership = [], freeAgents = [];
+    const taken = {};
+    for (let t = 0; t < playing + empty; t++) {
+      const leagueEntryId = 100 + t;
+      entries.push({ leagueEntryId: leagueEntryId, entryId: t === playing ? null : 900 + t, name: "Team " + t, manager: "Manager " + t, shortName: "T" + t, waiverPick: null });
+      rosters[String(leagueEntryId)] = [];
+      if (t >= playing) continue;
+      [1, 2, 3, 4].forEach(function (ty) {
+        for (let j = 0; j < QUOTA[ty]; j++) {
+          const c = byType[ty].shift();
+          if (c === undefined) return;
+          taken[c] = leagueEntryId;
+          rosters[String(leagueEntryId)].push(c);
+          ownership.push({ code: c, owner: leagueEntryId, status: "o", owned: true });
+        }
+      });
+    }
+    const picks = shuffle(entries.map(function (e, i) { return i + 1; }));
+    entries.forEach(function (e, i) { e.waiverPick = RNG() < 0.1 ? null : picks[i]; });
+    elements.forEach(function (e) {
+      if (taken[e.code]) return;
+      const st = RNG() < 0.85 ? "a" : "l";
+      ownership.push({ code: e.code, owner: null, status: st, owned: false });
+      if (st === "a") freeAgents.push(e.code);
+    });
+    const matches = [];
+    for (let ev = 1; ev <= gwN + 2; ev++) {
+      const order = shuffle(entries.map(function (e) { return e.leagueEntryId; }));
+      for (let i = 0; i + 1 < order.length; i += 2) {
+        matches.push({ event: ev, finished: ev <= gwN, started: ev <= gwN, entry1: order[i], points1: ri(20, 80), entry2: order[i + 1], points2: ri(20, 80), winner: null });
+      }
+    }
+    const standings = entries.map(function (e, i) {
+      return { leagueEntry: e.leagueEntryId, rank: i + 1, lastRank: i + 1, played: gwN, won: ri(0, Math.max(0, gwN)), drawn: 0, lost: 0, pointsFor: ri(50, 300), pointsAgainst: ri(50, 300), total: ri(0, 9) };
+    });
+    const meRow = RNG() < 0.85 ? entries[ri(0, entries.length - 1)] : null;
+    snap.draft.league_id = 4242;
+    snap.draft.league = { id: 4242, name: "Random Draft", scoring: "h", size: entries.length };
+    snap.draft.entries = entries;
+    snap.draft.ownership = ownership;
+    snap.draft.rosters = rosters;
+    snap.draft.freeAgents = freeAgents;
+    snap.draft.matches = matches;
+    snap.draft.standings = standings;
+    snap.draft.picks = {};
+    snap.draft.me = meRow ? { leagueEntryId: meRow.leagueEntryId, entryId: meRow.entryId, via: "fuzz" } : null;
+    state.draft.league_id = 4242;
+    if (meRow && rosters[String(meRow.leagueEntryId)].length) state.draft.roster = rosters[String(meRow.leagueEntryId)].slice();
+  }
+
   const ctx = E.buildCtx(snap, state, "2026-09-11T06:00:00Z");
   const u = { tag: tag, gwN: gwN, clubs: clubs, snap: snap, state: state, ctx: ctx, squad: squad, byId: byId, elements: elements };
   u.xi = ctx.ok && squad.length === 15 ? E.bestXI(squad, ctx) : { ids: [], bench: [], capId: null, viceId: null, formation: "" };
@@ -256,6 +315,42 @@ if (!LIVE_UNIVERSES.length) {
 function U() {
   const list = UNIVERSES.filter(function (u) { return u.ctx.ok && u.squad.length === 15; });
   return list.length ? rpick(list) : LIVE_UNIVERSES[0];
+}
+
+/* ---------------------------------------------------------------- the deep bank
+ *
+ * The 1M run generated 29 universes and every invariant saw only those. For the cheap
+ * invariants that is plenty — they run tens of thousands of times against every one of them.
+ * For the expensive ones it was the binding constraint: an invariant that solves a wildcard
+ * runs a few hundred times in the whole suite, so iteration count buys it nothing and universe
+ * diversity is the only thing that does.
+ *
+ * The expensive invariants (dispatch weight ≤ DEEP_MAX_W) therefore draw from their own small
+ * bank, one slot of which is replaced with a brand-new universe every DEEP_REBUILD deep draws.
+ * A universe costs about 21 ms to build, so the extra cost is (deep draws / DEEP_REBUILD) × 21
+ * ms and is tuned to keep the suite inside about six minutes at the release count. Everything
+ * else — iteration count, weights, invariants — is unchanged.
+ */
+// MC_DEEP_W=0 turns the deep bank off entirely — the pre-v88 behaviour, kept so the before and
+// after numbers in RETEST_v88 can be measured on one machine rather than argued about.
+const DEEP_MAX_W = process.env.MC_DEEP_W !== undefined
+  ? Math.max(0, Math.floor(Number(process.env.MC_DEEP_W) || 0))
+  : 5;
+// 24 deep draws per new universe: at the 1,000,000-iteration release count that is ~16,900 deep
+// draws, ~700 universes built for the bank and about 15 s of extra wall clock, measured.
+const DEEP_REBUILD = Math.max(1, Math.floor(Number(process.env.MC_DEEP_REBUILD) || 24));
+const DEEP_BANK_N = 3;
+const DEEP_BANK = [];
+let deepDraws = 0, deepCursor = 0, deepBuilt = 0;
+function Udeep() {
+  if (!DEEP_BANK.length) for (let i = 0; i < DEEP_BANK_N; i++) { DEEP_BANK.push(freshUniverse()); deepBuilt++; }
+  deepDraws++;
+  if (deepDraws % DEEP_REBUILD === 0) {
+    DEEP_BANK[deepCursor % DEEP_BANK_N] = freshUniverse();
+    deepBuilt++; deepCursor++;
+  }
+  const list = DEEP_BANK.filter(function (u) { return u.ctx.ok && u.squad.length === 15; });
+  return list.length ? rpick(list) : U();
 }
 
 // ---------------------------------------------------------------- input generators
@@ -1018,9 +1113,9 @@ inv("I94", "the engine never reads ep_this or ep_next (D1)", 3, function () {
 
 /* --- tournament and chips ------------------------------------------------- */
 
-inv("I95", "the tournament always carries the eight named models", 8, function (u) {
+inv("I95", "the tournament always carries the nine named models", 8, function (u) {
   const t = E.tournament(u.snap);
-  const want = ["season_mean", "last_gw", "per90", "shrunk_per90", "ict_rate", "bps_rate", "blend", "component_xp"];
+  const want = ["season_mean", "last_gw", "per90", "shrunk_per90", "ict_rate", "bps_rate", "blend", "component_xp", "player_xg"];
   return t.models.map(function (m) { return m.key; }).join(",") === want.join(",") ? OK : bad(t.models.map(function (m) { return m.key; }).join(","));
 });
 inv("I96", "every Spearman ρ is null or inside [-1,1]", 8, function (u) {
@@ -1028,7 +1123,7 @@ inv("I96", "every Spearman ρ is null or inside [-1,1]", 8, function (u) {
   const badm = t.models.filter(function (m) { return m.spearman !== null && !(m.spearman >= -1 && m.spearman <= 1); });
   return badm.length ? bad(badm[0].key + " ρ " + badm[0].spearman) : OK;
 });
-inv("I97", "promotion needs three transitions and the leader is one of the eight", 8, function (u) {
+inv("I97", "promotion needs three transitions and the leader is one of the nine", 8, function (u) {
   const t = E.tournament(u.snap);
   if (t.promotable !== (t.transitions >= 3)) return bad("promotable " + t.promotable + " at " + t.transitions + " transitions");
   if (t.leader === null) return OK;
@@ -1086,6 +1181,103 @@ inv("I104", "the draft join is by code, never by id (E-026)", 20, function (u) {
   return (!d || d.code === el.code) ? OK : bad("code " + el.code + " resolved to code " + d.code);
 });
 
+/* --- draft league (C5 · F2) ----------------------------------------------- */
+
+inv("I118", "the free-agent pool never contains a player somebody owns, and no claim targets one", 6, function (u) {
+  if (!u.ctx.draft.hasPool) return OK;
+  const own = u.ctx.draft.ownership;
+  const pool = E.draftPool(u.ctx);
+  for (let i = 0; i < pool.length; i++) {
+    const row = own[pool[i].code];
+    if (!row) return bad("pool code " + pool[i].code + " is not in the ownership map at all");
+    if (row.owner) return bad("pool code " + pool[i].code + " is owned by " + row.owner);
+    if (row.status !== "a") return bad("pool code " + pool[i].code + " carries element-status " + row.status);
+  }
+  const claims = E.draftWaivers(u.state, u.ctx);
+  for (let i = 0; i < claims.length; i++) {
+    const row = own[claims[i].in];
+    if (row && row.owner) return bad("claim for " + claims[i].inName + ", owned by " + row.owner);
+    if (claims[i].pool !== "api") return bad("a claim is labelled " + claims[i].pool + " while a real pool exists");
+  }
+  return OK;
+});
+inv("I119", "the rosters partition the owned codes: nobody is owned twice", 6, function (u) {
+  if (!u.ctx.draft.hasPool) return OK;
+  const seen = {};
+  const keys = Object.keys(u.ctx.draft.rosters);
+  for (let i = 0; i < keys.length; i++) {
+    const codes = u.ctx.draft.rosters[keys[i]];
+    for (let j = 0; j < codes.length; j++) {
+      if (seen[codes[j]]) return bad("code " + codes[j] + " is on both " + seen[codes[j]] + " and " + keys[i]);
+      seen[codes[j]] = keys[i];
+      const row = u.ctx.draft.ownership[codes[j]];
+      if (row && Number(row.owner) !== Number(keys[i])) return bad("code " + codes[j] + " is rostered by " + keys[i] + " but owned by " + row.owner);
+    }
+  }
+  return OK;
+});
+inv("I120", "the waiver order is a permutation of the league ordered by waiver pick, blanks last", 8, function (u) {
+  const wo = E.waiverOrder(u.ctx);
+  if (!wo.ok) return u.ctx.draft.entries.length ? bad("a league with " + u.ctx.draft.entries.length + " teams produced no order") : OK;
+  if (wo.order.length !== u.ctx.draft.entries.length) return bad("order of " + wo.order.length + " over " + u.ctx.draft.entries.length + " teams");
+  const seen = {};
+  let last = -Infinity, blankSeen = false;
+  for (let i = 0; i < wo.order.length; i++) {
+    const r = wo.order[i];
+    if (seen[r.leagueEntryId]) return bad("league entry " + r.leagueEntryId + " appears twice");
+    seen[r.leagueEntryId] = true;
+    if (r.position !== i + 1) return bad("position " + r.position + " at index " + i);
+    if (r.waiverPick === null) { blankSeen = true; continue; }
+    if (blankSeen) return bad("a team with waiver pick " + r.waiverPick + " sits behind a team with none");
+    if (r.waiverPick < last) return bad("waiver pick " + r.waiverPick + " after " + last);
+    last = r.waiverPick;
+  }
+  return OK;
+});
+inv("I121", "the head-to-head opponent is a real fixture partner and never the manager himself", 8, function (u) {
+  const gw = rpick([u.gwN, u.ctx.nextEvent, u.gwN + 1, 0, -3, 99]);
+  const h = E.h2hOpponent(u.ctx, gw);
+  if (!h.ok) return OK;
+  const me = u.ctx.draft.me.leagueEntryId;
+  if (h.opponent.leagueEntryId === me) return bad("the opponent is the manager himself");
+  const ev = h.gw;
+  const paired = u.ctx.draft.matches.some(function (m) {
+    return m.event === ev && ((m.entry1 === me && m.entry2 === h.opponent.leagueEntryId) || (m.entry2 === me && m.entry1 === h.opponent.leagueEntryId));
+  });
+  return paired ? OK : bad("GW" + ev + ": " + h.opponent.leagueEntryId + " is not paired with " + me + " in the fixture list");
+});
+inv("I122", "the C5 variance rule leans with the projected margin and still fields a legal eleven", 4, function (u) {
+  const codes = E.draftRoster(u.state, u.ctx).codes;
+  const x = E.draftXI(codes, u.ctx, { iters: 120 });
+  if (!x.ids.length) return OK;
+  if (!E.legalXI(x.ids, u.ctx.els).ok) return bad("the eleven is not legal: " + x.formation);
+  if (!x.h2h || !x.h2h.ok) return x.lean === "none" ? OK : bad("lean " + x.lean + " without a projection");
+  const want = x.h2h.margin < -0.5 ? "up" : (x.h2h.margin > 0.5 ? "down" : "none");
+  if (x.lean !== want) return bad("margin " + x.h2h.margin.toFixed(2) + " but lean " + x.lean);
+  const outside = x.codes.filter(function (c) { return codes.indexOf(c) < 0; });
+  return outside.length ? bad("code " + outside[0] + " is not on the roster") : OK;
+});
+inv("I123", "the roster is read from the league exactly when the league knows which team is his", 10, function (u) {
+  const r = E.draftRoster(u.state, u.ctx);
+  const me = u.ctx.draft.me ? u.ctx.draft.me.leagueEntryId : null;
+  const api = me ? E.draftRosterOf(me, u.ctx) : [];
+  if (me && api.length) {
+    if (r.source !== "api") return bad("source " + r.source + " while the league lists " + api.length + " players for " + me);
+    if (r.codes.join(",") !== api.join(",")) return bad("the roster does not match the league's own list");
+    return OK;
+  }
+  return r.source === "api" ? bad("source api with no league roster to read") : OK;
+});
+inv("I124", "draftLeagueInput never accepts a non-positive, absurd or absent number", 60, function () {
+  const junk = rpick(["", "   ", "abc", "-5", "0", "0000", "9".repeat(ri(10, 40)), "league/", "https://draft.premierleague.com/",
+    String(ri(1, 999999)), "https://draft.premierleague.com/league/" + ri(1, 999999) + "/standings",
+    "https://draft.premierleague.com/entry/" + ri(1, 999999) + "/event/" + ri(1, 38), null, undefined, {}, [], NaN]);
+  const r = E.draftLeagueInput(junk);
+  if (!r.ok) return (r.id === null && r.kind === null) ? OK : bad("rejected but returned " + JSON.stringify(r));
+  if (!Number.isInteger(r.id) || r.id <= 0 || r.id > 999999999) return bad("accepted id " + r.id + " from " + JSON.stringify(junk));
+  return ["league", "entry", "unknown"].indexOf(r.kind) >= 0 ? OK : bad("kind " + r.kind);
+});
+
 /* --- context and phase ---------------------------------------------------- */
 
 inv("I105", "buildCtx reports ok with a squad, a deadline and a strength table", 3, function (u) {
@@ -1125,6 +1317,189 @@ inv("I116", "fxMult answers 1 for a non-fixture argument and says it is unresolv
   return E.fxMult(f, f.team_h, u.ctx.TS) === byObj.mult ? OK : bad("fxMult and fxMultInfo disagree");
 });
 
+/* --- F4 minutes model and calibration, F5 player xG, F8 chip solver (v88) ------ */
+
+// The walk-forward is pure in the snapshot and is the expensive call in this file, so it is
+// memoised per universe: universes are rebuilt every REBUILD_EVERY iterations, and recomputing
+// the same answer thousands of times would only buy wall clock.
+function mwfOf(u) {
+  if (!u._mwf) u._mwf = E.minutesWalkForward(u.snap, { bins: 5 });
+  return u._mwf;
+}
+function solveOf(u) {
+  if (!u._chipSolve) u._chipSolve = E.chipSolver(u.ctx, {});
+  return u._chipSolve;
+}
+
+inv("I125", "every minutes-model probability is a real number inside [0,1]", 20, function (u) {
+  const el = rpick(u.elements);
+  const m = E.minutesModel(el, u.ctx, {});
+  const vals = { p: m.p, pModel: m.pModel, pIncumbent: m.pIncumbent, flagFactor: m.flagFactor };
+  const badKey = Object.keys(vals).filter(function (k) { return !(typeof vals[k] === "number" && isFinite(vals[k]) && vals[k] >= 0 && vals[k] <= 1); });
+  if (badKey.length) return bad("id " + el.id + " " + badKey.map(function (k) { return k + "=" + vals[k]; }).join(" "));
+  if (m.driving !== false || m.driver !== "pStart") return bad("id " + el.id + " claims driving=" + m.driving + " driver=" + m.driver);
+  if (m.fitted && Math.abs(m.p - m.pModel * m.flagFactor) > 1e-9) return bad("the flag factor was not applied multiplicatively on id " + el.id);
+  return OK;
+});
+
+inv("I126", "fitLogistic never returns a coefficient that is not finite, on any rows at all", 30, function (u) {
+  const n = ri(0, 40), k = ri(1, 5);
+  const X = [], y = [];
+  for (let i = 0; i < n; i++) {
+    const row = [];
+    for (let j = 0; j < k; j++) row.push(RNG() < 0.08 ? rpick([NaN, Infinity, -Infinity, "x", null]) : (RNG() * 4 - 2));
+    X.push(RNG() < 0.05 ? "junk" : row);
+    y.push(RNG() < 0.05 ? rpick([NaN, "x", null]) : (RNG() < 0.5 ? 1 : 0));
+  }
+  const f = E.fitLogistic(X, y, {});
+  if (!Array.isArray(f.beta)) return bad("beta is not an array");
+  const nonFinite = f.beta.filter(function (b) { return !isFinite(b); });
+  if (nonFinite.length) return bad(nonFinite.length + " of " + f.beta.length + " coefficients are not finite");
+  if (typeof f.note !== "string" || !f.note.length) return bad("a fit came back with no note");
+  if (f.ok && f.n < f.k + 2) return bad("the fit claims ok on " + f.n + " rows for " + f.k + " columns");
+  return OK;
+});
+
+inv("I127", "Brier is in [0,1] and the perfect and inverted forecasts score 0 and 1", 40, function () {
+  const n = ri(1, 40), y = [], p = [];
+  for (let i = 0; i < n; i++) { const v = RNG() < 0.5 ? 1 : 0; y.push(v); p.push(RNG() < 0.1 ? rpick([NaN, "x", 2, -1]) : RNG()); }
+  const b = E.brier(p, y);
+  if (!(b.brier >= 0 && b.brier <= 1)) return bad("Brier " + b.brier);
+  if (!(b.baseRate >= 0 && b.baseRate <= 1) || !(b.skill >= -1 && b.skill <= 1)) return bad("base " + b.baseRate + " skill " + b.skill);
+  const perfect = E.brier(y, y), worst = E.brier(y.map(function (v) { return 1 - v; }), y);
+  if (perfect.brier !== 0) return bad("a perfect forecast scored " + perfect.brier);
+  if (worst.brier !== 1) return bad("an inverted forecast scored " + worst.brier);
+  return OK;
+});
+
+inv("I128", "every reliability bin is inside [0,1] and the bins account for every scored row", 40, function () {
+  const n = ri(0, 60), y = [], p = [];
+  for (let i = 0; i < n; i++) { y.push(RNG() < 0.5 ? 1 : 0); p.push(RNG()); }
+  const nb = ri(2, 20);
+  const rel = E.reliability(p, y, nb);
+  if (rel.bins.length !== nb) return bad(rel.bins.length + " bins for " + nb + " asked");
+  let counted = 0;
+  for (const b of rel.bins) {
+    if (!(b.lo >= 0 && b.hi <= 1 && b.lo < b.hi)) return bad("bin [" + b.lo + "," + b.hi + "]");
+    if (!(b.meanPred >= 0 && b.meanPred <= 1 && b.meanOutcome >= 0 && b.meanOutcome <= 1)) return bad("bin means " + b.meanPred + "/" + b.meanOutcome);
+    counted += b.n;
+  }
+  return counted === rel.n ? OK : bad(counted + " rows binned of " + rel.n);
+});
+
+inv("I129", "the promotion gate cannot open below three transitions, three wins and a two-week hold-out", 40, function () {
+  const t = ri(0, 8), w = ri(0, 12), h = ri(0, 12);
+  const g = E.promotionGate({ transitions: t, wins: w, holdout: h, challenger: "c", incumbent: "i" });
+  if (g.wins > g.transitions || g.holdout > g.transitions) return bad("clamping failed: " + g.wins + "/" + g.holdout + " over " + g.transitions);
+  const want = g.transitions >= 3 && g.wins >= 3 && g.holdout >= 2;
+  if (g.promotable !== want) return bad("t=" + t + " w=" + w + " h=" + h + " → promotable " + g.promotable + ", expected " + want);
+  if (!g.promotable && !g.reasons.length) return bad("a shut gate gave no reason");
+  if (g.need !== 3 || g.needHoldout !== 2) return bad("the gate moved: need " + g.need + ", hold-out " + g.needHoldout);
+  return OK;
+});
+
+inv("I130", "the minutes walk-forward never fits on the gameweek it scores and never promotes below the gate", 2, function (u) {
+  const w = mwfOf(u);
+  if (w.driver !== "pStart") return bad("the driver is " + w.driver);
+  for (const f of w.folds) {
+    if (!(f.incumbent.brier >= 0 && f.incumbent.brier <= 1)) return bad("incumbent Brier " + f.incumbent.brier);
+    if (f.challenger && !(f.challenger.brier >= 0 && f.challenger.brier <= 1)) return bad("challenger Brier " + f.challenger.brier);
+    if (!f.fitted) continue;
+    if (f.fitGws.indexOf(f.to) >= 0) return bad("the fit for GW" + f.to + " included GW" + f.to);
+    for (const g of f.fitGws) if (g > f.from) return bad("the fit for GW" + f.to + " reached GW" + g);
+  }
+  const want = w.comparable >= 3 && w.wins >= 3 && w.holdout >= 2;
+  if (w.gate.promotable !== want) return bad("gate " + w.gate.promotable + " at " + w.comparable + "/" + w.wins + "/" + w.holdout);
+  return OK;
+});
+
+inv("I131", "the chip solver never repeats a chip in a set, never doubles a gameweek and never breaks an expiry", 6, function (u) {
+  const s = solveOf(u);
+  if (!s.ok) return OK;
+  const bounds = {}; s.sets.forEach(function (S) { bounds[S.set] = S; });
+  const seenChip = {}, seenEvent = {};
+  for (const a of s.plan) {
+    const key = a.set + ":" + a.chip;
+    if (seenChip[key]) return bad(a.chip + " assigned twice in set " + a.set);
+    seenChip[key] = true;
+    if (seenEvent[a.event]) return bad("two chips in GW" + a.event);
+    seenEvent[a.event] = true;
+    const B = bounds[a.set];
+    if (!B) return bad("assignment in an unknown set " + a.set);
+    if (a.event < B.from || a.event > B.to) return bad(a.chip + " in GW" + a.event + " outside set " + a.set);
+    if (a.event < u.ctx.nextEvent) return bad(a.chip + " assigned to GW" + a.event + ", already gone");
+    if (!isFinite(a.value) || a.value < 0) return bad(a.chip + " priced at " + a.value);
+  }
+  const used = {}; s.used.forEach(function (x) { used[x.set + ":" + x.chip] = true; });
+  for (const c of s.candidates) if (used[c.set + ":" + c.chip]) return bad(c.chip + " offered again in set " + c.set + " after being used");
+  if (!s.confirmed && s.plan.filter(function (a) { return a.chip !== "WC"; }).length) return bad("a bench boost, triple captain or free hit was assigned with no confirmed window");
+  return OK;
+});
+
+inv("I132", "the chip solver invents no double and no blank the fixture list does not carry", 6, function (u) {
+  const s = solveOf(u);
+  if (!s.ok) return OK;
+  const counts = {};
+  u.snap.fixtures.forEach(function (f) {
+    if (f.event === null || f.event === undefined || f.event < u.ctx.nextEvent) return;
+    counts[f.event + ":" + f.team_h] = (counts[f.event + ":" + f.team_h] || 0) + 1;
+    counts[f.event + ":" + f.team_a] = (counts[f.event + ":" + f.team_a] || 0) + 1;
+  });
+  for (const d of s.doubles) {
+    const two = d.teams.filter(function (t) { return (counts[d.event + ":" + t] || 0) >= 2; });
+    if (two.length !== d.teams.length) return bad("a GW" + d.event + " double names " + d.teams.length + " clubs, " + two.length + " of them really play twice");
+  }
+  for (const b of s.blanks) {
+    const none = b.teams.filter(function (t) { return !(counts[b.event + ":" + t] || 0); });
+    if (none.length !== b.teams.length) return bad("a GW" + b.event + " blank names " + b.teams.length + " clubs, " + none.length + " of them really have no fixture");
+  }
+  return OK;
+});
+
+inv("I133", "player xG is scored like every other model and is never promotable below the gate", 8, function (u) {
+  const t = E.tournament(u.snap);
+  const m = t.models.filter(function (x) { return x.key === "player_xg"; })[0];
+  if (!m) return bad("player_xg is missing from the tournament");
+  if (m.transitions !== t.transitions) return bad("player_xg scored " + m.transitions + " of " + t.transitions + " transitions");
+  if (m.spearman !== null && !(m.spearman >= -1 && m.spearman <= 1)) return bad("player_xg ρ " + m.spearman);
+  for (const x of t.models) {
+    if (!Array.isArray(x.perTransition)) return bad(x.key + " has no per-transition column");
+    if (x.perTransition.length !== t.transitions) return bad(x.key + " has " + x.perTransition.length + " per-transition values for " + t.transitions + " transitions");
+    if (x.spearman !== null) {
+      const mean = x.perTransition.reduce(function (a, b) { return a + b; }, 0) / x.perTransition.length;
+      if (Math.abs(mean - x.spearman) > 1e-9) return bad(x.key + " per-transition mean " + mean + " against published " + x.spearman);
+    }
+    const want = x.transitions >= 3 && x.wins >= 3 && x.holdout >= 2;
+    if (x.promotable !== want) return bad(x.key + " promotable " + x.promotable + " at " + x.transitions + "/" + x.wins + "/" + x.holdout);
+  }
+  return OK;
+});
+
+inv("I134", "truncateLive never exposes a gameweek after the cut and never mutates the snapshot", 20, function (u) {
+  const cut = ri(0, u.gwN + 2);
+  const before = JSON.stringify(Object.keys(u.snap.gw).sort());
+  const t = E.truncateLive(u.snap, cut);
+  const keys = Object.keys(t.gw).map(Number);
+  for (const k of keys) if (k > cut) return bad("gameweek " + k + " survived a cut at " + cut);
+  for (const f of t.fixtures) if (f.event > cut && (f.finished || f.started || f.team_h_score !== null || f.team_a_score !== null)) {
+    return bad("fixture " + f.id + " in GW" + f.event + " is still marked played after a cut at " + cut);
+  }
+  if (t.current_event !== cut || t.next_event !== cut + 1) return bad("the cut snapshot says current " + t.current_event + " next " + t.next_event);
+  return JSON.stringify(Object.keys(u.snap.gw).sort()) === before ? OK : bad("truncateLive mutated the original snapshot");
+});
+
+inv("I135", "eventMult is zero on a blank, one fixture on a single and the sum of both on a double", 30, function (u) {
+  const team = rpick(u.ctx.teamList).id;
+  const ev = ri(u.ctx.nextEvent, u.ctx.nextEvent + 4);
+  const fx = (u.ctx.fixturesByEvent[ev] || []).filter(function (f) { return f.team_h === team || f.team_a === team; });
+  const m = E.eventMult(team, u.ctx, ev);
+  if (!isFinite(m) || m < 0) return bad("eventMult " + m);
+  if (!fx.length) return m === 0 ? OK : bad("a blank scored " + m);
+  let want = 0;
+  fx.forEach(function (f) { want += E.fxMult(f, team, u.ctx.TS); });
+  return Math.abs(m - want) < 1e-9 ? OK : bad(fx.length + " fixtures summed to " + want + ", eventMult said " + m);
+});
+
 const ENGINE_SRC = fs.readFileSync(path.join(ROOT, "src", "engine.js"), "utf8");
 const TRAP = makeUniverse(3, 6, "trap");
 
@@ -1139,11 +1514,11 @@ for (let it = 0; it < ITERS; it++) {
     UNIVERSES[(it / REBUILD_EVERY) % UNIVERSES.length | 0] = freshUniverse();
   }
   const inv = INV[BAG[Math.floor(RNG() * BAG.length) % BAG.length]];
-  const u = U();
+  const u = inv.cost <= DEEP_MAX_W ? Udeep() : U();
   let out;
   try { out = inv.run(u); }
   catch (e) { out = { ok: false, detail: "threw: " + (e && e.message ? e.message : String(e)) }; }
-  report(inv, out === true || (out && out.ok !== false), out && out.detail);
+  report(inv, out === true || (out && out.ok !== false), out && out.detail, u.tag);
 }
 const secs = (Date.now() - t0) / 1000;
 
@@ -1155,9 +1530,39 @@ never.forEach(function (i) { failCount++; failures.push(i.id + " " + i.name + " 
 
 console.log("--- invariants ---");
 INV.forEach(function (i) {
-  const s = stats[i.id] || { run: 0, failed: 0 };
-  console.log((s.failed ? "FAIL " : "PASS ") + i.id + " " + i.name + " · " + s.run + " runs, " + s.failed + " failed");
+  const s = stats[i.id] || { run: 0, failed: 0, universes: 0 };
+  console.log((s.failed ? "FAIL " : "PASS ") + i.id + " " + i.name + " · " + s.run + " runs over " +
+    (s.universes || 0) + " universes, " + s.failed + " failed");
 });
+
+/* Universe diversity is a first-class bar now, not a footnote. An invariant that ran hundreds
+   of times against a handful of worlds has been measured hundreds of times against a handful
+   of worlds; the run count alone hides that. Floors: every invariant sees at least
+   MIN_UNIVERSES distinct worlds (or as many as it ran, when it ran fewer), and every expensive
+   invariant — the ones the deep bank exists for — sees at least MIN_DEEP_UNIVERSES. */
+const MIN_UNIVERSES = 5;
+const MIN_DEEP_UNIVERSES = 25;
+const thin = [];
+INV.forEach(function (i) {
+  const s = stats[i.id] || { run: 0, universes: 0 };
+  if (!s.run) return;                                    // the "never ran" check above owns this
+  const deep = i.cost <= DEEP_MAX_W;
+  const floor = Math.min(s.run, deep ? MIN_DEEP_UNIVERSES : MIN_UNIVERSES);
+  if ((s.universes || 0) < floor) thin.push(i.id + " " + (deep ? "(deep) " : "") + s.universes + " universes over " + s.run + " runs, floor " + floor);
+});
+thin.forEach(function (t) { failCount++; failures.push("universe diversity — " + t); });
+const deepStats = INV.filter(function (i) { return i.cost <= DEEP_MAX_W && stats[i.id] && stats[i.id].run; })
+  .map(function (i) { return stats[i.id].universes; });
+const shallowStats = INV.filter(function (i) { return i.cost > DEEP_MAX_W && stats[i.id] && stats[i.id].run; })
+  .map(function (i) { return stats[i.id].universes; });
+function lo(a) { return a.length ? Math.min.apply(null, a) : 0; }
+function hi(a) { return a.length ? Math.max.apply(null, a) : 0; }
+console.log("");
+console.log("universe diversity · expensive invariants (weight ≤ " + DEEP_MAX_W + ", " + deepStats.length + " of them): " +
+  lo(deepStats) + " to " + hi(deepStats) + " distinct worlds each, floor " + MIN_DEEP_UNIVERSES +
+  " · the rest: " + lo(shallowStats) + " to " + hi(shallowStats) + ", floor " + MIN_UNIVERSES);
+console.log("deep bank · " + deepDraws + " draws, one slot of " + DEEP_BANK_N + " replaced every " + DEEP_REBUILD +
+  " draws, " + deepBuilt + " universes built for it");
 if (failures.length) {
   console.log("");
   console.log("--- first " + failures.length + " failures ---");

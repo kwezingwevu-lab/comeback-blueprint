@@ -337,11 +337,11 @@ else bad "app-version-stamped-and-equals-package-major" "$ver_out"; fi
 # I7 · every suite named by CONTRACT §1 is present in qa/ (E-014: a workspace reset once wiped them)
 missing=""
 present=0
-for s in run.sh harness.cjs verify.sh tdz_check.cjs unit_engine.cjs smoke.cjs smoke_wk.cjs realistic.cjs buttons.cjs mc_full.cjs mc_all.cjs; do
+for s in run.sh harness.cjs verify.sh tdz_check.cjs unit_engine.cjs smoke.cjs smoke_wk.cjs realistic.cjs buttons.cjs webkit.js mc_full.cjs mc_all.cjs; do
   if [ -f "qa/$s" ]; then present=$((present + 1)); else missing="$missing $s"; fi
 done
-if [ -z "$missing" ]; then ok "every-suite-file-present-in-qa" "$present of 11 suite files present"
-else bad "every-suite-file-present-in-qa" "$present of 11 present; missing:$missing"; fi
+if [ -z "$missing" ]; then ok "every-suite-file-present-in-qa" "$present of 12 suite files present"
+else bad "every-suite-file-present-in-qa" "$present of 12 present; missing:$missing"; fi
 
 # I8 · dist/index.html exists and is not older than the sources it is built from
 if [ ! -f "$DIST" ]; then
@@ -414,6 +414,44 @@ else
   else
     bad "dist-shell-style-block-has-no-hex" "$shell_styles style blocks; hex found: ${shell_hex:-none}"
   fi
+fi
+
+# I15 · the draft-league block is in the shipped snapshot, and carries no invented league id
+draft_out="$(MC_ROOT="$ROOT" node -e '
+const fs=require("fs"), path=require("path");
+const L=JSON.parse(fs.readFileSync(path.join(process.env.MC_ROOT,"data","live.json"),"utf8"));
+const keys=["league","entries","ownership","rosters","freeAgents","matches","standings","picks","me","unjoined","unmappedOwners","counts"];
+const missing=keys.filter(k=>!(k in L.draft));
+const empty = L.draft.league===null && L.draft.entries.length===0 && L.draft.ownership.length===0 &&
+  Object.keys(L.draft.rosters).length===0 && L.draft.freeAgents.length===0 && L.draft.matches.length===0 &&
+  Object.keys(L.draft.picks).length===0 && L.draft.me===null;
+if (missing.length) { console.log("missing draft-league fields: "+missing.join(",")); process.exit(1); }
+if (L.draft.league_id!==null) { console.log("the shipped snapshot carries draft league id "+L.draft.league_id+" — Kwezi\u2019s is unknown and must not be invented"); process.exit(1); }
+if (!empty) { console.log("league_id is null but the league fields are not empty"); process.exit(1); }
+console.log("all "+keys.length+" draft-league fields present, league_id null, every one empty");
+' 2>&1)"
+if [ $? -eq 0 ]; then ok "draft-league-block-present-and-uninvented" "$draft_out"
+else bad "draft-league-block-present-and-uninvented" "$draft_out"; fi
+
+# I16 · the recorded draft-league fixtures the suites replay are in the repository
+fx_dir="qa/fixtures/draft"
+if [ ! -f "$fx_dir/MANIFEST.json" ]; then
+  bad "draft-fixtures-recorded-with-a-manifest" "$fx_dir/MANIFEST.json is missing"
+else
+  fx_out="$(MC_DIR="$fx_dir" node -e '
+const fs=require("fs"), path=require("path");
+const dir=process.env.MC_DIR;
+const m=JSON.parse(fs.readFileSync(path.join(dir,"MANIFEST.json"),"utf8"));
+const files=Object.keys(m.files||{});
+const missing=files.filter(f=>!fs.existsSync(path.join(dir,f)));
+if (!files.length) { console.log("the manifest lists no files"); process.exit(1); }
+if (missing.length) { console.log("listed but absent: "+missing.join(", ")); process.exit(1); }
+const bad=files.filter(f=>!/^https:\/\/draft\.premierleague\.com\/api\//.test(m.files[f]));
+if (bad.length) { console.log("not a public draft API url: "+bad.join(", ")); process.exit(1); }
+console.log(files.length+" recorded responses, every one from draft.premierleague.com/api, captured "+m.captured_at);
+' 2>&1)"
+  if [ $? -eq 0 ]; then ok "draft-fixtures-recorded-with-a-manifest" "$fx_out"
+  else bad "draft-fixtures-recorded-with-a-manifest" "$fx_out"; fi
 fi
 
 # ---------------------------------------------------------------- verdict

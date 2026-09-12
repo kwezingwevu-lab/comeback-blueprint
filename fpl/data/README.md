@@ -4,6 +4,7 @@
 |---|---|---|
 | `fetch_live.cjs` | Node 22 script (global `fetch`, no dependencies) that pulls the public classic and draft APIs and writes `live.json` in the CONTRACT §3 shape. | hand |
 | `live.json` | Committed snapshot of the public API: events, teams, elements, all fixtures, per-GW stats for finished gameweeks, Kwezi's entry / history / picks, the six winnable leagues with every rival's current picks, and the draft game, scoring, squad rules and elements. Every number is a number; prices are in tenths. | `fetch_live.cjs` |
+| `draft_league.cjs` | Pure shaping of the four public draft-league endpoints into the CONTRACT §3 `draft` league block. No network, no filesystem, no clock. Required by `fetch_live.cjs` and by the QA suites, so a suite can never pass against a copy of the shaping the fetcher does not run. | hand |
 | `validate_live.cjs` | 75 checks on `live.json` (keys, counts, shapes, no banned fields, ft derivation, league sizes, rival union, draft join). Exits 1 on any FAIL. | hand |
 | `weekly.js` | The WEEKLY STRATEGY ENGINE block: one `const WEEKLY = {…};` statement of decisions only (wildcard 15, captain, fallback, draft claims, draft XI, chip plan). `build.cjs` pastes it between the START/END markers. | hand, each Friday |
 
@@ -19,15 +20,33 @@ instead of the network (same code path, every URL answered from a file):
 node data/fetch_live.cjs --offline <dir>    # bootstrap.json fixtures_all.json live{gw}.json entry.json
                                             # history.json picks{gw}.json leagues/{id}.json rivals/{entry}.json
                                             # draft_bootstrap.json draft_game.json
+                                            # league_{id}_details.json league_{id}_status.json
+                                            # entry_{id}_public.json entry_{id}_event_{gw}.json
 ```
+
+## The draft league
+```
+node data/fetch_live.cjs --draft-league 1                                      # a league id
+node data/fetch_live.cjs --draft-league https://draft.premierleague.com/entry/1/event/3
+node data/fetch_live.cjs                                                       # or from state/kwezi.json
+```
+`--draft-league` accepts the address of a draft league, a bare league id, or a draft ENTRY id;
+a bare number is tried as a league first and then as an entry (`entry/{id}/public` →
+`league_set`). With no league id — which is where the file stands, because Kwezi's league id is
+unknown and must not be invented — every league field in the `draft` block is written empty and
+the app says the pool is unknown. With one, the block carries the teams, ownership by code,
+each team's fifteen, the free agents, the fixtures, the table, the current picks and which team
+is his. `element_status[].owner` is an **entry** id and is translated to a league-entry id in
+`draft_league.cjs`; everything downstream speaks league-entry ids (ERRORS.md E-063).
 The script is polite (at most 6 requests in flight; 3 retries with backoff on 429, 5xx and
 network errors), touches nothing account-side, never reads `ep_this`/`ep_next`, and refuses
 to write a file that contains the substring `ep_`. The deadline is read from
 `events[].is_next` every run, never hard-coded.
 
 ## Ids versus codes
-Classic and draft are two systems. Element ids differ between them for 59 of 655 players
-(Tzolakis is classic 572, draft 571). Every draft element in `live.json` carries `code`;
+Classic and draft are two systems. Element ids differ between them — 59 of 655 players when it
+was first measured on 11 September 2026, 59 of 656 the next morning after the game added a
+player, which is why no test pins the total (ERRORS.md E-064). Tzolakis is classic 572, draft 571. Every draft element in `live.json` carries `code`;
 join draft to classic on `code`, never on id or name. `weekly.js` therefore uses classic
 element ids in `classic` and player codes in `draft`; `state/kwezi.json` does the same.
 Name matching is banned outright (CLAUDE.md D3: it missed Konsa and N.Jackson).

@@ -3,7 +3,7 @@
 // draft entries are player "code"s (draft ids differ from classic for 59 players).
 // Names in comments were resolved against bootstrap-static on 11 Sep 2026.
 const WEEKLY = {
-  version: 87, gw: 4, written: "2026-09-11", source: "CLAUDE.md Part M + live check 11 Sep 2026",
+  version: 88, gw: 4, written: "2026-09-11", source: "CLAUDE.md Part M + live check 11 Sep 2026",
   classic: {
     plan: "wildcard",                                   // "wildcard" | "transfers" | "hold"
     // Tzolakis, Raya · Calafiori, Ajayi, Tarkowski, Bogle, Mendy · Janelt, Saka, Scott, Rogers, Barnes · João Pedro, Haaland, Barry

@@ -10,11 +10,11 @@
  *      transpile, so a name that esbuild renamed or dropped shows up as missing, not as a
  *      silent gap).
  *   3. Fuzzes each function with the 20 junk kinds, mixed with valid arguments drawn from a
- *      synthetic CONTRACT §3 snapshot, and evaluates all 35 property groups on every call.
+ *      synthetic CONTRACT §3 snapshot, and evaluates all 38 property groups on every call.
  *
  * Accounting
  *   iterations  = fuzz trials actually executed (argv[2], default 3000; release 25000)
- *   assertions  = iterations × 35 property groups + the fixture assertions
+ *   assertions  = iterations × 38 property groups + the fixture assertions
  *   functions   = <passed>/<total>: a function passes when no property group flagged it
  *   failures    = property-group violations
  *
@@ -38,11 +38,133 @@
 
 const fs = require("fs");
 const path = require("path");
+const WT = require("worker_threads");
 
 const ROOT = path.resolve(__dirname, "..");
 const APP = path.join(ROOT, "app", "FPL_Mission_Control.jsx");
 const ITERS = Math.max(1, Math.floor(Number(process.argv[2]) || 3000));
 const SEED = Math.floor(Number(process.argv[3]) || 20260911);
+
+/* ---------------------------------------------------------------- the watchdog
+ *
+ * The suite used to run in one thread, which meant it could not time out a synchronous loop
+ * from inside itself: a genuinely unbounded loop appeared as a run that never finished rather
+ * than as a named failure. That is how E-035 (binomial looping 1e308 times) was found — by a
+ * human noticing the suite had not returned.
+ *
+ * The whole fuzz run now happens in a worker thread. Before every trial the worker writes the
+ * function name and the junk kinds into a SharedArrayBuffer and bumps a counter; the parent
+ * thread, which has nothing else to do, watches that counter. A trial that has not returned
+ * within the budget is printed as `FAIL mc_full-watchdog — <function> <kinds> …`, the worker is
+ * terminated and the suite exits 1. Iteration counts and per-trial timings are unchanged; the
+ * only new cost is the worker start-up and a 1.5 s self-test that proves the watchdog fires.
+ *
+ * Layout of the shared buffer: Int32Array[0] = trial counter · [1] = label byte length ·
+ * bytes 64.. = the UTF-8 label of the trial in flight.
+ */
+const WATCHDOG_MS = Math.max(2000, Math.floor(Number(process.env.MC_WATCHDOG_MS) || 10000));
+const STARTUP_MS = Math.max(20000, Math.floor(Number(process.env.MC_STARTUP_MS) || 120000));
+const SAB_BYTES = 320;
+const LABEL_OFF = 64;
+
+function readLabel(sab) {
+  try {
+    const i32 = new Int32Array(sab, 0, 2);
+    const len = Math.max(0, Math.min(SAB_BYTES - LABEL_OFF, Atomics.load(i32, 1)));
+    if (!len) return "(no trial started yet)";
+    return new TextDecoder().decode(new Uint8Array(sab, LABEL_OFF, len));
+  } catch (e) { return "(label unreadable)"; }
+}
+
+/* One watcher, used by the self-test and by the real run, so the mechanism that guards the
+   suite is the mechanism the suite proves. Resolves {stalled, label, beats, code}. */
+function watch(worker, sab, budgetMs, startupMs) {
+  return new Promise(function (resolve) {
+    const i32 = new Int32Array(sab, 0, 2);
+    let lastBeat = -1;
+    let lastChange = Date.now();
+    let settled = false;
+    const timer = setInterval(function () {
+      if (settled) return;
+      const beat = Atomics.load(i32, 0);
+      if (beat !== lastBeat) { lastBeat = beat; lastChange = Date.now(); return; }
+      const budget = beat > 0 ? budgetMs : startupMs;
+      if (Date.now() - lastChange > budget) {
+        settled = true;
+        clearInterval(timer);
+        const label = readLabel(sab);
+        worker.terminate();
+        resolve({ stalled: true, label: label, beats: beat, waited: Date.now() - lastChange });
+      }
+    }, 200);
+    worker.on("exit", function (code) {
+      if (settled) return;
+      settled = true; clearInterval(timer);
+      resolve({ stalled: false, code: code, beats: Atomics.load(i32, 0) });
+    });
+    worker.on("error", function (err) {
+      if (settled) return;
+      settled = true; clearInterval(timer);
+      resolve({ stalled: false, code: 1, error: err, beats: Atomics.load(i32, 0) });
+    });
+  });
+}
+
+/* The parent. It proves the watchdog on a worker that really does loop for ever, then runs the
+   suite in a second worker under the same watcher. */
+if (WT.isMainThread && process.env.MC_NO_WORKER !== "1") {
+  (async function supervise() {
+    const selfSab = new SharedArrayBuffer(SAB_BYTES);
+    const SELF_BUDGET = 1500;
+    const SELF_SRC = [
+      "const { workerData } = require('worker_threads');",
+      "const i32 = new Int32Array(workerData.sab, 0, 2);",
+      "const bytes = new TextEncoder().encode('deliberateInfiniteLoop|self-test');",
+      "new Uint8Array(workerData.sab, 64, bytes.length).set(bytes);",
+      "Atomics.store(i32, 1, bytes.length);",
+      "Atomics.add(i32, 0, 1);",
+      "while (true) { Math.sqrt(2); }"
+    ].join("\n");
+    const t0 = Date.now();
+    const selfWorker = new WT.Worker(SELF_SRC, { eval: true, workerData: { sab: selfSab } });
+    const selfOut = await watch(selfWorker, selfSab, SELF_BUDGET, 20000);
+    const selfMs = Date.now() - t0;
+    const selfOk = selfOut.stalled === true && /deliberateInfiniteLoop/.test(String(selfOut.label));
+    console.log((selfOk ? "PASS " : "FAIL ") + "mc_full-watchdog-self-test-names-an-unbounded-loop — " +
+      (selfOut.stalled ? "named «" + selfOut.label + "» after " + selfMs + " ms (budget " + SELF_BUDGET + " ms)" :
+        "the loop was NOT caught: " + JSON.stringify(selfOut)));
+
+    const sab = new SharedArrayBuffer(SAB_BYTES);
+    const worker = new WT.Worker(__filename, {
+      argv: [String(ITERS), String(SEED)],
+      workerData: { sab: sab, selfTest: { ok: selfOk, ms: selfMs, budget: SELF_BUDGET, label: String(selfOut.label) } },
+      resourceLimits: { stackSizeMb: 8 }
+    });
+    const out = await watch(worker, sab, WATCHDOG_MS, STARTUP_MS);
+    if (out.stalled) {
+      console.log("");
+      console.log("FAIL mc_full-watchdog — «" + out.label + "» did not return within " + WATCHDOG_MS +
+        " ms (trial " + out.beats + "); the worker was terminated");
+      console.log("SUITE mc_full " + out.beats + " iters · watchdog timeout · 0/0 · 1");
+      process.exit(1);
+    }
+    if (out.error) console.log("FAIL mc_full — the worker errored: " + (out.error && out.error.message ? out.error.message : String(out.error)));
+    process.exit(selfOk ? (out.code || 0) : 1);
+  })();
+  return;                                   // CommonJS module scope: the worker runs the rest
+}
+
+/* The worker. Heartbeat helpers write into the buffer the parent is watching. */
+const SAB = WT.workerData && WT.workerData.sab ? WT.workerData.sab : new SharedArrayBuffer(SAB_BYTES);
+const BEAT = new Int32Array(SAB, 0, 2);
+const LABEL = new Uint8Array(SAB, LABEL_OFF, SAB_BYTES - LABEL_OFF);
+const ENC = new TextEncoder();
+function heartbeat(label) {
+  const b = ENC.encode(String(label).slice(0, SAB_BYTES - LABEL_OFF - 1));
+  LABEL.set(b.subarray(0, LABEL.length));
+  Atomics.store(BEAT, 1, Math.min(b.length, LABEL.length));
+  Atomics.add(BEAT, 0, 1);
+}
 
 // ---------------------------------------------------------------- reporting
 
@@ -382,6 +504,15 @@ const JUNK = [
 ];
 fixture("mc_full-exactly-20-junk-kinds", JUNK.length === 20, JUNK.length + " kinds");
 
+// The parent proved the watchdog on a worker that really does loop for ever before it started
+// this one; the result is carried in so it is counted with every other assertion.
+const SELF = (WT.workerData && WT.workerData.selfTest) || null;
+fixture("mc_full-watchdog-catches-an-unbounded-loop-and-names-it",
+  !!(SELF && SELF.ok), SELF ? "self-test returned " + JSON.stringify(SELF) : "the suite was run without the supervisor (MC_NO_WORKER=1)");
+fixture("mc_full-the-fuzz-loop-runs-under-that-watchdog",
+  !!(WT.workerData && WT.workerData.sab) && !WT.isMainThread,
+  WT.isMainThread ? "running on the main thread: an unbounded call would hang instead of failing" : "no shared heartbeat buffer");
+
 // ---------------------------------------------------------------- 5. valid arguments per function
 
 const STATS_ROW = { minutes: 90, starts: 1, goals: 1, assists: 1, cs: 1, gc: 0, dc: 12, bps: 30, saves: 0, bonus: 2, yc: 0, rc: 0, og: 0, pen_miss: 0, pen_save: 0 };
@@ -421,7 +552,23 @@ const VALID = {
   simPlayerDetail: [EL, CTX, mulberry32(6)], simPlayer: [EL, CTX, mulberry32(7)], fixtureDraws: [CTX, mulberry32(8)],
   entryPoints: [XI.ids, BENCH, XI.capId, XI.viceId, {}, CTX], squadOrder: [SQUAD, XI.capId, CTX],
   mcSquad: [SQUAD, XI.capId, CTX, 30, 11, XI.viceId], mcLeague: [CTX, 900, { iters: 30, seed: 3 }],
-  ranksOf: [[3, 1, 2]], spearman: [[1, 2, 3], [2, 1, 3]], mae: [[1, 2, 3], [2, 1, 3]], calibrateToPoints: [[10, 20, 30], [1, 2, 3]], tournament: [SNAP]
+  ranksOf: [[3, 1, 2]], spearman: [[1, 2, 3], [2, 1, 3]], mae: [[1, 2, 3], [2, 1, 3]], calibrateToPoints: [[10, 20, 30], [1, 2, 3]], tournament: [SNAP],
+  // F4 calibration, F5 player xG, F8 chip solver (v88)
+  logistic: [1.2], solveLinear: [[[2, 1], [1, 3]], [5, 10]],
+  fitLogistic: [[[1, 0], [1, 1], [1, 0], [1, 1], [1, 0], [1, 1], [1, 0.5], [1, 0.25]], [0, 1, 0, 1, 0, 1, 1, 0], {}],
+  brier: [[0.2, 0.8, 0.5], [0, 1, 1]], reliability: [[0.2, 0.8, 0.5], [0, 1, 1], 5],
+  promotionGate: [{ transitions: 2, wins: 2, holdout: 1, challenger: "x", incumbent: "y" }],
+  strengthFromCounts: [{ 1: { g: 3, xgf: 4.2, xga: 3.1 }, 2: { g: 3, xgf: 3.0, xga: 4.4 } }],
+  playerXgPredict: [{ played: 3, min: 270, pts: 18, xg: 1.2, xa: 0.4, cs: 1, gc: 2, dcHits: 2, bps: 60, ict: 30, bonus: 2, last: 6 },
+    { min: 9000, xg: 20, xa: 12 }, 3,
+    { play_short: 1, play_long: 2, goal: 5, assist: 3, cs: 1, gc_per2: 0, dc: 2, dc_threshold: 12, bonus: 1 },
+    [{ team: 1, opp: 2, home: true }], { TS: TS, Lbar: 1.4 }],
+  minutesTerms: [{ beta: [0, 0, 0, 0, 0] }], minutesPanel: [SNAP],
+  minutesFeatureVector: [[{ gw: 1, games: 1, min: 90, starts: 1 }, { gw: 2, games: 1, min: 45, starts: 0 }], 4, { 1: 0, 2: 86400000, 3: 172800000, 4: 259200000 }],
+  minutesRowsFor: [SNAP, 3, null], minutesFit: [SNAP, 3, {}], ctxMinutesFit: [CTX, {}], minutesModel: [EL, CTX, {}],
+  truncateLive: [SNAP, 2], minutesWalkForward: [SNAP, { bins: 5 }],
+  playerXg: [EL, CTX, {}], eventMult: [1, CTX, 4], xpEvent: [EL, CTX, 4], bestElevenForEvent: [CTX, 4, null],
+  chipValue: ["BB", 4, CTX, {}], chipSolver: [CTX, {}]
 };
 
 // Slot budgets: how many arguments to offer each function. Declared length, but never zero for
@@ -443,14 +590,18 @@ const ITER_SLOT = { mcSquad: 3, mcLeague: -1, wcSolve: -1, wildcardOptions: -1, 
 // The three primitives whose documented scalar answer to unusable input is NaN.
 const NAN_SENTINEL = ["num", "intOf", "idOf", "sortNum"];
 
-const PROB_KEYS = ["pstart", "pwin", "share", "prob", "p"];
-const INT_KEYS = ["cost", "now_cost", "bank", "bankafter", "budget", "hits", "ft", "k", "iters", "purchase", "sellprice", "entries", "transitions"];
+const PROB_KEYS = ["pstart", "pwin", "share", "prob", "p", "pmodel", "pincumbent", "flagfactor",
+  "brier", "baserate", "basebrier", "meanpred", "meanoutcome", "gap", "maxgap"];
+const INT_KEYS = ["cost", "now_cost", "bank", "bankafter", "budget", "hits", "ft", "k", "iters", "purchase", "sellprice", "entries", "transitions",
+  "wins", "holdout", "need", "needholdout", "comparable", "nbins", "considered", "set", "event", "fitrows"];
 const TENTH_KEYS = ["cost", "now_cost", "bank", "bankafter", "budget", "purchase"];
 // Published caps. "ids" is only a fifteen for the functions that return a squad — wcPool's `ids`
 // is a candidate pool and is legitimately longer — and "bench" is "whatever was not picked", so
 // its cap is the input list minus the eleven (4 for a real fifteen, and stricter than a flat 4
 // whenever the caller passed fewer than fifteen).
-const CAPS = { squad: 15, xi: 11, moves: 3, order: 8, models: 8, claims: 20, alternatives: 3, reasons: 60, relaxations: 12 };
+// models is 9 from v88: the eight of E5 plus the F5 player-xG challenger.
+const CAPS = { squad: 15, xi: 11, moves: 3, order: 8, models: 9, claims: 20, alternatives: 3, reasons: 60, relaxations: 12,
+  terms: 12, plan: 8, candidates: 16, sets: 2, bins: 20, x: 8, beta: 8, opponents: 4 };
 const IDS_CAP = { bestXI: 11, pickXI: 11, wildcardSolver: 15, wildcardOptions: 15, sanitiseState: 15 };
 
 function walk(v, visit) {
@@ -512,7 +663,7 @@ function idsOf(v) {
   return out;
 }
 
-// ---------------------------------------------------------------- 7. the 35 property groups
+// ---------------------------------------------------------------- 7. the 38 property groups
 
 const GROUPS = [
   ["P01", "nothing throws (total functions)", function (r) {
@@ -731,9 +882,9 @@ const GROUPS = [
     if (Number(r.out.gwsOfData) >= 8) return null;
     return r.out.pWin === null ? null : { ok: false, detail: r.kinds + " → pWin " + r.out.pWin + " on " + r.out.gwsOfData + " gameweeks" };
   }],
-  ["P29", "tournament returns the eight named models with ρ in [-1,1] or null", function (r) {
+  ["P29", "tournament returns the nine named models with ρ in [-1,1] or null", function (r) {
     if (r.name !== "tournament" || r.threw || !r.out || !Array.isArray(r.out.models)) return null;
-    const want = ["season_mean", "last_gw", "per90", "shrunk_per90", "ict_rate", "bps_rate", "blend", "component_xp"];
+    const want = ["season_mean", "last_gw", "per90", "shrunk_per90", "ict_rate", "bps_rate", "blend", "component_xp", "player_xg"];
     const keys = r.out.models.map(function (m) { return m.key; });
     if (keys.join(",") !== want.join(",")) return { ok: false, detail: "models " + keys.join(",") };
     const bad = r.out.models.filter(function (m) { return m.spearman !== null && !(m.spearman >= -1 && m.spearman <= 1); });
@@ -774,10 +925,65 @@ const GROUPS = [
   ["P35", "no call leaks a global or mutates the shared fixtures", function (r) {
     if (r.leaked) return { ok: false, detail: r.kinds + " leaked global " + r.leaked };
     return r.canary === SNAP_CANARY ? null : { ok: false, detail: r.kinds + " mutated the shared snapshot or state" };
+  }],
+  // ---- F4 / F5 / F8 (v88) ----
+  ["P36", "Brier stays in [0,1], skill in [-1,1], and every reliability bin is accounted for", function (r) {
+    if (r.threw || !r.out || typeof r.out !== "object") return null;
+    let bad = null;
+    walk(r.out, function (v, k, p) {
+      if (bad !== null || !v || typeof v !== "object" || Array.isArray(v)) return;
+      if (typeof v.brier === "number" && (!isFinite(v.brier) || v.brier < 0 || v.brier > 1)) bad = (p || k) + ".brier = " + v.brier;
+      if (bad === null && typeof v.skill === "number" && (!isFinite(v.skill) || v.skill < -1 || v.skill > 1)) bad = (p || k) + ".skill = " + v.skill;
+      if (bad === null && Array.isArray(v.bins) && typeof v.n === "number") {
+        let counted = 0, shape = true;
+        v.bins.forEach(function (b) {
+          if (!b || typeof b !== "object" || typeof b.n !== "number" || !(b.lo >= 0) || !(b.hi <= 1) || b.lo >= b.hi) { shape = false; return; }
+          counted += b.n;
+        });
+        if (!shape) bad = (p || k) + " has a malformed reliability bin";
+        else if (counted !== v.n) bad = (p || k) + " bins hold " + counted + " of " + v.n + " rows";
+      }
+    });
+    return bad === null ? null : { ok: false, detail: r.kinds + " → " + bad };
+  }],
+  ["P37", "the chip solver never repeats a chip in a set, doubles up a gameweek, or breaks an expiry", function (r) {
+    if (r.name !== "chipSolver" || r.threw || !r.out || !Array.isArray(r.out.plan)) return null;
+    const bounds = {};
+    (Array.isArray(r.out.sets) ? r.out.sets : []).forEach(function (S) { if (S && typeof S === "object") bounds[S.set] = S; });
+    const seenChip = {}, seenEvent = {};
+    let bad = null;
+    r.out.plan.forEach(function (a) {
+      if (bad !== null || !a || typeof a !== "object") return;
+      const key = a.set + ":" + a.chip;
+      if (seenChip[key]) { bad = a.chip + " assigned twice in set " + a.set; return; }
+      seenChip[key] = true;
+      if (seenEvent[a.event]) { bad = "two chips in GW" + a.event; return; }
+      seenEvent[a.event] = true;
+      const B = bounds[a.set];
+      if (!B) { bad = "assignment in an unknown set " + a.set; return; }
+      if (!(a.event >= B.from && a.event <= B.to)) bad = a.chip + " in GW" + a.event + " is outside set " + a.set;
+      else if (!isFinite(a.value) || a.value < 0) bad = a.chip + " priced at " + a.value;
+    });
+    return bad === null ? null : { ok: false, detail: r.kinds + " → " + bad };
+  }],
+  ["P38", "the promotion gate never opens below three transitions, three wins and a two-week hold-out", function (r) {
+    if (r.threw || !r.out || typeof r.out !== "object") return null;
+    let bad = null;
+    walk(r.out, function (v, k, p) {
+      if (bad !== null || !v || typeof v !== "object" || Array.isArray(v)) return;
+      if (typeof v.promotable !== "boolean" || typeof v.need !== "number" || typeof v.transitions !== "number") return;
+      if (v.promotable && (v.transitions < v.need || v.wins < v.need || v.holdout < v.needHoldout)) {
+        bad = (p || k) + " opened at " + v.transitions + " transitions, " + v.wins + " wins, hold-out " + v.holdout;
+      }
+      if (bad === null && (v.wins > v.transitions || v.holdout > v.transitions)) {
+        bad = (p || k) + " reports " + v.wins + " wins and a " + v.holdout + " hold-out over " + v.transitions + " transitions";
+      }
+    });
+    return bad === null ? null : { ok: false, detail: r.kinds + " → " + bad };
   }]
 ];
 
-fixture("mc_full-exactly-35-property-groups", GROUPS.length === 35, GROUPS.length + " groups");
+fixture("mc_full-exactly-38-property-groups", GROUPS.length === 38, GROUPS.length + " groups");
 
 // ---------------------------------------------------------------- 8. the fuzz loop
 
@@ -810,6 +1016,7 @@ for (let t = 0; t < ITERS; t++) {
   if (typeof fn !== "function") continue;
   const a = argsFor(name, fn, Math.floor(t / ORDER.length));
   const rec = { name: name, args: a.args, kinds: a.kinds, clean: a.clean, threw: false, err: "", errObj: null, out: undefined, ms: 0, leaked: null, canary: "" };
+  heartbeat(name + " [" + a.kinds + "]");
   useHooksOf(name);
   const t0 = process.hrtime.bigint();
   try { rec.out = fn.apply(null, a.args); }

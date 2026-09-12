@@ -96,9 +96,36 @@
  *                                      horizons include their end gameweek (E-042)
  *   chipWindows(live)               → {doubles[], blanks[], recommendation, nextEvent}
  *   chipRegret(chip, ctx, opts)     → {chip, useNow, bestLater, laterEvent, regretUse, regretHold, verdict, note}
- *   draftWaivers(state, ctx)        → [{priority, out, in, outName, inName, evOut, evIn, gain, why}]
+ *   draftWaivers(state, ctx)        → [{priority, out, in, outName, inName, evOut, evIn, gain, why,
+ *                                      forced, pool:"api"|"assumed", roster:"api"|"saved"|"none"}]
+ *                                      "api" means the claim came from the league's real free
+ *                                      agents; "assumed" is the old ordering over everyone
  *   watchlistAudit(codes, ctx)      → {keep[], drop[], unknown[], detail[]}
- *   draftXI(codes, ctx)             → {codes, ids, formation, score, gk, def[], mid[], fwd[], bench[]}
+ *   draftXIBase(codes, ctx, valueOf?) → the eleven under any per-player value function
+ *   draftXI(codes, ctx, opts?)      → {codes, ids, benchIds, formation, score, gk, def[], mid[],
+ *                                      fwd[], bench[], lean:"up"|"down"|"none", tilted,
+ *                                      tiltChangedXI, h2h, note}
+ *                                      C5 variance rule: ceiling when behind, floor when ahead
+ *
+ * Draft league (C5 · F2; empty until a league id is in the snapshot)
+ *   draftLeagueInput(text)          → {ok, kind:"league"|"entry"|"unknown", id, note}
+ *   draftOwnership(ctx)             → {ok, byCode, owners, ownedCount, unownedCount, poolCount, note}
+ *   draftPool(ctx, opts?)           → [{code, id, web_name, element_type, starts_last3, ev,
+ *                                      poolStatus, status, eligible}] — free agents only
+ *                                      (owner null and element-status "a"), ranked by EV.
+ *                                      poolStatus is claimability, status is fitness: the two
+ *                                      are different fields and a free agent can be injured
+ *   draftRosterOf(leagueEntryId,ctx)→ [codes]
+ *   draftRivalRosters(ctx)          → [{leagueEntryId, entryId, name, manager, codes[], ids[]}]
+ *   waiverOrder(ctx)                → {ok, order[], size, mine:{position, of}, note}
+ *   h2hOpponent(ctx, gw)            → {ok, gw, opponent, mine, myPoints, oppPoints, finished, note}
+ *   draftRoster(state, ctx)         → {codes, source:"api"|"saved"|"none", complete, note}
+ *   playerSpread(el, ctx, iters, seed) → {mean, sd, iters}
+ *   distStats(list)                 → {mean, sd, q10, q50, q90, n}
+ *   mcDraftXI(ids, bench, ctx, iters, seed) → {mean, sd, q10, q50, q90, iters, ok} (no captain)
+ *   mcH2H(myIds, myBench, oppIds, oppBench, ctx, iters, seed) → {ok, mine, theirs, margin}
+ *                                      both elevens in one loop over shared fixture draws
+ *   h2hProjection(ctx, opts?)       → {ok, gw, opponent, mine, theirs, margin, marginDist, lean, note}
  *
  * Squad / state
  *   sanitiseState(raw)              → state (§6 shape; cap 15, dedupe on id; never throws)
@@ -119,6 +146,51 @@
  *                                      distribution and is never reported as one (E-046)
  *   mcLeague(ctx, leagueId, opts)   → {leagueId, direction, rankBand, currentRank, medianRank, pWin|null, …}
  *
+ * Calibration and fitting (F4)
+ *   logistic(z)                     → probability in [0,1]; NaN answers 0.5, the infinities saturate
+ *   solveLinear(A, b)               → solution vector, or null on a singular or non-finite system
+ *   fitLogistic(X, y, opts?)        → {ok, beta[], n, k, iters, converged, ridge, logLik, baseRate, note}
+ *                                     ridge-penalised IRLS; the design matrix carries its own intercept
+ *   brier(predictions, outcomes)    → {brier, n, baseRate, baseBrier, skill, ok} — brier ∈ [0,1]
+ *   reliability(pred, out, bins?)   → {bins:[{lo,hi,n,meanPred,meanOutcome,gap}], n, baseRate, maxGap, ok}
+ *   promotionGate(opts)             → {promotable, transitions, wins, holdout, need, needHoldout,
+ *                                     transitionsOk, winsOk, holdoutOk, reasons[], note}
+ *                                     THE gate (CLAUDE.md J): three scored transitions, three of them
+ *                                     won, and a two-gameweek trailing hold-out. The model tournament
+ *                                     and the minutes walk-forward both go through this one function
+ *
+ * Minutes model (F4) — a challenger; it drives nothing until the gate opens
+ *   minutesPanel(live)              → {gws, deadlines, teamGames, rows, els, teamOf, ok}
+ *   minutesFeatureVector(hist, gw, deadlines) → [1, starts_last3, minutes_trend3, minutes_rate,
+ *                                     days_since_last_start] — every term bounded
+ *   minutesRowsFor(live, gw, panel?)→ {X, y, ids, seenFlag, n, seen, baseRate, note}: features from
+ *                                     gameweeks strictly before gw, outcome "did he start in gw"
+ *   minutesFit(live, uptoGw, opts?) → {ok, beta[], rows, gws[], converged, iters, terms[], note}
+ *   ctxMinutesFit(ctx, opts?)       → the same fit, cached on the context
+ *   minutesModel(el, ctx, opts?)    → {p, pModel, pIncumbent, flagFactor, fitted, driving:false,
+ *                                     driver:"pStart", features, terms[], fit, note}
+ *   truncateLive(live, uptoGw)      → the snapshot as it stood at the end of uptoGw
+ *   minutesWalkForward(live, opts?) → {folds[], comparable, wins, holdout, incumbent, challengerScore,
+ *                                     gate, note} — fit on ≤ k, score "started in k+1" on the held-out
+ *                                     gameweek for BOTH the Laplace incumbent and the challenger
+ *
+ * Player xG (F5) — the ninth tournament challenger; E6 bars it from driving anything
+ *   playerXg(el, ctx, opts?)        → {xp, xpPerFixture, p, lambda, lambdaAssist, mult, att, def,
+ *                                     xg90, xa90, fixtures, components, opponents[], note}
+ *   playerXgPredict(acc, prior, type, SCORING_row, fixtures, TSprev) → the same shape from the
+ *                                     walk-forward's own accumulators (no look-ahead)
+ *   strengthFromCounts(counts)      → {TS, Lbar}: the E2 xG shrinkage on any set of team counts
+ *
+ * Chips on the real calendar (F8)
+ *   eventMult(teamId, ctx, event)   → total fixture multiplier in one event (0 blank, 2 fixtures on a double)
+ *   xpEvent(el, ctx, event)         → E1 xP for one named event
+ *   bestElevenForEvent(ctx, ev, ids?) → {ids, score, formation, ok, pool, note} — no budget and no
+ *                                     club cap: an upper bound, and the note says so (E-068)
+ *   chipValue(chip, event, ctx, opts?) → {chip, event, value, basis, detail, ok}
+ *   chipSolver(ctx, opts?)          → {ok, doubles[], blanks[], confirmed, used[], candidates[], plan[],
+ *                                     total, sets[], windowNote, note, reasons[]} — the two chip sets
+ *                                     solved jointly under their expiries, one chip per gameweek
+ *
  * Tournament (E5)
  *   tournament(live)                → {models:[{key,name,spearman,mae,maeRaw,maeScale,
  *                                      maeCalibrated,transitions}], leader, promotable,
@@ -137,7 +209,7 @@
  *   applyRefresh(state, parsed)     → new state (throws on invalid input; never mutates)
  */
 
-var ENGINE_VERSION = "v87";
+var ENGINE_VERSION = "v88";
 
 var SCORING = {
   1: { play_short: 1, play_long: 2, goal: 6, assist: 3, cs: 4, gc_per2: -1, saves_per3: 1, pen_save: 5, pen_miss: -2, yc: -1, rc: -3, og: -2, dc: 0, dc_threshold: null, bonus: 1 },
@@ -174,7 +246,22 @@ var WC_BENCH_WEIGHT = 0.15;
 var WC_TRIGGER = 20;
 var MC_MIN_GWS_FOR_PWIN = 8;
 var MC_MIN_ITERS = 100;
+var MC_DRAFT_ITERS = 400;
+var MC_SPREAD_ITERS = 200;
+var H2H_LEAN_TOL = 0.5;
 var TOURNAMENT_PROMOTE_AT = 3;
+var PROMOTION_HOLDOUT_WEEKS = 2;
+var MINUTES_FEATURES = ["intercept", "starts_last3", "minutes_trend3", "minutes_rate", "days_since_last_start"];
+var MINUTES_MAX_DAYS = 35;
+var MINUTES_CHALLENGER = "The minutes logistic";
+var MINUTES_INCUMBENT = "the Laplace rate";
+var CHIP_NAMES = ["WC", "BB", "TC", "FH"];
+var CHIP_SETS = [{ set: 1, from: 1, to: 19 }, { set: 2, from: 20, to: 38 }];
+var CHIP_ALIAS = { wildcard: "WC", bboost: "BB", "3xc": "TC", freehit: "FH", wc: "WC", bb: "BB", tc: "TC", fh: "FH" };
+var CHIP_PRICE_WINDOWS = 4;
+var CHIP_MAX_WINDOWS = 2;
+var CHIP_FH_POOL = 60;
+var CHIP_SEARCH_NODES = 200000;
 var FT_CAP = 5;
 var REFRESH_MAX_TOKENS = 4000;
 var REFRESH_PAIRS = {
@@ -190,7 +277,8 @@ var TOURNAMENT_MODELS = [
   { key: "ict_rate", name: "ICT rate" },
   { key: "bps_rate", name: "BPS rate" },
   { key: "blend", name: "Blend" },
-  { key: "component_xp", name: "Component xP" }
+  { key: "component_xp", name: "Component xP" },
+  { key: "player_xg", name: "Player xG" }
 ];
 
 // ---------------------------------------------------------------- helpers
@@ -537,15 +625,15 @@ function teamStrength(live) {
       if (acc[f.team_h]) { acc[f.team_h].gg++; acc[f.team_h].gf += hs; acc[f.team_h].ga += as; }
       if (acc[f.team_a]) { acc[f.team_a].gg++; acc[f.team_a].gf += as; acc[f.team_a].ga += hs; }
     });
-    var sx = 0, sg = 0, sgo = 0, sgg = 0;
-    Object.keys(acc).forEach(function (t) { sx += acc[t].xgf; sg += acc[t].g; sgo += acc[t].gf; sgg += acc[t].gg; });
-    var Lbar = sg > 0 && sx > 0 ? sx / sg : LBAR_PRIOR;
+    var sgo = 0, sgg = 0;
+    Object.keys(acc).forEach(function (t) { sgo += acc[t].gf; sgg += acc[t].gg; });
+    var xgSide = strengthFromCounts(acc);            // one implementation of the E2 xG shrinkage
+    var Lbar = xgSide.Lbar;
     var LbarG = sgg > 0 && sgo > 0 ? sgo / sgg : LBAR_PRIOR;
     out.Lbar = Lbar; out.LbarGoals = LbarG;
+    out.TS = xgSide.TS;
     Object.keys(acc).forEach(function (t) {
       var a = acc[t];
-      var w = a.g / (a.g + TS_K);
-      out.TS[t] = { att: w * ((a.g ? a.xgf / a.g : 0) / Lbar) + (1 - w), def: w * ((a.g ? a.xga / a.g : 0) / Lbar) + (1 - w), g: a.g, xgf: a.xgf, xga: a.xga, Lbar: Lbar };
       var wg = a.gg / (a.gg + TS_K);
       out.TS_GOALS[t] = { att: wg * ((a.gg ? a.gf / a.gg : 0) / LbarG) + (1 - wg), def: wg * ((a.gg ? a.ga / a.gg : 0) / LbarG) + (1 - wg), g: a.gg, xgf: a.gf, xga: a.ga, gf: a.gf, ga: a.ga, Lbar: LbarG };
     });
@@ -716,7 +804,7 @@ function gamePhase(live, now) {
   } catch (e) { return "pre"; }
 }
 function buildCtx(live, state, now) {
-  var ctx = { ok: false, live: null, state: null, now: 0, nowISO: "", els: {}, elList: [], byCode: {}, teams: {}, teamList: [], events: [], nextEvent: 0, currentEvent: 0, deadline: null, hoursToDeadline: null, phase: "pre", fixtures: [], fixturesByEvent: {}, finishedGws: [], TS: {}, TS_GOALS: {}, Lbar: LBAR_PRIOR, gwStats: {}, rivalOwn: {}, capShare: {}, flags: {}, mults: { TS: {}, TS_GOALS: {} }, xp: {}, squadIds: [], squad: [], purchase: {}, picks: [], ft: 1, bank: 0, value: 0, budget: BUDGET_TENTHS, block: { changed: false, added: [], removed: [], block: false }, baseRates: { yc: 0.13, rc: 0.005, og: 0.004 }, draft: { els: {}, byCode: {}, scoring: null, waiversTime: null, deadline: null }, leagues: [], error: null };
+  var ctx = { ok: false, live: null, state: null, now: 0, nowISO: "", els: {}, elList: [], byCode: {}, teams: {}, teamList: [], events: [], nextEvent: 0, currentEvent: 0, deadline: null, hoursToDeadline: null, phase: "pre", fixtures: [], fixturesByEvent: {}, finishedGws: [], TS: {}, TS_GOALS: {}, Lbar: LBAR_PRIOR, gwStats: {}, rivalOwn: {}, capShare: {}, flags: {}, mults: { TS: {}, TS_GOALS: {} }, xp: {}, squadIds: [], squad: [], purchase: {}, picks: [], ft: 1, bank: 0, value: 0, budget: BUDGET_TENTHS, block: { changed: false, added: [], removed: [], block: false }, baseRates: { yc: 0.13, rc: 0.005, og: 0.004 }, draft: { els: {}, byCode: {}, scoring: null, waiversTime: null, deadline: null, leagueId: null, captainsDisabled: true, league: null, entries: [], entryById: {}, ownership: {}, rosters: {}, freeAgents: [], matches: [], standings: [], picks: {}, me: null, hasPool: false, note: "" }, leagues: [], error: null };
   try {
     if (!isObj(live) || !Array.isArray(live.elements)) { ctx.error = "live snapshot missing or malformed"; return ctx; }
     ctx.live = live;
@@ -777,8 +865,65 @@ function buildCtx(live, state, now) {
     var dEv = arr(d.events).filter(function (e) { return isObj(e) && intOf(e.id, -1) === nextEv; })[0];
     ctx.draft.waiversTime = dEv && dEv.waivers_time ? String(dEv.waivers_time) : null;
     ctx.draft.deadline = dEv && dEv.deadline_time ? String(dEv.deadline_time) : null;
-    ctx.draft.leagueId = d.league_id === undefined ? null : d.league_id;
+    ctx.draft.leagueId = d.league_id === undefined || d.league_id === null ? null : (intOf(d.league_id, 0) || null);
     ctx.draft.captainsDisabled = !(isObj(d.squad) && d.squad.captains_disabled === false);
+    // The league half of the draft block (CONTRACT §3). Absent when no league id has been
+    // supplied, in which case every field below stays empty and hasPool stays false.
+    ctx.draft.league = isObj(d.league) ? { id: intOf(d.league.id, 0) || null, name: String(d.league.name || ""), scoring: String(d.league.scoring || ""), size: intOf(d.league.size, 0) } : null;
+    arr(d.entries).forEach(function (e) {
+      if (!isObj(e)) return;
+      var lid = intOf(e.leagueEntryId, 0); if (!lid) return;
+      var row = {
+        leagueEntryId: lid,
+        entryId: e.entryId === null || e.entryId === undefined ? null : (intOf(e.entryId, 0) || null),
+        name: String(e.name || ""), manager: String(e.manager || ""), shortName: String(e.shortName || ""),
+        waiverPick: e.waiverPick === null || e.waiverPick === undefined ? null : (intOf(e.waiverPick, 0) || null)
+      };
+      ctx.draft.entries.push(row); ctx.draft.entryById[lid] = row;
+    });
+    arr(d.ownership).forEach(function (o) {
+      if (!isObj(o)) return;
+      var c = intOf(o.code, 0); if (!c) return;
+      ctx.draft.ownership[c] = { owner: o.owner === null || o.owner === undefined ? null : (intOf(o.owner, 0) || null), status: String(o.status || "") };
+    });
+    if (isObj(d.rosters)) Object.keys(d.rosters).forEach(function (k) {
+      var lid = intOf(k, 0); if (!lid) return;
+      ctx.draft.rosters[lid] = uniq(arr(d.rosters[k]).map(function (c) { return intOf(c, 0); }).filter(function (c) { return c > 0; }));
+    });
+    ctx.draft.freeAgents = uniq(arr(d.freeAgents).map(function (c) { return intOf(c, 0); }).filter(function (c) { return c > 0; }));
+    arr(d.matches).forEach(function (m) {
+      if (!isObj(m)) return;
+      ctx.draft.matches.push({
+        event: intOf(m.event, 0), finished: !!m.finished, started: !!m.started,
+        entry1: intOf(m.entry1, 0) || null, points1: num(m.points1, 0),
+        entry2: intOf(m.entry2, 0) || null, points2: num(m.points2, 0),
+        winner: m.winner === null || m.winner === undefined ? null : (intOf(m.winner, 0) || null)
+      });
+    });
+    arr(d.standings).forEach(function (r) {
+      if (!isObj(r)) return;
+      ctx.draft.standings.push({
+        leagueEntry: intOf(r.leagueEntry, 0) || null, rank: intOf(r.rank, 0), lastRank: intOf(r.lastRank, 0),
+        played: intOf(r.played, 0), won: intOf(r.won, 0), drawn: intOf(r.drawn, 0), lost: intOf(r.lost, 0),
+        pointsFor: num(r.pointsFor, 0), pointsAgainst: num(r.pointsAgainst, 0), total: num(r.total, 0)
+      });
+    });
+    if (isObj(d.picks)) Object.keys(d.picks).forEach(function (k) {
+      var lid = intOf(k, 0), p = d.picks[k]; if (!lid || !isObj(p)) return;
+      var codesOf = function (x) { return uniq(arr(x).map(function (c) { return intOf(c, 0); }).filter(function (c) { return c > 0; })); };
+      ctx.draft.picks[lid] = { event: intOf(p.event, 0), codes: codesOf(p.codes), xi: codesOf(p.xi), bench: codesOf(p.bench) };
+    });
+    if (isObj(d.me)) {
+      var mel = intOf(d.me.leagueEntryId, 0);
+      if (mel) ctx.draft.me = { leagueEntryId: mel, entryId: d.me.entryId === null || d.me.entryId === undefined ? null : (intOf(d.me.entryId, 0) || null), via: String(d.me.via || "") };
+    }
+    if (!ctx.draft.me && sstate.draft && sstate.draft.entry_id) {
+      var se = intOf(sstate.draft.entry_id, 0), hit = null;
+      ctx.draft.entries.forEach(function (e) { if (!hit && e.entryId === se) hit = e; });
+      if (hit) ctx.draft.me = { leagueEntryId: hit.leagueEntryId, entryId: hit.entryId, via: "saved entry id" };
+    }
+    ctx.draft.hasPool = Object.keys(ctx.draft.ownership).length > 0 && ctx.draft.entries.length > 0;
+    ctx.draft.note = ctx.draft.hasPool ? "" : (ctx.draft.leagueId ? "a draft league id is saved but this snapshot carries no ownership for it" : "no draft league id has been supplied");
   } catch (e) { ctx.ok = false; ctx.error = errMsg(e); }
   return ctx;
 }
@@ -1013,7 +1158,6 @@ function transferProtocol(state, ctx) {
       var different = plans.slice(1).filter(function (p) { return planKey(p) !== bestKey; });
       var alt = different.length ? different[0] : null;
       res.margin = alt ? best.value - alt.value : best.value;
-      res.value = best.value; res.hits = best.hits; res.k = best.k; res.bankAfter = best.bankAfter;
       res.alternatives = different.slice(0, 3).map(function (p) { return { value: p.value, k: p.k, hits: p.hits, moves: p.moves.map(function (m) { return { out: m.out, in: m.in, outName: m.outName, inName: m.inName, gain: m.gain }; }) }; });
       var hasForced = best.moves.some(function (m) { return m.forced; });
       if (res.margin >= MARGIN_HIGH) res.confidence = "HIGH";
@@ -1023,7 +1167,13 @@ function transferProtocol(state, ctx) {
       var ship = res.confidence !== "hold";
       if (!ship && hasForced) ship = true;
       if (ship) {
+        // E-067: every field that describes the SHIPPED plan is written here and nowhere else.
+        // k, hits, value and bankAfter used to be set from the best plan before the ship decision,
+        // so a hold week reported "no hit: 3 of your 3 free transfers" on the landing card with an
+        // empty list of moves. On a hold nothing is transferred: k and hits are 0, the bank is
+        // untouched, and the plan that was considered stays in `alternatives` with its own numbers.
         res.moves = best.moves;
+        res.value = best.value; res.hits = best.hits; res.k = best.k; res.bankAfter = best.bankAfter;
         newSquad = squad.filter(function (id) { return best.outs.indexOf(id) < 0; }).concat(best.ins);
         best.moves.forEach(function (m, i) { res.order.push({ step: i + 1, action: "sell", id: m.out, name: m.outName, price: m.priceOut }); });
         best.moves.forEach(function (m, i) { res.order.push({ step: best.moves.length + i + 1, action: "buy", id: m.in, name: m.inName, price: m.priceIn }); });
@@ -1467,7 +1617,7 @@ function chipRegret(chip, ctx, opts) {
     if (res.chip === "TC") { res.useNow = capXp; res.bestLater = dbl ? 2 * capXp : 0; res.laterEvent = dbl ? dbl.event : null; }
     else if (res.chip === "BB") { res.useNow = benchXp; res.bestLater = dbl ? 2 * benchXp : 0; res.laterEvent = dbl ? dbl.event : null; }
     else if (res.chip === "FH") { var wc = wildcardSolver(ctx, { both: false }); res.useNow = wc.ok && bx.ids.length ? Math.max(0, (wc.xi ? wc.xi.score : 0) - bx.score) : 0; res.bestLater = blank ? blank.n / 20 * 11 * (bx.score / 11 || 0) : 0; res.laterEvent = blank ? blank.event : null; }
-    else if (res.chip === "WC") { var tm = wildcardTiming(ctx); res.useNow = tm.breakeven.byGw19 || 0; res.bestLater = num(o.laterValue, 0); res.laterEvent = o.laterEvent === undefined ? null : o.laterEvent; }
+    else if (res.chip === "WC") { var tm = ctx._chipWcTiming || (ctx._chipWcTiming = wildcardTiming(ctx)); res.useNow = tm.breakeven.byGw19 || 0; res.bestLater = num(o.laterValue, 0); res.laterEvent = o.laterEvent === undefined ? null : o.laterEvent; }
     else { res.note = "unknown chip"; return res; }
     res.regretUse = Math.max(0, res.bestLater - res.useNow); res.regretHold = Math.max(0, res.useNow - res.bestLater);
     if (res.laterEvent === null && res.chip !== "WC") { res.verdict = res.useNow > 0 && res.chip === "WC" ? "use" : "no window"; res.note = "No confirmed later window in the fixture list; expected regret of holding is the single-GW value forgone, of using it is unknown until a window is scheduled."; }
@@ -1499,18 +1649,36 @@ function draftWaivers(state, ctx) {
   try {
     if (!okCtx(ctx)) return out;
     var st = state === undefined || state === null ? ctx.state : sanitiseState(state);
-    var roster = uniq(arr(st.draft.roster).map(function (c) { return num(c, NaN); }).filter(isFinite));
+    var rosterInfo = draftRoster(state, ctx);
+    var roster = rosterInfo.codes;
     var mine = {}; roster.forEach(function (c) { mine[c] = true; });
     var taken = {}; arr(isObj(state) && state.draft ? state.draft.taken : null).forEach(function (c) { taken[num(c, NaN)] = true; });
     var rosterRecs = roster.map(function (c) { return draftEl(c, ctx); }).filter(Boolean);
     var fa = {};
     [1, 2, 3, 4].forEach(function (t) { fa[t] = []; });
-    Object.keys(ctx.draft.byCode).forEach(function (c) {
-      var rec = draftEl(c, ctx); if (!rec || mine[rec.code] || taken[rec.code] || !rec.classic) return;
-      if (rec.status !== "a") return;
-      var ev = draftEV(rec, ctx); if (ev.starts_last3 === 0) return;
-      fa[rec.element_type].push({ rec: rec, ev: ev });
-    });
+    // With a league id the pool is the league's real free agents; without one it is every
+    // player not on the saved roster, which is an ordering and not a list — the two paths
+    // are named on every claim so the app can never present the second as the first.
+    var pool = draftPool(ctx);
+    // The switch is whether a league's ownership is loaded, not whether the pool came back
+    // non-empty: a real league with nothing worth claiming must not silently fall back to
+    // the assumed ordering over every player in the game.
+    var poolSource = ctx.draft.hasPool ? "api" : "assumed";
+    if (poolSource === "api") {
+      pool.forEach(function (p) {
+        if (mine[p.code] || taken[p.code]) return;
+        if (p.status !== "a" || p.starts_last3 === 0) return;
+        var rec = draftEl(p.code, ctx); if (!rec || !rec.classic) return;
+        fa[rec.element_type].push({ rec: rec, ev: draftEV(rec, ctx) });
+      });
+    } else {
+      Object.keys(ctx.draft.byCode).forEach(function (c) {
+        var rec = draftEl(c, ctx); if (!rec || mine[rec.code] || taken[rec.code] || !rec.classic) return;
+        if (rec.status !== "a") return;
+        var ev = draftEV(rec, ctx); if (ev.starts_last3 === 0) return;
+        fa[rec.element_type].push({ rec: rec, ev: ev });
+      });
+    }
     [1, 2, 3, 4].forEach(function (t) { fa[t].sort(function (a, b) { return b.ev.ev - a.ev.ev; }); });
     var used = {};
     function bestFA(t) { for (var i = 0; i < fa[t].length; i++) if (!used[fa[t][i].rec.code]) return fa[t][i]; return null; }
@@ -1523,7 +1691,7 @@ function draftWaivers(state, ctx) {
       if (!why) return;
       var b = bestFA(r.element_type); if (!b) return;
       used[b.rec.code] = true;
-      claims.push({ out: r.code, in: b.rec.code, outName: r.web_name, inName: b.rec.web_name, evOut: ev.ev, evIn: b.ev.ev, gain: b.ev.ev - ev.ev, why: why, forced: true });
+      claims.push({ out: r.code, in: b.rec.code, outName: r.web_name, inName: b.rec.web_name, evOut: ev.ev, evIn: b.ev.ev, gain: b.ev.ev - ev.ev, why: why, forced: true, pool: poolSource, roster: rosterInfo.source });
     });
     // C5: forced replacements go in first, but within that group the claim order is still
     // the gain — a waiver list is submitted in priority order and the biggest gain has to
@@ -1535,7 +1703,7 @@ function draftWaivers(state, ctx) {
       var ev = draftEV(r, ctx);
       var b = bestFA(r.element_type); if (!b) return;
       var gain = b.ev.ev - ev.ev;
-      if (gain > 0.5) upgrades.push({ out: r.code, in: b.rec.code, outName: r.web_name, inName: b.rec.web_name, evOut: ev.ev, evIn: b.ev.ev, gain: gain, why: "upgrade: EV " + b.ev.ev.toFixed(1) + " vs " + ev.ev.toFixed(1), forced: false });
+      if (gain > 0.5) upgrades.push({ out: r.code, in: b.rec.code, outName: r.web_name, inName: b.rec.web_name, evOut: ev.ev, evIn: b.ev.ev, gain: gain, why: "upgrade: EV " + b.ev.ev.toFixed(1) + " vs " + ev.ev.toFixed(1), forced: false, pool: poolSource, roster: rosterInfo.source });
     });
     upgrades.sort(function (a, b) { return b.gain - a.gain; });
     var seen = {};
@@ -1559,31 +1727,401 @@ function watchlistAudit(codes, ctx) {
   } catch (e) { /* total */ }
   return res;
 }
-function draftXI(codes, ctx) {
-  var res = { codes: [], ids: [], formation: "", score: 0, gk: null, def: [], mid: [], fwd: [], bench: [] };
+function draftXIBase(codes, ctx, valueOf) {
+  var res = { codes: [], ids: [], benchIds: [], formation: "", score: 0, gk: null, def: [], mid: [], fwd: [], bench: [] };
   try {
     if (!okCtx(ctx)) return res;
     var recs = uniq(arr(codes).map(function (c) { return num(c, NaN); }).filter(isFinite)).map(function (c) { return draftEl(c, ctx); }).filter(function (r) { return r && r.classic; });
     var ids = recs.map(function (r) { return r.classic.id; });
     var codeOf = {}; recs.forEach(function (r) { codeOf[r.classic.id] = r.code; });
-    var r = pickXI(ids, ctx, function (el) { return ctx.xp[el.id] ? ctx.xp[el.id].xp1 : xp1(el, ctx); });
+    var score = typeof valueOf === "function" ? valueOf : function (el) { return ctx.xp[el.id] ? ctx.xp[el.id].xp1 : xp1(el, ctx); };
+    var r = pickXI(ids, ctx, score);
     if (!r.ok) return res;
     res.ids = r.ids; res.codes = r.ids.map(function (id) { return codeOf[id]; }); res.formation = r.formation; res.score = r.score;
+    res.benchIds = r.bench.slice();
     res.bench = r.bench.map(function (id) { return codeOf[id]; });
     r.ids.forEach(function (id) { var t = elType(ctx.els[id]); if (t === 1) res.gk = codeOf[id]; else if (t === 2) res.def.push(codeOf[id]); else if (t === 3) res.mid.push(codeOf[id]); else res.fwd.push(codeOf[id]); });
   } catch (e) { /* total */ }
   return res;
 }
 
+/* C5 head-to-head XI. The eleven is the highest expected points unless this week's
+   opponent is known and the projections separate: behind, the tilt is towards ceiling;
+   ahead, towards floor. The tilt is kept only when it actually improves the statistic
+   that matters (the top tenth when behind, the bottom tenth when ahead), and the answer
+   always says which way it leaned and by how much. */
+function draftXI(codes, ctx, opts) {
+  var res = draftXIBase(codes, ctx);
+  res.lean = "none"; res.tilted = false; res.tiltChangedXI = false; res.h2h = null; res.note = "";
+  try {
+    if (!okCtx(ctx) || !res.ids.length) return res;
+    var o = isObj(opts) ? opts : {};
+    if (o.h2h === false) { res.note = "highest expected points"; return res; }
+    var proj = isObj(o.projection) ? o.projection : h2hProjection(ctx, { codes: codes, gw: o.gw, iters: o.iters });
+    res.h2h = proj;
+    if (!proj.ok) { res.note = "no opponent projection, so the eleven is the highest expected points"; return res; }
+    if (proj.lean === "level") { res.note = "the two projections are level, so the eleven is the highest expected points"; return res; }
+    var up = proj.lean === "up", k = 0.5, spread = {};
+    var tilt = draftXIBase(codes, ctx, function (el) {
+      var sp = spread[el.id];
+      if (!sp) { sp = playerSpread(el, ctx, MC_SPREAD_ITERS, 3000 + intOf(el.id, 1)); spread[el.id] = sp; }
+      var base = ctx.xp[el.id] ? ctx.xp[el.id].xp1 : xp1(el, ctx);
+      return base + (up ? k : -k) * sp.sd;
+    });
+    if (!tilt.ids.length) { res.note = "the variance tilt made no legal eleven, so the highest expected points stands"; return res; }
+    var iters = clamp(intOf(o.iters, MC_DRAFT_ITERS), MC_MIN_ITERS, 20000);
+    var a = mcDraftXI(res.ids, res.benchIds, ctx, iters, 21);
+    var b = mcDraftXI(tilt.ids, tilt.benchIds, ctx, iters, 21);
+    if (!a.ok || !b.ok) { res.note = "the tilt could not be simulated, so the highest expected points stands"; return res; }
+    var statA = up ? a.q90 : a.q10, statB = up ? b.q90 : b.q10;
+    var word = up ? "top tenth " : "bottom tenth ";
+    res.lean = proj.lean;
+    if (statB > statA) {
+      var sameXI = res.ids.slice().sort(sortNum).join(",") === tilt.ids.slice().sort(sortNum).join(",");
+      res.codes = tilt.codes; res.ids = tilt.ids; res.benchIds = tilt.benchIds; res.bench = tilt.bench;
+      res.formation = tilt.formation; res.score = tilt.score;
+      res.gk = tilt.gk; res.def = tilt.def; res.mid = tilt.mid; res.fwd = tilt.fwd;
+      res.tilted = true; res.tiltChangedXI = !sameXI;
+      res.note = (up ? "behind on the projection, so the team leans to the higher ceiling" : "ahead on the projection, so the team leans to the steadier floor") +
+        (sameXI ? " — the same eleven with the bench reordered: " : " — the eleven changes: ") +
+        word + statB.toFixed(1) + " against " + statA.toFixed(1) + " for the highest-expected-points side";
+    } else {
+      res.note = (up ? "behind on the projection, but no higher-ceiling eleven beat the highest-expected-points one: " : "ahead on the projection, but no steadier eleven beat the highest-expected-points one: ") +
+        word + statB.toFixed(1) + " against " + statA.toFixed(1);
+    }
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+// ---------------------------------------------------------------- draft league (C5 · F2)
+
+/* The manager types one thing: what he sees when he opens the league in the draft app.
+   That can be the whole address, the league number on its own, or his own entry number.
+   A bare number is ambiguous, so this parser never pretends to know which it is — the
+   fetcher tries it as a league first and then as an entry, and says which one answered. */
+function draftLeagueInput(text) {
+  var res = { ok: false, kind: null, id: null, note: "" };
+  try {
+    var s = String(text === undefined || text === null ? "" : text).trim();
+    if (!s) { res.note = "nothing typed"; return res; }
+    if (s.length > 400) { res.note = "too long to be a league id or a league address"; return res; }
+    var low = s.toLowerCase();
+    var kind = null, m = /\/entry\/(\d+)/.exec(low);
+    if (m) kind = "entry";
+    else { m = /\/leagues?\/(\d+)/.exec(low); if (m) kind = "league"; }
+    if (!m) { m = /(\d+)/.exec(low); if (m) kind = "unknown"; }
+    if (!m) { res.note = "there is no number in that"; return res; }
+    if (m[1].length > 9) { res.note = "that number is too long to be a draft id"; return res; }
+    var id = intOf(m[1], 0);
+    if (id <= 0) { res.note = "a draft id is a positive number"; return res; }
+    res.ok = true; res.kind = kind; res.id = id;
+    res.note = kind === "entry" ? "read as a draft entry id; the league comes from that entry"
+      : kind === "league" ? "read as a draft league id"
+        : "a bare number: tried as a league first, then as an entry";
+  } catch (e) { res.note = errMsg(e); }
+  return res;
+}
+
+/* Who owns what, by CODE. The draft API answers on draft element ids, which differ from
+   the classic ids for 59 of 655 players (E-026); the snapshot resolves them to codes
+   before they ever reach here. owner null means nobody has him. */
+function draftOwnership(ctx) {
+  var res = { ok: false, byCode: {}, owners: {}, entries: 0, ownedCount: 0, unownedCount: 0, poolCount: 0, unjoined: 0, note: "" };
+  try {
+    if (!okCtx(ctx)) { res.note = "no context"; return res; }
+    var own = isObj(ctx.draft.ownership) ? ctx.draft.ownership : {};
+    var keys = Object.keys(own);
+    if (!keys.length) { res.note = (ctx.draft.note ? ctx.draft.note + ", so " : "") + "the free-agent pool is unknown"; return res; }
+    keys.forEach(function (k) {
+      var c = intOf(k, 0); if (!c) return;
+      var row = isObj(own[k]) ? own[k] : {};
+      var owner = intOf(row.owner, 0) || null, status = String(row.status || "");
+      res.byCode[c] = { owner: owner, status: status };
+      if (owner) { res.ownedCount++; (res.owners[owner] = res.owners[owner] || []).push(c); }
+      else { res.unownedCount++; if (status === "a") res.poolCount++; }
+      if (!ctx.byCode[c]) res.unjoined++;
+    });
+    Object.keys(res.owners).forEach(function (o) { res.owners[o].sort(sortNum); });
+    res.entries = ctx.draft.entries.length;
+    res.ok = true;
+    res.note = res.ownedCount + " owned across " + res.entries + " teams, " + res.unownedCount +
+      " unowned of which " + res.poolCount + " carry draft status a";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+/* The real free-agent pool: owner null AND draft status "a". Ranked by EV = xp5 x P(start),
+   with the C5 watchlist rule (three starts of the last three) carried as a flag rather than
+   a filter — the rule governs the watchlist, and a forward pool with no three-start player
+   in it is a fact the manager has to see, not one to hide. Empty when no league is known. */
+function draftPool(ctx, opts) {
+  var out = [];
+  try {
+    if (!okCtx(ctx)) return out;
+    var o = isObj(opts) ? opts : {};
+    var minStarts = o.minStarts === undefined ? WC_MIN_STARTS3 : clamp(intOf(o.minStarts, WC_MIN_STARTS3), 0, 3);
+    var own = isObj(ctx.draft.ownership) ? ctx.draft.ownership : {};
+    var ownKeys = Object.keys(own);
+    // The pool is DERIVED from ownership — owner null and element-status "a" — rather than
+    // read off the snapshot's freeAgents list, so a wrong list cannot put a player somebody
+    // owns in front of the manager. freeAgents is used only when there is no ownership at all.
+    var codes = ownKeys.length
+      ? ownKeys.filter(function (k) { return !intOf(own[k].owner, 0) && String(own[k].status) === "a"; }).map(function (k) { return intOf(k, 0); })
+      : arr(ctx.draft.freeAgents);
+    if (!codes.length) return out;
+    codes.forEach(function (c) {
+      var code = intOf(c, 0); if (!code) return;
+      var o2 = own[code];
+      var rec = draftEl(code, ctx); if (!rec || !rec.classic) return;
+      var ev = draftEV(rec, ctx);
+      // Two different "a"s: poolStatus is the league's element-status (is he claimable),
+      // status is the player's own fitness. A free agent can be claimable and injured.
+      out.push({
+        code: rec.code, id: rec.classic.id, web_name: rec.web_name, team: rec.team,
+        element_type: rec.element_type, status: rec.status, poolStatus: o2 ? String(o2.status) : "a", chance: rec.chance,
+        starts_last3: ev.starts_last3, pstart: ev.pstart, xp5: ev.xp5, ev: ev.ev,
+        eligible: ev.starts_last3 >= minStarts && rec.status === "a"
+      });
+    });
+    out.sort(function (a, b) { return (Number(b.eligible) - Number(a.eligible)) || (b.ev - a.ev) || (a.code - b.code); });
+  } catch (e) { /* total */ }
+  return out;
+}
+
+function draftRosterOf(leagueEntryId, ctx) {
+  var out = [];
+  try {
+    if (!okCtx(ctx)) return out;
+    var lid = intOf(leagueEntryId, 0); if (!lid) return out;
+    var r = ctx.draft.rosters[lid];
+    if (Array.isArray(r) && r.length) return r.slice();
+    var own = isObj(ctx.draft.ownership) ? ctx.draft.ownership : {};
+    Object.keys(own).forEach(function (k) { if (intOf(own[k].owner, 0) === lid) out.push(intOf(k, 0)); });
+    out.sort(sortNum);
+  } catch (e) { /* total */ }
+  return out;
+}
+
+function draftRivalRosters(ctx) {
+  var out = [];
+  try {
+    if (!okCtx(ctx)) return out;
+    var meId = ctx.draft.me ? ctx.draft.me.leagueEntryId : null;
+    ctx.draft.entries.forEach(function (e) {
+      if (meId && e.leagueEntryId === meId) return;
+      var codes = draftRosterOf(e.leagueEntryId, ctx);
+      var ids = [];
+      codes.forEach(function (c) { var r = draftEl(c, ctx); if (r && r.classic) ids.push(r.classic.id); });
+      out.push({
+        leagueEntryId: e.leagueEntryId, entryId: e.entryId, name: e.name, manager: e.manager,
+        shortName: e.shortName, waiverPick: e.waiverPick, codes: codes, ids: ids
+      });
+    });
+  } catch (e) { /* total */ }
+  return out;
+}
+
+/* Waiver claim order as the league API reports it (league_entries[].waiver_pick). A team
+   the API gives no pick number sits last rather than first. */
+function waiverOrder(ctx) {
+  var res = { ok: false, order: [], size: 0, mine: null, note: "" };
+  try {
+    if (!okCtx(ctx)) { res.note = "no context"; return res; }
+    var entries = ctx.draft.entries;
+    if (!entries.length) { res.note = ctx.draft.note || "no draft league"; return res; }
+    var meId = ctx.draft.me ? ctx.draft.me.leagueEntryId : null;
+    var rows = entries.map(function (e) {
+      return { leagueEntryId: e.leagueEntryId, name: e.name, manager: e.manager, waiverPick: e.waiverPick, mine: !!meId && e.leagueEntryId === meId, position: 0 };
+    });
+    rows.sort(function (a, b) {
+      var pa = a.waiverPick === null ? Infinity : a.waiverPick, pb = b.waiverPick === null ? Infinity : b.waiverPick;
+      return (pa - pb) || (a.leagueEntryId - b.leagueEntryId);
+    });
+    rows.forEach(function (r, i) { r.position = i + 1; });
+    res.order = rows; res.size = rows.length; res.ok = true;
+    var mine = rows.filter(function (r) { return r.mine; })[0];
+    res.mine = mine ? { leagueEntryId: mine.leagueEntryId, position: mine.position, waiverPick: mine.waiverPick, of: rows.length } : null;
+    res.note = mine ? "you claim " + mine.position + " of " + rows.length : "the league is known but which team is yours is not";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+/* The head-to-head fixture for a gameweek, from the league's own matches array. */
+function h2hOpponent(ctx, gw) {
+  var res = { ok: false, gw: 0, opponent: null, mine: null, myPoints: null, oppPoints: null, finished: false, started: false, note: "" };
+  try {
+    if (!okCtx(ctx)) { res.note = "no context"; return res; }
+    var ev = intOf(gw, 0) || ctx.nextEvent;
+    res.gw = ev;
+    if (!ctx.draft.matches.length) { res.note = ctx.draft.note || "no draft league fixtures"; return res; }
+    var me = ctx.draft.me ? ctx.draft.me.leagueEntryId : null;
+    if (!me) { res.note = "the league is known but which team is yours is not"; return res; }
+    var m = null;
+    ctx.draft.matches.forEach(function (x) { if (!m && x.event === ev && (x.entry1 === me || x.entry2 === me)) m = x; });
+    if (!m) { res.note = "no fixture for GW" + ev; return res; }
+    var oppId = m.entry1 === me ? m.entry2 : m.entry1;
+    var mineRow = ctx.draft.entryById[me] || null, oppRow = ctx.draft.entryById[oppId] || null;
+    res.ok = true; res.finished = !!m.finished; res.started = !!m.started;
+    res.myPoints = m.entry1 === me ? m.points1 : m.points2;
+    res.oppPoints = m.entry1 === me ? m.points2 : m.points1;
+    res.mine = { leagueEntryId: me, name: mineRow ? mineRow.name : "", manager: mineRow ? mineRow.manager : "" };
+    res.opponent = { leagueEntryId: oppId, name: oppRow ? oppRow.name : "", manager: oppRow ? oppRow.manager : "" };
+    res.note = "GW" + ev + ": " + res.mine.name + " against " + res.opponent.name;
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+/* Kwezi's own fifteen: from the league API when the league and his team are known, from
+   the hand-typed list otherwise. The source is part of the answer. */
+function draftRoster(state, ctx) {
+  var res = { codes: [], source: "none", complete: false, leagueEntryId: null, note: "" };
+  try {
+    if (!okCtx(ctx)) return res;
+    var st = state === undefined || state === null ? ctx.state : sanitiseState(state);
+    var me = ctx.draft.me ? ctx.draft.me.leagueEntryId : null;
+    if (me) {
+      var api = draftRosterOf(me, ctx);
+      if (api.length) {
+        res.codes = api; res.source = "api"; res.leagueEntryId = me; res.complete = api.length === 15;
+        res.note = api.length + " players read from the league API";
+        return res;
+      }
+    }
+    var saved = uniq(arr(st && st.draft ? st.draft.roster : null).map(function (c) { return intOf(c, 0); }).filter(function (c) { return c > 0; }));
+    res.codes = saved; res.source = saved.length ? "saved" : "none"; res.complete = saved.length === 15;
+    res.note = saved.length ? saved.length + " players typed in by hand" : "no roster";
+  } catch (e) { /* total */ }
+  return res;
+}
+
+/* One player's own spread under the same Monte Carlo the squad uses — the input to the
+   C5 variance rule. Deterministic: the seed is the player. */
+function playerSpread(el, ctx, iters, seed) {
+  var res = { mean: 0, sd: 0, iters: 0 };
+  try {
+    if (!isObj(el) || !okCtx(ctx)) return res;
+    var n = clamp(intOf(iters, MC_SPREAD_ITERS), 20, 5000);
+    var R = mulberry32(intOf(seed, 0) || (3000 + intOf(el.id, 1)));
+    var sc = isObj(ctx.draft.scoring) ? ctx.draft.scoring : null;
+    var tot = [], s = 0;
+    for (var i = 0; i < n; i++) { var p = simPlayerDetail(el, ctx, R, null, sc).pts; tot.push(p); s += p; }
+    var mean = s / n, v = 0;
+    tot.forEach(function (t) { v += (t - mean) * (t - mean); });
+    res.mean = mean; res.sd = Math.sqrt(v / n); res.iters = n;
+  } catch (e) { /* total */ }
+  return res;
+}
+
+/* A draft eleven's distribution: draft scoring (a keeper's goal is ten, not six) and no
+   captain, because this league has none. */
+function mcDraftXI(ids, bench, ctx, iters, seed) {
+  var res = { mean: 0, sd: 0, q10: 0, q50: 0, q90: 0, iters: 0, ok: false };
+  try {
+    if (!okCtx(ctx)) return res;
+    // A draft eleven is a SET; only the bench is ordered. entryPoints walks the starters in
+    // the order it is given when it fills in for a player who did not appear, so leaving the
+    // caller's order alone let a reshuffle that changes nothing real move the distribution —
+    // and a variance tilt could then be "kept" for a side identical to the one it replaced.
+    var xi = uniq(idList(ids)).filter(function (id) { return ctx.els[id]; }).sort(sortNum);
+    if (xi.length !== 11) return res;
+    var bn = uniq(idList(bench)).filter(function (id) { return ctx.els[id] && xi.indexOf(id) < 0; });
+    var n = clamp(intOf(iters, MC_DRAFT_ITERS), MC_MIN_ITERS, 20000), R = mulberry32(intOf(seed, 11));
+    var sc = isObj(ctx.draft.scoring) ? ctx.draft.scoring : null;
+    var all = xi.concat(bn), totals = [];
+    for (var i = 0; i < n; i++) {
+      var draws = fixtureDraws(ctx, R), sims = {};
+      all.forEach(function (id) { sims[id] = simPlayerDetail(ctx.els[id], ctx, R, draws, sc); });
+      totals.push(entryPoints(xi, bn, null, null, sims, ctx));            // no captain in draft
+    }
+    var mean = sum(totals) / n, v = 0;
+    totals.forEach(function (t) { v += (t - mean) * (t - mean); });
+    totals.sort(sortNum);
+    res.mean = mean; res.sd = Math.sqrt(v / n); res.q10 = quantile(totals, 0.1); res.q50 = quantile(totals, 0.5); res.q90 = quantile(totals, 0.9);
+    res.iters = n; res.ok = true;
+  } catch (e) { /* total */ }
+  return res;
+}
+
+function distStats(list) {
+  var res = { mean: 0, sd: 0, q10: 0, q50: 0, q90: 0, n: 0 };
+  var v = arr(list).map(function (x) { return num(x, 0); });
+  if (!v.length) return res;
+  var mean = sum(v) / v.length, sq = 0;
+  v.forEach(function (x) { sq += (x - mean) * (x - mean); });
+  var sorted = v.slice().sort(sortNum);
+  res.mean = mean; res.sd = Math.sqrt(sq / v.length);
+  res.q10 = quantile(sorted, 0.1); res.q50 = quantile(sorted, 0.5); res.q90 = quantile(sorted, 0.9);
+  res.n = v.length;
+  return res;
+}
+
+/* Both elevens in ONE simulation, sharing the gameweek's fixture draws. The two teams play
+   in the same real matches, so their scores are correlated (E4's portfolio rule); simulating
+   them separately also made the margin disagree with itself depending on whose side you
+   asked from. Shared draws make it exactly antisymmetric. No captain: this league has none. */
+function mcH2H(myIds, myBench, oppIds, oppBench, ctx, iters, seed) {
+  var res = { ok: false, iters: 0, mine: null, theirs: null, margin: null };
+  try {
+    if (!okCtx(ctx)) return res;
+    var live = function (x) { return uniq(idList(x)).filter(function (id) { return ctx.els[id]; }); };
+    var xa = live(myIds).sort(sortNum), xb = live(oppIds).sort(sortNum);   // the eleven is a set
+    if (xa.length !== 11 || xb.length !== 11) return res;
+    var ba = live(myBench).filter(function (id) { return xa.indexOf(id) < 0; });
+    var bb = live(oppBench).filter(function (id) { return xb.indexOf(id) < 0; });
+    var n = clamp(intOf(iters, MC_DRAFT_ITERS), MC_MIN_ITERS, 20000), R = mulberry32(intOf(seed, 0) || 11);
+    var sc = isObj(ctx.draft.scoring) ? ctx.draft.scoring : null;
+    // Canonical order: the rng is consumed player by player, so simulating "mine" first would
+    // give a different draw sequence from simulating "theirs" first and the same fixture would
+    // produce two different margins depending on whose side you asked from.
+    var all = uniq(xa.concat(ba, xb, bb)).sort(sortNum);
+    var A = [], B = [], M = [];
+    for (var i = 0; i < n; i++) {
+      var draws = fixtureDraws(ctx, R), sims = {};
+      all.forEach(function (id) { sims[id] = simPlayerDetail(ctx.els[id], ctx, R, draws, sc); });
+      var pa = entryPoints(xa, ba, null, null, sims, ctx), pb = entryPoints(xb, bb, null, null, sims, ctx);
+      A.push(pa); B.push(pb); M.push(pa - pb);
+    }
+    res.mine = distStats(A); res.theirs = distStats(B); res.margin = distStats(M); res.iters = n; res.ok = true;
+  } catch (e) { /* total */ }
+  return res;
+}
+
+/* Both sides of this week's head-to-head, simulated. lean "up" means Kwezi is projected
+   behind and wants ceiling; "down" means ahead and wants floor. */
+function h2hProjection(ctx, opts) {
+  var res = { ok: false, gw: 0, opponent: null, mine: null, theirs: null, margin: null, marginDist: null, lean: "level", iters: 0, note: "" };
+  try {
+    if (!okCtx(ctx)) { res.note = "no context"; return res; }
+    var o = isObj(opts) ? opts : {};
+    var h = h2hOpponent(ctx, o.gw);
+    res.gw = h.gw; res.opponent = h.opponent;
+    if (!h.ok) { res.note = h.note; return res; }
+    var myCodes = arr(o.codes).length ? o.codes : draftRoster(null, ctx).codes;
+    var oppCodes = draftRosterOf(h.opponent.leagueEntryId, ctx);
+    var mineXI = draftXIBase(myCodes, ctx), oppXI = draftXIBase(oppCodes, ctx);
+    if (!mineXI.ids.length || !oppXI.ids.length) { res.note = "one of the two teams does not make a legal eleven"; return res; }
+    var iters = clamp(intOf(o.iters, MC_DRAFT_ITERS), MC_MIN_ITERS, 20000);
+    var hh = mcH2H(mineXI.ids, mineXI.benchIds, oppXI.ids, oppXI.benchIds, ctx, iters, 11);
+    if (!hh.ok) { res.note = "the simulation did not run"; return res; }
+    res.mine = hh.mine; res.theirs = hh.theirs; res.marginDist = hh.margin;
+    res.margin = hh.margin.mean; res.iters = iters; res.ok = true;
+    res.lean = res.margin < -H2H_LEAN_TOL ? "up" : (res.margin > H2H_LEAN_TOL ? "down" : "level");
+    res.note = "projected " + hh.mine.mean.toFixed(1) + " against " + hh.theirs.mean.toFixed(1) +
+      " over " + iters + " shared-fixture draws, margin " + (hh.margin.mean >= 0 ? "+" : "") + hh.margin.mean.toFixed(1) +
+      " (tenth to ninetieth " + hh.margin.q10.toFixed(1) + " to " + hh.margin.q90.toFixed(1) + ")";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
 // ---------------------------------------------------------------- state (§6), D3
 
 function sanitiseState(raw) {
-  var out = { version: 87, exported_at: null, entry: null, squad: [], bank: 0, ft: 1, value: 0, confirmed_gw: 0, leagues: [], draft: { league_id: null, roster: [], watchlist: [] }, ui: { mode: "simple", tab: "command", open: {}, reveals: {} }, ledger: [], refresh: { pair: "sonnet46", last: null } };
+  var out = { version: 88, exported_at: null, entry: null, squad: [], bank: 0, ft: 1, value: 0, confirmed_gw: 0, leagues: [], draft: { league_id: null, entry_id: null, roster: [], watchlist: [] }, ui: { mode: "simple", tab: "command", open: {}, reveals: {} }, ledger: [], refresh: { pair: "sonnet46", last: null } };
   try {
     var r = raw;
     if (typeof r === "string") { try { r = JSON.parse(r); } catch (e) { r = null; } }
     if (!isObj(r)) return out;
-    out.version = clamp(intOf(r.version, 87), 1, 100000);
+    out.version = clamp(intOf(r.version, 88), 1, 100000);
     out.exported_at = typeof r.exported_at === "string" ? r.exported_at.slice(0, 40) : null;
     var en = num(r.entry, NaN); out.entry = isFinite(en) && en > 0 ? Math.trunc(en) : null;
     var seen = {};
@@ -1601,6 +2139,8 @@ function sanitiseState(raw) {
     out.leagues = uniq(arr(r.leagues).map(function (x) { return num(x, NaN); }).filter(function (x) { return isFinite(x) && x > 0; }).map(Math.trunc)).slice(0, 50);
     var d = isObj(r.draft) ? r.draft : {};
     var lid = num(d.league_id, NaN); out.draft.league_id = isFinite(lid) && lid > 0 ? Math.trunc(lid) : null;
+    var eid = num(d.entry_id, NaN); out.draft.entry_id = isFinite(eid) && eid > 0 ? Math.trunc(eid) : null;
+    if (typeof d.league_input === "string" && d.league_input) out.draft.league_input = d.league_input.slice(0, 400);
     out.draft.roster = uniq(arr(d.roster).map(function (x) { return num(x, NaN); }).filter(function (x) { return isFinite(x) && x > 0; }).map(Math.trunc)).slice(0, 15);
     out.draft.watchlist = uniq(arr(d.watchlist).map(function (x) { return num(x, NaN); }).filter(function (x) { return isFinite(x) && x > 0; }).map(Math.trunc)).slice(0, 200);
     if (Array.isArray(d.taken)) out.draft.taken = uniq(d.taken.map(function (x) { return num(x, NaN); }).filter(function (x) { return isFinite(x) && x > 0; }).map(Math.trunc)).slice(0, 400);
@@ -1873,7 +2413,7 @@ function simFixture(fixture, ctx, rng) {
   } catch (e) { /* total */ }
   return out;
 }
-function simPlayerDetail(el, ctx, rng, draws) {
+function simPlayerDetail(el, ctx, rng, draws, scoring) {
   var res = { pts: 0, mins: 0 };
   if (!isObj(el) || !okCtx(ctx)) return res;
   var R = rngOf(rng), t = elType(el); if (!t) return res;
@@ -1881,7 +2421,7 @@ function simPlayerDetail(el, ctx, rng, draws) {
   var gs = ctx.gwStats[el.id] || { dcRate: 0, bonusRate: 0 };
   var team = num(el.team, -1), fx = arr(ctx.fixturesByEvent[ctx.nextEvent]).filter(function (f) { return num(f.team_h, -1) === team || num(f.team_a, -1) === team; });
   if (!fx.length) return res;
-  var rates = playerRates(el, ctx), S = SCORING[t];
+  var rates = playerRates(el, ctx), TBL = isObj(scoring) && isObj(scoring[t]) ? scoring : SCORING, S = TBL[t];
   fx.forEach(function (f) {
     if (R() >= x.pstart) return;                                      // did not start: 0 minutes
     var mins = R() < 0.85 ? 60 + Math.floor(R() * 31) : 1 + Math.floor(R() * 59);
@@ -1905,7 +2445,7 @@ function simPlayerDetail(el, ctx, rng, draws) {
     var yc = R() < rates.yc90 * frac ? 1 : 0, rc = R() < ctx.baseRates.rc * frac ? 1 : 0, og = R() < ctx.baseRates.og * frac ? 1 : 0;
     var bonus = isObj(draw) && isObj(draw.bonus) ? num(draw.bonus[el.id], 0) : (R() < clamp(num(gs.bonusRate, 0), 0, 1) ? 1 + Math.floor(R() * 3) : 0);
     var row = { minutes: mins, goals: goals, assists: assists, cs: cs, gc: gc, bonus: bonus, yc: yc, rc: rc, og: og, pen_miss: 0, pen_save: 0, saves: saves, dc: dc };
-    res.pts += pointsFor(row, t); res.mins += mins;
+    res.pts += pointsFor(row, t, TBL); res.mins += mins;
   });
   return res;
 }
@@ -2067,15 +2607,29 @@ function calibrateToPoints(pred, actual) {
   return res;
 }
 function tournament(live) {
-  var res = { models: TOURNAMENT_MODELS.map(function (m) { return { key: m.key, name: m.name, spearman: null, mae: null, maeRaw: null, maeScale: null, maeCalibrated: false, transitions: 0 }; }), leader: null, promotable: false, transitions: 0, maeUnits: "points", maeNote: "", note: "" };
+  var res = { models: TOURNAMENT_MODELS.map(function (m) { return { key: m.key, name: m.name, spearman: null, mae: null, maeRaw: null, maeScale: null, maeCalibrated: false, transitions: 0, perTransition: [], wins: 0, holdout: 0, gate: null, promotable: false }; }), leader: null, promotable: false, transitions: 0, transitionWinners: [], maeUnits: "points", maeNote: "", note: "" };
   try {
     if (!isObj(live) || !isObj(live.gw)) { res.note = "no finished gameweeks in the snapshot"; return res; }
     var keys = Object.keys(live.gw).map(function (k) { return num(k, NaN); }).filter(isFinite).sort(sortNum);
     var types = {}; arr(live.elements).forEach(function (el) { if (isObj(el)) types[el.id] = elType(el); });
     var acc = {};                                                       // cumulative per element
+    var pacc = { 1: { min: 0, xg: 0, xa: 0 }, 2: { min: 0, xg: 0, xa: 0 }, 3: { min: 0, xg: 0, xa: 0 }, 4: { min: 0, xg: 0, xa: 0 } };
+    var tacc = {};                                                      // cumulative team xG for and against
+    var fxById = {}, fxOf = {}, teamOf = {};                            // F5 needs the opponent of the gameweek it predicts
+    arr(live.teams).forEach(function (tm) { if (isObj(tm) && tm.id !== undefined) tacc[tm.id] = { g: 0, xgf: 0, xga: 0 }; });
+    arr(live.fixtures).forEach(function (f) {
+      if (!isObj(f)) return;
+      if (f.id !== undefined) fxById[f.id] = f;
+      var ev = intOf(f.event, -1); if (ev < 0) return;
+      var kh = ev + ":" + f.team_h, ka = ev + ":" + f.team_a;
+      (fxOf[kh] = fxOf[kh] || []).push({ team: num(f.team_h, -1), opp: num(f.team_a, -1), home: true });
+      (fxOf[ka] = fxOf[ka] || []).push({ team: num(f.team_a, -1), opp: num(f.team_h, -1), home: false });
+    });
+    arr(live.elements).forEach(function (el) { if (isObj(el)) teamOf[el.id] = num(el.team, -1); });
     var scores = {}; TOURNAMENT_MODELS.forEach(function (m) { scores[m.key] = { rho: [], mae: [], raw: [], scale: [], uncal: 0 }; });
     for (var i = 0; i < keys.length; i++) {
       var g = keys[i], rows = isObj(live.gw[g]) && isObj(live.gw[g].elements) ? live.gw[g].elements : {};
+      var TSprev = strengthFromCounts(tacc);                            // strength from the gameweeks BEFORE g
       if (i > 0) {
         var preds = {}; TOURNAMENT_MODELS.forEach(function (m) { preds[m.key] = []; }); var actual = [];
         Object.keys(rows).forEach(function (id) {
@@ -2088,6 +2642,7 @@ function tournament(live) {
           var component = (a.min / a.played >= 60 ? 2 : 1) + a.xg / a.played * S.goal + a.xa / a.played * S.assist + a.cs / a.played * S.cs + (a.gc / a.played) / 2 * S.gc_per2 + a.dcHits / a.played * S.dc + a.bonus / a.played;
           preds.season_mean.push(seasonMean); preds.last_gw.push(a.last); preds.per90.push(per90); preds.shrunk_per90.push(shrunk);
           preds.ict_rate.push(ict); preds.bps_rate.push(bps); preds.blend.push((seasonMean + shrunk + bps / 10) / 3); preds.component_xp.push(component);
+          preds.player_xg.push(playerXgPredict(a, pacc[t], t, S, fxOf[g + ":" + teamOf[id]], TSprev));
           actual.push(num(row[2], 0));
         });
         if (actual.length >= 10) TOURNAMENT_MODELS.forEach(function (m) {
@@ -2103,13 +2658,22 @@ function tournament(live) {
       Object.keys(rows).forEach(function (id) {
         var row = rows[id]; if (!Array.isArray(row)) return;
         var a = acc[id] = acc[id] || { played: 0, min: 0, pts: 0, xg: 0, xa: 0, cs: 0, gc: 0, dcHits: 0, bps: 0, ict: 0, bonus: 0, last: 0 };
-        if (num(row[0], 0) > 0) { a.played++; a.min += num(row[0], 0); a.pts += num(row[2], 0); a.xg += num(row[3], 0); a.xa += num(row[4], 0); a.cs += num(row[11], 0); a.gc += num(row[12], 0); a.bps += num(row[7], 0); a.ict += num(row[8], 0); a.bonus += num(row[13], 0); var thr = SCORING[types[id] || 3].dc_threshold; if (thr && num(row[6], 0) >= thr) a.dcHits++; }
+        if (num(row[0], 0) > 0) { a.played++; a.min += num(row[0], 0); a.pts += num(row[2], 0); a.xg += num(row[3], 0); a.xa += num(row[4], 0); a.cs += num(row[11], 0); a.gc += num(row[12], 0); a.bps += num(row[7], 0); a.ict += num(row[8], 0); a.bonus += num(row[13], 0); var thr = SCORING[types[id] || 3].dc_threshold; if (thr && num(row[6], 0) >= thr) a.dcHits++; var pt = types[id] || 3; if (pacc[pt]) { pacc[pt].min += num(row[0], 0); pacc[pt].xg += num(row[3], 0); pacc[pt].xa += num(row[4], 0); } }
         a.last = num(row[2], 0);
       });
       Object.keys(acc).forEach(function (id) { if (!rows[id]) acc[id].last = 0; });
+      var fxg = isObj(live.gw[g]) && isObj(live.gw[g].fixture_xg) ? live.gw[g].fixture_xg : null;
+      if (fxg) Object.keys(fxg).forEach(function (fid) {
+        var f = fxById[fid], v = fxg[fid];
+        if (!isObj(f) || !isObj(v)) return;
+        var hx = num(v.h, 0), ax = num(v.a, 0);
+        if (tacc[f.team_h]) { tacc[f.team_h].g++; tacc[f.team_h].xgf += hx; tacc[f.team_h].xga += ax; }
+        if (tacc[f.team_a]) { tacc[f.team_a].g++; tacc[f.team_a].xgf += ax; tacc[f.team_a].xga += hx; }
+      });
     }
     res.models.forEach(function (m) {
       var s = scores[m.key]; m.transitions = s.rho.length;
+      m.perTransition = s.rho.slice();                              // published even when it is empty
       if (!s.rho.length) return;
       m.spearman = sum(s.rho) / s.rho.length;
       m.mae = sum(s.mae) / s.mae.length;
@@ -2121,8 +2685,820 @@ function tournament(live) {
     res.transitions = Math.max.apply(null, [0].concat(res.models.map(function (m) { return m.transitions; })));
     var ranked = res.models.filter(function (m) { return m.spearman !== null; }).sort(function (a, b) { return b.spearman - a.spearman || a.mae - b.mae; });
     res.leader = ranked.length ? ranked[0].key : null;
-    res.promotable = res.transitions >= TOURNAMENT_PROMOTE_AT;
+    res.promotable = res.transitions >= TOURNAMENT_PROMOTE_AT;      // the transition-count half of the gate
+    // Which model led each transition, and then the SHARED promotion gate (CLAUDE.md J) per
+    // model: three scored transitions, three of them led, and a two-gameweek trailing run.
+    // promotionGate is the one door; F4's minutes walk-forward goes through the same function.
+    var winners = [];
+    for (var wi = 0; wi < res.transitions; wi++) {
+      var bestKey = null, bestV = null;
+      res.models.forEach(function (m) {
+        var pt = Array.isArray(m.perTransition) && m.perTransition.length > wi ? num(m.perTransition[wi], NaN) : NaN;
+        if (!isFinite(pt)) return;
+        if (bestV === null || pt > bestV) { bestV = pt; bestKey = m.key; }
+      });
+      winners.push(bestKey);
+    }
+    res.transitionWinners = winners;
+    res.models.forEach(function (m) {
+      var wins = 0, trail = 0;
+      winners.forEach(function (k) { if (k === m.key) wins++; });
+      for (var ti = winners.length - 1; ti >= 0; ti--) { if (winners[ti] === m.key) trail++; else break; }
+      m.wins = wins; m.holdout = trail;
+      m.gate = promotionGate({ transitions: m.transitions, wins: wins, holdout: trail, challenger: m.name, incumbent: "E1 xP in production" });
+      m.promotable = m.gate.promotable;
+    });
     res.note = res.transitions ? (res.transitions + " walk-forward transition" + (res.transitions === 1 ? "" : "s") + "; promotion needs " + TOURNAMENT_PROMOTE_AT) : "fewer than two finished gameweeks: no transition to score";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+// The E2 xG shrinkage, factored out so the tournament can rebuild team strength from the
+// gameweeks it is allowed to see without a second copy of the formula (F5 walk-forward).
+function strengthFromCounts(counts) {
+  var res = { TS: {}, Lbar: LBAR_PRIOR };
+  try {
+    var c = isObj(counts) ? counts : {};
+    var sx = 0, sg = 0;
+    Object.keys(c).forEach(function (t) { sx += num(c[t] && c[t].xgf, 0); sg += num(c[t] && c[t].g, 0); });
+    var Lbar = sg > 0 && sx > 0 ? sx / sg : LBAR_PRIOR;
+    res.Lbar = Lbar;
+    Object.keys(c).forEach(function (t) {
+      var a = isObj(c[t]) ? c[t] : { g: 0, xgf: 0, xga: 0 };
+      var g = num(a.g, 0), w = g / (g + TS_K);
+      res.TS[t] = {
+        att: w * ((g ? num(a.xgf, 0) / g : 0) / Lbar) + (1 - w),
+        def: w * ((g ? num(a.xga, 0) / g : 0) / Lbar) + (1 - w),
+        g: g, xgf: num(a.xgf, 0), xga: num(a.xga, 0), Lbar: Lbar
+      };
+    });
+  } catch (e) { /* total */ }
+  return res;
+}
+
+// The player-xG challenger as the tournament scores it: the same xG90 x att x def shape playerXg
+// ships, but built from the cumulative rows the walk-forward is allowed to see and from team
+// strength rebuilt on those gameweeks only, so it can never read the gameweek it is predicting.
+function playerXgPredict(a, prior, t, S, fixtures, TSprev) {
+  try {
+    if (!isObj(a) || !num(a.played, 0) || !isObj(S)) return 0;
+    var fx = arr(fixtures);
+    if (!fx.length) return 0;
+    var minsAvg = clamp(num(a.min, 0) / num(a.played, 1), 0, 90), frac = clamp(minsAvg / 90, 0, 1);
+    var mn = num(a.min, 0), wr = mn / (mn + 270);
+    var pr = isObj(prior) ? prior : { min: 0, xg: 0, xa: 0 };
+    var pm = num(pr.min, 0);
+    var pxg = pm > 0 ? num(pr.xg, 0) / pm * 90 : 0, pxa = pm > 0 ? num(pr.xa, 0) / pm * 90 : 0;
+    var xg90 = wr * (mn ? num(a.xg, 0) / mn * 90 : 0) + (1 - wr) * pxg;
+    var xa90 = wr * (mn ? num(a.xa, 0) / mn * 90 : 0) + (1 - wr) * pxa;
+    var TS = isObj(TSprev) && isObj(TSprev.TS) ? TSprev.TS : {};
+    var total = 0;
+    fx.forEach(function (f) {
+      if (!isObj(f)) return;
+      var at = tsEntry(TS, f.team), df = tsEntry(TS, f.opp);
+      var mult = at.att * df.def * (f.home ? HOME_ADV : AWAY_ADV);
+      var lam = xg90 * mult * frac, lamA = xa90 * mult * frac;
+      var lamOpp = df.Lbar * df.att * at.def * (f.home ? AWAY_ADV : HOME_ADV);
+      var pcs = clamp(Math.exp(-lamOpp), 0, 1);
+      total += (minsAvg >= 60 ? S.play_long : S.play_short) + lam * S.goal + lamA * S.assist +
+        (minsAvg >= 60 ? pcs : 0) * S.cs + (S.gc_per2 ? (lamOpp * frac) / 2 * S.gc_per2 : 0) +
+        (num(a.dcHits, 0) / num(a.played, 1)) * S.dc + (num(a.bonus, 0) / num(a.played, 1));
+    });
+    return isFinite(total) ? total : 0;
+  } catch (e) { return 0; }
+}
+
+// ------------------------------------------------- calibration and fitting (F4, F5, F8 support)
+
+// A logistic that is total: NaN carries no information and answers 0.5, the infinities saturate,
+// and every finite input is squashed into [0,1]. Everything downstream (Brier, the minutes model,
+// the promotion gate) relies on this never producing a NaN.
+function logistic(z) {
+  var v = typeof z === "number" ? z : num(z, NaN);
+  if (v !== v) return 0.5;
+  if (v === Infinity || v > 40) return 1;
+  if (v === -Infinity || v < -40) return 0;
+  return 1 / (1 + Math.exp(-v));
+}
+
+// Gauss-Jordan with partial pivoting. Returns null rather than throwing or returning NaN when the
+// system is singular or any coefficient is not finite — the Newton step then stops where it is.
+function solveLinear(A, b) {
+  try {
+    var rhs = arr(b), n = rhs.length;
+    if (!n || arr(A).length < n) return null;
+    var M = [], i, j;
+    for (i = 0; i < n; i++) {
+      var src = arr(A[i]);
+      if (src.length < n) return null;
+      var row = [];
+      for (j = 0; j < n; j++) { var v = num(src[j], NaN); if (!isFinite(v)) return null; row.push(v); }
+      var r = num(rhs[i], NaN); if (!isFinite(r)) return null;
+      row.push(r); M.push(row);
+    }
+    for (var c = 0; c < n; c++) {
+      var piv = c;
+      for (var p = c + 1; p < n; p++) if (Math.abs(M[p][c]) > Math.abs(M[piv][c])) piv = p;
+      if (!(Math.abs(M[piv][c]) > 1e-12)) return null;
+      var tmp = M[c]; M[c] = M[piv]; M[piv] = tmp;
+      for (var q = 0; q < n; q++) {
+        if (q === c) continue;
+        var f = M[q][c] / M[c][c];
+        if (!isFinite(f)) return null;
+        for (var k = c; k <= n; k++) M[q][k] -= f * M[c][k];
+      }
+    }
+    var out = [];
+    for (i = 0; i < n; i++) { var x = M[i][n] / M[i][i]; if (!isFinite(x)) return null; out.push(x); }
+    return out;
+  } catch (e) { return null; }
+}
+
+// Ridge-penalised logistic regression by IRLS (Newton-Raphson on the penalised log-likelihood).
+// Deterministic, seedless, dependency-free. The design matrix carries its own intercept column —
+// this function adds nothing — so the caller can say exactly which term is which.
+function fitLogistic(X, y, opts) {
+  var o = isObj(opts) ? opts : {};
+  var ridge = num(o.ridge, 1e-3); if (!(ridge > 0) || !isFinite(ridge)) ridge = 1e-3;
+  var maxIter = clamp(intOf(o.maxIter, 20), 1, 200);
+  var tol = num(o.tol, 1e-7); if (!(tol > 0)) tol = 1e-7;
+  var res = { ok: false, beta: [], k: 0, n: 0, iters: 0, converged: false, ridge: ridge, logLik: 0, ones: 0, baseRate: 0, note: "" };
+  try {
+    var rows = arr(X), ys = arr(y), i, j;
+    var n = Math.min(rows.length, ys.length);
+    if (!n) { res.note = "no rows to fit"; return res; }
+    var k = arr(rows[0]).length;
+    if (!k) { res.note = "the design matrix has no columns"; return res; }
+    res.k = k;
+    var Xc = [], yc = [], ones = 0;
+    for (i = 0; i < n; i++) {
+      var src = arr(rows[i]); if (src.length !== k) continue;
+      var keep = true, row = [];
+      for (j = 0; j < k; j++) { var v = num(src[j], NaN); if (!isFinite(v)) { keep = false; break; } row.push(v); }
+      var yv = num(ys[i], NaN);
+      if (!keep || !isFinite(yv)) continue;
+      Xc.push(row); yc.push(yv > 0.5 ? 1 : 0); ones += yv > 0.5 ? 1 : 0;
+    }
+    var m = Xc.length;
+    res.n = m; res.ones = ones; res.baseRate = m ? clamp(ones / m, 0, 1) : 0;
+    if (m < k + 2) { res.note = "fewer usable rows (" + m + ") than the fit needs (" + (k + 2) + ")"; return res; }
+    var beta = []; for (j = 0; j < k; j++) beta.push(0);
+    for (var it = 0; it < maxIter; it++) {
+      var H = [], grad = [], a, b2;
+      for (a = 0; a < k; a++) { grad.push(0); var hr = []; for (b2 = 0; b2 < k; b2++) hr.push(0); H.push(hr); }
+      for (i = 0; i < m; i++) {
+        var z = 0, xi = Xc[i];
+        for (j = 0; j < k; j++) z += beta[j] * xi[j];
+        var pr = logistic(z);
+        var w = Math.max(pr * (1 - pr), 1e-6);
+        var resid = yc[i] - pr;
+        for (a = 0; a < k; a++) {
+          grad[a] += resid * xi[a];
+          for (b2 = a; b2 < k; b2++) H[a][b2] += w * xi[a] * xi[b2];
+        }
+      }
+      for (a = 0; a < k; a++) { for (b2 = 0; b2 < a; b2++) H[a][b2] = H[b2][a]; }
+      for (a = 0; a < k; a++) { grad[a] -= ridge * beta[a]; H[a][a] += ridge; }
+      var step = solveLinear(H, grad);
+      if (!step) { res.note = "the Newton step was singular at iteration " + (it + 1) + "; the fit stopped there"; break; }
+      var moved = 0;
+      for (a = 0; a < k; a++) { var d = clamp(step[a], -4, 4); beta[a] += d; if (Math.abs(d) > moved) moved = Math.abs(d); }
+      res.iters = it + 1;
+      if (moved < tol) { res.converged = true; break; }
+    }
+    for (j = 0; j < k; j++) if (!isFinite(beta[j])) { res.note = "the fit produced a coefficient that is not finite"; return res; }
+    var ll = 0;
+    for (i = 0; i < m; i++) {
+      var zz = 0; for (j = 0; j < k; j++) zz += beta[j] * Xc[i][j];
+      var pp = clamp(logistic(zz), 1e-9, 1 - 1e-9);
+      ll += yc[i] ? Math.log(pp) : Math.log(1 - pp);
+    }
+    res.beta = beta; res.logLik = isFinite(ll) ? ll : 0; res.ok = true;
+    if (!res.note) res.note = res.converged ? "converged in " + res.iters + " Newton steps" : "stopped at the iteration cap of " + maxIter;
+  } catch (e) { res.note = "engine error: " + errMsg(e); res.ok = false; }
+  return res;
+}
+
+// Brier score of a probability forecast against 0/1 outcomes, with the base-rate forecast beside
+// it. Both are in [0,1] by construction; skill is the usual 1 - brier/baseBrier, clamped.
+function brier(predictions, outcomes) {
+  var res = { brier: 0, n: 0, baseRate: 0, baseBrier: 0, skill: 0, ok: false };
+  try {
+    var p = arr(predictions), y = arr(outcomes), n = Math.min(p.length, y.length), s = 0, ones = 0, c = 0;
+    for (var i = 0; i < n; i++) {
+      var pv = num(p[i], NaN), yv = num(y[i], NaN);
+      if (!isFinite(pv) || !isFinite(yv)) continue;
+      pv = clamp(pv, 0, 1); yv = yv > 0.5 ? 1 : 0;
+      s += (pv - yv) * (pv - yv); ones += yv; c++;
+    }
+    if (!c) return res;
+    res.n = c; res.brier = clamp(s / c, 0, 1); res.baseRate = clamp(ones / c, 0, 1);
+    res.baseBrier = clamp(res.baseRate * (1 - res.baseRate), 0, 1);
+    res.skill = res.baseBrier > 0 ? clamp(1 - res.brier / res.baseBrier, -1, 1) : 0;
+    res.ok = true;
+  } catch (e) { /* total */ }
+  return res;
+}
+
+// Reliability curve: equal-width probability bins with the mean forecast and the observed rate in
+// each. maxGap is the largest |mean forecast - observed rate| over the non-empty bins.
+function reliability(predictions, outcomes, bins) {
+  var nb = clamp(intOf(bins, 10), 2, 20);
+  var res = { bins: [], n: 0, nBins: nb, baseRate: 0, maxGap: 0, ok: false };
+  try {
+    var p = arr(predictions), y = arr(outcomes), n = Math.min(p.length, y.length), i;
+    var acc = [];
+    for (i = 0; i < nb; i++) acc.push({ lo: i / nb, hi: (i + 1) / nb, n: 0, sumP: 0, sumY: 0 });
+    var c = 0, ones = 0;
+    for (i = 0; i < n; i++) {
+      var pv = num(p[i], NaN), yv = num(y[i], NaN);
+      if (!isFinite(pv) || !isFinite(yv)) continue;
+      pv = clamp(pv, 0, 1); yv = yv > 0.5 ? 1 : 0;
+      var b = Math.min(nb - 1, Math.floor(pv * nb));
+      acc[b].n++; acc[b].sumP += pv; acc[b].sumY += yv; c++; ones += yv;
+    }
+    res.n = c; res.baseRate = c ? clamp(ones / c, 0, 1) : 0;
+    acc.forEach(function (a) {
+      var mp = a.n ? clamp(a.sumP / a.n, 0, 1) : 0, my = a.n ? clamp(a.sumY / a.n, 0, 1) : 0;
+      var gap = a.n ? Math.abs(mp - my) : 0;
+      if (a.n && gap > res.maxGap) res.maxGap = gap;
+      res.bins.push({ lo: a.lo, hi: a.hi, n: a.n, meanPred: mp, meanOutcome: my, gap: gap });
+    });
+    res.ok = c > 0;
+  } catch (e) { /* total */ }
+  return res;
+}
+
+// THE promotion gate (CLAUDE.md J, E5). One function, used by the model tournament and by the
+// minutes walk-forward, so a challenger can never be promoted through a second, softer door.
+// Three conditions, all required: at least TOURNAMENT_PROMOTE_AT scored transitions, at least
+// that many of them won, and the last PROMOTION_HOLDOUT_WEEKS of them won in a row (the hold-out).
+function promotionGate(opts) {
+  var o = isObj(opts) ? opts : {};
+  var need = TOURNAMENT_PROMOTE_AT, needHold = PROMOTION_HOLDOUT_WEEKS;
+  var transitions = Math.max(0, intOf(o.transitions, 0));
+  var wins = clamp(intOf(o.wins, 0), 0, transitions);
+  var holdout = clamp(intOf(o.holdout, 0), 0, transitions);
+  var res = {
+    challenger: String(o.challenger || "challenger"), incumbent: String(o.incumbent || "incumbent"),
+    transitions: transitions, wins: wins, holdout: holdout, need: need, needHoldout: needHold,
+    transitionsOk: transitions >= need, winsOk: wins >= need, holdoutOk: holdout >= needHold,
+    promotable: false, reasons: [], note: ""
+  };
+  res.promotable = res.transitionsOk && res.winsOk && res.holdoutOk;
+  if (!res.transitionsOk) res.reasons.push(transitions + " scored transition" + (transitions === 1 ? "" : "s") + "; the gate needs " + need);
+  if (!res.winsOk) res.reasons.push(wins + " of " + transitions + " won; the gate needs " + need);
+  if (!res.holdoutOk) res.reasons.push("the trailing hold-out is " + holdout + " gameweek" + (holdout === 1 ? "" : "s") + "; the gate needs " + needHold);
+  res.note = res.promotable
+    ? res.challenger + " clears the gate: " + wins + " of " + transitions + " transitions won with a " + holdout + "-gameweek hold-out."
+    : res.challenger + " does not drive anything: " + res.reasons.join("; ") + ".";
+  return res;
+}
+
+// ------------------------------------------------- minutes model (F4)
+
+// The five slots the spec names. Four are fitted from history; the flag is a present-tense field
+// with no per-gameweek history in the snapshot, and midweek European load is not in the snapshot
+// at all. Both are declared, both are reported as not fitted, and neither is quietly dropped.
+function minutesTerms(fit) {
+  var beta = isObj(fit) && Array.isArray(fit.beta) ? fit.beta : [];
+  var names = MINUTES_FEATURES;
+  var out = [];
+  for (var i = 0; i < names.length; i++) {
+    out.push({ name: names[i], coef: beta.length > i && isFinite(num(beta[i], NaN)) ? num(beta[i], 0) : null, fitted: beta.length > i, available: true, how: "fitted by IRLS on the finished gameweeks" });
+  }
+  out.push({
+    name: "flag", coef: null, fitted: false, available: true, how: "applied, not fitted",
+    why: "the snapshot carries one current status and chance per player, not a status per gameweek, so a flag coefficient cannot be fitted from history; the flag enters as the same availability factor E1 uses, multiplying the fitted probability"
+  });
+  out.push({
+    name: "european_load", coef: null, fitted: false, available: false, how: "not in the snapshot",
+    why: "the fixture list this app pulls is the Premier League fixture list; it carries no midweek European fixtures, so competition load is not a feature here and is not pretended to be one"
+  });
+  return out;
+}
+
+// Panel of everything the minutes features need, built once per snapshot.
+function minutesPanel(live) {
+  var res = { gws: [], deadlines: {}, teamGames: {}, rows: {}, els: [], teamOf: {}, ok: false };
+  try {
+    if (!isObj(live)) return res;
+    arr(live.events).forEach(function (e) {
+      if (!isObj(e)) return;
+      var id = intOf(e.id, 0), t = Date.parse(e.deadline_time);
+      if (id && isFinite(t)) res.deadlines[id] = t;
+    });
+    arr(live.fixtures).forEach(function (f) {
+      if (!isObj(f)) return;
+      var ev = intOf(f.event, -1); if (ev < 0) return;
+      var m = res.teamGames[ev] = res.teamGames[ev] || {};
+      m[f.team_h] = (m[f.team_h] || 0) + 1; m[f.team_a] = (m[f.team_a] || 0) + 1;
+    });
+    var gw = isObj(live.gw) ? live.gw : {};
+    res.gws = Object.keys(gw).map(function (k) { return num(k, NaN); }).filter(isFinite).sort(sortNum);
+    res.gws.forEach(function (g) { res.rows[g] = isObj(gw[g]) && isObj(gw[g].elements) ? gw[g].elements : {}; });
+    arr(live.elements).forEach(function (el) { if (isObj(el) && el.id !== undefined) { res.els.push(el); res.teamOf[el.id] = num(el.team, -1); } });
+    res.ok = res.gws.length > 0 && res.els.length > 0;
+  } catch (e) { /* total */ }
+  return res;
+}
+
+// [intercept, starts in the last three, minutes trend over the last three, minutes rate,
+//  days since the last start] — every one bounded, so a junk history cannot blow the fit up.
+function minutesFeatureVector(hist, targetGw, deadlines) {
+  // E-074: a null row in the history is not a gameweek of zero minutes, it is no row at all, and
+  // `last3[last3.length - 1].min` threw on it. Filtered once, at the top, so every reader below
+  // can assume an object.
+  var h = arr(hist).filter(isObj);
+  var last3 = h.slice(-3);
+  var starts3 = 0, games3 = 0;
+  last3.forEach(function (r) { starts3 += num(r && r.starts, 0); games3 += Math.max(1, num(r && r.games, 1)); });
+  var f1 = games3 > 0 ? clamp(starts3 / games3, 0, 1) : 0;
+  var lastMin = last3.length ? num(last3[last3.length - 1].min, 0) : 0;
+  var prevMin = lastMin;
+  if (last3.length > 1) { var s = 0; for (var i = 0; i < last3.length - 1; i++) s += num(last3[i].min, 0); prevMin = s / (last3.length - 1); }
+  var f2 = clamp((lastMin - prevMin) / 90, -1, 1);
+  var totMin = 0, totGames = 0;
+  h.forEach(function (r) { totMin += num(r && r.min, 0); totGames += Math.max(1, num(r && r.games, 1)); });
+  var f3 = totGames > 0 ? clamp(totMin / (90 * totGames), 0, 1) : 0;
+  var lastStart = 0;
+  h.forEach(function (r) { if (num(r && r.starts, 0) > 0) lastStart = intOf(r.gw, 0); });
+  var days = MINUTES_MAX_DAYS;
+  var D = isObj(deadlines) ? deadlines : {};
+  var t1 = num(D[intOf(targetGw, 0)], NaN), t0 = lastStart ? num(D[lastStart], NaN) : NaN;
+  if (isFinite(t1) && isFinite(t0) && t1 >= t0) days = clamp((t1 - t0) / 86400000, 0, MINUTES_MAX_DAYS);
+  var f4 = clamp(days / MINUTES_MAX_DAYS, 0, 1);
+  return [1, f1, f2, f3, f4];
+}
+
+// One walk-forward row set: features from every gameweek strictly BEFORE targetGw, outcome
+// "did he start in targetGw". Only players whose club actually had a fixture in targetGw get a
+// row — a blank gameweek is not a non-start.
+function minutesRowsFor(live, targetGw, panel) {
+  var P = isObj(panel) && Array.isArray(panel.gws) ? panel : minutesPanel(live);
+  var res = { X: [], y: [], ids: [], seenFlag: [], names: MINUTES_FEATURES.slice(), n: 0, seen: 0, baseRate: 0, targetGw: intOf(targetGw, 0), note: "" };
+  try {
+    var target = intOf(targetGw, 0);
+    if (!target) { res.note = "no target gameweek was given"; return res; }
+    if (P.gws.indexOf(target) < 0) { res.note = "GW" + target + " is not a finished gameweek in this snapshot"; return res; }
+    var prior = P.gws.filter(function (g) { return g < target; });
+    if (!prior.length) { res.note = "no finished gameweek sits before GW" + target + ", so there is no history to build a feature from"; return res; }
+    var hist = {};
+    prior.forEach(function (g) {
+      var rows = P.rows[g] || {}, tg = P.teamGames[g] || {};
+      P.els.forEach(function (el) {
+        var clubN = intOf(tg[P.teamOf[el.id]], 0);
+        var row = rows[el.id];
+        if (!clubN && !Array.isArray(row)) return;
+        var min = Array.isArray(row) ? num(row[0], 0) : 0, st = Array.isArray(row) ? num(row[1], 0) : 0;
+        (hist[el.id] = hist[el.id] || []).push({ gw: g, games: Math.max(clubN, st, Array.isArray(row) ? 1 : 0), min: min, starts: st });
+      });
+    });
+    var tRows = P.rows[target] || {}, tGames = P.teamGames[target] || {};
+    var ones = 0;
+    P.els.forEach(function (el) {
+      if (!intOf(tGames[P.teamOf[el.id]], 0)) return;
+      var h = hist[el.id];
+      if (!h || !h.length) return;
+      var played = 0;
+      h.forEach(function (r) { if (num(r.min, 0) > 0) played++; });
+      var row = tRows[el.id];
+      var y = Array.isArray(row) && num(row[1], 0) > 0 ? 1 : 0;
+      res.X.push(minutesFeatureVector(h, target, P.deadlines));
+      res.y.push(y); res.ids.push(el.id); res.seenFlag.push(played > 0 ? 1 : 0);
+      if (played > 0) res.seen++;
+      ones += y;
+    });
+    res.n = res.y.length;
+    res.baseRate = res.n ? clamp(ones / res.n, 0, 1) : 0;
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+// Fit on every finished gameweek up to and including uptoGw (0 = all of them).
+function minutesFit(live, uptoGw, opts) {
+  var res = { ok: false, beta: [], names: MINUTES_FEATURES.slice(), rows: 0, gws: [], upto: 0, converged: false, iters: 0, ridge: 0, logLik: 0, baseRate: 0, terms: [], note: "" };
+  try {
+    var P = minutesPanel(live);
+    if (!P.ok) { res.note = "the snapshot carries no finished gameweek to fit on"; res.terms = minutesTerms(res); return res; }
+    var upto = intOf(uptoGw, 0) || P.gws[P.gws.length - 1];
+    res.upto = upto;
+    var X = [], y = [];
+    P.gws.filter(function (g) { return g <= upto; }).forEach(function (g) {
+      var r = minutesRowsFor(live, g, P);
+      if (!r.n) return;
+      res.gws.push(g);
+      for (var i = 0; i < r.X.length; i++) { X.push(r.X[i]); y.push(r.y[i]); }
+    });
+    var f = fitLogistic(X, y, opts);
+    res.rows = f.n; res.beta = f.beta; res.converged = f.converged; res.iters = f.iters;
+    res.ridge = f.ridge; res.logLik = f.logLik; res.baseRate = f.baseRate; res.ok = f.ok;
+    res.note = res.gws.length
+      ? "fitted on " + f.n + " player-gameweek rows from GW" + res.gws[0] + " to GW" + res.gws[res.gws.length - 1] + "; " + f.note
+      : "no gameweek up to GW" + upto + " has a gameweek before it, so there is nothing to fit";
+    res.terms = minutesTerms(res);
+  } catch (e) { res.note = "engine error: " + errMsg(e); res.terms = minutesTerms(res); }
+  return res;
+}
+
+// The fit the app would use today, cached on the context (pure in the snapshot, so the cache is
+// only ever a repeat of the same answer).
+function ctxMinutesFit(ctx, opts) {
+  if (!okCtx(ctx)) return minutesFit(null, 0, opts);
+  if (ctx._minutesFit) return ctx._minutesFit;
+  ctx._minutesFit = minutesFit(ctx.live, 0, opts);
+  return ctx._minutesFit;
+}
+
+// F4's challenger for P(start). It does NOT drive anything: `driving` is false until the shared
+// promotion gate says otherwise, and the note says which model is driving today.
+function minutesModel(el, ctx, opts) {
+  var res = {
+    p: 0, pModel: 0, pIncumbent: 0, flagFactor: 1, fitted: false, driving: false, driver: "pStart",
+    features: { starts_last3: 0, minutes_trend3: 0, minutes_rate: 0, days_since_last_start: 1 },
+    x: [], terms: [], fit: null, note: ""
+  };
+  try {
+    if (!isObj(el)) { res.note = "no player was given"; res.terms = minutesTerms(null); return res; }
+    if (!okCtx(ctx)) { res.note = "no usable context"; res.terms = minutesTerms(null); return res; }
+    res.pIncumbent = pStart(el, ctx.gwStats);
+    var fit = ctxMinutesFit(ctx, opts);
+    res.fit = { ok: fit.ok, rows: fit.rows, gws: fit.gws.slice(), converged: fit.converged, iters: fit.iters, upto: fit.upto, note: fit.note };
+    res.terms = fit.terms && fit.terms.length ? fit.terms : minutesTerms(fit);
+    var fl = flagInfo(el);
+    res.flagFactor = clamp(fl.factor, 0, 1);
+    var P = ctx._minutesPanel || (ctx._minutesPanel = minutesPanel(ctx.live));
+    var hist = [];
+    P.gws.forEach(function (g) {
+      var rows = P.rows[g] || {}, tg = P.teamGames[g] || {};
+      var clubN = intOf(tg[num(el.team, -1)], 0), row = rows[el.id];
+      if (!clubN && !Array.isArray(row)) return;
+      hist.push({ gw: g, games: Math.max(clubN, Array.isArray(row) ? num(row[1], 0) : 0, Array.isArray(row) ? 1 : 0), min: Array.isArray(row) ? num(row[0], 0) : 0, starts: Array.isArray(row) ? num(row[1], 0) : 0 });
+    });
+    var x = minutesFeatureVector(hist, ctx.nextEvent, P.deadlines);
+    res.x = x.slice();
+    res.features = { starts_last3: x[1], minutes_trend3: x[2], minutes_rate: x[3], days_since_last_start: x[4] };
+    if (!fit.ok) {
+      res.p = res.pIncumbent;
+      res.note = "the minutes model could not be fitted on this snapshot (" + fit.note + "), so this is the Laplace rate the app ships.";
+      return res;
+    }
+    var z = 0;
+    for (var i = 0; i < x.length && i < fit.beta.length; i++) z += num(fit.beta[i], 0) * x[i];
+    res.fitted = true;
+    res.pModel = clamp(logistic(z), 0, 1);
+    res.p = clamp(res.pModel * res.flagFactor, 0, 1);
+    res.note = "challenger only: P(start) in production is still the Laplace rate. This figure drives nothing until the shared promotion gate opens.";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+// A snapshot as it stood at the end of uptoGw: later gameweek rows are dropped and later fixtures
+// are put back to unplayed, so nothing fitted on this can see the gameweek it is predicting.
+function truncateLive(live, uptoGw) {
+  if (!isObj(live)) return { elements: [], fixtures: [], gw: {}, events: [], teams: [] };
+  var upto = intOf(uptoGw, 0);
+  var out = {};
+  Object.keys(live).forEach(function (k) { out[k] = live[k]; });
+  var gw = {};
+  if (isObj(live.gw)) Object.keys(live.gw).forEach(function (k) { if (num(k, NaN) <= upto) gw[k] = live.gw[k]; });
+  out.gw = gw;
+  out.fixtures = arr(live.fixtures).map(function (f) {
+    if (!isObj(f)) return f;
+    if (intOf(f.event, -1) <= upto) return f;
+    if (!f.finished && !f.started) return f;
+    var c = {}; Object.keys(f).forEach(function (k) { c[k] = f[k]; });
+    c.finished = false; c.started = false; c.team_h_score = null; c.team_a_score = null;
+    return c;
+  });
+  out.current_event = upto; out.next_event = upto + 1;
+  return out;
+}
+
+// The calibration the v87 scorecard asked for: fit on gameweeks <= k, predict "did he start in
+// k+1", score BOTH the incumbent Laplace rate and the F4 challenger on the held-out gameweek.
+// Lower Brier is better. Both models carry the same present-tense flag factor, so the comparison
+// is like for like; the no-flag pair is reported beside it so the flag's contribution is visible.
+function minutesWalkForward(live, opts) {
+  var res = {
+    folds: [], comparable: 0, wins: 0, holdout: 0, driver: "pStart", challenger: "minutesModel",
+    incumbent: { brier: null, n: 0, folds: 0 }, challengerScore: { brier: null, n: 0, folds: 0 },
+    gate: promotionGate({ transitions: 0, wins: 0, holdout: 0, challenger: MINUTES_CHALLENGER, incumbent: MINUTES_INCUMBENT }),
+    flagHistory: false, europeanLoad: false, bins: 0, note: ""
+  };
+  try {
+    var o = isObj(opts) ? opts : {};
+    var nb = clamp(intOf(o.bins, 5), 2, 20);
+    res.bins = nb;
+    var P = minutesPanel(live);
+    if (!P.ok || P.gws.length < 2) {
+      res.note = "a walk-forward needs at least two finished gameweeks; this snapshot has " + (P.gws ? P.gws.length : 0) + ".";
+      return res;
+    }
+    var elsById = {};
+    arr(live.elements).forEach(function (el) { if (isObj(el) && el.id !== undefined) elsById[el.id] = el; });
+    var incSum = 0, incN = 0, chSum = 0, chN = 0;
+    for (var i = 1; i < P.gws.length; i++) {
+      var k = P.gws[i - 1], target = P.gws[i];
+      var pred = minutesRowsFor(live, target, P);
+      if (!pred.n) continue;
+      var gsK = elementGwStats(truncateLive(live, k));
+      var incP = [], incPnf = [], chP = [], chPnf = [], ys = [], seenP = [], seenC = [], seenY = [];
+      var fit = minutesFit(live, k, o);
+      for (var r = 0; r < pred.ids.length; r++) {
+        var el = elsById[pred.ids[r]];
+        if (!el) continue;
+        var fl = flagInfo(el), ff = clamp(fl.factor, 0, 1);
+        var raw = pStart(el, gsK);
+        var nf = ff > 0 ? clamp(raw / ff, 0, 1) : raw;          // pStart folds the flag in; peel it back out
+        incP.push(raw); incPnf.push(nf); ys.push(pred.y[r]);
+        var cp = null;
+        if (fit.ok) {
+          var z = 0, x = pred.X[r];
+          for (var j = 0; j < x.length && j < fit.beta.length; j++) z += num(fit.beta[j], 0) * x[j];
+          var pm = clamp(logistic(z), 0, 1);
+          chPnf.push(pm); cp = clamp(pm * ff, 0, 1); chP.push(cp);
+        }
+        if (pred.seenFlag[r]) { seenP.push(raw); seenY.push(pred.y[r]); if (cp !== null) seenC.push(cp); }
+      }
+      var incB = brier(incP, ys), chB = fit.ok ? brier(chP, ys) : null;
+      var fold = {
+        from: k, to: target, n: incB.n, baseRate: incB.baseRate, seen: pred.seen,
+        fitted: fit.ok, fitRows: fit.rows, fitGws: fit.gws.slice(),
+        incumbent: { brier: incB.brier, skill: incB.skill, n: incB.n, reliability: reliability(incP, ys, nb) },
+        challenger: chB ? { brier: chB.brier, skill: chB.skill, n: chB.n, reliability: reliability(chP, ys, nb) } : null,
+        noFlag: { incumbent: brier(incPnf, ys).brier, challenger: fit.ok ? brier(chPnf, ys).brier : null },
+        seenOnly: { n: seenY.length, incumbent: brier(seenP, seenY).brier, challenger: seenC.length ? brier(seenC, seenY).brier : null },
+        winner: "not scored", note: ""
+      };
+      if (!fit.ok) fold.note = "the challenger could not be fitted on gameweeks up to GW" + k + ": " + fit.note;
+      else if (chB.brier < incB.brier) fold.winner = "challenger";
+      else if (chB.brier > incB.brier) fold.winner = "incumbent";
+      else fold.winner = "tie";
+      res.folds.push(fold);
+      incSum += incB.brier * incB.n; incN += incB.n; res.incumbent.folds++;
+      if (chB) { chSum += chB.brier * chB.n; chN += chB.n; res.challengerScore.folds++; }
+    }
+    res.incumbent.brier = incN ? clamp(incSum / incN, 0, 1) : null; res.incumbent.n = incN;
+    res.challengerScore.brier = chN ? clamp(chSum / chN, 0, 1) : null; res.challengerScore.n = chN;
+    res.comparable = res.folds.filter(function (f) { return f.fitted; }).length;
+    res.wins = res.folds.filter(function (f) { return f.winner === "challenger"; }).length;
+    var trail = 0;
+    for (var t = res.folds.length - 1; t >= 0; t--) { if (res.folds[t].winner === "challenger") trail++; else break; }
+    res.holdout = trail;
+    res.gate = promotionGate({ transitions: res.comparable, wins: res.wins, holdout: res.holdout, challenger: MINUTES_CHALLENGER, incumbent: MINUTES_INCUMBENT });
+    res.note = "Walk-forward over " + res.folds.length + " transition" + (res.folds.length === 1 ? "" : "s") +
+      "; the challenger could be fitted on " + res.comparable + " of them, because a fit needs a gameweek of history before the gameweek it is fitted on. " +
+      "Production P(start) stays the Laplace rate. " + res.gate.note;
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+// ------------------------------------------------- player xG model (F5)
+
+// xG90 x att(team) x def(opponent), folded into the E1 shape. A ninth challenger in the
+// tournament, barred from driving anything by E6 and by the shared promotion gate.
+function playerXg(el, ctx, opts) {
+  var res = {
+    xp: 0, xpPerFixture: 0, p: 0, lambda: 0, lambdaAssist: 0, mult: 0, att: 1, def: 1,
+    xg90: 0, xa90: 0, fixtures: 0, event: 0, opponents: [], driving: false,
+    components: { appearance: 0, goals: 0, assists: 0, cs: 0, conceded: 0, dc: 0, bonus: 0 }, note: ""
+  };
+  try {
+    if (!isObj(el) || !okCtx(ctx)) { res.note = "no player or no usable context"; return res; }
+    var t = elType(el); if (!t) { res.note = "the player has no position"; return res; }
+    var o = isObj(opts) ? opts : {};
+    var event = intOf(o.event, 0) || ctx.nextEvent;
+    res.event = event;
+    var team = num(el.team, -1);
+    var fx = arr(ctx.fixturesByEvent[event]).filter(function (f) { return num(f.team_h, -1) === team || num(f.team_a, -1) === team; });
+    res.fixtures = fx.length;
+    var rates = playerRates(el, ctx);
+    res.xg90 = num(rates.xg90, 0); res.xa90 = num(rates.xa90, 0);
+    var gs = ctx.gwStats[el.id] || { dcRate: 0, bonusRate: 0, played: 0, minutes: 0, games: 0 };
+    var p = ctx.xp[el.id] ? ctx.xp[el.id].pstart : pStart(el, ctx.gwStats);
+    res.p = clamp(p, 0, 1);
+    if (!fx.length) { res.note = "no fixture for this club in GW" + event + ": a blank is worth nothing, not a default"; return res; }
+    var S = SCORING[t];
+    var minsAvg = num(gs.played, 0) > 0 ? clamp(num(gs.minutes, 0) / num(gs.played, 1), 0, 90) : 90;
+    var frac = clamp(minsAvg / 90, 0, 1);
+    var total = 0, attSum = 0, defSum = 0;
+    fx.forEach(function (f) {
+      var home = num(f.team_h, -1) === team, opp = home ? num(f.team_a, -1) : num(f.team_h, -1);
+      var a = tsEntry(ctx.TS, team), d = tsEntry(ctx.TS, opp);
+      attSum += a.att; defSum += d.def;
+      var mult = a.att * d.def * (home ? HOME_ADV : AWAY_ADV);
+      var lam = res.xg90 * mult * frac, lamA = res.xa90 * mult * frac;
+      var lamOpp = tsXg(opp, team, !home, ctx.TS);
+      var pcs = clamp(Math.exp(-lamOpp), 0, 1);
+      var appearance = minsAvg >= 60 ? S.play_long : S.play_short;
+      var csPts = (minsAvg >= 60 ? pcs : 0) * S.cs;
+      var gcPts = S.gc_per2 ? (lamOpp * frac) / 2 * S.gc_per2 : 0;
+      var dcPts = clamp(num(gs.dcRate, 0), 0, 1) * S.dc;
+      var bonusPts = Math.max(0, num(gs.bonusRate, 0));
+      res.lambda += lam; res.lambdaAssist += lamA; res.mult += mult;
+      res.components.appearance += appearance; res.components.goals += lam * S.goal; res.components.assists += lamA * S.assist;
+      res.components.cs += csPts; res.components.conceded += gcPts; res.components.dc += dcPts; res.components.bonus += bonusPts;
+      res.opponents.push({ opponent: opp, home: home, mult: mult, lambda: lam });
+      total += appearance + lam * S.goal + lamA * S.assist + csPts + gcPts + dcPts + bonusPts;
+    });
+    res.att = fx.length ? attSum / fx.length : 1;
+    res.def = fx.length ? defSum / fx.length : 1;
+    res.xpPerFixture = fx.length ? total / fx.length : 0;
+    res.xp = total * res.p;
+    res.note = "challenger only (E6 bars a component model from driving): the production xP is the E1 shrunk-points-per-start shape.";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+// ------------------------------------------------- chip solver on the real calendar (F8)
+
+// A team's total fixture multiplier in one event: 0 on a blank, one multiplier on a single, the
+// sum of both on a double. Never assumes one fixture (B2).
+function eventMult(teamId, ctx, event) {
+  var t = num(teamId, NaN);
+  if (!isFinite(t) || !okCtx(ctx)) return 0;
+  var m = 0;
+  arr(ctx.fixturesByEvent[intOf(event, -1)]).forEach(function (f) {
+    if (num(f.team_h, -1) === t || num(f.team_a, -1) === t) m += fxMult(f, t, ctx.TS);
+  });
+  return m;
+}
+function xpEvent(el, ctx, event) {
+  if (!isObj(el) || !okCtx(ctx)) return 0;
+  var x = ctx.xp[el.id];
+  var p = x ? x.pstart : pStart(el, ctx.gwStats);
+  return shrunkPps(el) * clamp(p, 0, 1) * eventMult(num(el.team, -1), ctx, event);
+}
+// The best legal eleven for one event out of a candidate list, scored on that event's fixtures.
+// Neither the budget nor the three-per-club cap is applied: the Free Hit figure this feeds is an
+// UPPER BOUND on both counts, and every place it is shown says so. A deep enough blank can leave
+// too few clubs for a legal fifteen at all, which is a fact about the blank, not about the solver.
+function bestElevenForEvent(ctx, event, ids) {
+  var res = { ids: [], score: 0, formation: "", ok: false, pool: 0, note: "" };
+  try {
+    if (!okCtx(ctx)) return res;
+    var ev = intOf(event, 0);
+    var source = Array.isArray(ids) && ids.length ? uniq(idList(ids)).filter(function (id) { return ctx.els[id]; })
+      : ctx.elList.map(function (el) { return el.id; });
+    var scored = [];
+    source.forEach(function (id) {
+      var el = ctx.els[id]; if (!el) return;
+      var v = xpEvent(el, ctx, ev);
+      if (v > 0) scored.push({ id: id, v: v });
+    });
+    scored.sort(function (a, b) { return b.v - a.v; });
+    res.pool = scored.length;
+    var top = scored.slice(0, CHIP_FH_POOL), vOf = {};
+    top.forEach(function (r) { vOf[r.id] = r.v; });
+    var xi = pickXI(top.map(function (r) { return r.id; }), ctx, function (el) { return num(vOf[el.id], 0); });
+    res.ids = xi.ids.slice(); res.score = num(xi.score, 0); res.formation = xi.formation; res.ok = xi.ok;
+    res.note = "best legal eleven for GW" + ev + " out of the " + top.length + " highest-scoring players whose club plays; " +
+      "neither the budget nor the three-per-club cap is applied, so it is an upper bound";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+// What one chip is worth in one event, priced from the fixture list and the E1 xP.
+function chipValue(chip, event, ctx, opts) {
+  var res = { chip: String(chip || "").toUpperCase(), event: intOf(event, 0), value: 0, basis: "", detail: "", ok: false };
+  try {
+    if (!okCtx(ctx)) { res.detail = "no usable context"; return res; }
+    var o = isObj(opts) ? opts : {};
+    var ev = res.event;
+    var squad = uniq(idList(o.ids && o.ids.length ? o.ids : ctx.squadIds)).filter(function (id) { return ctx.els[id]; });
+    if (res.chip !== "WC" && squad.length < 11) { res.detail = "the saved fifteen is not complete, so this chip cannot be priced"; return res; }
+    if (res.chip === "BB") {
+      var xiB = pickXI(squad, ctx, function (el) { return xpEvent(el, ctx, ev); });
+      var bench = xiB.ok ? xiB.bench : [];
+      res.value = sum(bench, function (id) { return xpEvent(ctx.els[id], ctx, ev); });
+      res.basis = "sum of the bench xP in GW" + ev;
+      res.detail = bench.length + " bench players priced on GW" + ev + " fixtures";
+      res.ok = true;
+    } else if (res.chip === "TC") {
+      var xiT = pickXI(squad, ctx, function (el) { return xpEvent(el, ctx, ev); });
+      var pool = xiT.ok ? xiT.ids : squad;
+      var best = 0, bestId = null;
+      pool.forEach(function (id) {
+        var el = ctx.els[id], t = elType(el);
+        if (t !== 3 && t !== 4) return;
+        if (flagInfo(el).flagged) return;
+        var v = xpEvent(el, ctx, ev);
+        if (v > best) { best = v; bestId = id; }
+      });
+      res.value = best;
+      res.basis = "the extra multiple on the best single fixture in GW" + ev;
+      res.detail = bestId === null ? "no unflagged attacker in the eleven" : "best attacker " + elName(bestId, ctx);
+      res.ok = bestId !== null;
+    } else if (res.chip === "FH") {
+      var mine = pickXI(squad, ctx, function (el) { return xpEvent(el, ctx, ev); });
+      var free = bestElevenForEvent(ctx, ev, null);
+      res.value = Math.max(0, num(free.score, 0) - num(mine.score, 0));
+      res.basis = "best eleven available in GW" + ev + " minus the current fifteen's best eleven";
+      res.detail = "upper bound: neither the budget nor the three-per-club cap is applied to the replacement eleven";
+      res.ok = free.ok;
+    } else if (res.chip === "WC") {
+      var tm = ctx._chipWcTiming || (ctx._chipWcTiming = wildcardTiming(ctx));
+      res.value = Math.max(0, num(tm.breakeven.byGw19, 0));
+      res.basis = "cumulative deficit of the current fifteen against the wildcard fifteen to the set-one expiry";
+      res.detail = tm.swapsNeeded + " swaps, " + (Math.round(num(tm.weeklyGap, 0) * 100) / 100) + " points a week at the start";
+      res.ok = true;
+    } else {
+      res.detail = "unknown chip";
+    }
+    if (!isFinite(res.value)) res.value = 0;
+  } catch (e) { res.detail = "engine error: " + errMsg(e); }
+  return res;
+}
+
+// F8. Enumerate the confirmed doubles and blanks, price every chip in every window it could be
+// played in, then solve the two chip sets JOINTLY: each chip once per set, each set inside its
+// own expiry, never two chips in one gameweek.
+function chipSolver(ctx, opts) {
+  var res = {
+    ok: false, nextEvent: 0, doubles: [], blanks: [], confirmed: false, used: [],
+    candidates: [], plan: [], total: 0, sets: [], considered: 0, note: "", windowNote: "", reasons: []
+  };
+  try {
+    if (!okCtx(ctx)) { res.note = "no usable context"; return res; }
+    var o = isObj(opts) ? opts : {};
+    res.nextEvent = ctx.nextEvent;
+    var w = chipWindows(ctx.live);
+    res.doubles = w.doubles.map(function (d) { return { event: d.event, n: d.n, teams: d.teams.slice() }; });
+    res.blanks = w.blanks.map(function (b) { return { event: b.event, n: b.n, teams: b.teams.slice() }; });
+    res.confirmed = res.doubles.length > 0 || res.blanks.length > 0;
+    var usedChips = {};
+    arr(ctx.live && ctx.live.history && ctx.live.history.chips).forEach(function (c) {
+      if (!isObj(c)) return;
+      var nm = CHIP_ALIAS[String(c.name || "").toLowerCase()] || String(c.name || "").toUpperCase();
+      var evt = intOf(c.event, 0);
+      var st = evt >= CHIP_SETS[1].from && evt <= CHIP_SETS[1].to ? 2 : 1;
+      usedChips[st + ":" + nm] = evt;
+      res.used.push({ set: st, chip: nm, event: evt });
+    });
+    var cand = [];
+    for (var si = 0; si < CHIP_SETS.length; si++) {
+      var S = CHIP_SETS[si];
+      res.sets.push({ set: S.set, from: S.from, to: S.to });
+      for (var ci = 0; ci < CHIP_NAMES.length; ci++) {
+        var chip = CHIP_NAMES[ci];
+        if (usedChips[S.set + ":" + chip] !== undefined) continue;
+        var events = [];
+        if (chip === "BB" || chip === "TC") events = res.doubles.map(function (d) { return d.event; });
+        else if (chip === "FH") events = res.blanks.map(function (b) { return b.event; });
+        else events = [ctx.nextEvent];
+        var inSet = [];
+        for (var ei = 0; ei < events.length; ei++) {
+          var ev = intOf(events[ei], 0);
+          if (ev >= S.from && ev <= S.to && ev >= ctx.nextEvent) inSet.push(ev);
+        }
+        if (!inSet.length) {
+          res.reasons.push(chip + " has no window inside set " + S.set + " (GW" + S.from + " to GW" + S.to + ") that is still ahead of GW" + ctx.nextEvent);
+          continue;
+        }
+        var priced = [];
+        for (var pi = 0; pi < inSet.length && pi < CHIP_PRICE_WINDOWS; pi++) {
+          var v = chipValue(chip, inSet[pi], ctx, o);
+          if (!v.ok) { res.reasons.push(chip + " in GW" + inSet[pi] + " could not be priced: " + v.detail); continue; }
+          priced.push({ set: S.set, chip: chip, event: inSet[pi], value: num(v.value, 0), basis: v.basis, detail: v.detail });
+        }
+        priced.sort(function (a, b) { return b.value - a.value || a.event - b.event; });
+        for (var qi = 0; qi < priced.length && qi < CHIP_MAX_WINDOWS; qi++) cand.push(priced[qi]);
+      }
+    }
+    cand.sort(function (a, b) { return b.value - a.value || a.event - b.event; });
+    res.candidates = cand;
+    // Exhaustive assignment. The candidate list is small by construction (four chips, two sets,
+    // at most CHIP_MAX_WINDOWS windows each), so depth-first search with a node cap is exact here
+    // and cannot run away on a fixture list that later carries many doubles.
+    var best = { total: 0, pick: [] };
+    var nodes = 0;
+    (function search(i, takenChip, takenEvent, acc, total) {
+      nodes++;
+      if (nodes > CHIP_SEARCH_NODES) return;
+      if (total > best.total) { best = { total: total, pick: acc.slice() }; }
+      for (var j = i; j < cand.length; j++) {
+        var c = cand[j];
+        var ck = c.set + ":" + c.chip;
+        if (takenChip[ck] || takenEvent[c.event]) continue;
+        takenChip[ck] = true; takenEvent[c.event] = true;
+        acc.push(c);
+        search(j + 1, takenChip, takenEvent, acc, total + c.value);
+        acc.pop();
+        takenChip[ck] = false; takenEvent[c.event] = false;
+      }
+    })(0, {}, {}, [], 0);
+    res.considered = nodes;
+    res.plan = best.pick.slice().sort(function (a, b) { return a.event - b.event || a.set - b.set; });
+    res.total = best.total;
+    res.ok = true;
+    res.windowNote = res.confirmed
+      ? "Windows are read from the published fixture list: " + res.doubles.length + " double" + (res.doubles.length === 1 ? "" : "s") +
+        " and " + res.blanks.length + " blank" + (res.blanks.length === 1 ? "" : "s") + " are scheduled."
+      : "No window is confirmed yet: the fixture list carries exactly one fixture for every club in every remaining gameweek, so there is no double and no blank to plan a Bench Boost, a Triple Captain or a Free Hit around.";
+    res.note = res.plan.length
+      ? res.windowNote + " The solver assigns " + res.plan.length + " chip" + (res.plan.length === 1 ? "" : "s") + " worth " + (Math.round(res.total * 10) / 10) + " points in total."
+      : res.windowNote + " Nothing is assigned.";
   } catch (e) { res.note = "engine error: " + errMsg(e); }
   return res;
 }
@@ -2142,10 +3518,19 @@ if (typeof module !== "undefined" && module.exports) {
     tierOf: tierOf, pickXI: pickXI, captainPick: captainPick, bestXI: bestXI, benchOrder: benchOrder, sellCandidates: sellCandidates, transferProtocol: transferProtocol,
     wcObjective: wcObjective, wcPool: wcPool, wcCost: wcCost, wcSetup: wcSetup, wcFeasible: wcFeasible, wcSolve: wcSolve, wcLocalOptimum: wcLocalOptimum,
     wildcardSolver: wildcardSolver, elName: elName, writtenFifteen: writtenFifteen, wildcardOptions: wildcardOptions, wildcardTiming: wildcardTiming, chipWindows: chipWindows, chipRegret: chipRegret,
-    draftEl: draftEl, draftEV: draftEV, draftWaivers: draftWaivers, watchlistAudit: watchlistAudit, draftXI: draftXI,
+    draftEl: draftEl, draftEV: draftEV, draftWaivers: draftWaivers, watchlistAudit: watchlistAudit, draftXIBase: draftXIBase, draftXI: draftXI,
+    draftLeagueInput: draftLeagueInput, draftOwnership: draftOwnership, draftPool: draftPool, draftRosterOf: draftRosterOf, draftRivalRosters: draftRivalRosters,
+    waiverOrder: waiverOrder, h2hOpponent: h2hOpponent, draftRoster: draftRoster, playerSpread: playerSpread,
+    distStats: distStats, mcDraftXI: mcDraftXI, mcH2H: mcH2H, h2hProjection: h2hProjection,
     sanitiseState: sanitiseState, detectSquadChange: detectSquadChange, ftAvailable: ftAvailable, sellPrice: sellPrice, bankAfter: bankAfter,
     openClosers: openClosers, salvageJson: salvageJson, stripFences: stripFences, parseJson: parseJson, blocksOf: blocksOf, pickText: pickText, blockTypes: blockTypes, refreshRequest: refreshRequest, applyRefresh: applyRefresh,
     mulberry32: mulberry32, rngOf: rngOf, poisson: poisson, binomial: binomial, posRates: posRates, playerRates: playerRates, likelyXI: likelyXI, simFixture: simFixture, simPlayerDetail: simPlayerDetail, simPlayer: simPlayer, fixtureDraws: fixtureDraws, entryPoints: entryPoints, squadOrder: squadOrder, mcSquad: mcSquad, mcLeague: mcLeague,
-    ranksOf: ranksOf, spearman: spearman, mae: mae, calibrateToPoints: calibrateToPoints, tournament: tournament
+    ranksOf: ranksOf, spearman: spearman, mae: mae, calibrateToPoints: calibrateToPoints, tournament: tournament,
+    strengthFromCounts: strengthFromCounts, playerXgPredict: playerXgPredict,
+    logistic: logistic, solveLinear: solveLinear, fitLogistic: fitLogistic, brier: brier, reliability: reliability, promotionGate: promotionGate,
+    minutesTerms: minutesTerms, minutesPanel: minutesPanel, minutesFeatureVector: minutesFeatureVector, minutesRowsFor: minutesRowsFor,
+    minutesFit: minutesFit, ctxMinutesFit: ctxMinutesFit, minutesModel: minutesModel, truncateLive: truncateLive, minutesWalkForward: minutesWalkForward,
+    playerXg: playerXg, eventMult: eventMult, xpEvent: xpEvent, bestElevenForEvent: bestElevenForEvent, chipValue: chipValue, chipSolver: chipSolver,
+    MINUTES_FEATURES: MINUTES_FEATURES, CHIP_SETS: CHIP_SETS, CHIP_NAMES: CHIP_NAMES, PROMOTION_HOLDOUT_WEEKS: PROMOTION_HOLDOUT_WEEKS
   };
 }

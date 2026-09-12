@@ -17,6 +17,9 @@ const H = require(path.join(__dirname, "harness.cjs"));
 
 const ROOT = path.resolve(__dirname, "..");
 const LIVE = require(path.join(ROOT, "data", "live.json"));
+// The engine is required here for ONE reason: the panel checks below compare what the screen
+// prints against what the engine computes, rather than against a number typed into the test.
+const ENG = require(path.join(ROOT, "src", "engine.js"));
 
 const NOW = "2026-09-11T08:00:00Z";                 // Friday before the GW4 deadline
 const LIVE_NOW = "2026-09-12T15:00:00Z";            // GW4 deadline 12:30Z, last kick-off 14 Sep 19:00Z
@@ -756,6 +759,81 @@ async function main() {
           b.captain + ", vice " + b.vice + ", " + b.words + " words · the two fifteens " +
           (a.fifteen === b.fifteen ? "are identical (the lock did nothing)" : "differ"));
     }
+
+    // ---------------------------------------------------------- F4 / F5 / F8 caveat panels
+
+    // Part F: every roadmap item ships with a UI caveat, and the caveat is a test gate like any
+    // other. Each number below is compared against the engine's own answer, never a literal.
+    await fresh({ html: html, mode: "full", ui: { mode: "full", tab: "lab", open: {}, reveals: {} }, now: NOW });
+    await page.click('[data-testid="sec-lab-minutes"]');
+    await page.waitForSelector('[data-section="lab-minutes"] .sec-b .row', { timeout: 20000 });
+    await page.click('[data-testid="rev-lab-min-terms"]');
+    await page.click('[data-testid="rev-lab-min-rel"]');
+    const minPanel = await page.evaluate(function () {
+      const sec = document.querySelector('[data-section="lab-minutes"] .sec-b');
+      return sec ? sec.innerText : "";
+    });
+    const mwfLive = ENG.minutesWalkForward(LIVE, { bins: 5 });
+    const lastFit = mwfLive.folds.filter(function (f) { return f.fitted; }).slice(-1)[0];
+    H.assert("F4-the-lab-panel-prints-the-engine's-own-Brier-scores-and-names-the-driver",
+      !!lastFit &&
+      minPanel.indexOf(lastFit.incumbent.brier.toFixed(4)) >= 0 &&
+      minPanel.indexOf(lastFit.challenger.brier.toFixed(4)) >= 0 &&
+      /Driving P\(start\)[\s\S]{0,40}Laplace/.test(minPanel) &&
+      /minutes logistic/i.test(minPanel),
+      "panel shows Laplace " + (lastFit ? lastFit.incumbent.brier.toFixed(4) : "—") + " and logistic " +
+        (lastFit ? lastFit.challenger.brier.toFixed(4) : "—") + " for GW" + (lastFit ? lastFit.from + "→" + lastFit.to : "?") +
+        "; first 160 chars: " + minPanel.slice(0, 160).replace(/\n/g, " | "));
+    H.assert("F4-the-lab-panel-says-the-flag-and-the-European-load-were-not-fitted",
+      /flag/i.test(minPanel) && /european load/i.test(minPanel) &&
+      /not a status per gameweek/i.test(minPanel) && /Premier League/i.test(minPanel) &&
+      /the gate needs 3/i.test(minPanel),
+      "the two declared-but-unfitted terms and the gate are all named in the panel");
+    H.assert("F4-the-reliability-curve-prints-what-it-said-against-what-happened",
+      /said/i.test(minPanel) && /happened/i.test(minPanel) &&
+      minPanel.indexOf(Math.round(lastFit.challenger.reliability.bins[0].meanPred * 100) + "%") >= 0,
+      "five bins, the first forecasting " + Math.round(lastFit.challenger.reliability.bins[0].meanPred * 100) + "%");
+
+    await page.click('[data-testid="sec-lab-tour"]');
+    await page.waitForSelector('[data-section="lab-tour"] .sec-b .row', { timeout: 20000 });
+    const tourPanel = await page.evaluate(function () {
+      const sec = document.querySelector('[data-section="lab-tour"] .sec-b');
+      return sec ? sec.innerText : "";
+    });
+    const tourLive = ENG.tournament(LIVE);
+    const pxg = tourLive.models.filter(function (m) { return m.key === "player_xg"; })[0];
+    H.assert("F5-the-tournament-panel-carries-the-ninth-model-and-promotes-nothing",
+      /Player xG/.test(tourPanel) &&
+      tourPanel.indexOf(pxg.spearman.toFixed(2)) >= 0 &&
+      /Promotable[\s\S]{0,20}not yet/i.test(tourPanel) &&
+      /promotes nothing/i.test(tourPanel) &&
+      tourLive.models.every(function (m) { return m.promotable === false; }),
+      "player_xg ρ " + pxg.spearman.toFixed(4) + " leading " + pxg.wins + " of " + tourLive.transitions +
+        " transitions, promotable " + pxg.promotable + "; the panel says promotable " +
+        (/not yet/i.test(tourPanel) ? "not yet" : "SOMETHING ELSE"));
+
+    await page.click('[data-testid="tab-chips"]');
+    await page.click('[data-testid="sec-ch-solver"]');
+    await page.waitForSelector('[data-section="ch-solver"] .sec-b .kv', { timeout: 30000 });
+    await page.click('[data-testid="rev-ch-solver-how"]');
+    const chipPanel = await page.evaluate(function () {
+      const sec = document.querySelector('[data-section="ch-solver"] .sec-b');
+      return sec ? sec.innerText : "";
+    });
+    const solveLive = ENG.chipSolver(ENG.buildCtx(LIVE, null, NOW), {});
+    const benchBoosted = solveLive.plan.filter(function (a) { return a.chip !== "WC"; });
+    H.assert("F8-the-chip-panel-says-no-window-is-confirmed-and-assigns-no-bench-boost",
+      /No window is confirmed yet/.test(chipPanel) &&
+      /Confirmed windows[\s\S]{0,20}none/i.test(chipPanel) &&
+      chipPanel.indexOf("BB") < 0 && chipPanel.indexOf("TC") < 0 && chipPanel.indexOf("FH") < 0 &&
+      benchBoosted.length === 0 && solveLive.confirmed === false,
+      "engine: " + solveLive.doubles.length + " doubles, " + solveLive.blanks.length + " blanks, plan " +
+        (solveLive.plan.map(function (a) { return a.chip + " GW" + a.event; }).join(", ") || "empty") +
+        "; panel first 140 chars: " + chipPanel.slice(0, 140).replace(/\n/g, " | "));
+    H.assert("F8-the-chip-panel-states-both-set-expiries-and-the-Free-Hit-upper-bound",
+      /Set one[\s\S]{0,40}GW19/.test(chipPanel) && /Set two[\s\S]{0,40}GW20 to GW38/.test(chipPanel) &&
+      /upper bound/i.test(chipPanel) && /never two chips in one gameweek/i.test(chipPanel),
+      "set one to the GW19 deadline, set two GW20 to GW38, the Free Hit labelled an upper bound and the one-chip-a-gameweek rule stated");
 
     // ---------------------------------------------------------- close
 

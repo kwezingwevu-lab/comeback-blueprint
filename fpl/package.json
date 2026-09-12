@@ -1,14 +1,15 @@
 {
   "name": "fpl-mission-control",
   "private": true,
-  "version": "87.0.0",
+  "version": "88.0.0",
   "description": "FPL Mission Control — single-file React app for Kwezi's FPL season. Factory + QA suites.",
   "scripts": {
     "fetch": "node data/fetch_live.cjs",
     "build": "node build.cjs",
     "tdz": "node qa/tdz_check.cjs app/FPL_Mission_Control.jsx",
     "verify": "bash qa/verify.sh",
-    "qa": "bash qa/run.sh"
+    "qa": "bash qa/run.sh",
+    "qa:release": "bash qa/run.sh --release"
   },
   "devDependencies": {
     "esbuild": "0.27.4",

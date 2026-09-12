@@ -1289,6 +1289,70 @@ check("TP-the-shipping-path-ends-its-order-with-the-captain-then-the-vice", func
   return { ok: ok, detail: o.map(function (x) { return x.step + " " + x.action + " " + x.id; }).join(" · ") };
 });
 
+// ---------------------------------------------------------------- E-067: a hold ships nothing
+
+// A hold has to report a hold. `k`, `hits`, `value` and `bankAfter` used to be written from the
+// best plan BEFORE the ship decision, so a hold week returned k=3 with an empty move list and the
+// landing card read "no hit: 3 of your 3 free transfers" while recommending no transfer at all.
+// Found by mc_all I55 on a randomly generated universe (0 moves for k 3).
+//
+// The fixture: a clean fifteen with no forced sell, and two out-of-squad midfielders made
+// numerically identical (same club, same season totals, same gameweek rows) so two genuinely
+// different plans tie exactly, the margin is 0 and the protocol holds with plans on the table.
+const SYN_TIE = (function () {
+  const V = JSON.parse(JSON.stringify(SYN));
+  const byId = {}; V.elements.forEach(function (e) { byId[e.id] = e; });
+  const donor = byId[11], twin = byId[35];
+  ["team", "element_type", "now_cost", "status", "news", "chance", "total_points", "minutes", "starts",
+   "xg", "xa", "xgc", "dc", "bps", "ict", "form", "goals", "assists", "cs", "gc", "bonus", "yc", "rc",
+   "og", "pen_miss", "pen_save", "saves"].forEach(function (k) { twin[k] = donor[k]; });
+  for (let g = 1; g <= 3; g++) {
+    const rows = V.gw[String(g)].elements;
+    if (rows[11]) rows[35] = rows[11].slice(); else delete rows[35];
+  }
+  return V;
+})();
+const TIE_SQUAD = [1, 2, 4, 8, 10, 12, 14, 16, 18, 19, 20, 23, 26, 29, 30];
+const TIE_STATE = {
+  version: 87, exported_at: SYN_NOW, entry: 3546875,
+  squad: TIE_SQUAD.map(function (id) {
+    const el = SYN_TIE.elements.filter(function (e) { return e.id === id; })[0];
+    return { id: id, purchase: el.now_cost };
+  }),
+  bank: 40, ft: 1, value: 960, confirmed_gw: 3, leagues: [900],
+  draft: { league_id: null, roster: [], watchlist: [] },
+  ui: { mode: "simple", tab: "command", open: {}, reveals: {} }, ledger: [],
+  refresh: { pair: "sonnet46", last: null }
+};
+const TIE_SNAP = (function () {
+  const V = JSON.parse(JSON.stringify(SYN_TIE));
+  V.picks = {};                                        // no live picks: nothing to block on
+  V.ft_available = 1;
+  return V;
+})();
+const CTX_TIE = E.buildCtx(TIE_SNAP, TIE_STATE, SYN_NOW);
+const TPT = E.transferProtocol(TIE_STATE, CTX_TIE);
+
+check("E067-a-hold-reports-no-transfers-no-hit-and-an-untouched-bank", function () {
+  const bad = [];
+  if (TPT.moves.length !== 0) bad.push("the fixture shipped " + TPT.moves.length + " moves instead of holding (confidence " + TPT.confidence + ")");
+  if (TPT.confidence !== "hold") bad.push("confidence is " + TPT.confidence + ", not hold");
+  if (!TPT.alternatives.length) bad.push("the plans that were considered were not kept as alternatives");
+  if (TPT.k !== 0) bad.push("k is " + TPT.k + " on a hold");
+  if (TPT.hits !== 0) bad.push("hits is " + TPT.hits + " on a hold");
+  if (TPT.value !== 0) bad.push("value is " + TPT.value + " on a hold");
+  if (TPT.bankAfter !== TPT.bank) bad.push("bankAfter " + TPT.bankAfter + " against a bank of " + TPT.bank);
+  return { ok: !bad.length, detail: bad.join("; ") || "margin " + r2(TPT.margin) + " with " + TPT.alternatives.length +
+    " plans considered (best worth " + r2(TPT.alternatives[0] ? TPT.alternatives[0].value : 0) + " over " +
+    (TPT.alternatives[0] ? TPT.alternatives[0].k : 0) + " swaps); shipped k 0, hits 0, bank " + TPT.bank + " unchanged" };
+});
+check("E067-every-transfer-plan-reports-as-many-moves-as-its-k", function () {
+  const all = [TP, TP3, TPH, TPT, E.transferProtocol(null, CTX)];
+  const bad = all.filter(function (r) { return r.moves.length !== r.k || r.hits !== Math.max(0, r.k - r.ft) * 4; });
+  return { ok: bad.length === 0, detail: bad.length ? bad.map(function (r) { return r.moves.length + " moves for k " + r.k + " hits " + r.hits; }).join("; ")
+    : all.map(function (r) { return r.confidence + ":" + r.k + "/" + r.moves.length; }).join(" · ") };
+});
+
 // ---------------------------------------------------------------- wildcard
 
 const WC = E.wildcardSolver(CTX, {});
@@ -1610,10 +1674,12 @@ check("MC-league-returns-a-direction-and-a-rank-band", function () {
 });
 
 const TOUR = E.tournament(SYN);
-check("TOURNAMENT-returns-exactly-the-eight-named-models", function () {
+check("TOURNAMENT-returns-exactly-the-nine-named-models", function () {
+  // Eight at v87; player_xg is the F5 challenger added at v88 and is barred from driving
+  // anything by E6 and by the shared promotion gate until it clears three transitions.
   const keys = TOUR.models.map(function (m) { return m.key; });
-  const want = ["season_mean", "last_gw", "per90", "shrunk_per90", "ict_rate", "bps_rate", "blend", "component_xp"];
-  return { ok: keys.length === 8 && keys.join(",") === want.join(","), detail: "keys: " + keys.join(", ") };
+  const want = ["season_mean", "last_gw", "per90", "shrunk_per90", "ict_rate", "bps_rate", "blend", "component_xp", "player_xg"];
+  return { ok: keys.length === 9 && keys.join(",") === want.join(","), detail: "keys: " + keys.join(", ") };
 });
 check("TOURNAMENT-spearman-values-are-inside-minus-1-and-1", function () {
   const bad = TOUR.models.filter(function (m) { return m.spearman !== null && !(m.spearman >= -1 && m.spearman <= 1); });
@@ -1622,7 +1688,7 @@ check("TOURNAMENT-spearman-values-are-inside-minus-1-and-1", function () {
 check("TOURNAMENT-promotion-needs-three-transitions", function () {
   return { ok: TOUR.transitions === 2 && TOUR.promotable === false, detail: TOUR.transitions + " transitions from 3 finished gameweeks; promotable=" + TOUR.promotable + " (gate is 3)" };
 });
-check("TOURNAMENT-leader-is-one-of-the-eight", function () {
+check("TOURNAMENT-leader-is-one-of-the-nine", function () {
   const keys = TOUR.models.map(function (m) { return m.key; });
   return { ok: TOUR.leader !== null && keys.indexOf(TOUR.leader) >= 0, detail: "leader " + TOUR.leader };
 });
@@ -1650,6 +1716,482 @@ check("TOURNAMENT-the-reported-MAEs-are-inside-one-order-of-magnitude-of-each-ot
 });
 check("TOURNAMENT-spearman-of-a-perfect-ranking-is-1", function () {
   return { ok: close(E.spearman([1, 2, 3, 4, 5], [10, 20, 30, 40, 50]), 1, 1e-9) && close(E.spearman([1, 2, 3, 4, 5], [50, 40, 30, 20, 10]), -1, 1e-9), detail: "perfect " + E.spearman([1, 2, 3, 4, 5], [10, 20, 30, 40, 50]) + ", inverted " + E.spearman([1, 2, 3, 4, 5], [50, 40, 30, 20, 10]) };
+});
+
+// ================================================================ F4 — calibration and the minutes model
+
+check("F4-logistic-is-total-and-always-inside-0-1", function () {
+  const junk = [NaN, Infinity, -Infinity, "x", {}, [], null, undefined, "12", 1e308, -1e308, 0, 40.1, -40.1, true];
+  const bad = [];
+  junk.forEach(function (v) {
+    const p = E.logistic(v);
+    if (typeof p !== "number" || !isFinite(p) || p < 0 || p > 1) bad.push(JSON.stringify(v) + " → " + p);
+  });
+  if (E.logistic(NaN) !== 0.5) bad.push("NaN did not answer 0.5");
+  if (E.logistic(0) !== 0.5) bad.push("logistic(0) was not 0.5");
+  if (E.logistic(Infinity) !== 1 || E.logistic(-Infinity) !== 0) bad.push("the infinities did not saturate");
+  if (!close(E.logistic(2), 1 / (1 + Math.exp(-2)), 1e-12)) bad.push("logistic(2) is not the sigmoid");
+  return { ok: !bad.length, detail: bad.join("; ") || junk.length + " junk inputs, every answer inside [0,1]; NaN → 0.5" };
+});
+
+check("F4-solveLinear-solves-a-known-system-and-answers-null-on-a-singular-one", function () {
+  const x = E.solveLinear([[2, 1], [1, 3]], [5, 10]);
+  const sing = E.solveLinear([[1, 2], [2, 4]], [3, 6]);
+  const junk = E.solveLinear([[1, NaN], [2, 4]], [3, 6]);
+  const ok = Array.isArray(x) && close(x[0], 1, 1e-9) && close(x[1], 3, 1e-9) && sing === null && junk === null;
+  return { ok: ok, detail: "2x+y=5, x+3y=10 → " + JSON.stringify(x ? x.map(r4) : x) + "; singular → " + sing + "; NaN entry → " + junk };
+});
+
+// Generate from a KNOWN logistic, then check the fit finds it back and beats the base rate.
+const FIT_DATA = (function () {
+  const rng = E.mulberry32(20260912);
+  const X = [], y = [];
+  for (let i = 0; i < 600; i++) {
+    const x1 = i / 599;                                  // deterministic sweep of the feature
+    const p = 1 / (1 + Math.exp(-(-4 + 8 * x1)));
+    X.push([1, x1]); y.push(rng() < p ? 1 : 0);
+  }
+  return { X: X, y: y };
+})();
+
+check("F4-fitLogistic-recovers-the-coefficients-it-was-generated-from", function () {
+  const f = E.fitLogistic(FIT_DATA.X, FIT_DATA.y, {});
+  if (!f.ok) return { ok: false, detail: "the fit did not converge: " + f.note };
+  const b0 = f.beta[0], b1 = f.beta[1];
+  const ok = f.converged && Math.abs(b0 + 4) < 1.2 && Math.abs(b1 - 8) < 2.0 && f.n === 600 && f.k === 2;
+  return { ok: ok, detail: "generated from intercept −4 and slope 8; fitted " + r2(b0) + " and " + r2(b1) +
+    " on " + f.n + " rows in " + f.iters + " Newton steps (" + f.note + ")" };
+});
+
+check("F4-the-fitted-model-beats-the-base-rate-on-Brier", function () {
+  const f = E.fitLogistic(FIT_DATA.X, FIT_DATA.y, {});
+  const pred = FIT_DATA.X.map(function (x) { return E.logistic(f.beta[0] * x[0] + f.beta[1] * x[1]); });
+  const b = E.brier(pred, FIT_DATA.y);
+  const flat = E.brier(FIT_DATA.y.map(function () { return b.baseRate; }), FIT_DATA.y);
+  return { ok: f.ok && b.ok && b.brier < flat.brier && b.skill > 0.3 && b.brier >= 0 && b.brier <= 1,
+    detail: "fitted Brier " + r4(b.brier) + " against the base rate's " + r4(flat.brier) + " (base " + r4(b.baseRate) + ", skill " + r4(b.skill) + ")" };
+});
+
+check("F4-fitLogistic-never-returns-a-coefficient-that-is-not-finite", function () {
+  const cases = [
+    { X: [[1, NaN], [1, 2], [1, 3], [1, 4], [1, 5]], y: [1, 0, 1, 0, 1] },
+    { X: [[1, 1], [1, 1], [1, 1], [1, 1], [1, 1]], y: [1, 1, 1, 1, 1] },      // perfectly separated constant
+    { X: [[1, 1e308], [1, -1e308], [1, 0], [1, 1], [1, 2]], y: [1, 0, 1, 0, 1] },
+    { X: "not a matrix", y: 7 },
+    { X: [], y: [] },
+    { X: [[1, 0], [1, 1]], y: [1, 0] }                                          // fewer rows than the fit needs
+  ];
+  const bad = [];
+  cases.forEach(function (c, i) {
+    const f = E.fitLogistic(c.X, c.y, {});
+    if (!Array.isArray(f.beta)) { bad.push("case " + i + ": beta is not an array"); return; }
+    f.beta.forEach(function (b, j) { if (!isFinite(b)) bad.push("case " + i + " coefficient " + j + " = " + b); });
+    if (typeof f.note !== "string" || !f.note.length) bad.push("case " + i + ": no note");
+  });
+  return { ok: !bad.length, detail: bad.join("; ") || cases.length + " degenerate fits, every coefficient finite and every one carrying a reason" };
+});
+
+check("F4-brier-scores-a-perfect-a-worst-and-a-base-rate-forecast-exactly", function () {
+  const y = [1, 0, 1, 0, 1, 1, 0, 0];
+  const perfect = E.brier(y, y);
+  const worst = E.brier(y.map(function (v) { return 1 - v; }), y);
+  const flat = E.brier(y.map(function () { return 0.5; }), y);
+  const junk = E.brier("nonsense", {});
+  const ok = perfect.brier === 0 && worst.brier === 1 && close(flat.brier, 0.25, 1e-12) &&
+    close(flat.baseRate, 0.5, 1e-12) && close(flat.baseBrier, 0.25, 1e-12) && close(flat.skill, 0, 1e-12) &&
+    junk.ok === false && junk.brier === 0;
+  return { ok: ok, detail: "perfect " + perfect.brier + ", inverted " + worst.brier + ", base-rate forecast " + r4(flat.brier) +
+    " with skill " + r4(flat.skill) + "; junk answers ok=false" };
+});
+
+check("F4-reliability-bins-account-for-every-row-and-a-calibrated-forecast-has-a-small-gap", function () {
+  const rng = E.mulberry32(4242);
+  const p = [], y = [];
+  for (let i = 0; i < 2000; i++) { const q = (i % 100) / 100 + 0.005; p.push(q); y.push(rng() < q ? 1 : 0); }
+  const rel = E.reliability(p, y, 5);
+  const counted = rel.bins.reduce(function (s, b) { return s + b.n; }, 0);
+  const ordered = rel.bins.every(function (b, i) { return b.lo === i / 5 && b.hi === (i + 1) / 5; });
+  const inRange = rel.bins.every(function (b) { return b.meanPred >= 0 && b.meanPred <= 1 && b.meanOutcome >= 0 && b.meanOutcome <= 1; });
+  return { ok: rel.ok && counted === 2000 && rel.n === 2000 && ordered && inRange && rel.maxGap < 0.12 && rel.nBins === 5,
+    detail: counted + " of 2000 rows binned into " + rel.nBins + " bins; largest gap between forecast and outcome " + r4(rel.maxGap) };
+});
+
+check("F4-minutesFeatureVector-is-bounded-on-any-history-and-starts-with-the-intercept", function () {
+  // The null-row cases are E-074: `last3[last3.length - 1].min` threw on a history whose last
+  // entry was null. mc_full found it at the 25000 release count and not at 3000.
+  const cases = [[], null, "junk", [{ gw: 1, games: 1, min: 90, starts: 1 }],
+    [{ gw: 1, games: NaN, min: Infinity, starts: "x" }, { gw: 2, games: 1, min: 90, starts: 1 }],
+    [{ gw: 1, games: 1, min: 0, starts: 0 }, { gw: 2, games: 1, min: 0, starts: 0 }, { gw: 3, games: 1, min: 0, starts: 0 }],
+    [null], [null, null], [null, Infinity, { gw: 1, games: 1, min: 90, starts: 1 }],
+    [{ gw: 1, games: 1, min: 90, starts: 1 }, null], [undefined, null, 3], ["x", { gw: 2, games: 1, min: 45, starts: 0 }]];
+  const bad = [];
+  cases.forEach(function (h, i) {
+    const x = E.minutesFeatureVector(h, 4, { 1: 0, 2: 86400000, 3: 172800000, 4: 259200000 });
+    if (x.length !== E.MINUTES_FEATURES.length) bad.push("case " + i + ": " + x.length + " terms, not " + E.MINUTES_FEATURES.length);
+    if (x[0] !== 1) bad.push("case " + i + ": the intercept is " + x[0]);
+    x.forEach(function (v, j) { if (!isFinite(v) || v < -1 || v > 1) bad.push("case " + i + " term " + j + " = " + v); });
+  });
+  return { ok: !bad.length, detail: bad.join("; ") || cases.length + " histories including junk; every term finite and inside [−1,1]" };
+});
+
+check("F4-the-feature-matrix-uses-no-data-from-the-gameweek-it-predicts", function () {
+  const V = JSON.parse(JSON.stringify(SYN));
+  Object.keys(V.gw["3"].elements).forEach(function (id) {
+    const r = V.gw["3"].elements[id];
+    r[0] = 0; r[1] = 0; r[2] = 0;                                  // wipe GW3 minutes, starts and points
+  });
+  const base = E.minutesRowsFor(SYN, 3, null);
+  const wiped = E.minutesRowsFor(V, 3, null);
+  const sameX = JSON.stringify(base.X) === JSON.stringify(wiped.X);
+  const yChanged = JSON.stringify(base.y) !== JSON.stringify(wiped.y);
+  return { ok: base.n > 0 && sameX && yChanged && base.ids.join(",") === wiped.ids.join(","),
+    detail: base.n + " rows; wiping GW3 leaves the feature matrix byte-identical (" + sameX + ") and changes only the outcome column (" + yChanged + ")" };
+});
+
+check("F4-a-club-with-no-fixture-gets-no-row-because-a-blank-is-not-a-non-start", function () {
+  const V = JSON.parse(JSON.stringify(SYN));
+  V.fixtures = V.fixtures.filter(function (f) { return !(f.event === 3 && f.team_h === 4 && f.team_a === 6); });
+  Object.keys(V.gw["3"].elements).forEach(function (id) {
+    const el = V.elements.filter(function (e) { return e.id === Number(id); })[0];
+    if (el && (el.team === 4 || el.team === 6)) delete V.gw["3"].elements[id];
+  });
+  const rows = E.minutesRowsFor(V, 3, null);
+  const teamOf = {}; V.elements.forEach(function (e) { teamOf[e.id] = e.team; });
+  const blanked = rows.ids.filter(function (id) { return teamOf[id] === 4 || teamOf[id] === 6; });
+  const full = E.minutesRowsFor(SYN, 3, null);
+  return { ok: blanked.length === 0 && rows.n > 0 && rows.n < full.n,
+    detail: rows.n + " rows with teams 4 and 6 blank in GW3, against " + full.n + " on the full fixture list; rows for the blanked clubs: " + blanked.length };
+});
+
+const SYN_MWF = E.minutesWalkForward(SYN, { bins: 5 });
+
+check("F4-the-walk-forward-scores-both-models-and-can-only-fit-where-history-exists", function () {
+  const f0 = SYN_MWF.folds[0], f1 = SYN_MWF.folds[1];
+  const ok = SYN_MWF.folds.length === 2 && f0.fitted === false && f1.fitted === true &&
+    f0.challenger === null && f1.challenger !== null &&
+    f0.incumbent.brier >= 0 && f0.incumbent.brier <= 1 && f1.challenger.brier >= 0 && f1.challenger.brier <= 1 &&
+    SYN_MWF.comparable === 1 && /no gameweek up to GW1/.test(f0.note);
+  return { ok: ok, detail: "GW1→GW2 incumbent " + r4(f0.incumbent.brier) + ", challenger " + (f0.challenger ? r4(f0.challenger.brier) : "not fitted") +
+    "; GW2→GW3 incumbent " + r4(f1.incumbent.brier) + ", challenger " + r4(f1.challenger.brier) + " → " + f1.winner };
+});
+
+check("F4-the-walk-forward-never-fits-on-the-gameweek-it-scores", function () {
+  const bad = [];
+  SYN_MWF.folds.forEach(function (f) {
+    if (!f.fitted) return;
+    if (f.fitGws.indexOf(f.to) >= 0) bad.push("the fit for GW" + f.to + " included GW" + f.to);
+    f.fitGws.forEach(function (g) { if (g > f.from) bad.push("the fit for GW" + f.to + " included GW" + g + ", past the cut at GW" + f.from); });
+  });
+  return { ok: !bad.length, detail: bad.join("; ") || SYN_MWF.folds.map(function (f) { return "GW" + f.to + " fitted on [" + f.fitGws.join(",") + "]"; }).join("; ") };
+});
+
+check("F4-truncateLive-hides-every-later-gameweek-and-puts-later-fixtures-back-to-unplayed", function () {
+  const t = E.truncateLive(SYN, 2);
+  const keys = Object.keys(t.gw).map(Number).sort(function (a, b) { return a - b; });
+  const laterPlayed = t.fixtures.filter(function (f) { return f.event > 2 && (f.finished || f.started || f.team_h_score !== null); });
+  const earlyIntact = t.fixtures.filter(function (f) { return f.event <= 2 && f.finished; }).length;
+  const original = SYN.fixtures.filter(function (f) { return f.event === 3 && f.finished; }).length;
+  return { ok: keys.join(",") === "1,2" && laterPlayed.length === 0 && earlyIntact === 6 && original === 3 &&
+      t.current_event === 2 && t.next_event === 3 && SYN.gw["3"] !== undefined,
+    detail: "gameweeks kept [" + keys.join(",") + "], " + laterPlayed.length + " later fixtures still marked played, " +
+      earlyIntact + " earlier fixtures intact; the original snapshot still carries GW3 (" + (SYN.gw["3"] !== undefined) + ")" };
+});
+
+check("F4-minutesModel-declares-the-flag-and-the-European-load-as-terms-it-did-not-fit", function () {
+  const m = E.minutesModel(CTX.els[16], CTX, {});
+  const flag = m.terms.filter(function (t) { return t.name === "flag"; })[0];
+  const euro = m.terms.filter(function (t) { return t.name === "european_load"; })[0];
+  const fitted = m.terms.filter(function (t) { return t.fitted; });
+  const ok = !!flag && flag.fitted === false && /not a status per gameweek/.test(flag.why) &&
+    !!euro && euro.fitted === false && euro.available === false && /Premier League/.test(euro.why) &&
+    fitted.length === E.MINUTES_FEATURES.length;
+  return { ok: ok, detail: fitted.length + " fitted terms (" + E.MINUTES_FEATURES.join(", ") + "); flag and European load both declared and both not fitted" };
+});
+
+check("F4-minutesModel-drives-nothing-and-says-the-Laplace-rate-is-the-driver", function () {
+  const bad = [];
+  [16, 22, 34, 3].forEach(function (id) {
+    const m = E.minutesModel(CTX.els[id], CTX, {});
+    if (m.driving !== false) bad.push(id + " claims to be driving");
+    if (m.driver !== "pStart") bad.push(id + " names the driver as " + m.driver);
+    if (!(m.p >= 0 && m.p <= 1) || !(m.pModel >= 0 && m.pModel <= 1)) bad.push(id + " p=" + m.p + " pModel=" + m.pModel);
+    if (!close(m.pIncumbent, E.pStart(CTX.els[id], CTX.gwStats), 1e-12)) bad.push(id + " does not report the shipped pStart");
+  });
+  const flagged = E.minutesModel(CTX.els[22], CTX, {});
+  if (!close(flagged.flagFactor, 0.75, 1e-12)) bad.push("the 75% doubt did not become a 0.75 factor");
+  if (!close(flagged.p, flagged.pModel * 0.75, 1e-12)) bad.push("the flag was not applied multiplicatively");
+  return { ok: !bad.length, detail: bad.join("; ") || "four players: driving=false, driver=pStart, the 75% doubt multiplies the fitted probability by 0.75" };
+});
+
+check("GATE-the-promotion-gate-cannot-open-below-three-transitions", function () {
+  const bad = [];
+  for (let t = 0; t <= 2; t++) {
+    const g = E.promotionGate({ transitions: t, wins: 99, holdout: 99, challenger: "x" });
+    if (g.promotable) bad.push(t + " transitions opened the gate");
+    if (g.wins > t || g.holdout > t) bad.push(t + " transitions reported " + g.wins + " wins and a " + g.holdout + " hold-out");
+    if (!g.reasons.length) bad.push(t + " transitions gave no reason");
+  }
+  const open = E.promotionGate({ transitions: 3, wins: 3, holdout: 2 });
+  return { ok: !bad.length && open.promotable === true,
+    detail: bad.join("; ") || "0, 1 and 2 transitions all stay shut even with the wins and the hold-out maxed; 3 wins over 3 with a 2-week hold-out opens it" };
+});
+
+check("GATE-three-wins-alone-are-not-enough-without-the-two-week-holdout", function () {
+  const noHold = E.promotionGate({ transitions: 4, wins: 3, holdout: 1 });
+  const noWins = E.promotionGate({ transitions: 4, wins: 2, holdout: 2 });
+  const both = E.promotionGate({ transitions: 4, wins: 3, holdout: 2 });
+  return { ok: noHold.promotable === false && noHold.holdoutOk === false && noHold.winsOk === true &&
+      noWins.promotable === false && noWins.winsOk === false && both.promotable === true &&
+      E.PROMOTION_HOLDOUT_WEEKS === 2,
+    detail: "3 wins with a 1-week hold-out: " + noHold.promotable + "; 2 wins with a 2-week hold-out: " + noWins.promotable +
+      "; 3 wins with a 2-week hold-out: " + both.promotable };
+});
+
+check("GATE-the-tournament-and-the-minutes-walk-forward-go-through-the-same-gate", function () {
+  const tourGate = TOUR.models.filter(function (m) { return m.gate; })[0];
+  const mwfGate = SYN_MWF.gate;
+  const ok = !!tourGate && !!mwfGate && tourGate.gate.need === mwfGate.need && tourGate.gate.needHoldout === mwfGate.needHoldout &&
+    mwfGate.need === 3 && mwfGate.needHoldout === 2 && TOUR.models.every(function (m) { return m.promotable === false; });
+  return { ok: ok, detail: "both gates want " + mwfGate.need + " transitions and a " + mwfGate.needHoldout +
+    "-gameweek hold-out; no tournament model is promotable at " + TOUR.transitions + " transitions" };
+});
+
+// ================================================================ F5 — player xG
+
+check("F5-playerXg-is-xG90-times-att-times-def-folded-into-the-E1-shape", function () {
+  const el = CTX.els[16];
+  const rates = E.playerRates(el, CTX);
+  const fx = CTX.fixturesByEvent[4].filter(function (f) { return f.team_h === el.team || f.team_a === el.team; });
+  if (fx.length !== 1) return { ok: false, detail: "expected exactly one GW4 fixture for team " + el.team + ", found " + fx.length };
+  const f = fx[0], home = f.team_h === el.team, opp = home ? f.team_a : f.team_h;
+  const a = E.tsEntry(CTX.TS, el.team), d = E.tsEntry(CTX.TS, opp);
+  const mult = a.att * d.def * (home ? 1.10 : 0.90);
+  const gs = CTX.gwStats[16];
+  const minsAvg = gs.minutes / gs.played, frac = minsAvg / 90;
+  const lam = rates.xg90 * mult * frac, lamA = rates.xa90 * mult * frac;
+  const lamOpp = E.tsXg(opp, el.team, !home, CTX.TS);
+  const S = E.SCORING[3];
+  const want = (minsAvg >= 60 ? S.play_long : S.play_short) + lam * S.goal + lamA * S.assist +
+    (minsAvg >= 60 ? Math.exp(-lamOpp) : 0) * S.cs + (S.gc_per2 ? (lamOpp * frac) / 2 * S.gc_per2 : 0) +
+    gs.dcRate * S.dc + gs.bonusRate;
+  const px = E.playerXg(el, CTX, {});
+  const p = E.pStart(el, CTX.gwStats);
+  const ok = close(px.mult, mult, 1e-12) && close(px.lambda, lam, 1e-12) && close(px.xpPerFixture, want, 1e-9) &&
+    close(px.xp, want * p, 1e-9) && px.driving === false && px.fixtures === 1 && close(px.att, a.att, 1e-12) && close(px.def, d.def, 1e-12);
+  return { ok: ok, detail: "xG90 " + r4(rates.xg90) + " x att " + r4(a.att) + " x def " + r4(d.def) + " x home 1.10 → λ " + r4(px.lambda) +
+    "; recomputed by hand " + r4(want) + " against the engine's " + r4(px.xpPerFixture) + " per fixture, " + r4(px.xp) + " after P(start) " + r4(p) };
+});
+
+check("F5-playerXg-answers-zero-on-a-blank-and-names-it", function () {
+  const V = JSON.parse(JSON.stringify(SYN));
+  V.fixtures = V.fixtures.filter(function (f) { return !(f.event === 4 && f.team_h === 1 && f.team_a === 4); });
+  const c = E.buildCtx(V, SYN_STATE, SYN_NOW);
+  const px = E.playerXg(c.els[4], c, {});
+  const still = E.playerXg(c.els[16], c, {});
+  return { ok: px.xp === 0 && px.fixtures === 0 && /blank is worth nothing/.test(px.note) && still.xp > 0,
+    detail: "team 1 blank in GW4 → xp " + px.xp + " (" + px.note + "); a club that still plays scores " + r4(still.xp) };
+});
+
+check("F5-player-xg-is-the-ninth-model-and-is-scored-like-the-other-eight", function () {
+  const m = TOUR.models.filter(function (x) { return x.key === "player_xg"; })[0];
+  const scored = TOUR.models.filter(function (x) { return x.spearman !== null; });
+  const ok = !!m && m.name === "Player xG" && m.transitions === TOUR.transitions && m.spearman !== null &&
+    m.spearman >= -1 && m.spearman <= 1 && m.mae !== null && m.mae > 0 &&
+    Array.isArray(m.perTransition) && m.perTransition.length === TOUR.transitions && scored.length === 9;
+  return { ok: ok, detail: m ? "player_xg ρ " + r4(m.spearman) + " over " + m.transitions + " transitions, MAE " + r2(m.mae) +
+    " points, per transition [" + m.perTransition.map(r4).join(", ") + "]" : "player_xg is missing from the tournament" };
+});
+
+check("F5-player-xg-cannot-drive-anything-even-when-it-leads-every-transition", function () {
+  const m = TOUR.models.filter(function (x) { return x.key === "player_xg"; })[0];
+  const bad = [];
+  if (!m) return { ok: false, detail: "player_xg is missing" };
+  if (m.promotable !== false) bad.push("player_xg says it is promotable at " + m.transitions + " transitions");
+  if (!m.gate || m.gate.transitionsOk !== false) bad.push("the gate does not report the transition count as the blocker");
+  TOUR.models.forEach(function (x) { if (x.promotable) bad.push(x.key + " claims to be promotable"); });
+  return { ok: !bad.length, detail: bad.join("; ") || "player_xg led " + m.wins + " of " + TOUR.transitions +
+    " transitions with a " + m.holdout + "-gameweek trailing run and is still not promotable: " + m.gate.reasons.join("; ") };
+});
+
+check("F5-the-tournament-reads-no-team-strength-from-the-gameweek-it-is-predicting", function () {
+  const V = JSON.parse(JSON.stringify(SYN));
+  Object.keys(V.gw["3"].fixture_xg).forEach(function (fid) {
+    V.gw["3"].fixture_xg[fid] = { h: 9.5, a: 0.01 };                  // an absurd GW3 xG record
+  });
+  const t2 = E.tournament(V);
+  const a = TOUR.models.filter(function (m) { return m.key === "player_xg"; })[0];
+  const b = t2.models.filter(function (m) { return m.key === "player_xg"; })[0];
+  const same = JSON.stringify(a.perTransition.map(r4)) === JSON.stringify(b.perTransition.map(r4));
+  return { ok: same && a.perTransition.length === 2,
+    detail: "GW3 team xG rewritten to 9.5 against 0.01; the player-xG per-transition ρ is [" + a.perTransition.map(r4).join(", ") +
+      "] before and [" + b.perTransition.map(r4).join(", ") + "] after" };
+});
+
+check("F5-per-transition-Spearman-averages-back-to-the-published-mean", function () {
+  const bad = [];
+  TOUR.models.forEach(function (m) {
+    if (m.spearman === null) return;
+    const mean = m.perTransition.reduce(function (s, v) { return s + v; }, 0) / m.perTransition.length;
+    if (!close(mean, m.spearman, 1e-12)) bad.push(m.key + ": mean of " + JSON.stringify(m.perTransition.map(r4)) + " is " + r4(mean) + ", published " + r4(m.spearman));
+  });
+  return { ok: !bad.length, detail: bad.join("; ") || "all nine models: the per-transition figures average exactly to the published ρ" };
+});
+
+// ================================================================ F8 — the chip solver on the real calendar
+
+const SYN_SOLVE = E.chipSolver(CTX, {});
+const SYN_SOLVE_CHIP = E.chipSolver(CTX_CHIP, {});
+
+function solverShapeErrors(s, nextEvent) {
+  const bad = [];
+  const seenChip = {}, seenEvent = {};
+  const bounds = {}; s.sets.forEach(function (S) { bounds[S.set] = S; });
+  s.plan.forEach(function (a) {
+    const key = a.set + ":" + a.chip;
+    if (seenChip[key]) bad.push(a.chip + " assigned twice in set " + a.set);
+    seenChip[key] = true;
+    if (seenEvent[a.event]) bad.push("two chips in GW" + a.event);
+    seenEvent[a.event] = true;
+    const B = bounds[a.set];
+    if (!B) { bad.push("assignment in an unknown set " + a.set); return; }
+    if (a.event < B.from || a.event > B.to) bad.push(a.chip + " in GW" + a.event + " is outside set " + a.set + " (GW" + B.from + "–GW" + B.to + ")");
+    if (a.event < nextEvent) bad.push(a.chip + " assigned to GW" + a.event + ", already past");
+    if (!isFinite(a.value) || a.value < 0) bad.push(a.chip + " priced at " + a.value);
+  });
+  return bad;
+}
+
+check("F8-with-no-double-and-no-blank-the-solver-says-no-window-is-confirmed", function () {
+  const s = SYN_SOLVE;
+  const nonWc = s.plan.filter(function (a) { return a.chip !== "WC"; });
+  const ok = s.ok && s.confirmed === false && s.doubles.length === 0 && s.blanks.length === 0 &&
+    /No window is confirmed yet/.test(s.windowNote) && nonWc.length === 0 &&
+    s.reasons.some(function (r) { return /BB has no window/.test(r); });
+  return { ok: ok, detail: "confirmed " + s.confirmed + "; plan " + s.plan.map(function (a) { return a.chip + " GW" + a.event; }).join(", ") +
+    "; " + s.windowNote };
+});
+
+check("F8-a-real-double-and-a-real-blank-are-found-and-every-chip-is-priced-in-them", function () {
+  const s = SYN_SOLVE_CHIP;
+  const bb = s.candidates.filter(function (c) { return c.chip === "BB" && c.event === 5; })[0];
+  const tc = s.candidates.filter(function (c) { return c.chip === "TC" && c.event === 5; })[0];
+  const fh = s.candidates.filter(function (c) { return c.chip === "FH" && c.event === 6; })[0];
+  const ok = s.ok && s.confirmed === true && s.doubles.length === 1 && s.doubles[0].event === 5 &&
+    s.blanks.length === 1 && s.blanks[0].event === 6 && !!bb && !!tc && !!fh &&
+    bb.value >= 0 && tc.value > 0 && fh.value >= 0;
+  return { ok: ok, detail: "double GW5, blank GW6 → BB " + (bb ? r2(bb.value) : "—") + ", TC " + (tc ? r2(tc.value) : "—") +
+    ", FH " + (fh ? r2(fh.value) : "—") + " points; " + s.windowNote };
+});
+
+check("F8-the-solver-never-uses-a-chip-twice-nor-two-chips-in-one-gameweek", function () {
+  const bad = solverShapeErrors(SYN_SOLVE, CTX.nextEvent).concat(solverShapeErrors(SYN_SOLVE_CHIP, CTX_CHIP.nextEvent));
+  const s = SYN_SOLVE_CHIP;
+  const atFive = s.plan.filter(function (a) { return a.event === 5; });
+  const wanted = s.candidates.filter(function (a) { return a.event === 5; });
+  if (wanted.length < 2) bad.push("the fixture did not create two chips competing for GW5");
+  if (atFive.length > 1) bad.push("both chips were assigned to GW5");
+  return { ok: !bad.length, detail: bad.join("; ") || wanted.length + " chips want GW5 and exactly " + atFive.length +
+    " is assigned there; plan " + s.plan.map(function (a) { return a.chip + " set " + a.set + " GW" + a.event; }).join(", ") };
+});
+
+check("F8-a-chip-already-used-in-a-set-is-never-offered-again-in-that-set", function () {
+  const V = JSON.parse(JSON.stringify(SYN_CHIP));
+  V.history.chips = [{ name: "bboost", event: 2 }, { name: "wildcard", event: 3 }];
+  const c = E.buildCtx(V, SYN_STATE, SYN_NOW);
+  const s = E.chipSolver(c, {});
+  const bb = s.candidates.filter(function (x) { return x.chip === "BB" && x.set === 1; });
+  const wc = s.candidates.filter(function (x) { return x.chip === "WC" && x.set === 1; });
+  const tc = s.candidates.filter(function (x) { return x.chip === "TC" && x.set === 1; });
+  return { ok: bb.length === 0 && wc.length === 0 && tc.length === 1 && s.used.length === 2 &&
+      s.used.filter(function (u) { return u.chip === "BB" && u.set === 1; }).length === 1,
+    detail: "Bench Boost and Wildcard already played in set one → " + bb.length + " BB and " + wc.length +
+      " WC candidates left, Triple Captain still offered (" + tc.length + ")" };
+});
+
+// A calendar that runs to GW21 with a double in GW20, so the set-two expiry is a real test and
+// not an assertion about a window that cannot exist.
+const SYN_LATE = (function () {
+  const V = JSON.parse(JSON.stringify(SYN));
+  let fid = 5000;
+  for (let g = 9; g <= 21; g++) {
+    V.events.push({ id: g, name: "Gameweek " + g, deadline_time: "2026-12-" + String(g).padStart(2, "0") + "T12:30:00Z", is_current: false, is_next: false, finished: false, average_entry_score: 50 });
+    [[1, 2], [3, 4], [5, 6]].forEach(function (p) {
+      V.fixtures.push({ id: ++fid, event: g, team_h: p[0], team_a: p[1], team_h_difficulty: 3, team_a_difficulty: 3, finished: false, started: false, kickoff_time: "2026-12-" + String(g).padStart(2, "0") + "T14:00:00Z", team_h_score: null, team_a_score: null });
+    });
+  }
+  V.fixtures.push({ id: ++fid, event: 20, team_h: 2, team_a: 1, team_h_difficulty: 3, team_a_difficulty: 3, finished: false, started: false, kickoff_time: "2026-12-20T16:00:00Z", team_h_score: null, team_a_score: null });
+  return V;
+})();
+
+check("F8-a-double-inside-set-two-is-only-ever-assigned-to-a-set-two-chip", function () {
+  const c = E.buildCtx(SYN_LATE, SYN_STATE, SYN_NOW);
+  const s = E.chipSolver(c, {});
+  const bad = solverShapeErrors(s, c.nextEvent);
+  const dbl = s.doubles.filter(function (d) { return d.event === 20; })[0];
+  if (!dbl) bad.push("the GW20 double was not detected");
+  s.candidates.forEach(function (x) {
+    if (x.event === 20 && x.set !== 2) bad.push(x.chip + " offered in GW20 as a set-" + x.set + " chip");
+    if (x.set === 1 && x.event > 19) bad.push("set one offered a chip in GW" + x.event);
+  });
+  const late = s.plan.filter(function (a) { return a.event === 20; });
+  if (!late.length) bad.push("nothing was assigned to the only confirmed double");
+  late.forEach(function (a) { if (a.set !== 2) bad.push(a.chip + " assigned to GW20 from set " + a.set); });
+  return { ok: !bad.length, detail: bad.join("; ") || "GW20 double over " + (dbl ? dbl.n : 0) + " clubs; " +
+    late.map(function (a) { return a.chip + " from set " + a.set; }).join(", ") + " assigned there, and set one is confined to GW19 and earlier" };
+});
+
+check("F8-eventMult-counts-both-fixtures-of-a-double-and-nothing-on-a-blank", function () {
+  const single = E.eventMult(1, CTX_CHIP, 4);
+  const dbl = E.eventMult(1, CTX_CHIP, 5);
+  const blank = E.eventMult(1, CTX_CHIP, 6);
+  const parts = CTX_CHIP.fixturesByEvent[5].filter(function (f) { return f.team_h === 1 || f.team_a === 1; })
+    .map(function (f) { return E.fxMult(f, 1, CTX_CHIP.TS); });
+  const ok = parts.length === 2 && close(dbl, parts[0] + parts[1], 1e-12) && blank === 0 && single > 0 && dbl > single;
+  return { ok: ok, detail: "team 1: GW4 single " + r4(single) + ", GW5 double " + r4(dbl) + " (= " + parts.map(r4).join(" + ") + "), GW6 blank " + blank };
+});
+
+check("F8-bench-boost-is-the-bench-and-triple-captain-is-the-best-single-fixture", function () {
+  const bb = E.chipValue("BB", 5, CTX_CHIP, {});
+  const tc = E.chipValue("TC", 5, CTX_CHIP, {});
+  const xi = E.pickXI(CTX_CHIP.squadIds, CTX_CHIP, function (el) { return E.xpEvent(el, CTX_CHIP, 5); });
+  const benchWant = xi.bench.reduce(function (s, id) { return s + E.xpEvent(CTX_CHIP.els[id], CTX_CHIP, 5); }, 0);
+  let capWant = 0;
+  xi.ids.forEach(function (id) {
+    const el = CTX_CHIP.els[id];
+    if (el.element_type < 3 || E.isFlagged(el)) return;
+    const v = E.xpEvent(el, CTX_CHIP, 5);
+    if (v > capWant) capWant = v;
+  });
+  return { ok: bb.ok && tc.ok && close(bb.value, benchWant, 1e-9) && close(tc.value, capWant, 1e-9) && xi.bench.length === 4,
+    detail: "bench of " + xi.bench.length + " worth " + r2(bb.value) + " against " + r2(benchWant) +
+      " recomputed; best unflagged attacker " + r2(tc.value) + " against " + r2(capWant) };
+});
+
+check("F8-free-hit-is-the-best-available-eleven-minus-your-own-and-is-labelled-an-upper-bound", function () {
+  const fh = E.chipValue("FH", 6, CTX_CHIP, {});
+  const mine = E.pickXI(CTX_CHIP.squadIds, CTX_CHIP, function (el) { return E.xpEvent(el, CTX_CHIP, 6); });
+  const free = E.bestElevenForEvent(CTX_CHIP, 6, null);
+  const blanked = free.ids.filter(function (id) { return E.eventMult(CTX_CHIP.els[id].team, CTX_CHIP, 6) === 0; });
+  const legal = E.legalXI(free.ids, CTX_CHIP.els);
+  return { ok: fh.ok && free.ok && legal.ok && close(fh.value, Math.max(0, free.score - mine.score), 1e-9) && blanked.length === 0 &&
+      /upper bound/.test(fh.detail) && /budget/.test(free.note) && /three-per-club/.test(free.note),
+    detail: "best available eleven in the GW6 blank " + r2(free.score) + " (" + free.formation + ", legal " + legal.ok +
+      ") against your own " + r2(mine.score) + " → " + r2(fh.value) + "; nobody in it is blank; " + fh.detail };
+});
+
+check("F8-the-joint-solve-is-never-worse-than-taking-the-chips-one-at-a-time", function () {
+  const s = SYN_SOLVE_CHIP;
+  // The greedy answer takes the best candidate, then the best that still fits, and so on.
+  const greedy = [], gChip = {}, gEvent = {};
+  s.candidates.forEach(function (c) {
+    const k = c.set + ":" + c.chip;
+    if (gChip[k] || gEvent[c.event]) return;
+    gChip[k] = true; gEvent[c.event] = true; greedy.push(c);
+  });
+  const gTotal = greedy.reduce(function (t, c) { return t + c.value; }, 0);
+  return { ok: s.total >= gTotal - 1e-9 && s.considered > 1,
+    detail: "joint solve " + r2(s.total) + " points over " + s.plan.length + " chips against the greedy " + r2(gTotal) +
+      " over " + greedy.length + "; " + s.considered + " nodes searched" };
 });
 
 // ================================================================ E-026 — draft ↔ classic join on code
@@ -1745,11 +2287,18 @@ try { LIVE = JSON.parse(fs.readFileSync(LIVE_PATH, "utf8")); } catch (e) { LIVE 
 if (!LIVE) {
   console.log("SKIP live block — data/live.json is missing or unreadable (" + LIVE_PATH + ")");
 } else {
-  check("E026-live-59-draft-ids-differ-from-their-classic-ids", function () {
-    const byCode = {}, byId = {};
-    LIVE.elements.forEach(function (e) { byCode[e.code] = e; byId[e.id] = e; });
-    const differ = LIVE.draft.elements.filter(function (d) { const c = byCode[d.code]; return c && c.id !== d.id; });
-    return { ok: differ.length === 59, detail: differ.length + " draft ids differ from the classic id (expected 59, checked 11 Sep 2026)" };
+  // The recorded figure was 59 of 655 on 11 Sep 2026. The game added a player that evening and
+  // the tables became 656 long, which failed a constant on a snapshot that was entirely correct
+  // (E-064). The invariant is that every draft element joins by code and that the shift is real;
+  // the size of the shift is reported, not frozen. smoke_wk reconciles it against the live API.
+  check("E026-live-every-draft-element-joins-by-code-and-the-id-shift-is-real", function () {
+    const byCode = {};
+    LIVE.elements.forEach(function (e) { byCode[e.code] = e; });
+    const joined = LIVE.draft.elements.filter(function (d) { return !!byCode[d.code]; });
+    const differ = joined.filter(function (d) { return byCode[d.code].id !== d.id; });
+    return { ok: joined.length === LIVE.draft.elements.length && differ.length > 0,
+      detail: joined.length + " of " + LIVE.draft.elements.length + " draft elements join to a classic element by code; " +
+        differ.length + " of them carry a different id (59 of 655 was the figure recorded on 11 Sep 2026)" };
   });
   check("E026-joining-by-code-resolves-the-same-player-joining-by-id-does-not", function () {
     const byCode = {}, byId = {};
@@ -1998,7 +2547,7 @@ if (!LIVE) {
     const lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
     const raws = scored.map(function (m) { return m.maeRaw; });
     const rlo = Math.min.apply(null, raws), rhi = Math.max.apply(null, raws);
-    return { ok: scored.length === 8 && lo > 0 && hi <= 10 * lo,
+    return { ok: scored.length === 9 && lo > 0 && hi <= 10 * lo,
       detail: "calibrated spread " + r2(lo) + "–" + r2(hi) + " (ratio " + r2(hi / lo) + "); raw spread " + r2(rlo) + "–" + r2(rhi) + " (ratio " + r2(rhi / rlo) + ")" };
   });
   check("LIVE-the-BPS-rate-model-is-the-one-the-rescaling-moves", function () {
@@ -2008,8 +2557,8 @@ if (!LIVE) {
     return { ok: bps.maeRaw / bps.mae > 3 && bps.maeScale < 0.5 && Math.abs(bps.mae - cxp.mae) < 1 && cxp.maeRaw / cxp.mae < 1.5,
       detail: "bps_rate MAE " + r2(bps.maeRaw) + " raw → " + r2(bps.mae) + " in points (scale " + r4(bps.maeScale) + "); component_xp " + r2(cxp.maeRaw) + " → " + r2(cxp.mae) + " (scale " + r4(cxp.maeScale) + ")" };
   });
-  check("LIVE-tournament-has-eight-models-and-is-not-promotable-yet", function () {
-    return { ok: ltour.models.length === 8 && ltour.transitions === 2 && ltour.promotable === false, detail: ltour.models.length + " models · " + ltour.transitions + " transitions · promotable " + ltour.promotable + " (gate is 3, GW5 earliest)" };
+  check("LIVE-tournament-has-nine-models-and-is-not-promotable-yet", function () {
+    return { ok: ltour.models.length === 9 && ltour.transitions === 2 && ltour.promotable === false, detail: ltour.models.length + " models · " + ltour.transitions + " transitions · promotable " + ltour.promotable + " (gate is 3, GW5 earliest)" };
   });
   // E-054: CLAUDE.md Part M and data/weekly.js both carry a written tournament leader
   // ("bps_rate", recorded at v86). The engine recomputes the walk-forward from the snapshot and
@@ -2037,6 +2586,386 @@ if (!LIVE) {
     const nextEv = LIVE.events.filter(function (e) { return e.is_next; })[0];
     return { ok: !!nextEv && LCTX.deadline === nextEv.deadline_time && LCTX.nextEvent === nextEv.id, detail: "events[is_next] GW" + (nextEv ? nextEv.id : "?") + " " + (nextEv ? nextEv.deadline_time : "?") + " · ctx " + LCTX.nextEvent + " " + LCTX.deadline };
   });
+  // ================================================================ draft league (C5 · F2)
+  //
+  // Driven from qa/fixtures/draft/ — verbatim public responses recorded on 11 Sep 2026 —
+  // through data/draft_league.cjs, the same shaping function data/fetch_live.cjs runs.
+  // No suite touches the network.
+
+  const DF = require("./fixtures/draft_fixture.cjs");
+  const DF_RAW1 = DF.raw(1);
+  const DF_RAW100 = DF.raw(100);
+  const L1 = DF.withLeague(LIVE, 1, { meEntryId: 1 });
+  const L100 = DF.withLeague(LIVE, 100, {});
+  const L1_CTX = E.buildCtx(L1, LSTATE, LIVE.fetched_at);
+  const L100_CTX = E.buildCtx(L100, LSTATE, LIVE.fetched_at);
+  const NO_LEAGUE_CTX = E.buildCtx(LIVE, LSTATE, LIVE.fetched_at);
+
+  check("DRAFT-league-input-reads-an-address-an-id-and-an-entry", function () {
+    const cases = [
+      ["https://draft.premierleague.com/league/1/standings", "league", 1],
+      ["https://draft.premierleague.com/leagues/26474/details", "league", 26474],
+      ["https://draft.premierleague.com/entry/1/event/3", "entry", 1],
+      ["  1234  ", "unknown", 1234],
+      ["league 99 of mine", "unknown", 99]
+    ];
+    const bad = [];
+    cases.forEach(function (c) {
+      const r = E.draftLeagueInput(c[0]);
+      if (!r.ok || r.kind !== c[1] || r.id !== c[2]) bad.push(JSON.stringify(c[0]) + " → " + JSON.stringify(r));
+    });
+    ["", "   ", "no digits here", "12345678901234", new Array(500).join("9")].forEach(function (x) {
+      const r = E.draftLeagueInput(x);
+      if (r.ok) bad.push(JSON.stringify(String(x).slice(0, 20)) + " was accepted: " + JSON.stringify(r));
+    });
+    return { ok: bad.length === 0, detail: bad.join("; ") || cases.length + " accepted forms and 5 rejected ones all read as documented" };
+  });
+
+  check("DRAFT-fixture-league-1-shapes-into-fourteen-fifteens", function () {
+    const d = L1.draft;
+    const sizes = Object.keys(d.rosters).map(function (k) { return d.rosters[k].length; });
+    const ok = d.entries.length === 14 && Object.keys(d.rosters).length === 14 &&
+      sizes.every(function (n) { return n === 15; }) && d.counts.owned === 210 &&
+      d.freeAgents.length === d.counts.freeAgents && d.matches.length > 0 && d.standings.length === 14;
+    return { ok: ok, detail: d.entries.length + " teams, " + Object.keys(d.rosters).length + " rosters of " +
+      (sizes.join("/") || "none") + ", " + d.counts.owned + " owned, " + d.freeAgents.length + " free agents, " +
+      d.matches.length + " fixtures, " + d.standings.length + " standings rows, " + d.unjoined + " draft element(s) the snapshot cannot join" };
+  });
+
+  // E-063. element_status[].owner is an ENTRY id, not a league-entry id. The fixture proves
+  // the trap is live (three owners in league 1 are not league-entry ids at all) and that the
+  // shaped block speaks league-entry ids throughout.
+  check("E063-element-status-owner-is-an-entry-id-and-is-translated", function () {
+    const details = DF_RAW1.details, status = DF_RAW1.status;
+    const leagueEntryIds = {}; details.league_entries.forEach(function (e) { leagueEntryIds[e.id] = true; });
+    const entryToLeagueEntry = {}; details.league_entries.forEach(function (e) { if (e.entry_id) entryToLeagueEntry[e.entry_id] = e.id; });
+    const owners = {}; status.element_status.forEach(function (r) { if (r.owner !== null) owners[r.owner] = true; });
+    const rawOwners = Object.keys(owners).map(Number);
+    const trapped = rawOwners.filter(function (o) { return !leagueEntryIds[o]; });
+    if (!trapped.length) return { ok: false, detail: "the fixture no longer contains an owner that is not a league-entry id, so this check cannot prove the translation" };
+    const bad = [];
+    L1.draft.ownership.forEach(function (row) {
+      if (row.owner === null) return;
+      if (!leagueEntryIds[row.owner]) bad.push("code " + row.code + " owned by " + row.owner + ", which is not a league-entry id");
+    });
+    // and the translation lands on the right team: a trapped entry id maps to its league entry
+    trapped.forEach(function (o) {
+      const want = entryToLeagueEntry[o];
+      const got = L1.draft.rosters[String(want)];
+      if (!got || got.length !== 15) bad.push("entry id " + o + " should become league entry " + want + " with fifteen players");
+    });
+    return { ok: bad.length === 0, detail: bad.join("; ") ||
+      "raw owners " + trapped.join(", ") + " are entry ids and not league-entry ids; all " + L1.draft.ownership.filter(function (r) { return r.owner !== null; }).length +
+      " owned rows carry a league-entry id after shaping" };
+  });
+
+  check("DRAFT-pool-is-free-agents-only-and-excludes-every-rostered-code", function () {
+    const pool = E.draftPool(L1_CTX);
+    const rostered = {};
+    Object.keys(L1_CTX.draft.rosters).forEach(function (k) { L1_CTX.draft.rosters[k].forEach(function (c) { rostered[c] = k; }); });
+    const free = {}; L1_CTX.draft.freeAgents.forEach(function (c) { free[c] = true; });
+    const owned = pool.filter(function (p) { return rostered[p.code]; });
+    const notFree = pool.filter(function (p) { return !free[p.code]; });
+    // element-status "a" is claimability; elements[].status is fitness. A free agent can be
+    // claimable and injured, so the pool membership test is the first and eligibility uses both.
+    const statusBad = pool.filter(function (p) { return p.poolStatus !== "a"; });
+    const unfit = pool.filter(function (p) { return p.status !== "a"; });
+    const unfitEligible = unfit.filter(function (p) { return p.eligible; });
+    const sorted = pool.every(function (p, i) {
+      if (!i) return true;
+      const q = pool[i - 1];
+      return (Number(q.eligible) > Number(p.eligible)) || (q.eligible === p.eligible && q.ev >= p.ev - 1e-9);
+    });
+    const elig = pool.filter(function (p) { return p.eligible; });
+    const eligBad = elig.filter(function (p) { return p.starts_last3 < 3; });
+    return {
+      ok: pool.length > 0 && !owned.length && !notFree.length && !statusBad.length && sorted && !eligBad.length && !unfitEligible.length,
+      detail: pool.length + " free agents, " + elig.length + " of them with three starts of three; " +
+        owned.length + " owned by somebody, " + notFree.length + " outside the free-agent list, " + statusBad.length +
+        " not claimable; " + unfit.length + " claimable but carrying a fitness flag, of which " + unfitEligible.length +
+        " wrongly marked eligible; ranking descending within the eligible groups: " + sorted +
+        "; top three " + pool.slice(0, 3).map(function (p) { return p.web_name + " " + p.ev.toFixed(1); }).join(", ")
+    };
+  });
+
+  // A corrupted snapshot: the freeAgents list is made to contain a player the ownership map
+  // says is rostered. The pool is derived from ownership, so he must not appear — the guard
+  // this proves could not fail while the pool merely read the list (mutation-checked).
+  check("DRAFT-a-wrong-free-agent-list-cannot-put-an-owned-player-in-the-pool", function () {
+    const bent = JSON.parse(JSON.stringify(L1));
+    const victimOwner = Object.keys(bent.draft.rosters)[0];
+    const victim = bent.draft.rosters[victimOwner][0];
+    bent.draft.freeAgents = bent.draft.freeAgents.concat([victim]);
+    const c = E.buildCtx(bent, LSTATE, LIVE.fetched_at);
+    const pool = E.draftPool(c);
+    const claims = E.draftWaivers(null, c);
+    const inPool = pool.filter(function (p) { return p.code === victim; });
+    const claimed = claims.filter(function (x) { return x.in === victim; });
+    return { ok: pool.length > 0 && !inPool.length && !claimed.length,
+      detail: "code " + victim + " (owned by league entry " + victimOwner + ") was pushed into freeAgents; the pool of " +
+        pool.length + " contains him " + inPool.length + " times and the claims " + claimed.length + " times" };
+  });
+
+  check("DRAFT-a-claim-is-never-for-a-player-somebody-owns", function () {
+    const claims = E.draftWaivers(null, L1_CTX);
+    const rostered = {};
+    Object.keys(L1_CTX.draft.rosters).forEach(function (k) { L1_CTX.draft.rosters[k].forEach(function (c) { rostered[c] = Number(k); }); });
+    const me = L1_CTX.draft.me.leagueEntryId;
+    const mine = {}; (L1_CTX.draft.rosters[me] || []).forEach(function (c) { mine[c] = true; });
+    const bad = [];
+    claims.forEach(function (c) {
+      if (rostered[c.in]) bad.push(c.inName + " is owned by league entry " + rostered[c.in]);
+      if (!mine[c.out]) bad.push(c.outName + " is not on your fifteen");
+      if (c.pool !== "api") bad.push(c.inName + " was claimed from the assumed pool while a real one exists");
+      if (c.roster !== "api") bad.push("the roster behind the claim came from " + c.roster);
+    });
+    let seenUnforced = false;
+    claims.forEach(function (c) { if (c.forced && seenUnforced) bad.push("a forced replacement ranks below an upgrade"); if (!c.forced) seenUnforced = true; });
+    return { ok: claims.length > 0 && !bad.length, detail: bad.join("; ") ||
+      claims.length + " claims, all from the real pool: " + claims.map(function (c) { return c.priority + ". " + c.outName + " to " + c.inName + " " + c.gain.toFixed(1) + (c.forced ? " forced" : ""); }).join(" · ") };
+  });
+
+  check("DRAFT-waiver-order-is-the-league-s-own-waiver-pick", function () {
+    const wo = E.waiverOrder(L1_CTX);
+    const want = DF_RAW1.details.league_entries.slice().sort(function (a, b) {
+      const pa = a.waiver_pick === null || a.waiver_pick === undefined ? Infinity : a.waiver_pick;
+      const pb = b.waiver_pick === null || b.waiver_pick === undefined ? Infinity : b.waiver_pick;
+      return (pa - pb) || (a.id - b.id);
+    }).map(function (e) { return e.id; });
+    const got = wo.order.map(function (r) { return r.leagueEntryId; });
+    const meRow = DF_RAW1.details.league_entries.filter(function (e) { return e.id === L1_CTX.draft.me.leagueEntryId; })[0];
+    const minePos = want.indexOf(meRow.id) + 1;
+    const ok = wo.ok && JSON.stringify(got) === JSON.stringify(want) && wo.mine &&
+      wo.mine.position === minePos && wo.mine.of === want.length && wo.mine.waiverPick === meRow.waiver_pick;
+    return { ok: ok, detail: "order " + got.join(",") + " against the API's waiver_pick order " + want.join(",") +
+      "; you claim " + (wo.mine ? wo.mine.position + " of " + wo.mine.of + " on waiver pick " + wo.mine.waiverPick : "unknown") };
+  });
+
+  check("DRAFT-league-100-empty-seat-owns-nothing-and-claims-last", function () {
+    const seat = DF_RAW100.details.league_entries.filter(function (e) { return e.entry_id === null; })[0];
+    if (!seat) return { ok: false, detail: "the league 100 fixture no longer has a team without an entry id" };
+    const wo = E.waiverOrder(L100_CTX);
+    const last = wo.order[wo.order.length - 1];
+    const roster = E.draftRosterOf(seat.id, L100_CTX);
+    const ok = wo.ok && wo.order.length === 10 && last.leagueEntryId === seat.id && roster.length === 0 && !wo.mine;
+    return { ok: ok, detail: "league entry " + seat.id + " has no entry id, owns " + roster.length + " players and sits " +
+      (last ? last.position : "?") + " of " + wo.order.length + "; whose team is whose is unknown, so mine is " + JSON.stringify(wo.mine) };
+  });
+
+  check("DRAFT-h2h-opponent-comes-from-the-league-s-matches", function () {
+    const gw = L1_CTX.nextEvent;
+    const wanted = {};
+    DF_RAW1.details.matches.forEach(function (m) {
+      if (Number(m.event) !== gw) return;
+      wanted[m.league_entry_1] = m.league_entry_2;
+      wanted[m.league_entry_2] = m.league_entry_1;
+    });
+    const bad = [];
+    let n = 0;
+    L1.draft.entries.forEach(function (e) {
+      const snap = DF.asTeam(LIVE, 1, e.leagueEntryId);
+      const c = E.buildCtx(snap, LSTATE, LIVE.fetched_at);
+      const h = E.h2hOpponent(c, gw);
+      n++;
+      if (!h.ok) { bad.push(e.name + ": " + h.note); return; }
+      if (h.opponent.leagueEntryId !== wanted[e.leagueEntryId]) {
+        bad.push(e.name + " → " + h.opponent.leagueEntryId + ", the API says " + wanted[e.leagueEntryId]);
+      }
+    });
+    return { ok: n === 14 && !bad.length, detail: bad.join("; ") || n + " teams, every GW" + gw + " opponent matches the league's own fixture list" };
+  });
+
+  check("DRAFT-h2h-margin-is-antisymmetric-because-the-draws-are-shared", function () {
+    const gw = L1_CTX.nextEvent;
+    const margin = {};
+    L1.draft.entries.forEach(function (e) {
+      const c = E.buildCtx(DF.asTeam(LIVE, 1, e.leagueEntryId), LSTATE, LIVE.fetched_at);
+      const p = E.h2hProjection(c, {});
+      margin[e.leagueEntryId] = p.ok ? { m: p.margin, opp: p.opponent.leagueEntryId, mine: p.mine.mean, theirs: p.theirs.mean, dist: p.marginDist } : null;
+    });
+    const bad = [];
+    Object.keys(margin).forEach(function (k) {
+      const a = margin[k];
+      if (!a) { bad.push(k + " has no projection"); return; }
+      const b = margin[a.opp];
+      if (!b) { bad.push("no projection for opponent " + a.opp); return; }
+      if (Math.abs(a.m + b.m) > 1e-9) bad.push(k + " sees " + a.m.toFixed(3) + " while " + a.opp + " sees " + b.m.toFixed(3));
+      if (Math.abs(a.m - (a.mine - a.theirs)) > 1e-9) bad.push(k + ": the mean margin is not the difference of the means");
+      if (!(a.dist.q10 <= a.dist.q50 && a.dist.q50 <= a.dist.q90)) bad.push(k + ": margin quantiles are out of order");
+    });
+    const sample = margin[1];
+    return { ok: !bad.length, detail: bad.slice(0, 3).join("; ") || "seven fixtures, every margin the exact negative of its mirror; league entry 1 projects " +
+      sample.mine.toFixed(1) + " against " + sample.theirs.toFixed(1) + " (margin " + sample.m.toFixed(2) + ", tenth to ninetieth " + sample.dist.q10.toFixed(1) + " to " + sample.dist.q90.toFixed(1) + ")" };
+  });
+
+  check("DRAFT-C5-variance-rule-leans-up-when-behind-and-down-when-ahead", function () {
+    const bad = [];
+    let tilted = 0, leaned = 0;
+    L1.draft.entries.forEach(function (e) {
+      const c = E.buildCtx(DF.asTeam(LIVE, 1, e.leagueEntryId), LSTATE, LIVE.fetched_at);
+      const roster = E.draftRoster(null, c).codes;
+      const xi = E.draftXI(roster, c);
+      const plain = E.draftXIBase(roster, c);
+      if (!xi.h2h || !xi.h2h.ok) { bad.push(e.name + ": no projection"); return; }
+      const m = xi.h2h.margin;
+      const want = m < -0.5 ? "up" : (m > 0.5 ? "down" : "none");
+      if (xi.lean !== want) bad.push(e.name + ": margin " + m.toFixed(2) + " but lean " + xi.lean);
+      if (xi.lean !== "none") leaned++;
+      const sameXI = xi.ids.slice().sort().join() === plain.ids.slice().sort().join();
+      const sameBench = xi.benchIds.join() === plain.benchIds.join();
+      if (xi.tilted) {
+        tilted++;
+        if (sameXI && sameBench) bad.push(e.name + " is marked tilted but neither the eleven nor the bench changed");
+        if (xi.tiltChangedXI === sameXI) bad.push(e.name + ": tiltChangedXI says " + xi.tiltChangedXI + " while the eleven " + (sameXI ? "did not change" : "changed"));
+        if (E.legalXI(xi.ids, c.els).ok !== true) bad.push(e.name + ": the tilted eleven is not legal");
+      } else if (!sameXI || !sameBench) {
+        bad.push(e.name + " changed its side without being marked tilted");
+      }
+      if (!/(ahead|behind|level)/.test(xi.note)) bad.push(e.name + ": the note does not say which side of the projection he is on — " + xi.note);
+      if (!/(ceiling|floor|highest.expected.points)/.test(xi.note)) bad.push(e.name + ": the note does not name the direction — " + xi.note);
+    });
+    return { ok: !bad.length && leaned > 0, detail: bad.slice(0, 3).join("; ") ||
+      leaned + " of 14 teams separate on the projection and " + tilted + " of those keep a tilted eleven; every one states the direction and the quantile it was judged on" };
+  });
+
+  check("DRAFT-mcDraftXI-applies-no-captain-where-mcSquad-does", function () {
+    const roster = E.draftRoster(null, L1_CTX).codes;
+    const base = E.draftXIBase(roster, L1_CTX);
+    const ids = base.ids.concat(base.benchIds);
+    const draftRun = E.mcDraftXI(base.ids, base.benchIds, L1_CTX, 400, 5);
+    const classicRun = E.mcSquad(base.ids.concat(base.benchIds), base.ids[0], L1_CTX, 400, 5);
+    return {
+      ok: draftRun.ok && draftRun.mean > 0 && classicRun.mean > draftRun.mean && ids.length === 15,
+      detail: "fifteen players; draft run (no captain) " + draftRun.mean.toFixed(2) + ", classic run (captain doubled) " +
+        classicRun.mean.toFixed(2) + " — the captain double is the difference"
+    };
+  });
+
+  check("DRAFT-roster-comes-from-the-api-when-the-league-knows-it", function () {
+    const api = E.draftRoster(null, L1_CTX);
+    const saved = E.draftRoster(null, NO_LEAGUE_CTX);
+    const mine = L1_CTX.draft.rosters[L1_CTX.draft.me.leagueEntryId] || [];
+    return {
+      ok: api.source === "api" && api.complete && api.codes.length === 15 &&
+        JSON.stringify(api.codes) === JSON.stringify(mine) &&
+        saved.source === "saved" && saved.codes.length === (LSTATE.draft.roster || []).length,
+      detail: "with a league: " + api.codes.length + " codes from the API (" + api.note + "); without one: " +
+        saved.codes.length + " from the saved state (" + saved.note + ")"
+    };
+  });
+
+  // E-026 again, now on the league path: the 59 shifted ids must survive the ownership join.
+  check("E026-the-code-join-holds-for-every-shifted-draft-id-in-the-league", function () {
+    const byCode = {}; LIVE.elements.forEach(function (el) { byCode[el.code] = el; });
+    const byId = {}; LIVE.elements.forEach(function (el) { byId[el.id] = el; });
+    const draftById = {}; LIVE.draft.elements.forEach(function (d) { draftById[d.id] = d; });
+    const shifted = LIVE.draft.elements.filter(function (d) { const c = byCode[d.code]; return c && Number(c.id) !== Number(d.id); });
+    const ownByCode = {}; L1.draft.ownership.forEach(function (r) { ownByCode[r.code] = r; });
+    const rawByElement = {}; DF_RAW1.status.element_status.forEach(function (r) { rawByElement[r.element] = r; });
+    const bad = [];
+    let checked = 0;
+    shifted.forEach(function (d) {
+      const rawRow = rawByElement[d.id];
+      if (!rawRow) { bad.push(d.web_name + ": draft id " + d.id + " is not in the recorded element-status"); return; }
+      const shaped = ownByCode[d.code];
+      if (!shaped) { bad.push(d.web_name + ": code " + d.code + " did not survive the join"); return; }
+      // keying on the draft id instead would have named a different footballer
+      const wrong = byId[d.id];
+      if (!wrong || wrong.code === d.code) { bad.push(d.web_name + ": the fixture cannot separate the two joins"); return; }
+      checked++;
+    });
+    return { ok: shifted.length === 59 && checked === 59 && !bad.length,
+      detail: bad.slice(0, 3).join("; ") || checked + " of " + shifted.length + " shifted draft ids join by code through the league's ownership; " +
+        "worked example " + (shifted[0] ? shifted[0].web_name + " draft id " + shifted[0].id + " is classic id " + byCode[shifted[0].code].id + ", where the classic table's id " + shifted[0].id + " is " + byId[shifted[0].id].web_name : "none") };
+  });
+
+  check("DRAFT-without-a-league-id-nothing-changes", function () {
+    const c = NO_LEAGUE_CTX;
+    const pool = E.draftPool(c);
+    const own = E.draftOwnership(c);
+    const wo = E.waiverOrder(c);
+    const h = E.h2hOpponent(c, c.nextEvent);
+    const claims = E.draftWaivers(null, c);
+    const bad = [];
+    if (c.draft.hasPool) bad.push("hasPool is true without a league");
+    if (pool.length) bad.push("the pool is not empty");
+    if (own.ok) bad.push("ownership claims to be known");
+    if (wo.ok) bad.push("a waiver order was produced");
+    if (h.ok) bad.push("an opponent was produced");
+    if (!claims.length) bad.push("the documented fallback produced no claims at all");
+    claims.forEach(function (cl) { if (cl.pool !== "assumed") bad.push("a fallback claim is labelled " + cl.pool); });
+    if (!/no draft league id/.test(c.draft.note)) bad.push("the context does not say why the pool is unknown: " + c.draft.note);
+    return { ok: !bad.length, detail: bad.join("; ") || claims.length + " fallback claims, every one labelled assumed; " + c.draft.note };
+  });
+
+  // ------------------------------------------------------------ F4 / F5 / F8 on the live snapshot
+  const LWF = E.minutesWalkForward(LIVE, { bins: 5 });
+  console.log("");
+  console.log("minutes model (F4), walk-forward on the shipped snapshot:");
+  LWF.folds.forEach(function (f) {
+    console.log("  GW" + f.from + " → GW" + f.to + ": n " + f.n + " · base rate " + r4(f.baseRate) +
+      " · Laplace Brier " + r4(f.incumbent.brier) + " (skill " + r4(f.incumbent.skill) + ")" +
+      " · logistic " + (f.challenger ? r4(f.challenger.brier) + " (skill " + r4(f.challenger.skill) + ")" : "not fitted") +
+      " → " + f.winner);
+    if (f.challenger) console.log("    reliability, 5 bins: " + f.challenger.reliability.bins.map(function (b) {
+      return "[" + r2(b.lo) + "–" + r2(b.hi) + "] n " + b.n + " said " + r2(b.meanPred) + " happened " + r2(b.meanOutcome);
+    }).join(" · "));
+    console.log("    no-flag pair: Laplace " + r4(f.noFlag.incumbent) + " · logistic " + (f.noFlag.challenger === null ? "—" : r4(f.noFlag.challenger)) +
+      " · players seen before: n " + f.seenOnly.n + " Laplace " + r4(f.seenOnly.incumbent) + " logistic " + (f.seenOnly.challenger === null ? "—" : r4(f.seenOnly.challenger)));
+  });
+  console.log("  gate: " + LWF.gate.note);
+
+  check("LIVE-F4-both-models-are-scored-and-the-gate-is-shut", function () {
+    const scored = LWF.folds.filter(function (f) { return f.fitted; });
+    const ok = LWF.folds.length === 2 && LWF.comparable === 1 && LWF.gate.promotable === false &&
+      LWF.folds.every(function (f) { return f.incumbent.brier >= 0 && f.incumbent.brier <= 1; }) &&
+      scored.every(function (f) { return f.challenger.brier >= 0 && f.challenger.brier <= 1; }) &&
+      LWF.driver === "pStart";
+    return { ok: ok, detail: LWF.folds.length + " transitions, " + LWF.comparable + " of them fittable; driver " + LWF.driver +
+      "; " + LWF.gate.reasons.join("; ") };
+  });
+
+  const LPXEL = LCTX.els[LCTX.squadIds[0]] || LCTX.elList[0];
+  const LPX = E.playerXg(LPXEL, LCTX, {});
+  const lpxModel = ltour.models.filter(function (m) { return m.key === "player_xg"; })[0];
+  console.log("");
+  console.log("player xG (F5): ρ " + (lpxModel && lpxModel.spearman !== null ? r4(lpxModel.spearman) : "—") +
+    " · calibrated MAE " + (lpxModel && lpxModel.mae !== null ? r2(lpxModel.mae) + " pts" : "—") +
+    " · per transition [" + (lpxModel ? lpxModel.perTransition.map(r4).join(", ") : "") + "]" +
+    " · led " + (lpxModel ? lpxModel.wins : 0) + " of " + ltour.transitions + " · promotable " + (lpxModel ? lpxModel.promotable : "—"));
+  console.log("  every model, ρ then MAE in points: " + ltour.models.slice().sort(function (a, b) { return (b.spearman || 0) - (a.spearman || 0); })
+    .map(function (m) { return m.key + " " + (m.spearman === null ? "—" : r4(m.spearman)) + "/" + (m.mae === null ? "—" : r2(m.mae)); }).join(" · "));
+  console.log("  worked example: " + (LPXEL ? LPXEL.web_name : "no player") +
+    " xG90 " + r4(LPX.xg90) + " x att " + r4(LPX.att) + " x def " + r4(LPX.def) + " → lambda " + r4(LPX.lambda) + ", xP " + r2(LPX.xp));
+
+  check("LIVE-F5-player-xg-is-scored-and-still-cannot-be-promoted", function () {
+    if (!lpxModel) return { ok: false, detail: "player_xg is not in the live tournament" };
+    return { ok: lpxModel.spearman !== null && lpxModel.promotable === false && lpxModel.gate.transitionsOk === false &&
+        ltour.models.every(function (m) { return m.promotable === false; }),
+      detail: "player_xg ρ " + r4(lpxModel.spearman) + " leading " + lpxModel.wins + " of " + ltour.transitions +
+        " transitions; " + lpxModel.gate.reasons.join("; ") };
+  });
+
+  const LCS = E.chipSolver(LCTX, {});
+  console.log("");
+  console.log("chip solver (F8): doubles " + LCS.doubles.length + " · blanks " + LCS.blanks.length +
+    " · confirmed " + LCS.confirmed + " · plan " + (LCS.plan.length ? LCS.plan.map(function (a) { return a.chip + " set " + a.set + " GW" + a.event + " " + r2(a.value); }).join(", ") : "nothing"));
+  console.log("  " + LCS.windowNote);
+
+  check("LIVE-F8-no-window-is-confirmed-on-the-real-calendar", function () {
+    const counts = {};
+    LIVE.fixtures.forEach(function (f) {
+      if (f.event === null || f.event === undefined || f.event < LIVE.next_event) return;
+      counts[f.event + ":" + f.team_h] = (counts[f.event + ":" + f.team_h] || 0) + 1;
+      counts[f.event + ":" + f.team_a] = (counts[f.event + ":" + f.team_a] || 0) + 1;
+    });
+    const doubles = Object.keys(counts).filter(function (k) { return counts[k] >= 2; });
+    const nonWc = LCS.plan.filter(function (a) { return a.chip !== "WC"; });
+    return { ok: LCS.ok && LCS.confirmed === false && doubles.length === 0 && nonWc.length === 0 && /No window is confirmed yet/.test(LCS.windowNote),
+      detail: "every remaining club-gameweek in the published list has exactly one fixture (" + doubles.length +
+        " with two), so no Bench Boost, Triple Captain or Free Hit window exists; the solver assigns " + LCS.plan.length + " chip" + (LCS.plan.length === 1 ? "" : "s") };
+  });
+
   console.log("--- end live sanity ---");
   console.log("");
 }

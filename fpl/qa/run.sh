@@ -1,24 +1,53 @@
 #!/usr/bin/env bash
 # qa/run.sh — the full gate (CONTRACT §8, CLAUDE.md H1/H3).
 #
-#   tdz (self-test + sources) → esbuild → build → tdz (built app) → verify → unit_engine
-#       → smoke → smoke_wk → realistic → buttons → mc_full 3000 → mc_all
+#   tdz (self-test + sources) → esbuild → build → tdz (built app) → verify → validate_live → unit_engine
+#       → smoke → smoke_wk → realistic → components → buttons → webkit → mc_full → mc_all
+#
+# components is the component OUTPUT suite (qa/components.cjs): every React component rendered
+# on its own through react-dom/server from the real snapshot, then from four degraded contexts,
+# then with the 20 junk kinds in one prop slot at a time. mc_full fuzzes the components' props
+# contract; this one fuzzes what comes out.
+#
+# webkit is the Safari-engine acceptance suite (qa/webkit.js): the manager reads this app on an
+# iPhone, so the Part G gates and the storage paths are re-measured under WebKit, not only in
+# Chromium. It launches playwright.webkit directly — never `npx playwright install webkit`.
 #
 # Prints ALL PASS only when every step passed. A suite file that does not exist yet is a
 # clear FAIL line naming the missing file, never a crash — the suites are written by
 # several agents in parallel and this script has to stay runnable in between.
 #
-# Run from fpl/:  bash qa/run.sh      (npm run qa)
-# Release run:    MC_ITERS=25000 bash qa/run.sh
+# Run from fpl/:  bash qa/run.sh              (npm run qa) — mc_full at the 3000 dev count
+# Release run:    bash qa/run.sh --release    — mc_full at the 25000 release count (CLAUDE.md H3)
+#
+# A TAG IS CUT ONLY AFTER A --release RUN. The dev count is for the edit loop; the release count
+# is what actually found E-035 (binomial looping without bound) and E-036 (clamp returning NaN
+# from the helper that guarantees probabilities sit in [0,1]). Neither showed up at 3000.
+# MC_ITERS=<n> still works and overrides both.
 
 set -uo pipefail
+
+RELEASE=0
+for arg in "$@"; do
+  case "$arg" in
+    --release) RELEASE=1 ;;
+    -h|--help) echo "usage: bash qa/run.sh [--release]"; exit 0 ;;
+    *) echo "run.sh: unknown argument '$arg' (only --release is understood)"; exit 2 ;;
+  esac
+done
 
 cd "$(dirname "$0")/.." || { echo "FAIL run.sh — cannot reach the fpl/ directory"; exit 1; }
 
 APP="app/FPL_Mission_Control.jsx"
 ENGINE="src/engine.js"
 UI="src/ui.jsx"
-MC_ITERS="${MC_ITERS:-3000}"
+MC_DEV_ITERS=3000
+MC_RELEASE_ITERS=25000
+if [ "$RELEASE" -eq 1 ]; then
+  MC_ITERS="${MC_ITERS:-$MC_RELEASE_ITERS}"
+else
+  MC_ITERS="${MC_ITERS:-$MC_DEV_ITERS}"
+fi
 
 STEPS=0
 FAILED=0
@@ -156,11 +185,14 @@ fi
 # ---------------------------------------------------------------- 5-12. the suites
 
 sh_suite qa/verify.sh
+node_suite data/validate_live.cjs      # the snapshot against CONTRACT §3 (77 checks)
 node_suite qa/unit_engine.cjs
 node_suite qa/smoke.cjs
 node_suite qa/smoke_wk.cjs
 node_suite qa/realistic.cjs
+node_suite qa/components.cjs      # component output under react-dom/server, valid + degraded + junk
 node_suite qa/buttons.cjs
+node_suite qa/webkit.js
 
 # mc_full takes the iteration count as an argument and needs a deeper stack.
 STEPS=$((STEPS + 1))
@@ -181,6 +213,11 @@ node_suite qa/mc_all.cjs
 # ---------------------------------------------------------------- verdict
 
 hr
+if [ "$RELEASE" -eq 1 ]; then
+  echo "MODE release · mc_full ran at $MC_ITERS iterations (a tag is cut only after a --release run)"
+else
+  echo "MODE dev · mc_full ran at $MC_ITERS iterations · run 'bash qa/run.sh --release' ($MC_RELEASE_ITERS) before cutting a tag"
+fi
 if [ "$FAILED" -eq 0 ]; then
   echo "ALL PASS ($STEPS steps)"
   exit 0

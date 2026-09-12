@@ -1,0 +1,27 @@
+{
+  "captured_at": "2026-09-11T23:24:37Z",
+  "source": "draft.premierleague.com/api (public, unauthenticated)",
+  "files": {
+    "game.json": "https://draft.premierleague.com/api/game",
+    "league_1_details.json": "https://draft.premierleague.com/api/league/1/details",
+    "league_1_status.json": "https://draft.premierleague.com/api/league/1/element-status",
+    "entry_1_event_3.json": "https://draft.premierleague.com/api/entry/1/event/3",
+    "entry_25_event_3.json": "https://draft.premierleague.com/api/entry/25/event/3",
+    "entry_117_event_3.json": "https://draft.premierleague.com/api/entry/117/event/3",
+    "entry_137_event_3.json": "https://draft.premierleague.com/api/entry/137/event/3",
+    "entry_140_event_3.json": "https://draft.premierleague.com/api/entry/140/event/3",
+    "entry_167_event_3.json": "https://draft.premierleague.com/api/entry/167/event/3",
+    "entry_234_event_3.json": "https://draft.premierleague.com/api/entry/234/event/3",
+    "entry_251_event_3.json": "https://draft.premierleague.com/api/entry/251/event/3",
+    "entry_280_event_3.json": "https://draft.premierleague.com/api/entry/280/event/3",
+    "entry_296_event_3.json": "https://draft.premierleague.com/api/entry/296/event/3",
+    "entry_725_event_3.json": "https://draft.premierleague.com/api/entry/725/event/3",
+    "entry_1963_event_3.json": "https://draft.premierleague.com/api/entry/1963/event/3",
+    "entry_22006_event_3.json": "https://draft.premierleague.com/api/entry/22006/event/3",
+    "entry_29226_event_3.json": "https://draft.premierleague.com/api/entry/29226/event/3",
+    "entry_1_public.json": "https://draft.premierleague.com/api/entry/1/public",
+    "league_100_details.json": "https://draft.premierleague.com/api/league/100/details",
+    "league_100_status.json": "https://draft.premierleague.com/api/league/100/element-status"
+  },
+  "current_event": 3
+}

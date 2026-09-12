@@ -1,5 +1,5 @@
 {
-  "version": 87,
+  "version": 88,
   "exported_at": "2026-09-11T06:21:29Z",
   "entry": 3546875,
   "squad": [
@@ -78,6 +78,7 @@
   ],
   "draft": {
     "league_id": null,
+    "entry_id": null,
     "roster": [
       209036,
       446008,
@@ -92,9 +93,9 @@
       494521,
       489639
     ],
+    "watchlist": [],
     "roster_complete": false,
-    "roster_note": "12 of 15 known (Guéhi, Mbeumo, Gibbs-White, Rice, Igor Jesus, N.Jackson, Richarlison, Hughes, Senesi, Wilson, Truffert, Verbruggen). Three bench slots are unknown: the second goalkeeper, one defender and one further outfield player (by squad shape 2-5-5-3: 1 GKP, 2 DEF/MID/FWD short). Wilson is assumed to be the Leeds midfielder (code 153682); Brentford and Coventry also have a Wilson. Supply the draft league URL and the roster is read from the API.",
-    "watchlist": []
+    "roster_note": "12 of 15 known (Gu\u00e9hi, Mbeumo, Gibbs-White, Rice, Igor Jesus, N.Jackson, Richarlison, Hughes, Senesi, Wilson, Truffert, Verbruggen). Three bench slots are unknown: the second goalkeeper, one defender and one further outfield player (by squad shape 2-5-5-3: 1 GKP, 2 DEF/MID/FWD short). Wilson is assumed to be the Leeds midfielder (code 153682); Brentford and Coventry also have a Wilson. Supply the draft league URL and the roster is read from the API."
   },
   "ui": {
     "mode": "simple",

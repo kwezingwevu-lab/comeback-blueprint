@@ -37,6 +37,16 @@ const ENTRY = 3546875;
 const NOW = LIVE.fetched_at;
 
 const ctx = E.buildCtx(LIVE, STATE, NOW);
+
+// The draft-league half (C5 · F2), replayed from the recorded public responses in
+// qa/fixtures/draft/ through data/draft_league.cjs — the same shaping function the fetcher
+// runs. LCTX is this app on a snapshot that HAS a league; ctx is the shipped one, which has
+// none, so both halves of the honest/real split are exercised in the same suite.
+const DF = require("./fixtures/draft_fixture.cjs");
+const DF_RAW1 = DF.raw(1);
+const LIVE_L1 = DF.withLeague(LIVE, 1, { meEntryId: 1 });
+const LCTX = E.buildCtx(LIVE_L1, STATE, NOW);
+let LEAGUE_LIVE = null;
 const SELL_GAIN_MIN = 4;
 const CONVERGENCE = 0.60;
 
@@ -110,6 +120,12 @@ async function pull() {
     OFFLINE_WHY = e && e.message ? String(e.message) : String(e);
     FRESH = null;
   }
+  // The league endpoints, for the "are they still public and still shaped like this" check.
+  // League 1 is a public league used as a fixture, not the manager's own.
+  try {
+    const [details, status] = await Promise.all([getJSON(DRAFT_API + "/league/1/details"), getJSON(DRAFT_API + "/league/1/element-status")]);
+    LEAGUE_LIVE = { details: details, status: status };
+  } catch (e) { LEAGUE_LIVE = null; }
 }
 // The live view of one classic element: fresh when the API answered, the snapshot otherwise.
 function liveEl(id) {
@@ -126,7 +142,7 @@ function flaggedLive(e) { return !e || e.status !== "a" || (e.chance !== null &&
 // ---------------------------------------------------------------- the UI pass
 
 async function collectUI() {
-  const out = { ok: false, why: "", status: "", landing: "", timing: "", draftRows: [], draftText: "" };
+  const out = { ok: false, why: "", status: "", landing: "", timing: "", draftRows: [], draftText: "", poolText: "" };
   let browser = null;
   try {
     browser = await H.launch();
@@ -158,6 +174,64 @@ async function collectUI() {
       document.querySelectorAll('[data-section="df-waivers"] .row'),
       (r) => r.innerText.replace(/\s+/g, " ").trim()
     ));
+    await page.click('[data-testid="sec-df-pool"]');
+    await page.waitForFunction(() => {
+      const s = document.querySelector('[data-section="df-pool"] .sec-b');
+      return !!s && !s.hidden && s.innerText.trim().length > 0;
+    }, null, { timeout: 15000 });
+    out.poolText = await page.evaluate(() => document.querySelector('[data-section="df-pool"]').innerText);
+    out.ok = true;
+  } catch (e) {
+    out.why = e && e.message ? String(e.message) : String(e);
+  } finally {
+    if (browser) { try { await browser.close(); } catch (e) { /* nothing left to close */ } }
+  }
+  return out;
+}
+
+/* The same build, opened on a snapshot that carries a draft league. Everything read here is
+   what the manager would see once he pastes his league id. */
+async function collectDraftUI() {
+  const out = { ok: false, why: "", waiverText: "", poolText: "", poolRows: [], h2hText: "", xiText: "" };
+  let browser = null;
+  try {
+    browser = await H.launch();
+    const page = await browser.newPage();
+    await H.open(page, {
+      mode: "full", state: STATE, now: NOW, inlineData: LIVE_L1,
+      ui: { mode: "full", tab: "draft", open: {}, reveals: {} },
+      mocks: { "https://fantasy.premierleague.com/**": (route) => route.abort(), "https://api.anthropic.com/**": (route) => route.abort() }
+    });
+    await page.waitForFunction(() => {
+      const s = document.querySelector('[data-section="df-waivers"]');
+      return !!s && /waivers process/.test(s.innerText);
+    }, null, { timeout: 20000 });
+    out.waiverText = await page.evaluate(() => document.querySelector('[data-section="df-waivers"]').innerText);
+
+    await page.click('[data-testid="sec-df-pool"]');
+    await page.waitForFunction(() => {
+      const s = document.querySelector('[data-section="df-pool"] .sec-b');
+      return !!s && !s.hidden && /Unclaimed and available/.test(s.innerText);
+    }, null, { timeout: 20000 });
+    out.poolText = await page.evaluate(() => document.querySelector('[data-section="df-pool"]').innerText);
+    out.poolRows = await page.evaluate(() => Array.prototype.map.call(
+      document.querySelectorAll('[data-section="df-pool"] .row'),
+      (r) => r.innerText.replace(/\s+/g, " ").trim()
+    ));
+
+    await page.click('[data-testid="sec-df-h2h"]');
+    await page.waitForFunction(() => {
+      const s = document.querySelector('[data-section="df-h2h"] .sec-b');
+      return !!s && !s.hidden && /Projected|No head-to-head/.test(s.innerText);
+    }, null, { timeout: 30000 });
+    out.h2hText = await page.evaluate(() => document.querySelector('[data-section="df-h2h"]').innerText);
+
+    await page.click('[data-testid="sec-df-xi"]');
+    await page.waitForFunction(() => {
+      const s = document.querySelector('[data-section="df-xi"] .sec-b');
+      return !!s && !s.hidden && s.innerText.trim().length > 0;
+    }, null, { timeout: 30000 });
+    out.xiText = await page.evaluate(() => document.querySelector('[data-section="df-xi"]').innerText);
     out.ok = true;
   } catch (e) {
     out.why = e && e.message ? String(e.message) : String(e);
@@ -181,6 +255,7 @@ function sast(iso) {
 async function main() {
   await pull();
   const ui = await collectUI();
+  const dui = await collectDraftUI();          // one browser at a time (4 CPUs)
 
   // ---- 1 · the deadline the app works to is the live is_next deadline
   {
@@ -490,13 +565,36 @@ async function main() {
       claims.length + " claims, all twelve codes resolve in both tables; worked example " + (ex ? ex.web_name + " draft id " + ex.id + " vs classic id " + ctx.byCode[ex.code].id + " (keying on the draft id would give " + (wrong ? wrong.web_name : "nobody") + ")" : "none") + (bad.length ? " — " + bad.join("; ") : ""));
   }
 
-  // ---- 26 · and the size of that mismatch is what the session recorded
+  // ---- 26 · and the size of that mismatch reconciles against the live API, not a frozen number
+  //
+  // This check used to assert "59 of 655" as a constant. The game added a player on
+  // 11 September 2026 and the two tables became 656 long, so the constant failed on a
+  // snapshot that was entirely correct — a dated observation pretending to be an invariant
+  // (ERRORS.md E-064). What is actually invariant is that EVERY draft element joins to a
+  // classic element by code, and that the size of the id shift in the snapshot is the size
+  // of the id shift the live API reports right now. Both are asserted; neither is frozen.
   {
     let joined = 0, differ = 0;
     LIVE.draft.elements.forEach((d) => { const c = ctx.byCode[d.code]; if (!c) return; joined++; if (Number(c.id) !== Number(d.id)) differ++; });
-    assert("draft-ids-differ-from-classic-for-59-of-655",
-      joined === 655 && differ === 59,
-      differ + " of " + joined + " draft ids differ from the classic id (expected 59 of 655)");
+    const unjoined = LIVE.draft.elements.length - joined;
+    let liveDiffer = null, liveJoined = null;
+    if (FRESH) {
+      const byCode = new Map(FRESH.boot.elements.map((e) => [Number(e.code), e]));
+      liveDiffer = 0; liveJoined = 0;
+      FRESH.draft.elements.forEach((d) => {
+        const c = byCode.get(Number(d.code));
+        if (!c) return;
+        liveJoined++;
+        if (Number(c.id) !== Number(d.id)) liveDiffer++;
+      });
+    }
+    const reconciles = liveDiffer === null ? true : (differ === liveDiffer && Math.abs(joined - liveJoined) <= 2);
+    assert("draft-ids-differ-from-classic-and-the-count-reconciles-live",
+      joined === LIVE.draft.elements.length && unjoined === 0 && differ > 0 && reconciles,
+      differ + " of " + joined + " draft ids differ from the classic id in the snapshot (" + unjoined + " unjoined)" +
+      (liveDiffer === null ? "; the live API was unreachable, so the count was not reconciled" :
+        "; the " + SRC() + " says " + liveDiffer + " of " + liveJoined + " right now") +
+      " — 59 of 655 was the recorded figure on 11 Sep 2026, before the game added a player");
   }
 
   // ---- 27 · C5: forced replacements first, then the largest gain
@@ -590,6 +688,90 @@ async function main() {
     assert("ft-budget-respected",
       ok1 && ok2 && ok3,
       "at FT " + ctx.ft + ": " + tp.k + " transfers, hit " + tp.hits + "; forced to FT 0: " + zero.k + " transfers, hit " + zero.hits + " (" + zero.confidence + "); at FT 1: " + two.k + " transfers, hit " + two.hits);
+  }
+
+  // ---- 33 · the draft league endpoints this build depends on are still public and still shaped
+  {
+    let src = "recorded fixture (qa/fixtures/draft)", det = DF_RAW1.details, stat = DF_RAW1.status;
+    if (LEAGUE_LIVE) { src = "live draft API"; det = LEAGUE_LIVE.details; stat = LEAGUE_LIVE.status; }
+    const missing = ["league_entries", "matches", "standings"].filter((k) => !Array.isArray(det[k]));
+    const entryFields = det.league_entries && det.league_entries[0]
+      ? ["id", "entry_id", "entry_name", "waiver_pick"].filter((f) => !(f in det.league_entries[0])) : ["no entries at all"];
+    const statusRows = Array.isArray(stat.element_status) ? stat.element_status : [];
+    const statusFields = statusRows[0] ? ["element", "owner", "status"].filter((f) => !(f in statusRows[0])) : ["no element_status rows"];
+    const entryIds = new Set((det.league_entries || []).map((e) => e.entry_id).filter((x) => x !== null && x !== undefined));
+    const leagueEntryIds = new Set((det.league_entries || []).map((e) => e.id));
+    const owners = [...new Set(statusRows.map((r) => r.owner).filter((x) => x !== null))];
+    const ownersAreEntryIds = owners.length > 0 && owners.every((o) => entryIds.has(o));
+    const trapped = owners.filter((o) => !leagueEntryIds.has(o));
+    assert("draft-league-endpoints-are-public-and-shaped-as-documented",
+      !missing.length && !entryFields.length && !statusFields.length && ownersAreEntryIds,
+      src + ": league " + (det.league ? det.league.id + " " + JSON.stringify(det.league.name) : "?") + ", " +
+      (det.league_entries || []).length + " teams, " + statusRows.length + " element-status rows, " + owners.length + " owners" +
+      (missing.length ? "; missing arrays " + missing.join(",") : "") +
+      (entryFields.length ? "; missing entry fields " + entryFields.join(",") : "") +
+      (statusFields.length ? "; missing status fields " + statusFields.join(",") : "") +
+      "; owner is an entry id (E-063): " + ownersAreEntryIds + ", " + trapped.length + " of them not league-entry ids");
+  }
+
+  // ---- 34 · with a league id the Draft tab shows the real pool, in the engine's order
+  {
+    const pool = E.draftPool(LCTX);
+    const rostered = new Set();
+    Object.keys(LCTX.draft.rosters).forEach((k) => LCTX.draft.rosters[k].forEach((code) => rostered.add(code)));
+    const want = pool.slice(0, 12);
+    const rows = dui.poolRows || [];
+    const bad = [];
+    want.forEach((p, i) => {
+      const row = rows[i];
+      if (!row) { bad.push("row " + (i + 1) + " is missing"); return; }
+      if (row.indexOf(p.web_name) < 0) bad.push("row " + (i + 1) + " reads " + JSON.stringify(row) + ", the engine ranks " + p.web_name);
+      if (rostered.has(p.code)) bad.push(p.web_name + " is on somebody's fifteen");
+      if (row.indexOf(p.starts_last3 + "/3") < 0) bad.push(p.web_name + " does not carry the three-start rule on screen");
+    });
+    assert("draft-tab-shows-the-real-pool-when-a-league-id-is-present",
+      dui.ok && want.length === 12 && rows.length >= 12 && !bad.length,
+      dui.ok ? rows.length + " rows on screen against the engine's ranking of " + pool.length + " free agents; top three " +
+        want.slice(0, 3).map((p) => p.web_name + " " + p.ev.toFixed(1)).join(", ") + (bad.length ? " — " + bad.slice(0, 3).join("; ") : "") :
+        "the page did not open: " + dui.why);
+  }
+
+  // ---- 35 · and the claim order and this week's opponent, both read from the league
+  {
+    const wo = E.waiverOrder(LCTX);
+    const h = E.h2hOpponent(LCTX, LCTX.nextEvent);
+    const proj = E.h2hProjection(LCTX, {});
+    const orderLine = wo.mine ? wo.mine.position + " of " + wo.mine.of : "";
+    const oppRow = h.ok ? LCTX.draft.entryById[h.opponent.leagueEntryId] : null;
+    const oppName = oppRow ? oppRow.name : "";
+    // A failed projection is a failed check, not a thrown suite (E-052): a suite that dies
+    // half way through reports fewer assertions and reads like a smaller pass.
+    const margin = proj.ok && typeof proj.margin === "number" ? (proj.margin >= 0 ? "+" : "") + proj.margin.toFixed(1) : "";
+    const bad = [];
+    if (!wo.ok) bad.push("no waiver order: " + wo.note);
+    if (!h.ok) bad.push("no head-to-head fixture: " + h.note);
+    if (!proj.ok) bad.push("no projection: " + proj.note);
+    if (!orderLine || dui.waiverText.indexOf(orderLine) < 0) bad.push("the waivers panel does not say you claim " + (orderLine || "anything"));
+    if (!oppName || dui.h2hText.indexOf(oppName) < 0) bad.push("the head-to-head panel does not name " + (oppName || "an opponent"));
+    if (!margin || dui.h2hText.indexOf(margin) < 0) bad.push("the margin " + (margin || "(none computed)") + " is not on screen");
+    if (!/(ceiling|floor|highest expected points)/.test(dui.h2hText)) bad.push("the panel does not say which way the eleven leans");
+    assert("draft-tab-shows-the-claim-order-and-the-head-to-head",
+      dui.ok && !bad.length,
+      dui.ok ? "claim order " + (orderLine || "unknown") + ", GW" + h.gw + " against " + (oppName || "nobody") +
+        (proj.ok ? ", projected " + proj.mine.mean.toFixed(1) + " to " + proj.theirs.mean.toFixed(1) + " (margin " + margin + ", lean " + proj.lean + ")" : ", no projection") +
+        (bad.length ? " — " + bad.join("; ") : "") : "the page did not open: " + dui.why);
+  }
+
+  // ---- 36 · and without a league id it says the pool is unknown instead of guessing
+  {
+    const honest = /cannot be listed without the draft league id/.test(ui.draftText);
+    const poolNote = /unknown until a draft league id is saved/.test(ui.poolText);
+    const claims = E.draftWaivers(STATE, ctx);
+    assert("draft-tab-admits-the-pool-is-unknown-without-a-league-id",
+      ui.ok && honest && poolNote && !ctx.draft.hasPool && claims.length > 0 && claims.every((c2) => c2.pool === "assumed"),
+      ui.ok ? "waivers panel carries the honest notice: " + honest + "; free-agent panel: " +
+        JSON.stringify(ui.poolText.replace(/\s+/g, " ").trim().slice(0, 90)) + "; all " + claims.length +
+        " engine claims labelled assumed" : "the page did not open: " + ui.why);
   }
 
   const c = H.counts();

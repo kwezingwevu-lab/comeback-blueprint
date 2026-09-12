@@ -4,6 +4,13 @@
  * in the exact CONTRACT.md §3 shape. Node 22, global fetch, no dependencies.
  *
  *   node data/fetch_live.cjs                 network build
+ *   node data/fetch_live.cjs --draft-league X  also pull the draft league X: its teams,
+ *                                            ownership, rosters, free agents, fixtures
+ *                                            and table. X may be a league id, a draft
+ *                                            entry id, or the address of either — a bare
+ *                                            number is tried as a league first, then as
+ *                                            an entry. Without it the draft block keeps
+ *                                            today's shape with every league field empty.
  *   node data/fetch_live.cjs --offline DIR   same code path, but every URL is
  *                                            answered from a snapshot folder:
  *                                            bootstrap.json fixtures_all.json live{gw}.json
@@ -23,6 +30,8 @@
 
 const fs = require("fs");
 const path = require("path");
+const ENGINE = require("../src/engine.js");                 // draftLeagueInput: one parser, not two
+const { shapeDraftLeague, emptyDraftLeague } = require("./draft_league.cjs");
 
 const ENTRY = 3546875;
 const CLASSIC = "https://fantasy.premierleague.com/api";
@@ -38,6 +47,21 @@ const argv = process.argv.slice(2);
 function argOf(flag) { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] : null; }
 const OFFLINE_DIR = argOf("--offline");
 const OUT = argOf("--out") || path.join(__dirname, "live.json");
+const STATE_PATH = argOf("--state") || path.join(__dirname, "..", "state", "kwezi.json");
+
+// The draft league id: the command line first, then state/kwezi.json. Never invented — when
+// neither carries one the draft block ships with every league field empty and the app says so.
+function savedDraft() {
+  try {
+    const st = JSON.parse(fs.readFileSync(STATE_PATH, "utf8"));
+    const d = st && st.draft && typeof st.draft === "object" ? st.draft : {};
+    return { league_id: d.league_id || null, entry_id: d.entry_id || null, input: typeof d.league_input === "string" ? d.league_input : null };
+  } catch (e) { return { league_id: null, entry_id: null, input: null }; }
+}
+const SAVED = savedDraft();
+const DRAFT_INPUT = argOf("--draft-league") || SAVED.input || (SAVED.league_id ? String(SAVED.league_id) : null);
+const DRAFT_ENTRY_ARG = argOf("--draft-entry") || (SAVED.entry_id ? String(SAVED.entry_id) : null);
+const MANAGER_NAME = { first: "Kwezi", last: "Ngwevu" };
 
 // ---------------------------------------------------------------- transport
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -50,6 +74,10 @@ function offlineFile(url) {
   if (u.host === "draft.premierleague.com") {
     if (p === "/api/bootstrap-static") return "draft_bootstrap.json";
     if (p === "/api/game") return "draft_game.json";
+    if ((m = p.match(/^\/api\/league\/(\d+)\/details$/))) return `league_${m[1]}_details.json`;
+    if ((m = p.match(/^\/api\/league\/(\d+)\/element-status$/))) return `league_${m[1]}_status.json`;
+    if ((m = p.match(/^\/api\/entry\/(\d+)\/public$/))) return `entry_${m[1]}_public.json`;
+    if ((m = p.match(/^\/api\/entry\/(\d+)\/event\/(\d+)$/))) return `entry_${m[1]}_event_${m[2]}.json`;
   } else {
     if (p === "/api/bootstrap-static") return "bootstrap.json";
     if (p === "/api/fixtures") return "fixtures_all.json";
@@ -315,6 +343,62 @@ async function main() {
     })),
     league_id: null,   // unknown until the manager supplies the draft league URL
   };
+  Object.assign(draft, emptyDraftLeague());
+
+  // ---------------------------------------------------------------- draft league (optional)
+  const draftGw = Number(draftGame.current_event) || Number(current_event) || 0;
+  if (DRAFT_INPUT) {
+    const parsed = ENGINE.draftLeagueInput(DRAFT_INPUT);
+    if (!parsed.ok) {
+      warnings.push(`draft league "${DRAFT_INPUT}": ${parsed.note}`);
+    } else {
+      const tryLeague = async (id) => {
+        try { return await getJSON(`${DRAFT}/league/${id}/details`); }
+        catch (e) { return null; }
+      };
+      const viaEntry = async (id) => {
+        try {
+          const pub = await getJSON(`${DRAFT}/entry/${id}/public`);
+          const set = (pub && pub.entry && Array.isArray(pub.entry.league_set)) ? pub.entry.league_set : [];
+          return set.length ? Number(set[0]) : null;
+        } catch (e) { return null; }
+      };
+      let leagueId = null, details = null, meEntryId = Number(DRAFT_ENTRY_ARG) || null, how = "";
+      if (parsed.kind !== "entry") {
+        details = await tryLeague(parsed.id);
+        if (details) { leagueId = parsed.id; how = "league id"; }
+      }
+      if (!details) {
+        const lid = await viaEntry(parsed.id);
+        if (lid) {
+          details = await tryLeague(lid);
+          if (details) { leagueId = lid; meEntryId = meEntryId || parsed.id; how = "entry id " + parsed.id + " → league " + lid; }
+        }
+      }
+      if (!details) {
+        warnings.push(`draft league "${DRAFT_INPUT}": neither league/${parsed.id}/details nor entry/${parsed.id}/public answered`);
+      } else {
+        const status = await getJSON(`${DRAFT}/league/${leagueId}/element-status`);
+        const entryIds = (details.league_entries || []).map((e) => e.entry_id).filter((x) => x !== null && x !== undefined);
+        const picksRaw = draftGw ? await pool(entryIds, async (eid) => {
+          try { return await getJSON(`${DRAFT}/entry/${eid}/event/${draftGw}`); }
+          catch (e) { warnings.push(`draft entry ${eid} event ${draftGw}: ${e.message}`); return null; }
+        }) : [];
+        const picks = {};
+        entryIds.forEach((eid, i) => { if (picksRaw[i]) picks[String(eid)] = picksRaw[i]; });
+        const block = shapeDraftLeague({
+          details, status, picks, elements: draft.elements, leagueId,
+          meEntryId, meName: MANAGER_NAME, event: draftGw,
+        });
+        Object.assign(draft, block);
+        draft.league_id = leagueId;
+        console.error(`draft league ${leagueId} "${draft.league.name}" via ${how}: ` +
+          `${block.counts.entries} teams, ${block.counts.owned} owned, ${block.counts.freeAgents} free agents` +
+          `${block.unjoined ? `, ${block.unjoined} draft element(s) not in the bootstrap` : ""}` +
+          `${block.me ? `, your team is league entry ${block.me.leagueEntryId} (${block.me.via})` : ", your own team was not identified"}`);
+      }
+    }
+  }
 
   const out = {
     fetched_at,
@@ -354,6 +438,7 @@ async function main() {
   console.log(
     `live.json: ${teams.length} teams, ${elements.length} elements, ${fixtures.length} fixtures, gw ${Object.keys(gw).join("/")}, ` +
     `picks GW1-${pickGws.length}, ${leagues.length} leagues, ${Object.keys(rivals).length} rivals, ${draft.elements.length} draft elements, ` +
+    `draft league ${draft.league_id === null ? "none" : draft.league_id + " (" + draft.counts.entries + " teams, " + draft.counts.freeAgents + " free agents)"}, ` +
     `ft ${out.ft_available} | fetched_at ${fetched_at} | next_event ${next_event} | deadline ${nextEv ? nextEv.deadline_time : "n/a"} | ` +
     `${Buffer.byteLength(text)} bytes -> ${path.relative(process.cwd(), OUT)}${OFFLINE_DIR ? " (offline)" : ""}`
   );

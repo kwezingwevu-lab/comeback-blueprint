@@ -5,6 +5,8 @@
 # Browser note: the CI runner has no /opt/pw-browsers, so Playwright's Chromium is installed here
 # before the browser suites. qa/harness.cjs launch() must fall back to Playwright's default browser
 # when /opt/pw-browsers/chromium does not exist (CONTRACT.md §8; ERRORS.md E-027 note).
+# WebKit is installed alongside it for qa/webkit.js, the Safari-engine acceptance suite: the manager
+# reads this app on an iPhone, so the Part G gates and the storage paths are measured on both engines.
 name: fpl-gate
 
 on:
@@ -40,20 +42,31 @@ jobs:
       - name: Install (npm ci)
         run: npm ci 2>&1 | tee -a "$GATE_LOG"
 
-      - name: TDZ check
-        run: node qa/tdz_check.cjs app/FPL_Mission_Control.jsx 2>&1 | tee -a "$GATE_LOG"
+      - name: TDZ check (self-test + sources)
+        run: node qa/tdz_check.cjs --self-test 2>&1 | tee -a "$GATE_LOG" && node qa/tdz_check.cjs src/engine.js src/ui.jsx 2>&1 | tee -a "$GATE_LOG"
 
       - name: esbuild syntax gate (real bundle)
         run: npx esbuild app/FPL_Mission_Control.jsx --bundle --loader:.jsx=jsx --outfile=/tmp/mc.js 2>&1 | tee -a "$GATE_LOG"
 
+      - name: build (build.cjs -> app/ + dist/)
+        run: node build.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      - name: TDZ check (freshly built app)
+        run: node qa/tdz_check.cjs app/FPL_Mission_Control.jsx 2>&1 | tee -a "$GATE_LOG"
+
       - name: verify.sh (live reconciliation + invariants)
         run: bash qa/verify.sh 2>&1 | tee -a "$GATE_LOG"
+
+      - name: validate_live (snapshot shape)
+        run: node data/validate_live.cjs 2>&1 | tee -a "$GATE_LOG"
 
       - name: unit_engine
         run: node qa/unit_engine.cjs 2>&1 | tee -a "$GATE_LOG"
 
-      - name: Install Playwright Chromium (runner has no /opt/pw-browsers)
-        run: npx playwright install --with-deps chromium 2>&1 | tee -a "$GATE_LOG"
+      - name: Install Playwright Chromium and WebKit (runner has no /opt/pw-browsers)
+        run: |
+          npx playwright install --with-deps chromium 2>&1 | tee -a "$GATE_LOG"
+          npx playwright install --with-deps webkit 2>&1 | tee -a "$GATE_LOG"
 
       - name: smoke
         run: node qa/smoke.cjs 2>&1 | tee -a "$GATE_LOG"
@@ -64,8 +77,14 @@ jobs:
       - name: realistic
         run: node qa/realistic.cjs 2>&1 | tee -a "$GATE_LOG"
 
+      - name: components (render output)
+        run: node qa/components.cjs 2>&1 | tee -a "$GATE_LOG"
+
       - name: buttons
         run: node qa/buttons.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      - name: webkit (Safari-engine acceptance)
+        run: node qa/webkit.js 2>&1 | tee -a "$GATE_LOG"
 
       - name: mc_full 3000
         run: node --stack-size=4000 qa/mc_full.cjs 3000 2>&1 | tee -a "$GATE_LOG"

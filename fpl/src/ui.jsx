@@ -310,7 +310,7 @@ function flagList(ctx, ids) {
    the Part M claim-outs plus the XI codes that are not claim-ins. */
 
 function seedState(live) {
-  const st = { version: 87, exported_at: null, entry: null, squad: [], bank: 0, ft: 1, value: 0, confirmed_gw: 0, leagues: [], draft: { league_id: null, roster: [], watchlist: [] }, ui: { mode: "simple", tab: "command", open: {}, reveals: {} }, ledger: [], refresh: { pair: "sonnet46", last: null } };
+  const st = { version: 88, exported_at: null, entry: null, squad: [], bank: 0, ft: 1, value: 0, confirmed_gw: 0, leagues: [], draft: { league_id: null, roster: [], watchlist: [] }, ui: { mode: "simple", tab: "command", open: {}, reveals: {} }, ledger: [], refresh: { pair: "sonnet46", last: null } };
   try {
     const cur = Number(live.current_event) || 0;
     const pk = live.picks ? live.picks[cur] || live.picks[String(cur)] : null;
@@ -789,7 +789,7 @@ function MoveList(props) {
         return (
           <Row key={o.step + o.action + o.id} cols="22px minmax(0,1fr) auto">
             <span className="dim">{o.step}</span>
-            <span className="nm"><span className={tone}>{o.action === "sell" ? "Sell" : o.action === "buy" ? "Buy" : o.action === "captain" ? "Captain" : "Vice"}</span> {o.name}</span>
+            <span className="nm"><span className={tone || undefined}>{o.action === "sell" ? "Sell" : o.action === "buy" ? "Buy" : o.action === "captain" ? "Captain" : "Vice"}</span> {o.name}</span>
             <span className="rt dim">{o.price === undefined ? "" : money(o.price)}</span>
           </Row>
         );
@@ -1239,46 +1239,118 @@ function checkClaims(claims, ctx, roster) {
 function TabDraft(props) {
   const ctx = props.ctx, ui = props.ui, on = props.on, state = props.state;
   const sec = function (id) { return openOf(ui, "draft", id); };
-  const roster = state.draft.roster || [];
-  const complete = state.draft.roster_complete === true;
+  const pool = ctx.draft.hasPool;
+  const rosterInfo = draftRoster(state, ctx);
+  const roster = rosterInfo.codes;
+  const complete = rosterInfo.complete || state.draft.roster_complete === true;
   const checked = checkClaims(WEEKLY.draft.claims, ctx, roster);
   const engine = sec("df-waivers") ? draftWaivers(state, ctx) : [];
+  const free = sec("df-pool") ? draftPool(ctx) : [];
+  const order = pool ? waiverOrder(ctx) : null;
   const xi = sec("df-xi") ? draftXI(roster, ctx) : null;
+  const h2h = sec("df-h2h") ? h2hProjection(ctx, { codes: roster }) : null;
   const audit = sec("df-watch") ? watchlistAudit(state.draft.watchlist, ctx) : null;
   const wHours = ctx.draft.waiversTime ? (msOf(ctx.draft.waiversTime) - ctx.now) / 3600000 : null;
-  const [txt, setTxt] = React.useState(state.draft.league_id === null ? "" : String(state.draft.league_id));
+  const saved = state.draft.league_input || (state.draft.league_id === null ? (state.draft.entry_id === null ? "" : String(state.draft.entry_id)) : String(state.draft.league_id));
+  const [txt, setTxt] = React.useState(saved);
   const typed = txt.trim();
-  const changed = typed !== (state.draft.league_id === null ? "" : String(state.draft.league_id));
+  const parsed = draftLeagueInput(typed);
+  const changed = typed !== saved;
   return (
     <div>
-      {complete ? null : (
-        <div className="note note-w">Roster is {roster.length} of 15. Save the draft league id and the rest reads from the API.</div>
+      {pool ? null : (
+        <div className="note note-w">Roster is {roster.length} of 15 and the free agents are unknown. Save the draft league id and both read from the API.</div>
       )}
+      {pool && !complete ? (
+        <div className="note note-w">The league answers, but your fifteen is {roster.length} of 15.</div>
+      ) : null}
 
       <Section id="df-waivers" title="Waivers" open={sec("df-waivers")} onToggle={on.sec}>
         <KV k={"GW" + ctx.nextEvent + " waivers process"} v={ctx.draft.waiversTime ? sastText(ctx.draft.waiversTime) + ", " + leftLine(wHours) : "unknown"} tone={wHours !== null && wHours < 6 ? "out" : ""} />
-        {checked.map(function (c) {
-          return (
-            <Row key={c.key} cols="22px minmax(0,1fr) 46px">
-              <span className="dim">{c.priority}</span>
-              <span className="nm"><span className="out">{c.outName}</span> <span className="dim">to</span> <span className="go">{c.inName}</span></span>
-              <span className="rt">{one(c.gain)}</span>
-              <span className="mini" style={{ gridColumn: "1 / -1" }}>
-                <span className={c.forced ? "out" : "dim"}>{c.forced ? "forced" : "upgrade"}</span>
-                {c.priority === c.written ? null : <span>written {c.written}</span>}
-                {c.issues.length ? <span className="warnt">{c.issues.join("; ")}</span> : <span>valid</span>}
-              </span>
-            </Row>
-          );
-        })}
-        <div className="note">Free agents cannot be listed without the draft league id: the check above proves the players leaving are out and the players arriving start, not that they are unclaimed.</div>
-        <Reveal id="df-eng" label="What the engine would claim" open={!!ui.reveals["df-eng"]} onToggle={on.rev}>
-          {engine.length ? engine.slice(0, 6).map(function (c) {
-            return <div key={c.out + "-" + c.in}>{c.priority}. {c.outName} to {c.inName}, {one(c.gain)} — {c.why}</div>;
-          }) : <div>No claim clears the bar.</div>}
-          <div>This ranking treats every player not on your roster as available, which the pool is not. Read it as an ordering, not a list.</div>
-        </Reveal>
-        <div className="dim">Forced replacements first, then the largest gain. <Tier k="model" /> five-week xP · <Tier k="T0" /> draft status</div>
+        {pool ? <KV k="Your claim order" v={order && order.mine ? order.mine.position + " of " + order.mine.of : "not known"} /> : null}
+        {pool ? (
+          <div>
+            {engine.length ? engine.slice(0, 8).map(function (c) {
+              return (
+                <Row key={"e-" + c.out + "-" + c.in} cols="22px minmax(0,1fr) 46px">
+                  <span className="dim">{c.priority}</span>
+                  <span className="nm"><span className="out">{c.outName}</span> <span className="dim">to</span> <span className="go">{c.inName}</span></span>
+                  <span className="rt">{one(c.gain)}</span>
+                  <span className="mini" style={{ gridColumn: "1 / -1" }}>
+                    <span className={c.forced ? "out" : "dim"}>{c.forced ? "forced" : "upgrade"}</span>
+                    <span>{c.why}</span>
+                  </span>
+                </Row>
+              );
+            }) : <div className="dim">No claim clears the bar: nothing in the free agents beats what you have.</div>}
+            <div className="dim">Claimed from the league's own free agents. <Tier k="T0" /> ownership · <Tier k="model" /> five-week xP</div>
+            <Reveal id="df-written" label="The written claims, checked" open={!!ui.reveals["df-written"]} onToggle={on.rev}>
+              {checked.map(function (c) {
+                return <div key={c.key}>{c.priority}. {c.outName} to {c.inName}, {one(c.gain)}{c.issues.length ? " — " + c.issues.join("; ") : " — valid"}</div>;
+              })}
+            </Reveal>
+          </div>
+        ) : (
+          <div>
+            {checked.map(function (c) {
+              return (
+                <Row key={c.key} cols="22px minmax(0,1fr) 46px">
+                  <span className="dim">{c.priority}</span>
+                  <span className="nm"><span className="out">{c.outName}</span> <span className="dim">to</span> <span className="go">{c.inName}</span></span>
+                  <span className="rt">{one(c.gain)}</span>
+                  <span className="mini" style={{ gridColumn: "1 / -1" }}>
+                    <span className={c.forced ? "out" : "dim"}>{c.forced ? "forced" : "upgrade"}</span>
+                    {c.priority === c.written ? null : <span>written {c.written}</span>}
+                    {c.issues.length ? <span className="warnt">{c.issues.join("; ")}</span> : <span>valid</span>}
+                  </span>
+                </Row>
+              );
+            })}
+            <div className="note">Free agents cannot be listed without the draft league id: the check above proves the players leaving are out and the players arriving start, not that they are unclaimed.</div>
+            <Reveal id="df-eng" label="What the engine would claim" open={!!ui.reveals["df-eng"]} onToggle={on.rev}>
+              {engine.length ? engine.slice(0, 6).map(function (c) {
+                return <div key={c.out + "-" + c.in}>{c.priority}. {c.outName} to {c.inName}, {one(c.gain)} — {c.why}</div>;
+              }) : <div>No claim clears the bar.</div>}
+              <div>This ranking treats every player not on your roster as available, which the pool is not. Read it as an ordering, not a list.</div>
+            </Reveal>
+            <div className="dim">Forced replacements first, then the largest gain. <Tier k="model" /> five-week xP · <Tier k="T0" /> draft status</div>
+          </div>
+        )}
+      </Section>
+
+      <Section id="df-pool" title="Free agents" open={sec("df-pool")} onToggle={on.sec}>
+        {pool ? (
+          <div>
+            <KV k="Unclaimed and available" v={free.length} />
+            {free.slice(0, 12).map(function (p, i) {
+              return (
+                <Row key={"fa-" + p.code} cols="22px minmax(0,1fr) 34px 46px">
+                  <span className="dim">{i + 1}</span>
+                  <span className="nm">{p.web_name} <span className="dim">{POS_NAME[p.element_type]} {teamOf(ctx, p.id)}</span></span>
+                  <span className={"rt " + (p.eligible ? "go" : "dim")}>{p.starts_last3}/3</span>
+                  <span className="rt">{one(p.ev)}</span>
+                </Row>
+              );
+            })}
+            <div className="dim">Ranked on five-week xP times P(start). The three-start column is the watchlist rule: a name earns its place by starting the last three. <Tier k="T0" /> ownership and starts</div>
+          </div>
+        ) : (
+          <div className="dim">The pool is unknown until a draft league id is saved. Nothing is listed rather than a guess at who is unclaimed.</div>
+        )}
+      </Section>
+
+      <Section id="df-h2h" title="Head to head" open={sec("df-h2h")} onToggle={on.sec}>
+        {h2h && h2h.ok ? (
+          <div>
+            <KV k={"GW" + h2h.gw + " opponent"} v={h2h.opponent.name} />
+            <KV k="Projected" v={one(h2h.mine.mean) + " against " + one(h2h.theirs.mean)} />
+            <KV k="Margin" v={(h2h.margin >= 0 ? "+" : "") + one(h2h.margin)} tone={h2h.margin >= 0 ? "go" : "out"} />
+            <div className="dim">Tenth to ninetieth of the margin {one(h2h.marginDist.q10)} to {one(h2h.marginDist.q90)}, over {h2h.iters} draws that share each fixture between the two teams. <Tier k="model" /> Monte Carlo</div>
+            <div className="note">{h2h.lean === "up" ? "Behind on the projection: the eleven takes the higher ceiling." : h2h.lean === "down" ? "Ahead on the projection: the eleven takes the steadier floor." : "Level: the eleven is simply the highest expected points."}</div>
+          </div>
+        ) : (
+          <div className="dim">{pool ? (h2h && h2h.note ? h2h.note : "No head-to-head fixture for this gameweek.") : "No head-to-head fixture without the draft league id: this week's opponent comes from the league's own fixture list."}</div>
+        )}
       </Section>
 
       <Section id="df-xi" title="Draft XI" open={sec("df-xi")} onToggle={on.sec}>
@@ -1296,7 +1368,11 @@ function TabDraft(props) {
               );
             })}
             <div className="dim">The eleven from the roster as it stands. The claims above change it.</div>
-            <div className="note">Head to head is won by beating one opponent, not the field: when you are behind, pick the higher ceiling; when you are ahead, pick the steadier floor. No captain in this league.</div>
+            {xi.lean === "none" ? (
+              <div className="note">Head to head is won by beating one opponent, not the field: when you are behind, pick the higher ceiling; when you are ahead, pick the steadier floor. No captain in this league.</div>
+            ) : (
+              <div className="note">{xi.note}. No captain in this league.</div>
+            )}
             <div className="dim">Draft scoring gives a keeper ten for a goal where the classic game gives six; everything else matches. <Tier k="T0" /> draft rules</div>
           </div>
         ) : <div className="dim">The roster does not yet make a legal eleven.</div>}
@@ -1323,16 +1399,21 @@ function TabDraft(props) {
       </Section>
 
       <Section id="df-league" title="Draft league" open={sec("df-league")} onToggle={on.sec}>
-        <KV k="Saved id" v={state.draft.league_id === null ? "none" : state.draft.league_id} />
-        <input className="inp" data-testid="draft-league" inputMode="numeric" placeholder="League id from the draft site"
-          aria-label="Draft league id" value={txt} onChange={function (e) { setTxt(e.target.value); }} />
+        <KV k="Saved" v={saved === "" ? "none" : saved} />
+        {pool ? <KV k="Reading" v={((ctx.draft.league || {}).name || "league " + ctx.draft.leagueId) + ", " + ctx.draft.entries.length + " teams"} /> : null}
+        {pool && ctx.draft.me ? <KV k="Your team" v={(ctx.draft.entryById[ctx.draft.me.leagueEntryId] || {}).name || ctx.draft.me.leagueEntryId} /> : null}
+        <input className="inp" data-testid="draft-league" placeholder="League address, league id, or your entry id"
+          aria-label="Draft league" value={txt} onChange={function (e) { setTxt(e.target.value); }} />
+        {typed && !parsed.ok ? <div className="note note-w">{parsed.note}</div> : null}
+        {typed && parsed.ok ? <div className="dim">Read as {parsed.kind === "entry" ? "entry" : parsed.kind === "league" ? "league" : "number"} {parsed.id}: {parsed.note}</div> : null}
         {changed ? (
           <button className="btn btn-go" data-testid="draft-league-save"
-            onClick={function () { props.onLeague(typed === "" ? null : Number(typed)); }}>
+            onClick={function () { props.onLeague(typed === "" ? null : typed); }}>
             {typed === "" ? "Clear" : "Save"}
           </button>
         ) : null}
-        <div className="dim">With the id the roster, the free agents and the waiver order come from the draft API instead of being typed in.</div>
+        <div className="dim">It is the number in the address when you open the league in the draft app. Your own entry number works too.</div>
+        <div className="dim">With it the roster, the free agents, the claim order and this week's opponent come from the draft API instead of being typed in. The next refresh of the snapshot picks it up.</div>
       </Section>
     </div>
   );
@@ -1347,6 +1428,7 @@ function TabChips(props) {
   const used = (ctx.live.history && ctx.live.history.chips) || [];
   const expiry = WEEKLY.chips ? WEEKLY.chips.set1_expires_gw : 19;
   const regrets = sec("ch-regret") ? ["TC", "BB", "FH", "WC"].map(function (c) { return chipRegret(c, ctx, {}); }) : [];
+  const solve = sec("ch-solver") ? chipSolver(ctx, {}) : null;
   return (
     <div>
       <Section id="ch-now" title="Chips" open={sec("ch-now")} onToggle={on.sec}>
@@ -1358,6 +1440,44 @@ function TabChips(props) {
         <KV k="This week" v={plan.kind === "wildcard" ? "Wildcard 1" : "no chip"} tone={plan.kind === "wildcard" ? "go" : ""} />
         <div className="note">{w.recommendation.note}</div>
         <div className="dim">Windows are counted from the published fixture list, never assumed. <Tier k="T0" /> fixtures</div>
+        </Guard>
+      </Section>
+
+      <Section id="ch-solver" title="Chip solver" open={sec("ch-solver")} onToggle={on.sec}>
+        <Guard ctx={ctx} onConfirm={props.onConfirm} where="ch-solver">
+        {solve ? (
+          <div>
+            <KV k="Set one" v={"GW" + solve.sets[0].from + " to the GW" + solve.sets[0].to + " deadline"} />
+            <KV k="Set two" v={"GW" + solve.sets[1].from + " to GW" + solve.sets[1].to} />
+            <KV k="Confirmed windows" v={solve.confirmed ? solve.doubles.length + " doubles, " + solve.blanks.length + " blanks" : "none"} tone={solve.confirmed ? "go" : "out"} />
+            {solve.plan.length ? (
+              <div className="tbl">
+                <Row head cols="44px 44px 52px minmax(0,1fr)">
+                  <span>Chip</span><span className="rt">Set</span><span className="rt">GW</span><span className="rt">Worth</span>
+                </Row>
+                {solve.plan.map(function (a) {
+                  return (
+                    <Row key={"cs-" + a.set + a.chip} cols="44px 44px 52px minmax(0,1fr)">
+                      <span>{a.chip}</span>
+                      <span className="rt dim">{a.set}</span>
+                      <span className="rt">{a.event}</span>
+                      <span className="rt">{one(a.value)} pts</span>
+                    </Row>
+                  );
+                })}
+              </div>
+            ) : <div className="panel-v">Nothing is assigned.</div>}
+            <div className="note note-w">{solve.windowNote}</div>
+            <Reveal id="ch-solver-how" label="How each one is priced" open={!!ui.reveals["ch-solver-how"]} onToggle={on.rev}>
+              {solve.candidates.map(function (c) {
+                return <div key={"cw-" + c.set + c.chip + c.event}>{c.chip} in GW{c.event}, set {c.set}: {one(c.value)} points — {c.basis}. {c.detail}.</div>;
+              })}
+              <div>Bench Boost is the sum of the bench in that gameweek, Triple Captain the extra multiple on the best single fixture, Free Hit the best eleven available in a blank minus your own, and the Wildcard the deficit the timing model already computes. The Free Hit figure is an upper bound: the replacement eleven applies neither the budget nor the three-per-club cap.</div>
+              <div>The two sets are solved together, not one at a time: a chip is used once per set, inside that set's expiry, and never two chips in one gameweek.</div>
+            </Reveal>
+            <div className="dim">Doubles and blanks are counted from the published fixture list, one fixture at a time, and never assumed. <Tier k="T0" /> fixtures</div>
+          </div>
+        ) : null}
         </Guard>
       </Section>
 
@@ -1387,30 +1507,25 @@ function TabChips(props) {
 
 /* ------------------------------------------------------------------ tab: lab */
 
-/* tournament() averages Spearman over the transitions it scored and does not publish the
-   per-transition figures. Running the same engine function over each prefix of the finished
-   gameweeks gives the running mean after i transitions, and i x mean_i minus (i-1) x
-   mean_(i-1) recovers transition i exactly, because that average is arithmetic. No model is
-   recomputed here: every number comes back from the engine. */
-function tourTransitions(live) {
+/* The engine now publishes each model's per-transition Spearman (tournament().models[].
+   perTransition), so this reads the engine's own numbers rather than recovering them from the
+   running mean. Nothing is recomputed here. */
+function tourTransitions(live, tour) {
   const out = [];
   try {
-    if (!live || typeof live !== "object" || !live.gw || typeof live.gw !== "object") return out;
-    const keys = Object.keys(live.gw).map(Number).filter(function (n) { return isFinite(n); }).sort(function (a, b) { return a - b; });
-    if (keys.length < 2) return out;
-    let prev = null;
-    for (let i = 1; i < keys.length; i++) {
-      const sub = {};
-      for (let j = 0; j <= i; j++) sub[String(keys[j])] = live.gw[String(keys[j])];
-      const t = tournament(Object.assign({}, live, { gw: sub }));
-      const row = { label: keys[i - 1] + " to " + keys[i], rho: {} };
-      const means = {};
+    const t = tour && Array.isArray(tour.models) ? tour : tournament(live);
+    const keys = live && live.gw && typeof live.gw === "object"
+      ? Object.keys(live.gw).map(Number).filter(function (n) { return isFinite(n); }).sort(function (a, b) { return a - b; })
+      : [];
+    const n = Number(t.transitions) || 0;
+    for (let i = 0; i < n; i++) {
+      const from = keys[i] === undefined ? i + 1 : keys[i];
+      const to = keys[i + 1] === undefined ? from + 1 : keys[i + 1];
+      const row = { label: from + " to " + to, rho: {} };
       t.models.forEach(function (m) {
-        const p = prev && prev[m.key] !== null && prev[m.key] !== undefined ? prev[m.key] : 0;
-        row.rho[m.key] = m.spearman === null ? null : i * m.spearman - (i - 1) * p;
-        means[m.key] = m.spearman;
+        const v = Array.isArray(m.perTransition) && m.perTransition.length > i ? m.perTransition[i] : null;
+        row.rho[m.key] = v === undefined ? null : v;
       });
-      prev = means;
       out.push(row);
     }
   } catch (e) { return out; }
@@ -1421,13 +1536,16 @@ function TabLab(props) {
   const ctx = props.ctx, ui = props.ui, on = props.on, state = props.state, rf = props.refresh;
   const sec = function (id) { return openOf(ui, "lab", id); };
   const tour = sec("lab-tour") ? tournament(ctx.live) : null;
+  const mwf = sec("lab-minutes") ? minutesWalkForward(ctx.live, { bins: 5 }) : null;
+  const mfold = mwf ? mwf.folds.filter(function (f) { return f.fitted; }).slice(-1)[0] || null : null;
+  const mterms = mwf ? minutesFit(ctx.live, 0, {}).terms : [];
   const tags = sec("lab-ts") ? overUnderTags(ctx.live) : null;
   const [imp, setImp] = React.useState("");
   const [copied, setCopied] = React.useState("");
   const json = JSON.stringify(state, null, 2);
   const bars = tour ? tour.models.slice().sort(function (a, b) { return (b.spearman || 0) - (a.spearman || 0); }) : [];
   const chart = bars.filter(function (m) { return m.spearman !== null; }).map(function (m) { return { name: m.name, rho: Number((m.spearman || 0).toFixed(3)) }; });
-  const trans = tour ? tourTransitions(ctx.live) : [];
+  const trans = tour ? tourTransitions(ctx.live, tour) : [];
   const scored = bars.filter(function (m) { return m.spearman !== null; });
   const lead4 = scored.slice(0, 4);
   const spread = lead4.length > 1 ? lead4[0].spearman - lead4[lead4.length - 1].spearman : 0;
@@ -1438,6 +1556,9 @@ function TabLab(props) {
     return d > mx ? d : mx;
   }, 0) : 0;
   const transCols = "minmax(0,1fr) repeat(" + Math.max(1, trans.length) + ", 56px)";
+  const leadRow = tour ? scored.filter(function (m) { return m.key === tour.leader; })[0] || scored[0] || null : null;
+  const gateNeed = leadRow && leadRow.gate ? leadRow.gate.need : 3;
+  const gateHold = leadRow && leadRow.gate ? leadRow.gate.needHoldout : 2;
   return (
     <div>
       <Section id="lab-data" title="Data" open={sec("lab-data")} onToggle={on.sec}>
@@ -1513,11 +1634,78 @@ function TabLab(props) {
               </div>
             ) : null}
             <div className="note note-w">
-              {tour.transitions} transition{tour.transitions === 1 ? "" : "s"} is not a verdict. The four leading models sit inside {two(spread)} of one another{trans.length > 1 ? ", while a single model moves as much as " + two(swing) + " between the two transitions" : ""}, so the order in this table is not decision-grade in either direction: it is no evidence that component xP is the best model and none that it is not. It also disagrees with the figures the plan carries from version 86, where BPS rate led at 0.148 and component xP was last at 0.032. Nothing here promotes anything. The gate needs three transitions and still answers not yet, and component xP stays barred from driving a recommendation on its record of three last places until a fresh walk forward says otherwise.
+              {tour.transitions} transition{tour.transitions === 1 ? "" : "s"} is not a verdict. The four leading models sit inside {two(spread)} of one another{trans.length > 1 ? ", while a single model moves as much as " + two(swing) + " between them" : ""}, so the order in this table is not decision-grade in either direction. {leadRow ? leadRow.name + " leads the table and led " + leadRow.wins + " of the " + tour.transitions + " transitions" : "No model has been scored yet"}, and it promotes nothing: the shared gate wants {gateNeed} scored transitions, {gateNeed} of them won and a {gateHold}-gameweek hold-out, and there {tour.transitions === 1 ? "is" : "are"} {tour.transitions}. The figures the plan carries from version 86 — BPS rate leading at 0.148, component xP last at 0.032 — are not reproduced here either. Player xG is the F5 challenger and component xP is barred by E6; neither drives a recommendation, and the production xP is unchanged.
             </div>
             <div className="note">{tour.note}</div>
             <div className="dim">{tour.maeNote}</div>
             <div className="dim">Eight models score the next gameweek from data up to the last one. Promotion needs three transitions ahead, so the leader here drives nothing yet. <Tier k="model" /></div>
+          </div>
+        ) : null}
+      </Section>
+
+      <Section id="lab-minutes" title="Minutes model" open={sec("lab-minutes")} onToggle={on.sec}>
+        {mwf ? (
+          <div>
+            <KV k="Driving P(start)" v="the Laplace rate" tone="go" />
+            <KV k="Challenger" v="minutes logistic (F4)" />
+            <KV k="Transitions fitted and scored" v={mwf.comparable + " of " + mwf.folds.length} />
+            <KV k="Base rate, did he start" v={mfold ? pc(mfold.baseRate) : "—"} />
+            <div className="tbl">
+              <Row head cols="minmax(0,1fr) 56px 56px 58px">
+                <span>Brier, lower wins</span><span className="rt">Laplace</span><span className="rt">Logistic</span><span className="rt">Ahead</span>
+              </Row>
+              {mwf.folds.map(function (f) {
+                return (
+                  <Row key={"mf-" + f.from + "-" + f.to} cols="minmax(0,1fr) 56px 56px 58px">
+                    <span className="nm">GW{f.from} to GW{f.to}</span>
+                    <span className="rt">{f.incumbent ? f.incumbent.brier.toFixed(4) : "—"}</span>
+                    <span className="rt">{f.challenger ? f.challenger.brier.toFixed(4) : "not fitted"}</span>
+                    <span className={"rt " + (f.winner === "challenger" ? "go" : "dim")}>{f.winner === "not scored" ? "—" : f.winner === "challenger" ? "logistic" : f.winner}</span>
+                  </Row>
+                );
+              })}
+            </div>
+            <Reveal id="lab-min-rel" label="Reliability curve" open={!!ui.reveals["lab-min-rel"]} onToggle={on.rev}>
+              {mfold && mfold.challenger ? (
+                <div className="tbl">
+                  <Row head cols="88px 34px 50px minmax(0,1fr)">
+                    <span>Forecast</span><span className="rt">n</span><span className="rt">Said</span><span className="rt">Happened</span>
+                  </Row>
+                  {mfold.challenger.reliability.bins.map(function (b) {
+                    return (
+                      <Row key={"rb-" + b.lo} cols="88px 34px 50px minmax(0,1fr)">
+                        <span className="nm">{pc(b.lo)} to {pc(b.hi)}</span>
+                        <span className="rt">{b.n}</span>
+                        <span className="rt">{b.n ? pc(b.meanPred) : "—"}</span>
+                        <span className="rt">{b.n ? pc(b.meanOutcome) : "—"}</span>
+                      </Row>
+                    );
+                  })}
+                  <div className="dim">Largest gap between what it said and what happened: {pc(mfold.challenger.reliability.maxGap)} on GW{mfold.to}.</div>
+                </div>
+              ) : <div className="dim">No transition has been fitted yet, so there is no curve to draw.</div>}
+            </Reveal>
+            <Reveal id="lab-min-terms" label="What is in the model" open={!!ui.reveals["lab-min-terms"]} onToggle={on.rev}>
+              <div className="tbl">
+                <Row head cols="minmax(0,1fr) 62px 62px">
+                  <span>Term</span><span className="rt">Coefficient</span><span className="rt">Fitted</span>
+                </Row>
+                {mterms.map(function (t) {
+                  return (
+                    <Row key={"mt-" + t.name} cols="minmax(0,1fr) 62px 62px">
+                      <span className="nm">{t.name.replace(/_/g, " ")}</span>
+                      <span className="rt">{t.coef === null ? "—" : two(t.coef)}</span>
+                      <span className={"rt " + (t.fitted ? "" : "dim")}>{t.fitted ? "yes" : "no"}</span>
+                    </Row>
+                  );
+                })}
+              </div>
+              {mterms.filter(function (t) { return !t.fitted; }).map(function (t) {
+                return <div key={"mw-" + t.name} className="dim">{t.name.replace(/_/g, " ")}: {t.why}</div>;
+              })}
+            </Reveal>
+            <div className="note note-w">{mwf.note} Until that gate opens, every P(start) on every other screen is the Laplace rate from E1, and this panel is the only place the logistic appears.</div>
+            <div className="dim">Brier is the mean squared error of a probability forecast: 0 is perfect, the base rate alone scores {mfold ? two(mfold.baseRate * (1 - mfold.baseRate)) : "—"} here. Fit on the gameweeks up to k, score on k+1, never the other way round. <Tier k="model" /></div>
           </div>
         ) : null}
       </Section>
@@ -1698,10 +1886,24 @@ export default function App() {
     });
   }, [live, setState]);
 
-  const onLeague = React.useCallback(function (id) {
+  /* One control, three acceptable answers: the league address, the league number, or his
+     own entry number. A bare number is stored as a league id and the fetcher falls back to
+     the entry endpoint if the league one does not answer — the app itself never calls the
+     draft API (D4: the refresh path is the only network it does). */
+  const onLeague = React.useCallback(function (text) {
     setState(function (s) {
       const next = JSON.parse(JSON.stringify(s));
-      next.draft.league_id = id;
+      const raw = text === null || text === undefined ? "" : String(text).trim();
+      if (!raw) {
+        next.draft.league_id = null; next.draft.entry_id = null; next.draft.league_input = "";
+        return sanitiseState(next);
+      }
+      const p = draftLeagueInput(raw);
+      next.draft.league_input = raw;
+      if (p.ok) {
+        next.draft.league_id = p.kind === "entry" ? null : p.id;
+        next.draft.entry_id = p.kind === "entry" ? p.id : null;
+      }
       return sanitiseState(next);
     });
   }, [setState]);
