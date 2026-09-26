@@ -57,11 +57,11 @@ GitHub shows HTML files as text, so opening the file in the GitHub app does not 
 2. Repository → **Actions** → **Publish app** → **Run workflow** → Run. Wait for the green tick (about a minute).
 3. Open `https://kwezingwevu-lab.github.io/comeback-blueprint/` in Safari. It forwards to the app.
 4. Share → **Add to Home Screen**. From now on it opens full-screen like an app, and works offline after the first visit.
-5. After any build session, run **Publish app** again; the next time the phone is online the app picks up the new version by itself.
+5. After any build session, run **Publish app** again. The next time you open the app with signal, it loads the new version (it checks each time it comes back to the foreground); with no or poor signal it opens the saved copy within a few seconds.
 
 **Moving your data to the installed app (do this once).** Each web address has its own storage, and on iPhone a Home Screen app keeps its storage apart from Safari even at the same address, so logs made in another copy do not appear automatically. In the old copy: Home → Data → **Save backup to iCloud Drive**. In the installed app: Home → Data → **Restore** → pick that file.
 
-*Know what public means:* the app contains suburb-level coordinates for the calendar distances (two decimals, roughly a kilometre) and your profile defaults (age, height, starting weight). No house number and no logged data — your logs live only on the phone and in your backup files.
+*Know what public means:* the page source contains your home coordinates to three decimals (about 100 m — enough to pick out the estate, not the house) for the calendar distances, and your profile defaults (age, height, starting weight). The estate's name is no longer shown on any screen. No logged data is published — your logs live only on the phone and in your backup files. If that is more than you want public, use GitHub Pro to keep the repository private.
 
 ## Part 7 — Automatic checks on every change (CI)
 

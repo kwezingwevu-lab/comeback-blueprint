@@ -36,7 +36,7 @@ body{font-family:var(--f-body);background:var(--ink);color:var(--text);line-heig
 body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(680px 380px at 82% -10%,rgba(255,197,61,.09),transparent 60%),radial-gradient(620px 380px at 8% -5%,rgba(63,216,200,.08),transparent 58%)}
 .wrap{max-width:var(--maxw);margin:0 auto;padding:0 16px;position:relative;z-index:1}
 
-header.app{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,rgba(10,13,20,.97),rgba(10,13,20,.85));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+header.app{position:sticky;top:0;z-index:50;padding-top:env(safe-area-inset-top,0px);background:linear-gradient(180deg,rgba(10,13,20,.97),rgba(10,13,20,.85));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
 .head-inner{max-width:var(--maxw);margin:0 auto;padding:11px 16px;display:flex;align-items:center;justify-content:space-between;gap:14px}
 .brand{display:flex;align-items:center;gap:11px;min-width:0}
 .mark{width:42px;height:42px;border-radius:12px;flex:none;background:linear-gradient(135deg,var(--gold-2) 0%,var(--gold-deep) 48%,var(--cyan-deep) 100%);box-shadow:0 6px 18px rgba(255,197,61,.28),inset 0 1px 0 rgba(255,255,255,.4);display:grid;place-items:center}

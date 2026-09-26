@@ -2,7 +2,7 @@
 
 Every session adds to this list, builds everything on it that can be verified, and says plainly why the rest waits. "Shipped" means a named check in the QA suites proves it; nothing is marked shipped on the strength of reading the code.
 
-Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions; 12 queued with the reason; 6 not possible from a web app, with the honest alternative.
+Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then a 64-finding adversarial review round fixed and proven (section R); 12 queued with the reason; 6 not possible from a web app, with the honest alternative.
 
 ## A. Correctness and coherence (every tab tells the same story)
 
@@ -35,7 +35,7 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions; 12 qu
 | B2 | Region tracker: hard sets logged per region this week vs the plan, with last week beside it (calves, hamstrings, glutes, quads, lower, mid and upper back) | Shipped · X9 |
 | B3 | Strength curves: estimated 1RM per exercise straight from the Lift log, table of bests, change since first session, PB flags | Shipped · X9 |
 | B4 | Sessions record home or gym, so curves and targets never mix 15 kg bells with a barbell | Shipped · X8 |
-| B5 | Readiness: a logged night under 6 h turns the first compound into RIR 2 and drops the aggressive extra set | Shipped · X7 |
+| B5 | Readiness: a logged night under 6 h turns the first compound into RIR 2 and drops the aggressive extra set (Brief and Lift) | Shipped · X7, Y |
 | B6 | Legs & Back focus, calves four days a week incl. tibialis, region map (earlier sessions) | Shipped |
 
 ## C. Body composition and fuel
@@ -103,6 +103,17 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions; 12 qu
 | I3 | Track tabs fit at 390 px (Weight, Lifts, Regions, Tests, Tapes); five-button engine row wraps | Shipped · X9 |
 | I4 | "Fill" button no longer stretches across the Last-time box | Shipped |
 | I5 | Header subtitle truncates cleanly instead of sliding under the chips | Shipped |
+
+## R. Review round (26 Sep): 64 verified findings, all fixed
+
+| Area | Findings | Proof |
+|---|---|---|
+| Progression and history (home ranges, deload anchor, aggressive rule, location, bodyweight sets, labels, steps) | 13 | Section Y |
+| March engine (Day-1 anchor, pricing from Day 1, band slowdown, after-milestone, Cut wording, waist rule, roadmap start) | 12 | Section Y |
+| Offline app (errors and stalls fall back, cache bypass, full-asset stamp, update on resume, status-bar safe area) | 5 | PWA 10/10 |
+| Data safety (vault restore, false toast, settings reload, scans, imports, export contents) | 9 | Section Y |
+| Calendar data and helper | 13 | Section Y, helper self-test 9/9 |
+| Tests and docs honesty (mutant-proof checks, disclosures, gotchas) | 12 | Section Y, docs |
 
 ## K. Queued (not built yet) — what each needs
 

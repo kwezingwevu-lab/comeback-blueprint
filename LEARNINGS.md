@@ -31,3 +31,9 @@ See CLAUDE.md §6 for the numbered list. Additions:
 - 2026-09-26: Aggregators and organisers disagree (RaceSpace listed Hollywoodbets at James & Ethel Gray Park; the organiser says Nasrec). The organiser wins; say so in the note.
 - 2026-09-26: A one-word event name ("Vaal") matched a different race in the calendar helper; one-word names must match exactly.
 - 2026-09-26: Relative model horizons drift: projecting "months from today" made March targets shrink every week with no data. Anchor targets to Day 1.
+- 2026-09-26 (review round, 136 agents, 64 verified findings): the IndexedDB vault had never worked on a real wipe — the boot migration called DB.save() on an empty localStorage, which overwrote the vault before idbBoot read it, and idbBoot then showed a false "Restored" toast. The QA check passed only because its init script re-seeded the flag that skipped the migration. Boot code must never persist an empty state over a backup; a restore must re-check emptiness after every await.
+- 2026-09-26: Mutation-test new checks (break the code, the check must fail). Four of this session's checks passed against broken code: home-vs-gym leakage, the key whitelist, lifts-default, and export contents.
+- 2026-09-26: A target and the "last time" line on the same card must read the same history (same location, deloads excluded), or the card contradicts itself.
+- 2026-09-26: Relative targets compared with a typed-body-fat lean estimate go negative as weight rises; price routes from Day 1, not from "now".
+- 2026-09-26: innerText applies CSS text-transform — assert with case-insensitive patterns on uppercase labels.
+- 2026-09-26: A service worker's network-first page needs a timeout and must treat HTTP errors like failures, or "offline-ready" still shows a blank or error screen on bad signal.
