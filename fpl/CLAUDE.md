@@ -57,9 +57,9 @@ The manager finds it hard to know what to do each week. **The first screen tells
 Consequences the models must respect: FWD never earns a clean sheet; GKP never earns DefCon; DEF value is CS + DefCon + BPS, so a DEF's fixture matters more than a MID's; captain doubles everything including negatives.
 
 ## B2. Calendar & mechanics
-- Deadline = 90 min before the first kick-off. **GW4: Sat 12 Sep 12:30 UTC / 14:30 SAST.** Read `events[].deadline_time` every session; never hard-code.
+- Deadline = 90 min before the first kick-off. Read `events[].deadline_time` every session; never hard-code — and do not write the current one here either. A gameweek number in this file is stale within the week, and a stale master prompt misleads the next session more than no number would (E-084).
 - Free transfers: 1 per GW, bank to 5. Hit = −4 per extra. FT count comes from `entry/{id}/` and `entry/{id}/history/`.
-- Chips: Wildcard, Free Hit, Bench Boost, Triple Captain — **two sets**; set 1 expires at the GW19 deadline (2 Jan 2027 13:30 GMT). WC1 is in play this GW.
+- Chips: Wildcard, Free Hit, Bench Boost, Triple Captain — **two sets**; set 1 can be used up to the GW19 deadline. Which chips are still in hand comes from `history.chips`, never from this file: the v87/v88 plan of record recommended Wildcard 1 in GW4 and it was **not played**, so a sentence here saying it was in play would have been wrong for two gameweeks.
 - Price changes overnight (~01:30–02:30 UTC) from net transfers; sell price = purchase + half the rise, rounded down.
 - Squad: 15 = 2 GKP / 5 DEF / 5 MID / 3 FWD · ≤£100.0m · ≤3 per club · XI formations 3-4-3 … 5-4-1 with 1 GKP, ≥3 DEF, ≥2 MID, ≥1 FWD.
 - Autosubs: bench order matters; a benched player replaces a 0-minute starter if the formation stays legal.
@@ -400,3 +400,72 @@ promoted onto it (ERRORS.md E-087, open, deliberate).
 ---
 
 *Best in class here has meant one thing: nothing shown to the manager that has not been checked against the source and against the model's own record. Keep it that way.*
+
+---
+
+# PART N — THE RULES THE CODE MUST ENCODE (v110 §4, each verified)
+
+Added in v110. Every rule here is cited in the code that implements it, and the citation is the
+point: a rule in a prompt that no function names is a rule nobody applies.
+
+## N1. Classic
+
+- **Free transfers.** One more after each deadline, capped at five. A wildcard or free-hit week keeps
+  the count exactly as it was: nothing spent, nothing added (Fantasy Football Scout, 20 Jul 2026).
+  The cap is `1 + game_settings.max_extra_free_transfers`, read from bootstrap, not typed.
+- **Hits.** −4 per transfer beyond the free ones, and only once every free transfer is used.
+  The week's limit is therefore FT + 1 with one hit, capped at five — which is why the transfer
+  search is exhaustive to three swaps and greedy above it (E-090). A search limit is never allowed
+  to masquerade as a rule of the game.
+- **Chips.** Two of each. The first set can be used up to the GW19 deadline: wildcard and free hit
+  from GW2, bench boost and triple captain from GW1. One chip per gameweek.
+- **Selling price.** The price paid plus half of any rise, rounded down to £0.1m; a fall is taken in
+  full. Price paid is `now_cost − cost_change_start` for the original fifteen and `element_in_cost`
+  from `/api/entry/{id}/transfers/` for anyone bought since. A screenshot is not a source: prices
+  taken off the Transfers page went stale within days (E-088's class, and §7.13).
+- **Defensive contribution.** 10 CBIT actions for defenders, 12 for midfielders and forwards, scores
+  2 points, once per match. Goalkeepers never score it. `defensive_contribution` in the live data is
+  a **count**, not a points total.
+- **Squad.** 2/5/5/3, at most 3 per club. The eleven has 1 GK, 3–5 DEF, 2–5 MID and 1–3 FWD.
+- **Picks timing.** Classic picks for the gameweek in play publish only after the deadline is
+  processed — the endpoint answers 404 "Not found" until then. Plan from the last published squad,
+  and never treat the current gameweek's picks as known.
+- **Team strength.** The FPL `strength_*` team fields are all zero this season. Never use them.
+
+## N2. Draft
+
+- **Squad.** 2/5/5/3 with **no club limit**. Bench slot 12 is locked to a goalkeeper, there are no
+  captains, and scoring is the same as Classic.
+- **Like for like.** Every waiver claim and every trade swaps a player for one in the same position.
+  A cross-position proposal is a defect, not a suggestion (§7.3).
+- **Ownership status.** `o` owned, `a` available, `l` dropped since the last waiver run and locked
+  until the next one. Before waivers settle (`/api/game` → `waivers_processed == false`) every
+  unowned player is a **claim**; afterwards `a` players can be signed instantly until the deadline.
+  The label the app shows is phase-aware, because "sign now" for a player who can only be claimed is
+  advice that cannot be followed (§7.4).
+- **Waiver processing in this league**, reproduced 74/74 against its own log, GW2–5 (E-089):
+  - the order is reverse league standings, read from `waiver_pick` and never re-derived from the
+    table — the picks are set at the last run and the table moves;
+  - claims settle in **rounds**; each round visits managers in that order and each manager's claims
+    are tried in the order lodged until one **lands**;
+  - a claim fails "already claimed" if its target has gone — **checked first** — or "drop already
+    gone" if its drop has left the roster;
+  - **nobody moves to the bottom** after a success;
+  - a failed claim is consumed and not retried.
+- **Re-draft.** Read `league.drafts` from `/api/league/{id}/details`. The unfinished draft's `event`
+  is the first gameweek of the new rosters, so the Draft horizon is that gameweek minus one. On this
+  league it is event 21, so the horizon is GW20 — read, not assumed (§7.12).
+- **Rivals' elevens** publish at the deadline.
+
+## N3. Two games, two currencies
+
+Classic and Draft are separate games. Never add, average, net or compare a Classic figure with a
+Draft figure, and label every number the app shows with its game. The final message to the manager
+never shows the two as a sum.
+
+## N4. What this file may not contain
+
+No figure that the engine can compute. A gameweek number, a deadline, a free-transfer count, a
+league position or a price in this file is stale within the week and will be quoted by a future
+session as if it were true. Part M is the one exception, and it carries its own timestamp and the
+words "verify before trusting" for that reason.

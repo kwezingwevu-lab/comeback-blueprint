@@ -26244,16 +26244,16 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
   var Zap = createLucideIcon(__iconData15);
 
   // app/FPL_Mission_Control.jsx
-  var import_jsx_runtime = __toESM(require_jsx_runtime()), APP_VERSION = "v89", ENGINE_VERSION = "v88", SCORING = {
+  var import_jsx_runtime = __toESM(require_jsx_runtime()), APP_VERSION = "v89", ENGINE_VERSION = "v89", SCORING = {
     1: { play_short: 1, play_long: 2, goal: 6, assist: 3, cs: 4, gc_per2: -1, saves_per3: 1, pen_save: 5, pen_miss: -2, yc: -1, rc: -3, og: -2, dc: 0, dc_threshold: null, bonus: 1 },
     2: { play_short: 1, play_long: 2, goal: 6, assist: 3, cs: 4, gc_per2: -1, saves_per3: 0, pen_save: 0, pen_miss: -2, yc: -1, rc: -3, og: -2, dc: 2, dc_threshold: 10, bonus: 1 },
     3: { play_short: 1, play_long: 2, goal: 5, assist: 3, cs: 1, gc_per2: 0, saves_per3: 0, pen_save: 0, pen_miss: -2, yc: -1, rc: -3, og: -2, dc: 2, dc_threshold: 12, bonus: 1 },
     4: { play_short: 1, play_long: 2, goal: 4, assist: 3, cs: 0, gc_per2: 0, saves_per3: 0, pen_save: 0, pen_miss: -2, yc: -1, rc: -3, og: -2, dc: 2, dc_threshold: 12, bonus: 1 }
-  }, POS_NAME = { 1: "GKP", 2: "DEF", 3: "MID", 4: "FWD" }, SQUAD_SHAPE = { 1: 2, 2: 5, 3: 5, 4: 3 }, FORMATIONS = [[3, 4, 3], [3, 5, 2], [4, 3, 3], [4, 4, 2], [4, 5, 1], [5, 2, 3], [5, 3, 2], [5, 4, 1]], PRIOR_PPS = { 1: 3.2, 2: 3.4, 3: 3.9, 4: 3.8 }, BINOMIAL_MAX_N = 5e3, SHRINK_K = 4, TS_K = 6, HOME_ADV = 1.1, AWAY_ADV = 0.9, DECAY = [1, 0.82, 0.68, 0.56, 0.46], BENCH_FACTOR = 0.85, LBAR_PRIOR = 1.4, BUDGET_TENTHS = 1e3, MAX_PER_CLUB = 3, MAX_INCOMING_PER_CLUB = 2, HIT_COST = 4, MAX_SWAPS = 3, SELL_GAIN_MIN = 4, MARGIN_HIGH = 2, MARGIN_MED = 0.8, CONVERGENCE = 0.6, EDGE_MAX = 0.25, SHARED_MIN = 0.7, WC_MIN_STARTS3 = 3, WC_MIN_PSTART = 0.75, WC_BENCH_WEIGHT = 0.15, WC_TRIGGER = 20, MC_MIN_GWS_FOR_PWIN = 8, MC_MIN_ITERS = 100, MC_DRAFT_ITERS = 400, MC_SPREAD_ITERS = 200, H2H_LEAN_TOL = 0.5, TOURNAMENT_PROMOTE_AT = 3, PROMOTION_HOLDOUT_WEEKS = 2, MINUTES_FEATURES = ["intercept", "starts_last3", "minutes_trend3", "minutes_rate", "days_since_last_start"], MINUTES_MAX_DAYS = 35, MINUTES_CHALLENGER = "The minutes logistic", MINUTES_INCUMBENT = "the Laplace rate", CHIP_NAMES = ["WC", "BB", "TC", "FH"], CHIP_SETS = [{ set: 1, from: 1, to: 19 }, { set: 2, from: 20, to: 38 }], CHIP_ALIAS = { wildcard: "WC", bboost: "BB", "3xc": "TC", freehit: "FH", wc: "WC", bb: "BB", tc: "TC", fh: "FH" }, CHIP_PRICE_WINDOWS = 4, CHIP_MAX_WINDOWS = 2, CHIP_FH_POOL = 60, CHIP_SEARCH_NODES = 2e5, FT_CAP = 5, REFRESH_MAX_TOKENS = 4e3, REFRESH_PAIRS = {
+  }, POS_NAME = { 1: "GKP", 2: "DEF", 3: "MID", 4: "FWD" }, SQUAD_SHAPE = { 1: 2, 2: 5, 3: 5, 4: 3 }, FORMATIONS = [[3, 4, 3], [3, 5, 2], [4, 3, 3], [4, 4, 2], [4, 5, 1], [5, 2, 3], [5, 3, 2], [5, 4, 1]], PRIOR_PPS = { 1: 3.2, 2: 3.4, 3: 3.9, 4: 3.8 }, BINOMIAL_MAX_N = 5e3, SHRINK_K = 4, TS_K = 6, HOME_ADV = 1.1, AWAY_ADV = 0.9, DECAY = [1, 0.82, 0.68, 0.56, 0.46], BENCH_FACTOR = 0.85, LBAR_PRIOR = 1.4, BUDGET_TENTHS = 1e3, MAX_PER_CLUB = 3, MAX_INCOMING_PER_CLUB = 2, HIT_COST = 4, MAX_SWAPS = 3, MAX_GREEDY_SWAPS = 5, SELL_GAIN_MIN = 4, MARGIN_HIGH = 2, MARGIN_MED = 0.8, CONVERGENCE = 0.6, EDGE_MAX = 0.25, SHARED_MIN = 0.7, WC_MIN_STARTS3 = 3, WC_MIN_PSTART = 0.75, WC_BENCH_WEIGHT = 0.15, WC_TRIGGER = 20, MC_MIN_GWS_FOR_PWIN = 8, MC_MIN_ITERS = 100, MC_DRAFT_ITERS = 400, MC_SPREAD_ITERS = 200, H2H_LEAN_TOL = 0.5, TOURNAMENT_PROMOTE_AT = 3, PROMOTION_HOLDOUT_WEEKS = 2, MINUTES_FEATURES = ["intercept", "starts_last3", "minutes_trend3", "minutes_rate", "days_since_last_start"], MINUTES_MAX_DAYS = 35, MINUTES_CHALLENGER = "The minutes logistic", MINUTES_INCUMBENT = "the Laplace rate", CHIP_NAMES = ["WC", "BB", "TC", "FH"], CHIP_SETS = [{ set: 1, from: 1, to: 19 }, { set: 2, from: 20, to: 38 }], CHIP_ALIAS = { wildcard: "WC", bboost: "BB", "3xc": "TC", freehit: "FH", wc: "WC", bb: "BB", tc: "TC", fh: "FH" }, CHIP_PRICE_WINDOWS = 4, CHIP_MAX_WINDOWS = 2, CHIP_FH_POOL = 60, CHIP_SEARCH_NODES = 2e5, FT_CAP = 5, REFRESH_MAX_TOKENS = 4e3, REFRESH_PAIRS = {
     sonnet46: { model: "claude-sonnet-4-6", tool: "web_search_20250305" },
     sonnet5: { model: "claude-sonnet-5", tool: "web_search_20260209" },
     opus5: { model: "claude-opus-5", tool: "web_search_20260209" }
-  }, TOURNAMENT_MODELS = [
+  }, WINNABLE_MAX_SIZE = 40, WINPROB_ITERS = 400, WINPROB_TOP_N = 3, AUTOSUB_MAX_BLANKS = 4, HIER_MIN_PLAYERS = 4, HIER_MIN_SIGMA2 = 0.25, HIER_MIN_TAU2 = 1e-3, DC_DECAY_PER_DAY = 65e-4, DC_MAX_ITERS = 200, DC_TOL = 1e-9, DC_RHO_GRID = 81, PTS_DIST_MIN = -6, PTS_DIST_MAX = 34, NB_MIN_R = 0.05, NB_MAX_R = 1e6, LOG_SCORE_FLOOR = 1e-9, PMF_CACHE_STEP = 20, TOURNAMENT_MODELS = [
     { key: "season_mean", name: "Season mean" },
     { key: "last_gw", name: "Last GW" },
     { key: "per90", name: "Per 90" },
@@ -26262,7 +26262,8 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
     { key: "bps_rate", name: "BPS rate" },
     { key: "blend", name: "Blend" },
     { key: "component_xp", name: "Component xP" },
-    { key: "player_xg", name: "Player xG" }
+    { key: "player_xg", name: "Player xG" },
+    { key: "hier_pool", name: "Hierarchical pool" }
   ];
   function num(x, d) {
     var v = typeof x == "number" ? x : typeof x == "string" && x.trim() !== "" ? Number(x) : NaN;
@@ -27129,8 +27130,8 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
       squad.forEach(function(id) {
         inSquad[id] = !0;
       });
-      var maxK = Math.min(FT + 1, MAX_SWAPS);
-      forced.length > maxK && res.reasons.push(forced.length + " forced sells but at most " + maxK + " transfers this week; the lowest-xp forced sells go first"), forced.sort(function(a, b) {
+      var weekK = Math.min(FT + 1, MAX_GREEDY_SWAPS), maxK = Math.min(weekK, MAX_SWAPS);
+      res.weekLimit = weekK, res.searchLimit = maxK, forced.length > weekK && res.reasons.push(forced.length + " forced sells and the week allows " + weekK + " transfer" + (weekK === 1 ? "" : "s") + " (" + FT + " free" + (weekK > FT ? " plus one hit" : "") + "); the lowest-xp forced sells go first"), forced.sort(function(a, b) {
         return ctx.xp[a].xp5 - ctx.xp[b].xp5;
       });
       var candByPos = { 1: [], 2: [], 3: [], 4: [] };
@@ -27175,6 +27176,37 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
           rec(0, []);
         });
       }
+      if (weekK > MAX_SWAPS && plans.length) {
+        plans.sort(function(a, b) {
+          return b.value - a.value || a.k - b.k;
+        });
+        for (var grown = plans[0], gk = MAX_SWAPS + 1; gk <= weekK; gk++) {
+          var used = {};
+          grown.outs.forEach(function(id) {
+            used[id] = !0;
+          });
+          var usedIn = {};
+          grown.ins.forEach(function(id) {
+            usedIn[id] = !0;
+          });
+          var bestNext = null, stillOut = squad.filter(function(id) {
+            return !used[id] && !protectedIds[id];
+          });
+          if (stillOut.sort(function(a, b) {
+            var fa = forced.indexOf(a) >= 0 ? 0 : 1, fb = forced.indexOf(b) >= 0 ? 0 : 1;
+            return fa - fb || (ctx.xp[a] ? ctx.xp[a].xp5 : 0) - (ctx.xp[b] ? ctx.xp[b].xp5 : 0);
+          }), stillOut.slice(0, 8).forEach(function(outId) {
+            var cands = candByPos[elType(ctx.els[outId])] || [];
+            cands.slice(0, 8).forEach(function(inId) {
+              if (!usedIn[inId]) {
+                var p = evalPlan(grown.outs.concat([outId]), grown.ins.concat([inId]), gk);
+                p && (!bestNext || p.value > bestNext.value) && (bestNext = p);
+              }
+            });
+          }), !bestNext || bestNext.value <= grown.value) break;
+          plans.push(bestNext), grown = bestNext;
+        }
+      }
       plans.sort(function(a, b) {
         return b.value - a.value || a.k - b.k;
       });
@@ -27194,8 +27226,14 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
         });
         var hasForced = best.moves.some(function(m) {
           return m.forced;
+        }), keptForced = res.forced.filter(function(f) {
+          return best.outs.indexOf(f.id) < 0;
         });
-        res.margin >= MARGIN_HIGH ? res.confidence = "HIGH" : res.margin >= MARGIN_MED ? res.confidence = "MED" : res.confidence = hasForced ? "LOW" : "hold", res.confidence === "hold" && best.value <= 0 && res.reasons.push("best plan does not beat holding");
+        keptForced.length && (res.keptForced = keptForced.map(function(f) {
+          return { id: f.id, name: elName(f.id, ctx), reason: f.reason };
+        }), res.reasons.push("kept despite the flag, because the swap did not pay: " + res.keptForced.map(function(f) {
+          return f.name + " (" + f.reason + ")";
+        }).join(", "))), res.margin >= MARGIN_HIGH ? res.confidence = "HIGH" : res.margin >= MARGIN_MED ? res.confidence = "MED" : res.confidence = hasForced ? "LOW" : "hold", res.confidence === "hold" && best.value <= 0 && res.reasons.push("best plan does not beat holding");
         var ship = res.confidence !== "hold";
         !ship && hasForced && (ship = !0), ship ? (res.moves = best.moves, res.value = best.value, res.hits = best.hits, res.k = best.k, res.bankAfter = best.bankAfter, newSquad = squad.filter(function(id) {
           return best.outs.indexOf(id) < 0;
@@ -28298,6 +28336,51 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
     var n = Math.max(0, intOf(now, 0)), p = intOf(purchase, NaN);
     return !isFinite(p) || p <= 0 ? n : n > p ? p + Math.floor((n - p) / 2) : n;
   }
+  function purchasePrices(elements, transfers, squadIds) {
+    var res = { paid: {}, source: {}, bought: 0, original: 0, note: "" };
+    try {
+      var E = elMap(elements), ids = arr(squadIds).map(function(x) {
+        return intOf(x, 0);
+      }).filter(function(x) {
+        return x > 0;
+      });
+      ids.length || (ids = Object.keys(E).map(function(k) {
+        return intOf(k, 0);
+      }));
+      var log2 = arr(transfers).filter(isObj).slice().sort(function(a, b) {
+        return String(a.time || "").localeCompare(String(b.time || ""));
+      }), byTransfer = {};
+      log2.forEach(function(t) {
+        var inId = intOf(t.element_in, 0), cost = intOf(t.element_in_cost, NaN);
+        inId > 0 && isFinite(cost) && cost > 0 && (byTransfer[inId] = cost);
+      }), ids.forEach(function(id) {
+        var el2 = E[id];
+        if (isObj(el2)) {
+          var now = intOf(el2.now_cost, 0);
+          Object.prototype.hasOwnProperty.call(byTransfer, id) ? (res.paid[id] = byTransfer[id], res.source[id] = "transfer", res.bought++) : (res.paid[id] = now - intOf(el2.cost_change_start, 0), res.source[id] = "start", res.original++);
+        }
+      }), res.note = res.original + " priced from the start price, " + res.bought + " from the transfer log";
+    } catch (e) {
+      res.note = "engine error: " + errMsg(e);
+    }
+    return res;
+  }
+  function sellPrices(elements, transfers, squadIds) {
+    var out = { rows: {}, paidSource: {}, note: "" };
+    try {
+      var E = elMap(elements), pp = purchasePrices(elements, transfers, squadIds);
+      Object.keys(pp.paid).forEach(function(id) {
+        var el2 = E[id];
+        if (isObj(el2)) {
+          var now = intOf(el2.now_cost, 0), paid = intOf(pp.paid[id], 0);
+          out.rows[id] = { now, paid, sell: sellPrice(now, paid) }, out.paidSource[id] = pp.source[id];
+        }
+      }), out.note = pp.note;
+    } catch (e) {
+      out.note = "engine error: " + errMsg(e);
+    }
+    return out;
+  }
   function bankAfter(state, moves, els) {
     try {
       var st = sanitiseState(state), E = elMap(els), purchase = {};
@@ -28593,26 +28676,10 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
   function entryPoints(xi, bench, capId, viceId, sims, ctx) {
     if (!okCtx(ctx)) return 0;
     isObj(sims) || (sims = {});
-    var total = 0, starters = arr(xi).slice(), benchLeft = arr(bench).slice(), counts = posCounts(starters, ctx.els);
-    starters.forEach(function(id, i) {
-      var s = sims[id] || { pts: 0, mins: 0 };
-      if (!(s.mins > 0))
-        for (var st = elType(ctx.els[id]), j = 0; j < benchLeft.length; j++) {
-          var b = benchLeft[j], bs = sims[b] || { pts: 0, mins: 0 };
-          if (!(bs.mins <= 0)) {
-            var bt = elType(ctx.els[b]);
-            if (st === 1 || bt === 1) {
-              if (st !== bt) continue;
-            } else {
-              var c = { 2: counts[2], 3: counts[3], 4: counts[4] };
-              if (c[st]--, c[bt]++, !(c[2] >= 3 && c[3] >= 2 && c[4] >= 1)) continue;
-              counts = c;
-            }
-            starters[i] = b, benchLeft.splice(j, 1);
-            break;
-          }
-        }
-    }), starters.forEach(function(id) {
+    var total = 0, sub = autosubResolve(xi, bench, function(id) {
+      return (sims[id] || { mins: 0 }).mins > 0;
+    }, ctx), starters = sub.ok ? sub.starters : arr(xi).slice();
+    starters.forEach(function(id) {
       total += (sims[id] || { pts: 0 }).pts;
     });
     var cap = capId, capS = sims[cap] || { pts: 0, mins: 0 };
@@ -28802,8 +28869,8 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
   }
   function tournament(live) {
     var res = { models: TOURNAMENT_MODELS.map(function(m) {
-      return { key: m.key, name: m.name, spearman: null, mae: null, maeRaw: null, maeScale: null, maeCalibrated: !1, transitions: 0, perTransition: [], wins: 0, holdout: 0, gate: null, promotable: !1 };
-    }), leader: null, decidable: !1, promotable: !1, transitions: 0, transitionWinners: [], maeUnits: "points", maeNote: "", note: "" };
+      return { key: m.key, name: m.name, spearman: null, mae: null, maeRaw: null, maeScale: null, maeCalibrated: !1, transitions: 0, perTransition: [], wins: 0, holdout: 0, gate: null, promotable: !1, crps: null, logScore: null, crpsPerTransition: [], logPerTransition: [], crpsWins: 0, crpsHoldout: 0, gateCrps: null, promotableCrps: !1 };
+    }), leader: null, decidable: !1, promotable: !1, transitions: 0, transitionWinners: [], maeUnits: "points", maeNote: "", crpsLeader: null, logScoreLeader: null, promotableCrps: !1, transitionWinnersCrps: [], authoritativeMetric: "spearman", distNote: "", note: "" };
     try {
       if (!isObj(live) || !isObj(live.gw))
         return res.note = "no finished gameweeks in the snapshot", res;
@@ -28830,23 +28897,23 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
       });
       var scores = {};
       TOURNAMENT_MODELS.forEach(function(m) {
-        scores[m.key] = { rho: [], mae: [], raw: [], scale: [], uncal: 0 };
+        scores[m.key] = { rho: [], mae: [], raw: [], scale: [], uncal: 0, crps: [], logs: [] };
       });
-      for (var i = 0; i < keys.length; i++) {
+      for (var dAcc = { n: 0, sum: 0, sum2: 0 }, i = 0; i < keys.length; i++) {
         var g = keys[i], rows = isObj(live.gw[g]) && isObj(live.gw[g].elements) ? live.gw[g].elements : {}, TSprev = strengthFromCounts(tacc);
         if (i > 0) {
           var preds = {};
           TOURNAMENT_MODELS.forEach(function(m) {
             preds[m.key] = [];
           });
-          var actual = [];
-          Object.keys(rows).forEach(function(id) {
+          var actual = [], priors = [], hgroups = hierGroups(hierRowsFromAcc(acc, types));
+          if (Object.keys(rows).forEach(function(id) {
             var a = acc[id];
             if (!(!a || !a.played)) {
               var row = rows[id];
               if (!(!Array.isArray(row) || num(row[0], 0) <= 0)) {
                 var t = types[id] || 3, S = SCORING[t], seasonMean = a.pts / a.played, per90 = a.min ? a.pts / a.min * 90 : 0, w = a.played / (a.played + SHRINK_K), shrunk = w * per90 + (1 - w) * (PRIOR_PPS[t] || 3.5), bps = a.bps / a.played, ict = a.ict / a.played, component = (a.min / a.played >= 60 ? 2 : 1) + a.xg / a.played * S.goal + a.xa / a.played * S.assist + a.cs / a.played * S.cs + a.gc / a.played / 2 * S.gc_per2 + a.dcHits / a.played * S.dc + a.bonus / a.played;
-                preds.season_mean.push(seasonMean), preds.last_gw.push(a.last), preds.per90.push(per90), preds.shrunk_per90.push(shrunk), preds.ict_rate.push(ict), preds.bps_rate.push(bps), preds.blend.push((seasonMean + shrunk + bps / 10) / 3), preds.component_xp.push(component), preds.player_xg.push(playerXgPredict(a, pacc[t], t, S, fxOf[g + ":" + teamOf2[id]], TSprev)), actual.push(num(row[2], 0));
+                preds.season_mean.push(seasonMean), preds.last_gw.push(a.last), preds.per90.push(per90), preds.shrunk_per90.push(shrunk), preds.ict_rate.push(ict), preds.bps_rate.push(bps), preds.blend.push((seasonMean + shrunk + bps / 10) / 3), preds.component_xp.push(component), preds.player_xg.push(playerXgPredict(a, pacc[t], t, S, fxOf[g + ":" + teamOf2[id]], TSprev)), preds.hier_pool.push(hierPosterior({ id: num(id, 0), type: t, n: a.played, mean: seasonMean, variance: a.played >= 2 ? Math.max(0, (num(a.pts2, 0) - a.played * seasonMean * seasonMean) / (a.played - 1)) : NaN }, hgroups[t]).postMean), priors.push(seasonMean), actual.push(num(row[2], 0));
               }
             }
           }), actual.length >= 10 && TOURNAMENT_MODELS.forEach(function(m) {
@@ -28854,14 +28921,39 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
             S.rho.push(spearman(preds[m.key], actual));
             var cal = calibrateToPoints(preds[m.key], actual);
             S.mae.push(mae(cal.pred, actual)), S.raw.push(mae(preds[m.key], actual)), S.scale.push(cal.scale), cal.calibrated || S.uncal++;
-          });
+          }), actual.length >= 10) {
+            var dmean = dAcc.n ? dAcc.sum / dAcc.n : 0, dvar = dAcc.n > 1 ? Math.max(0, (dAcc.sum2 - dAcc.n * dmean * dmean) / (dAcc.n - 1)) : 0, disp = nbDispersion(dmean, dvar, PTS_DIST_MIN), priorMean = priors.length ? sum(priors) / priors.length : 0, pmfCache = {}, distOf = function(mu) {
+              var key = Math.round(num(mu, 0) * PMF_CACHE_STEP);
+              return pmfCache[key] || (pmfCache[key] = pointsPmf(key / PMF_CACHE_STEP, disp, {})), pmfCache[key];
+            };
+            TOURNAMENT_MODELS.forEach(function(m) {
+              var pv = preds[m.key], pm = 0, c = 0, q;
+              for (q = 0; q < pv.length; q++) {
+                var u = num(pv[q], NaN);
+                isFinite(u) && (pm += u, c++);
+              }
+              pm = c ? pm / c : 0;
+              var k = pm > 0 && priorMean > 0 ? priorMean / pm : 1;
+              (!isFinite(k) || k <= 0) && (k = 1);
+              var sc = 0, sl = 0, n2 = 0;
+              for (q = 0; q < pv.length && q < actual.length; q++) {
+                var mu = num(pv[q], NaN);
+                if (isFinite(mu)) {
+                  var d = distOf(mu * k);
+                  sc += crpsDiscrete(d, actual[q]), sl += logScoreDiscrete(d, actual[q]), n2++;
+                }
+              }
+              n2 && (scores[m.key].crps.push(sc / n2), scores[m.key].logs.push(sl / n2));
+            });
+          }
         }
         Object.keys(rows).forEach(function(id) {
           var row = rows[id];
           if (Array.isArray(row)) {
-            var a = acc[id] = acc[id] || { played: 0, min: 0, pts: 0, xg: 0, xa: 0, cs: 0, gc: 0, dcHits: 0, bps: 0, ict: 0, bonus: 0, last: 0 };
+            var a = acc[id] = acc[id] || { played: 0, min: 0, pts: 0, pts2: 0, xg: 0, xa: 0, cs: 0, gc: 0, dcHits: 0, bps: 0, ict: 0, bonus: 0, last: 0 };
             if (num(row[0], 0) > 0) {
-              a.played++, a.min += num(row[0], 0), a.pts += num(row[2], 0), a.xg += num(row[3], 0), a.xa += num(row[4], 0), a.cs += num(row[11], 0), a.gc += num(row[12], 0), a.bps += num(row[7], 0), a.ict += num(row[8], 0), a.bonus += num(row[13], 0);
+              var pv0 = num(row[2], 0);
+              a.pts2 = num(a.pts2, 0) + pv0 * pv0, dAcc.n++, dAcc.sum += pv0, dAcc.sum2 += pv0 * pv0, a.played++, a.min += num(row[0], 0), a.pts += num(row[2], 0), a.xg += num(row[3], 0), a.xa += num(row[4], 0), a.cs += num(row[11], 0), a.gc += num(row[12], 0), a.bps += num(row[7], 0), a.ict += num(row[8], 0), a.bonus += num(row[13], 0);
               var thr = SCORING[types[id] || 3].dc_threshold;
               thr && num(row[6], 0) >= thr && a.dcHits++;
               var pt = types[id] || 3;
@@ -28883,7 +28975,7 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
       }
       res.models.forEach(function(m) {
         var s = scores[m.key];
-        m.transitions = s.rho.length, m.perTransition = s.rho.slice(), s.rho.length && (m.spearman = sum(s.rho) / s.rho.length, m.mae = sum(s.mae) / s.mae.length, m.maeRaw = sum(s.raw) / s.raw.length, m.maeScale = sum(s.scale) / s.scale.length, m.maeCalibrated = s.uncal === 0);
+        m.transitions = s.rho.length, m.perTransition = s.rho.slice(), s.rho.length && (m.spearman = sum(s.rho) / s.rho.length, m.mae = sum(s.mae) / s.mae.length, m.maeRaw = sum(s.raw) / s.raw.length, m.maeScale = sum(s.scale) / s.scale.length, m.maeCalibrated = s.uncal === 0, m.crpsPerTransition = s.crps.slice(), m.logPerTransition = s.logs.slice(), s.crps.length && (m.crps = sum(s.crps) / s.crps.length), s.logs.length && (m.logScore = sum(s.logs) / s.logs.length));
       }), res.maeNote = "MAE is reported in points: each predictor is rescaled by mean(points) / mean(prediction) over the gameweek it was fitted on, so the column ranks accuracy and not units. maeRaw keeps the unscaled figure. Spearman needs no rescaling.", res.transitions = Math.max.apply(null, [0].concat(res.models.map(function(m) {
         return m.transitions;
       })));
@@ -28910,7 +29002,35 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
         m.wins = wins, m.holdout = trail, m.gate = promotionGate({ transitions: m.transitions, wins, holdout: trail, challenger: m.name, incumbent: "E1 xP in production" }), m.promotable = m.gate.promotable;
       }), res.promotable = res.models.some(function(m) {
         return m.promotable === !0;
-      }), res.note = res.transitions ? res.transitions + " walk-forward transition" + (res.transitions === 1 ? "" : "s") + "; promotion needs " + TOURNAMENT_PROMOTE_AT + " with a " + PROMOTION_HOLDOUT_WEEKS + "-gameweek trailing hold-out. The gate is " + (res.decidable ? "decidable" : "not decidable yet") + " and " + (res.promotable ? "one or more models have passed it" : "no model has passed it") + "." : "fewer than two finished gameweeks: no transition to score";
+      });
+      for (var cw = [], ci = 0; ci < res.transitions; ci++) {
+        var bk = null, bv = null;
+        res.models.forEach(function(m) {
+          var v = Array.isArray(m.crpsPerTransition) && m.crpsPerTransition.length > ci ? num(m.crpsPerTransition[ci], NaN) : NaN;
+          isFinite(v) && (bv === null || v < bv) && (bv = v, bk = m.key);
+        }), cw.push(bk);
+      }
+      res.transitionWinnersCrps = cw, res.models.forEach(function(m) {
+        var w = 0, tr = 0;
+        cw.forEach(function(k) {
+          k === m.key && w++;
+        });
+        for (var ti = cw.length - 1; ti >= 0 && cw[ti] === m.key; ti--)
+          tr++;
+        m.crpsWins = w, m.crpsHoldout = tr, m.gateCrps = promotionGate({ transitions: Array.isArray(m.crpsPerTransition) ? m.crpsPerTransition.length : 0, wins: w, holdout: tr, challenger: m.name + " on CRPS", incumbent: "E1 xP in production" }), m.promotableCrps = m.gateCrps.promotable;
+      }), res.promotableCrps = res.models.some(function(m) {
+        return m.promotableCrps === !0;
+      });
+      var scoredC = res.models.filter(function(m) {
+        return m.crps !== null;
+      }).sort(function(a, b) {
+        return a.crps - b.crps;
+      }), scoredL = res.models.filter(function(m) {
+        return m.logScore !== null;
+      }).sort(function(a, b) {
+        return a.logScore - b.logScore;
+      });
+      res.crpsLeader = scoredC.length ? scoredC[0].key : null, res.logScoreLeader = scoredL.length ? scoredL[0].key : null, res.distNote = scoredC.length ? "CRPS and the logarithmic score run over the whole predicted distribution (lower is better, both walk-forward). CRPS leader " + res.crpsLeader + " at " + scoredC[0].crps.toFixed(4) + "; log score leader " + res.logScoreLeader + (scoredL.length ? " at " + scoredL[0].logScore.toFixed(4) : "") + ". The gate this app promotes on is still Spearman (authoritativeMetric): the CRPS gate is published beside it as gateCrps and promotableCrps, and moving the gate onto it is its own decision with its own before-and-after." : "fewer than ten scored rows in any transition: no distributional score", res.note = res.transitions ? res.transitions + " walk-forward transition" + (res.transitions === 1 ? "" : "s") + "; promotion needs " + TOURNAMENT_PROMOTE_AT + " with a " + PROMOTION_HOLDOUT_WEEKS + "-gameweek trailing hold-out. The gate is " + (res.decidable ? "decidable" : "not decidable yet") + " and " + (res.promotable ? "one or more models have passed it" : "no model has passed it") + "." : "fewer than two finished gameweeks: no transition to score";
     } catch (e) {
       res.note = "engine error: " + errMsg(e);
     }
@@ -29690,6 +29810,1185 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
     }
     return res;
   }
+  function autosubResolve(xi, bench, playedOf, ctx) {
+    var res = { starters: [], subsIn: [], subsOut: [], ok: !1 };
+    try {
+      if (!okCtx(ctx)) return res;
+      var played = typeof playedOf == "function" ? playedOf : function() {
+        return !0;
+      }, starters = arr(xi).slice(), benchLeft = arr(bench).slice(), counts = posCounts(starters, ctx.els), ins = [], outs = [];
+      starters.forEach(function(id, i) {
+        if (!played(id))
+          for (var st = elType(ctx.els[id]), j = 0; j < benchLeft.length; j++) {
+            var b = benchLeft[j];
+            if (played(b)) {
+              var bt = elType(ctx.els[b]);
+              if (st === 1 || bt === 1) {
+                if (st !== bt) continue;
+              } else {
+                var c = { 2: counts[2], 3: counts[3], 4: counts[4] };
+                if (c[st]--, c[bt]++, !(c[2] >= 3 && c[3] >= 2 && c[4] >= 1)) continue;
+                counts = c;
+              }
+              starters[i] = b, benchLeft.splice(j, 1), ins.push(b), outs.push(id);
+              break;
+            }
+          }
+      }), res.starters = starters, res.subsIn = ins, res.subsOut = outs, res.ok = !0;
+    } catch {
+    }
+    return res;
+  }
+  function permutations(list) {
+    var src = arr(list);
+    if (src.length > 6) return [src.slice()];
+    var out = [];
+    return (function rec(rest, cur) {
+      if (!rest.length) {
+        out.push(cur.slice());
+        return;
+      }
+      for (var i = 0; i < rest.length; i++) {
+        var next = rest.slice(), v = next.splice(i, 1)[0];
+        cur.push(v), rec(next, cur), cur.pop();
+      }
+    })(src, []), out;
+  }
+  function benchPlan(squadIds, xiIds, ctx) {
+    var res = {
+      ok: !1,
+      xi: [],
+      bench: [],
+      gkSub: null,
+      order: [],
+      rows: [],
+      patterns: 0,
+      truncatedMass: 0,
+      expectedGain: 0,
+      bestGain: 0,
+      worstGain: 0,
+      orderValue: 0,
+      bestOrder: [],
+      note: ""
+    };
+    try {
+      if (!okCtx(ctx))
+        return res.note = "no context", res;
+      var squad = uniq(idList(squadIds)).filter(function(id2) {
+        return ctx.els[id2];
+      }), xi = uniq(idList(xiIds)).filter(function(id2) {
+        return ctx.els[id2] && squad.indexOf(id2) >= 0;
+      });
+      if ((xi.length !== 11 || !legalXI(xi, ctx.els).ok) && (xi = bestXI(squad, ctx).ids.slice()), xi.length !== 11)
+        return res.note = "no legal eleven to plan a bench around", res;
+      var xiSet = {};
+      xi.forEach(function(id2) {
+        xiSet[id2] = !0;
+      });
+      var bench = squad.filter(function(id2) {
+        return !xiSet[id2];
+      }), gk = bench.filter(function(id2) {
+        return elType(ctx.els[id2]) === 1;
+      }), outfield = bench.filter(function(id2) {
+        return elType(ctx.els[id2]) !== 1;
+      }).slice(0, 5);
+      res.xi = xi.slice(), res.bench = bench.slice(), res.gkSub = gk.length ? gk[0] : null;
+      var pOf = {}, eOf = {};
+      squad.forEach(function(id2) {
+        var el2 = ctx.els[id2], x = ctx.xp[id2] || { shrunk: shrunkPps(el2), pstart: pStart(el2, ctx.gwStats) };
+        pOf[id2] = clamp(num(x.pstart, 0), 0, 1), eOf[id2] = Math.max(0, num(x.shrunk, 0) * num((ctx.mults.TS[el2.team] || [0])[0], 0));
+      });
+      for (var maxBlanks = Math.min(AUTOSUB_MAX_BLANKS, xi.length), subsets = [], mass = 0, k = 0; k <= maxBlanks; k++)
+        combos(xi, k).forEach(function(set2) {
+          var pr = 1, blank = {};
+          xi.forEach(function(id2) {
+            var isB = set2.indexOf(id2) >= 0;
+            blank[id2] = isB, pr *= isB ? 1 - pOf[id2] : pOf[id2];
+          }), !(pr <= 0) && (subsets.push({ blank, p: pr }), mass += pr);
+        });
+      for (var benchAll = (res.gkSub === null ? [] : [res.gkSub]).concat(outfield), benchPatterns = [], total = 1 << benchAll.length, m = 0; m < total; m++) {
+        for (var pr2 = 1, on = {}, b = 0; b < benchAll.length; b++) {
+          var id = benchAll[b], up = (m & 1 << b) === 0;
+          on[id] = up, pr2 *= up ? pOf[id] : 1 - pOf[id];
+        }
+        pr2 > 0 && benchPatterns.push({ on, p: pr2 });
+      }
+      res.patterns = subsets.length * Math.max(1, benchPatterns.length), res.truncatedMass = clamp(1 - mass, 0, 1);
+      var evaluate = function(order) {
+        var full = (res.gkSub === null ? [] : [res.gkSub]).concat(order), gain = 0, pEnter = {};
+        return full.forEach(function(id2) {
+          pEnter[id2] = 0;
+        }), subsets.forEach(function(S) {
+          for (var anyBlank = !1, i = 0; i < xi.length; i++) if (S.blank[xi[i]]) {
+            anyBlank = !0;
+            break;
+          }
+          anyBlank && benchPatterns.forEach(function(B) {
+            var p = S.p * B.p;
+            if (!(p <= 0)) {
+              var r2 = autosubResolve(xi, full, function(id2) {
+                return S.blank[id2] !== void 0 ? !S.blank[id2] : B.on[id2] !== void 0 ? B.on[id2] : !0;
+              }, ctx);
+              r2.ok && r2.subsIn.forEach(function(id2) {
+                pEnter[id2] = num(pEnter[id2], 0) + p, gain += p * num(eOf[id2], 0);
+              });
+            }
+          });
+        }), { gain, pEnter, order: order.slice() };
+      }, planned = benchOrder(squad, xi, ctx);
+      planned.length !== outfield.length && (planned = outfield.slice());
+      var mine = evaluate(planned), best = null, worst = null;
+      permutations(outfield).forEach(function(o) {
+        var v = evaluate(o);
+        (!best || v.gain > best.gain) && (best = v), (!worst || v.gain < worst.gain) && (worst = v);
+      }), res.order = planned.slice(), res.expectedGain = mine.gain, res.bestGain = best ? best.gain : mine.gain, res.worstGain = worst ? worst.gain : mine.gain, res.bestOrder = best ? best.order.slice() : planned.slice(), res.orderValue = Math.max(0, res.bestGain - res.worstGain);
+      var counts = posCounts(xi, ctx.els);
+      benchAll.forEach(function(id2) {
+        var el2 = ctx.els[id2], bt = elType(el2), replaces = xi.filter(function(s) {
+          var st = elType(ctx.els[s]);
+          if (st === 1 || bt === 1) return st === bt;
+          var c = { 2: counts[2], 3: counts[3], 4: counts[4] };
+          return c[st]--, c[bt]++, c[2] >= 3 && c[3] >= 2 && c[4] >= 1;
+        }), pe = clamp(num(mine.pEnter[id2], 0), 0, 1);
+        res.rows.push({
+          id: id2,
+          web_name: String(el2.web_name || ""),
+          pos: POS_NAME[bt] || "?",
+          pStart: pOf[id2],
+          eGiven: eOf[id2],
+          pEnter: pe,
+          value: pe * num(eOf[id2], 0),
+          replaces: replaces.slice()
+        });
+      }), res.ok = !0, res.note = "P(comes on) is exact over " + res.patterns + " played/blanked patterns under the real autosub rules (" + (res.truncatedMass * 100).toFixed(4) + "% of the probability left out as more simultaneous blanks than the bench could cover). The bench is worth " + res.expectedGain.toFixed(2) + " expected points this gameweek and the ORDER is worth " + res.orderValue.toFixed(2) + " of that. Back-tested over the finished gameweeks the ordering has returned 0 points, because no starter has blanked (leakBacktest, ERRORS.md E-091).";
+    } catch (e) {
+      res.note = "engine error: " + errMsg(e);
+    }
+    return res;
+  }
+  function picksOf(live, gw) {
+    var res = { ok: !1, gw: intOf(gw, 0), xi: [], bench: [], ids: [], capId: null, viceId: null, chip: null };
+    try {
+      if (!isObj(live) || !isObj(live.picks)) return res;
+      var p = live.picks[gw] || live.picks[String(gw)];
+      if (!isObj(p) || !Array.isArray(p.picks)) return res;
+      var rows = p.picks.filter(isObj).slice().sort(function(a, b) {
+        return num(a.position, 0) - num(b.position, 0);
+      });
+      if (rows.length < 11) return res;
+      res.chip = p.active_chip === void 0 ? null : p.active_chip, rows.forEach(function(r2, i) {
+        var id = num(r2.element, NaN);
+        isFinite(id) && (res.ids.push(id), i < 11 ? res.xi.push(id) : res.bench.push(id), r2.is_captain === !0 && (res.capId = id), r2.is_vice_captain === !0 && (res.viceId = id));
+      }), res.ok = res.xi.length === 11;
+    } catch {
+    }
+    return res;
+  }
+  function gwSims(live, gw, ids) {
+    var out = {};
+    try {
+      var rows = isObj(live) && isObj(live.gw) && isObj(live.gw[gw] || live.gw[String(gw)]) ? (live.gw[gw] || live.gw[String(gw)]).elements : null;
+      arr(ids).forEach(function(id) {
+        var row = isObj(rows) ? rows[id] : null;
+        out[id] = Array.isArray(row) ? { pts: num(row[2], 0), mins: num(row[0], 0) } : { pts: 0, mins: 0 };
+      });
+    } catch {
+    }
+    return out;
+  }
+  function bestEntryOverElevens(ids, capId, viceId, sims, ctx, mustCaptain) {
+    var res = { best: null, xi: [], bench: [], formation: "", elevens: 0, ok: !1 };
+    try {
+      if (!okCtx(ctx)) return res;
+      var list = uniq(idList(ids)).filter(function(id) {
+        return ctx.els[id];
+      });
+      if (list.length < 11 || list.length > 15) return res;
+      var cap = num(capId, NaN), force = mustCaptain !== !1;
+      combos(list, 11).forEach(function(xi) {
+        if (legalXI(xi, ctx.els).ok && !(force && isFinite(cap) && xi.indexOf(cap) < 0)) {
+          res.elevens++;
+          var rest = list.filter(function(id) {
+            return xi.indexOf(id) < 0;
+          }), bgk = rest.filter(function(id) {
+            return elType(ctx.els[id]) === 1;
+          }), bof = rest.filter(function(id) {
+            return elType(ctx.els[id]) !== 1;
+          });
+          permutations(bof).forEach(function(ord) {
+            var t = entryPoints(xi, bgk.concat(ord), capId, viceId, sims, ctx);
+            (res.best === null || t > res.best) && (res.best = t, res.xi = xi.slice(), res.bench = bgk.concat(ord), res.formation = formationOf(xi, ctx.els));
+          });
+        }
+      }), res.ok = res.best !== null, res.ok || (res.best = 0);
+    } catch {
+    }
+    return res;
+  }
+  function leakBacktest(live, opts) {
+    var res = {
+      ok: !1,
+      gws: [],
+      totals: { bench: 0, xi: 0, captain: 0, actual: 0, engineXi: 0, engineCaptain: 0 },
+      reconciles: !0,
+      reported: { pointsOnBench: 0, note: "" },
+      engineAvailable: 0,
+      flaggedToday: 0,
+      note: ""
+    };
+    try {
+      var o = isObj(opts) ? opts : {};
+      if (!isObj(live) || !isObj(live.gw) || !isObj(live.picks))
+        return res.note = "no finished gameweeks with picks in the snapshot", res;
+      var gws = Object.keys(live.gw).map(function(k) {
+        return num(k, NaN);
+      }).filter(isFinite).sort(sortNum), histRows = isObj(live.history) && Array.isArray(live.history.current) ? live.history.current : [], histOf = {};
+      histRows.forEach(function(r2) {
+        isObj(r2) && (histOf[intOf(r2.event, -1)] = r2);
+      });
+      var ctxNow = isObj(o.ctx) && o.ctx.ok ? o.ctx : buildCtx(live, o.state || null, o.now || live.fetched_at);
+      if (!ctxNow.ok)
+        return res.note = "context could not be built", res;
+      gws.forEach(function(g) {
+        var pk = picksOf(live, g);
+        if (pk.ok) {
+          var sims = gwSims(live, g, pk.ids), playedOf = function(id) {
+            return num((sims[id] || {}).mins, 0) > 0;
+          }, ptsOf = function(id) {
+            return num((sims[id] || {}).pts, 0);
+          }, actual = entryPoints(pk.xi, pk.bench, pk.capId, pk.viceId, sims, ctxNow), hist = histOf[g] || null, reported = hist ? num(hist.points, NaN) : NaN, recon = !isFinite(reported) || Math.abs(reported - actual) < 1e-9;
+          recon || (res.reconciles = !1);
+          var gkSub = pk.bench.filter(function(id) {
+            return elType(ctxNow.els[id]) === 1;
+          }), outSub = pk.bench.filter(function(id) {
+            return elType(ctxNow.els[id]) !== 1;
+          }), benchBest = actual;
+          permutations(outSub).forEach(function(ord) {
+            var t = entryPoints(pk.xi, gkSub.concat(ord), pk.capId, pk.viceId, sims, ctxNow);
+            t > benchBest && (benchBest = t);
+          });
+          var blanks = pk.xi.filter(function(id) {
+            return !playedOf(id);
+          }), fired = autosubResolve(pk.xi, pk.bench, playedOf, ctxNow).subsIn.length, hind = bestEntryOverElevens(pk.ids, pk.capId, pk.viceId, sims, ctxNow, !0), xiBest = hind.ok && hind.best > actual ? hind.best : actual, capBest = actual, capBestId = pk.capId;
+          pk.xi.forEach(function(id) {
+            var t = entryPoints(pk.xi, pk.bench, id, pk.viceId, sims, ctxNow);
+            t > capBest && (capBest = t, capBestId = id);
+          });
+          var eng = { available: !1, xi: null, capId: null, viceId: null, xiPoints: null, capPoints: null, note: "" };
+          if (g > gws[0]) {
+            var cut = truncateElements(truncateLive(live, g - 1), g - 1), evObj = arr(live.events).filter(function(e) {
+              return isObj(e) && intOf(e.id, -1) === g;
+            })[0], ctxK = buildCtx(cut, { squad: pk.ids.map(function(id) {
+              return { id, purchase: num((ctxNow.els[id] || {}).now_cost, 0) };
+            }), confirmed_gw: g - 1 }, evObj && evObj.deadline_time ? evObj.deadline_time : null);
+            if (ctxK.ok) {
+              var bx = bestXI(pk.ids, ctxK);
+              if (bx.ids.length === 11) {
+                var ebGk = bx.bench.filter(function(id) {
+                  return elType(ctxK.els[id]) === 1;
+                }), ebOut = benchOrder(pk.ids, bx.ids, ctxK);
+                eng.available = !0, eng.xi = bx.ids.slice(), eng.capId = bx.capId, eng.viceId = bx.viceId, eng.xiPoints = entryPoints(bx.ids, ebGk.concat(ebOut), pk.capId, pk.viceId, sims, ctxNow), eng.capPoints = entryPoints(pk.xi, pk.bench, bx.capId === null ? pk.capId : bx.capId, pk.viceId, sims, ctxNow), res.engineAvailable++;
+              } else eng.note = "the engine could not field a legal eleven from the fifteen";
+            } else eng.note = "the truncated context did not build";
+          } else eng.note = "no gameweek of history exists before the first finished gameweek";
+          var flagged = pk.ids.filter(function(id) {
+            return (ctxNow.flags[id] || flagInfo(ctxNow.els[id])).flagged;
+          }).length;
+          res.flaggedToday += flagged;
+          var row = {
+            gw: g,
+            actual,
+            reported: isFinite(reported) ? reported : null,
+            reconciles: recon,
+            pointsOnBench: hist ? num(hist.points_on_bench, 0) : 0,
+            blanks: blanks.length,
+            autosubsFired: fired,
+            bench: { best: benchBest, leak: benchBest - actual, orderings: permutations(outSub).length },
+            xi: { best: xiBest, leak: xiBest - actual, formationHindsight: hind.formation, elevens: hind.elevens, engine: eng.xiPoints, engineLeak: eng.xiPoints === null ? null : eng.xiPoints - actual },
+            captain: {
+              playedId: pk.capId,
+              best: capBest,
+              bestId: capBestId,
+              leak: capBest - actual,
+              engineId: eng.capId,
+              engine: eng.capPoints,
+              engineLeak: eng.capPoints === null ? null : eng.capPoints - actual
+            },
+            engine: { available: eng.available, capId: eng.capId, note: eng.note },
+            flaggedToday: flagged
+          };
+          res.gws.push(row), res.totals.actual += actual, res.totals.bench += row.bench.leak, res.totals.xi += row.xi.leak, res.totals.captain += row.captain.leak, row.xi.engineLeak !== null && (res.totals.engineXi += row.xi.engineLeak), row.captain.engineLeak !== null && (res.totals.engineCaptain += row.captain.engineLeak), res.reported.pointsOnBench += row.pointsOnBench;
+        }
+      }), res.ok = res.gws.length > 0, res.reported.note = "points_on_bench over these gameweeks sums to " + res.reported.pointsOnBench + ", which is what the bench scored while benched. None of it was receivable: " + res.gws.reduce(function(s, r2) {
+        return s + r2.autosubsFired;
+      }, 0) + " autosubs fired across " + res.gws.length + " gameweeks. The recoverable bench figure is " + res.totals.bench.toFixed(0) + " (ERRORS.md E-091).", res.note = res.ok ? "Perfect hindsight over GW" + res.gws[0].gw + "-GW" + res.gws[res.gws.length - 1].gw + " on " + res.totals.actual + " points scored: bench ordering " + res.totals.bench.toFixed(0) + ", XI selection " + res.totals.xi.toFixed(0) + ", captaincy " + res.totals.captain.toFixed(0) + ". Hindsight is an upper bound no model reaches \u2014 read the three as a ranking of where the effort belongs. The engine's own ex-ante choices, scored on the same gameweeks, are " + res.totals.engineXi.toFixed(0) + " for the eleven and " + res.totals.engineCaptain.toFixed(0) + " for the armband against what he played. Today's injury flags are the only present-tense input (E-069): " + res.flaggedToday + " flagged player-gameweeks." : "no finished gameweek carried both picks and a live block";
+    } catch (e) {
+      res.note = "engine error: " + errMsg(e);
+    }
+    return res;
+  }
+  function truncateElements(live, uptoGw) {
+    try {
+      if (!isObj(live)) return live;
+      var upto = intOf(uptoGw, 0), gw = isObj(live.gw) ? live.gw : {}, keys = Object.keys(gw).map(function(k) {
+        return num(k, NaN);
+      }).filter(isFinite).filter(function(k) {
+        return k <= upto;
+      }).sort(sortNum), acc = {};
+      keys.forEach(function(g) {
+        var rows = isObj(gw[g]) && isObj(gw[g].elements) ? gw[g].elements : isObj(gw[String(g)]) && isObj(gw[String(g)].elements) ? gw[String(g)].elements : {};
+        Object.keys(rows).forEach(function(id) {
+          var r2 = rows[id];
+          if (Array.isArray(r2)) {
+            var a = acc[id] = acc[id] || { minutes: 0, starts: 0, total_points: 0, xg: 0, xa: 0, xgc: 0, dc: 0, bps: 0, ict: 0, goals: 0, assists: 0, cs: 0, gc: 0, bonus: 0, yc: 0, rc: 0, og: 0, pen_miss: 0, pen_save: 0, saves: 0 };
+            a.minutes += num(r2[0], 0), a.starts += num(r2[1], 0), a.total_points += num(r2[2], 0), a.xg += num(r2[3], 0), a.xa += num(r2[4], 0), a.xgc += num(r2[5], 0), a.dc += num(r2[6], 0), a.bps += num(r2[7], 0), a.ict += num(r2[8], 0), a.goals += num(r2[9], 0), a.assists += num(r2[10], 0), a.cs += num(r2[11], 0), a.gc += num(r2[12], 0), a.bonus += num(r2[13], 0), a.yc += num(r2[14], 0), a.rc += num(r2[15], 0), a.og += num(r2[16], 0), a.pen_miss += num(r2[17], 0), a.pen_save += num(r2[18], 0), a.saves += num(r2[19], 0);
+          }
+        });
+      });
+      var out = {};
+      return Object.keys(live).forEach(function(k) {
+        out[k] = live[k];
+      }), out.elements = arr(live.elements).map(function(el2) {
+        if (!isObj(el2)) return el2;
+        var c = {};
+        Object.keys(el2).forEach(function(k) {
+          c[k] = el2[k];
+        });
+        var a = acc[el2.id];
+        return ["minutes", "starts", "total_points", "xg", "xa", "xgc", "dc", "bps", "ict", "goals", "assists", "cs", "gc", "bonus", "yc", "rc", "og", "pen_miss", "pen_save", "saves"].forEach(function(k) {
+          c[k] = a ? a[k] : 0;
+        }), c.truncated_to_gw = upto, c;
+      }), out;
+    } catch {
+      return live;
+    }
+  }
+  function winnableLeagues(ctx, opts) {
+    var out = [];
+    try {
+      if (!okCtx(ctx)) return out;
+      var o = isObj(opts) ? opts : {}, cap = intOf(o.maxSize, WINNABLE_MAX_SIZE), only = Array.isArray(o.leagues) ? o.leagues.map(function(v) {
+        return num(v, NaN);
+      }).filter(isFinite) : null;
+      arr(ctx.leagues).forEach(function(L) {
+        if (isObj(L)) {
+          var id = num(L.id, NaN);
+          if (isFinite(id)) {
+            var size = intOf(L.size, arr(L.standings).length);
+            only && only.indexOf(id) < 0 || !only && size > cap || out.push({ id, name: String(L.name || ""), size, rank: intOf(L.rank, 0) || null, standings: arr(L.standings).length });
+          }
+        }
+      });
+    } catch {
+    }
+    return out;
+  }
+  function leagueField(ctx, leagueId) {
+    var res = { ok: !1, leagueId: null, name: "", size: 0, rows: [], meIndex: -1, missingPicks: 0, simulated: 0, myTotal: 0, note: "" };
+    try {
+      if (!okCtx(ctx)) return res;
+      var L = arr(ctx.leagues).filter(function(l) {
+        return isObj(l) && num(l.id, NaN) === num(leagueId, NaN);
+      })[0];
+      if (!L)
+        return res.note = "league not in the snapshot", res;
+      res.leagueId = num(L.id), res.name = String(L.name || ""), res.size = intOf(L.size, arr(L.standings).length);
+      var me = isObj(ctx.live) && isObj(ctx.live.entry) ? num(ctx.live.entry.id, NaN) : NaN, rivals = isObj(ctx.live) && isObj(ctx.live.rivals) ? ctx.live.rivals : {};
+      arr(L.standings).forEach(function(r2) {
+        if (isObj(r2)) {
+          var e = num(r2.entry, NaN);
+          if (isFinite(e)) {
+            var row = { entry: e, total: num(r2.total, 0), rank: intOf(r2.rank, 0), me: e === me, xi: null, bench: [], cap: null };
+            if (!row.me && isObj(rivals[e]) && Array.isArray(rivals[e].picks)) {
+              var pk = rivals[e].picks.filter(isObj).slice().sort(function(a, b) {
+                return num(a.position, 0) - num(b.position, 0);
+              }), ids = pk.map(function(p) {
+                return num(p.element, NaN);
+              }).filter(function(id) {
+                return isFinite(id) && ctx.els[id];
+              });
+              if (ids.length >= 11 && legalXI(ids.slice(0, 11), ctx.els).ok) {
+                row.xi = ids.slice(0, 11), row.bench = ids.slice(11);
+                var cp = pk.filter(function(p) {
+                  return p.is_captain === !0 || num(p.multiplier, 1) >= 2;
+                })[0];
+                row.cap = cp ? num(cp.element) : null;
+              }
+            }
+            res.rows.push(row);
+          }
+        }
+      }), res.meIndex = res.rows.map(function(r2) {
+        return r2.me;
+      }).indexOf(!0), res.meIndex < 0 && (res.rows.push({ entry: isFinite(me) ? me : 0, total: isObj(ctx.live) && isObj(ctx.live.entry) ? num(ctx.live.entry.summary_overall_points, 0) : 0, rank: res.rows.length + 1, me: !0, xi: null, bench: [], cap: null }), res.meIndex = res.rows.length - 1), res.myTotal = res.rows[res.meIndex].total, res.missingPicks = res.rows.filter(function(r2) {
+        return !r2.me && !r2.xi;
+      }).length, res.simulated = res.rows.filter(function(r2) {
+        return !r2.me && r2.xi;
+      }).length, res.ok = res.rows.length > 0, res.note = res.simulated + " of " + (res.rows.length - 1) + " rivals carry submitted picks; " + res.missingPicks + " score the simulated field mean.";
+    } catch (e) {
+      res.note = "engine error: " + errMsg(e);
+    }
+    return res;
+  }
+  function candidateSquads(ctx, candidates) {
+    var out = [];
+    try {
+      if (!okCtx(ctx)) return out;
+      var list = Array.isArray(candidates) && candidates.length ? candidates : [null];
+      list.forEach(function(c, i) {
+        var ids, key, label, capId = null, viceId = null;
+        if (Array.isArray(c))
+          ids = c, key = "c" + (i + 1), label = "candidate " + (i + 1);
+        else if (isObj(c))
+          ids = Array.isArray(c.ids) ? c.ids : Array.isArray(c.squad) ? c.squad : [], key = String(c.key || "c" + (i + 1)), label = String(c.label || key), capId = c.capId === void 0 ? null : c.capId, viceId = c.viceId === void 0 ? null : c.viceId;
+        else {
+          ids = arr(ctx.picks).length ? arr(ctx.picks).slice().sort(function(a, b) {
+            return num(a.position, 0) - num(b.position, 0);
+          }).map(function(p) {
+            return num(p.element, NaN);
+          }) : ctx.squadIds, key = "current", label = "the fifteen he submitted";
+          var cp = arr(ctx.picks).filter(function(p) {
+            return isObj(p) && (p.is_captain === !0 || num(p.multiplier, 1) >= 2);
+          })[0], vp = arr(ctx.picks).filter(function(p) {
+            return isObj(p) && p.is_vice_captain === !0;
+          })[0];
+          cp && (capId = num(cp.element, NaN)), vp && (viceId = num(vp.element, NaN));
+        }
+        var so = squadOrder(ids, capId, ctx);
+        if (so) {
+          var vice = num(viceId, NaN);
+          if (!isFinite(vice) || so.xi.indexOf(vice) < 0) {
+            var cpk = captainPick(so.xi, ctx);
+            vice = cpk.viceId === null ? null : cpk.viceId;
+          }
+          out.push({ key, label, ids: uniq(idList(ids)), xi: so.xi, bench: so.bench, cap: so.cap, vice });
+        }
+      });
+    } catch {
+    }
+    return out;
+  }
+  function winProbabilityCore(ctx, candidates, opts) {
+    var res = {
+      ok: !1,
+      iters: 0,
+      seed: 0,
+      gwsOfData: 0,
+      reportable: !1,
+      event: 0,
+      leagues: [],
+      candidates: [],
+      note: ""
+    };
+    try {
+      if (!okCtx(ctx))
+        return res.note = "no context", res;
+      var o = isObj(opts) ? opts : {}, cands = candidateSquads(ctx, candidates);
+      if (!cands.length)
+        return res.note = "no legal candidate squad to simulate", res;
+      var Ls = winnableLeagues(ctx, o), fields = [];
+      if (Ls.forEach(function(L) {
+        var f2 = leagueField(ctx, L.id);
+        f2.ok && fields.push(f2);
+      }), !fields.length)
+        return res.note = "no winnable league in the snapshot to simulate against", res;
+      var n = clamp(intOf(o.iters, WINPROB_ITERS), MC_MIN_ITERS, 2e4), seed2 = intOf(o.seed, 89), R = mulberry32(seed2);
+      res.iters = n, res.seed = seed2, res.event = ctx.nextEvent, res.gwsOfData = arr(ctx.finishedGws).length, res.reportable = res.gwsOfData >= MC_MIN_GWS_FOR_PWIN;
+      var union = {};
+      cands.forEach(function(c) {
+        c.xi.concat(c.bench).forEach(function(id) {
+          union[id] = !0;
+        });
+      }), fields.forEach(function(f2) {
+        f2.rows.forEach(function(r2) {
+          r2.xi && r2.xi.concat(r2.bench).forEach(function(id) {
+            union[id] = !0;
+          });
+        });
+      });
+      for (var unionIds = Object.keys(union).map(Number).filter(function(id) {
+        return ctx.els[id];
+      }), acc = cands.map(function() {
+        return { pts: [], leagues: fields.map(function() {
+          return { first: 0, top: 0, rankSum: 0, ranks: [] };
+        }), anyFirst: 0, allFirst: 0 };
+      }), i = 0; i < n; i++) {
+        var draws = fixtureDraws(ctx, R), sims = {};
+        unionIds.forEach(function(id) {
+          sims[id] = simPlayerDetail(ctx.els[id], ctx, R, draws);
+        });
+        var myPts = cands.map(function(c) {
+          return entryPoints(c.xi, c.bench, c.cap, c.vice, sims, ctx);
+        });
+        myPts.forEach(function(p, ci) {
+          acc[ci].pts.push(p);
+        });
+        for (var li = 0; li < fields.length; li++) {
+          for (var f = fields[li], rivalTotals = [], known = [], ri = 0; ri < f.rows.length; ri++) {
+            var row = f.rows[ri];
+            if (!row.me)
+              if (row.xi) {
+                var p2 = entryPoints(row.xi, row.bench, row.cap, null, sims, ctx);
+                known.push(p2), rivalTotals.push({ base: row.total, pts: p2, filled: !1 });
+              } else rivalTotals.push({ base: row.total, pts: null, filled: !0 });
+          }
+          for (var fillMean = known.length ? sum(known) / known.length : 0, ci2 = 0; ci2 < cands.length; ci2++) {
+            for (var mine = f.myTotal + myPts[ci2], rank = 1, k = 0; k < rivalTotals.length; k++) {
+              var t = rivalTotals[k].base + (rivalTotals[k].pts === null ? fillMean : rivalTotals[k].pts);
+              t > mine && rank++;
+            }
+            var a = acc[ci2].leagues[li];
+            a.rankSum += rank, a.ranks.push(rank), rank === 1 && a.first++, rank <= WINPROB_TOP_N && a.top++;
+          }
+        }
+        for (var ci3 = 0; ci3 < cands.length; ci3++) {
+          for (var anyF = !1, allF = !0, lj = 0; lj < fields.length; lj++) {
+            var last = acc[ci3].leagues[lj].ranks[acc[ci3].leagues[lj].ranks.length - 1];
+            last === 1 ? anyF = !0 : allF = !1;
+          }
+          anyF && acc[ci3].anyFirst++, allF && acc[ci3].allFirst++;
+        }
+      }
+      res.leagues = fields.map(function(f2) {
+        return { leagueId: f2.leagueId, name: f2.name, size: f2.size, entries: f2.rows.length, rivalsSimulated: f2.simulated, missingPicks: f2.missingPicks, currentRank: f2.rows[f2.meIndex].rank || null, note: f2.note };
+      }), res.candidates = cands.map(function(c, ci) {
+        var a2 = acc[ci], ev = distStats(a2.pts), per = a2.leagues.map(function(g, li2) {
+          var ranks = g.ranks.slice().sort(sortNum), cur = res.leagues[li2].currentRank, med = quantile3(ranks, 0.5), band2 = [quantile3(ranks, 0.1), quantile3(ranks, 0.9)], dir = cur === null ? "hold" : med < cur - 0.5 ? "up" : med > cur + 0.5 ? "down" : "hold";
+          return {
+            leagueId: res.leagues[li2].leagueId,
+            name: res.leagues[li2].name,
+            size: res.leagues[li2].size,
+            pFirst: clamp(g.first / n, 0, 1),
+            pTop3: clamp(g.top / n, 0, 1),
+            pFirstShown: res.reportable ? clamp(g.first / n, 0, 1) : null,
+            expRank: g.rankSum / n,
+            medianRank: med,
+            rankBand: band2,
+            currentRank: cur,
+            direction: dir,
+            headline: "GW" + ctx.nextEvent + " " + res.leagues[li2].name + ": rank " + (cur === null ? "unknown" : cur) + " \u2192 median " + med.toFixed(1) + ", tenth to ninetieth " + band2[0].toFixed(0) + " to " + band2[1].toFixed(0) + " (" + dir + ")" + (res.reportable ? ", P(first) " + (100 * g.first / n).toFixed(1) + "%" : "")
+          };
+        }), pf = per.map(function(p) {
+          return p.pFirst;
+        });
+        return {
+          key: c.key,
+          label: c.label,
+          ids: c.ids.slice(),
+          capId: c.cap,
+          viceId: c.vice,
+          ev,
+          leagues: per,
+          pooled: {
+            pFirstMean: pf.length ? sum(pf) / pf.length : 0,
+            pFirstBest: pf.length ? Math.max.apply(null, pf) : 0,
+            pFirstWorst: pf.length ? Math.min.apply(null, pf) : 0,
+            pAnyFirst: clamp(a2.anyFirst / n, 0, 1),
+            pAllFirst: clamp(a2.allFirst / n, 0, 1),
+            expRankMean: per.length ? sum(per, function(p) {
+              return p.expRank;
+            }) / per.length : 0
+          }
+        };
+      }), res.ok = !0, res.note = "One gameweek (GW" + ctx.nextEvent + ") simulated " + n + " times against the rivals' actual GW" + ctx.currentEvent + " fifteens, over " + fields.length + " winnable league" + (fields.length === 1 ? "" : "s") + " and " + unionIds.length + " players, on shared per-fixture goal draws. " + (res.reportable ? "P(first) is reported: " + res.gwsOfData + " finished gameweeks." : "Direction and rank band only: " + res.gwsOfData + " of the " + MC_MIN_GWS_FOR_PWIN + " finished gameweeks a win probability needs before it can be a headline (E-020). The probabilities are computed \u2014 a squad comparison cannot be made without them \u2014 and pFirstShown is null.");
+    } catch (e) {
+      res.note = "engine error: " + errMsg(e);
+    }
+    return res;
+  }
+  function winProbability(ctx, opts) {
+    var o = isObj(opts) ? opts : {}, cands = Array.isArray(o.candidates) ? o.candidates : Array.isArray(o.ids) && o.ids.length ? [{ key: "candidate", label: "candidate fifteen", ids: o.ids, capId: o.capId, viceId: o.viceId }] : null, core = winProbabilityCore(ctx, cands, o), res = {
+      ok: core.ok,
+      iters: core.iters,
+      seed: core.seed,
+      gwsOfData: core.gwsOfData,
+      reportable: core.reportable,
+      event: core.event,
+      leagues: [],
+      pooled: null,
+      candidate: null,
+      note: core.note
+    };
+    return core.ok && core.candidates.length && (res.candidate = { key: core.candidates[0].key, label: core.candidates[0].label, ids: core.candidates[0].ids, capId: core.candidates[0].capId, viceId: core.candidates[0].viceId, ev: core.candidates[0].ev }, res.leagues = core.candidates[0].leagues, res.pooled = core.candidates[0].pooled), res;
+  }
+  function objectiveCompare(ctx, candidates, opts) {
+    var res = {
+      ok: !1,
+      iters: 0,
+      seed: 0,
+      gwsOfData: 0,
+      reportable: !1,
+      event: 0,
+      leagues: [],
+      candidates: [],
+      byEv: null,
+      byWin: null,
+      agree: !0,
+      disagree: !1,
+      pairs: [],
+      note: "",
+      verdict: ""
+    };
+    try {
+      var o = isObj(opts) ? opts : {}, core = winProbabilityCore(ctx, candidates, o);
+      if (res.ok = core.ok, res.iters = core.iters, res.seed = core.seed, res.gwsOfData = core.gwsOfData, res.reportable = core.reportable, res.event = core.event, res.leagues = core.leagues, res.note = core.note, !core.ok)
+        return res.verdict = core.note, res;
+      var byEv = core.candidates.slice().sort(function(a2, b2) {
+        return b2.ev.mean - a2.ev.mean;
+      }), byWin = core.candidates.slice().sort(function(a2, b2) {
+        return b2.pooled.pAnyFirst - a2.pooled.pAnyFirst || b2.pooled.pFirstMean - a2.pooled.pFirstMean;
+      }), evRank = {}, winRank = {};
+      byEv.forEach(function(c, i) {
+        evRank[c.key] = i + 1;
+      }), byWin.forEach(function(c, i) {
+        winRank[c.key] = i + 1;
+      }), res.candidates = core.candidates.map(function(c) {
+        return {
+          key: c.key,
+          label: c.label,
+          ids: c.ids.slice(),
+          capId: c.capId,
+          viceId: c.viceId,
+          ev: c.ev,
+          leagues: c.leagues,
+          pooled: c.pooled,
+          evRank: evRank[c.key],
+          winRank: winRank[c.key],
+          objectivesAgree: evRank[c.key] === winRank[c.key]
+        };
+      }), res.byEv = byEv[0].key, res.byWin = byWin[0].key, res.agree = res.byEv === res.byWin, res.disagree = !res.agree;
+      for (var a = 0; a < core.candidates.length; a++) for (var b = 0; b < core.candidates.length; b++)
+        if (a !== b) {
+          var A = core.candidates[a], B = core.candidates[b], dEv = A.ev.mean - B.ev.mean, dWin = A.pooled.pFirstMean - B.pooled.pFirstMean, dAny = A.pooled.pAnyFirst - B.pooled.pAnyFirst, verdict;
+          dEv < 0 && dWin > 0 ? verdict = A.label + " lowers EV but raises P(first) against " + B.label + ": " + Math.abs(dEv).toFixed(2) + " expected points given up for " + (dWin * 100).toFixed(2) + " percentage points of P(first). That is the differential trade, and it is the whole point of comparing the two objectives." : dEv > 0 && dWin < 0 ? verdict = A.label + " raises EV but lowers P(first) against " + B.label + ": " + dEv.toFixed(2) + " expected points bought for " + Math.abs(dWin * 100).toFixed(2) + " percentage points of P(first). That is the safe-pick trap \u2014 more points, less chance of finishing first." : dEv === 0 && dWin === 0 ? verdict = A.label + " and " + B.label + " are indistinguishable under both objectives on these draws." : verdict = "the two objectives agree between " + A.label + " and " + B.label + " (" + (dEv >= 0 ? "+" : "") + dEv.toFixed(2) + " EV, " + (dWin >= 0 ? "+" : "") + (dWin * 100).toFixed(2) + "pp P(first)).", res.pairs.push({ a: A.key, b: B.key, evDelta: dEv, pFirstDelta: dWin, pAnyFirstDelta: dAny, conflict: dEv < 0 && dWin > 0 || dEv > 0 && dWin < 0, verdict });
+        }
+      var conflicts = res.pairs.filter(function(p) {
+        return p.conflict;
+      });
+      res.verdict = (res.agree ? "Both objectives name " + byEv[0].label + "." : "The objectives disagree: expected points names " + byEv[0].label + " and P(first) names " + byWin[0].label + ".") + " " + conflicts.length + " of " + res.pairs.length + " ordered pairs trade one objective against the other. " + (res.reportable ? "" : "Under " + MC_MIN_GWS_FOR_PWIN + " finished gameweeks the win probabilities are a direction and a rank band, not a headline percentage (E-020); the DIFFERENCE between two candidates on shared draws is what is being read here, not its level. ") + "Neither objective replaces the other: both are shown, the difference is priced, and the manager chooses.";
+    } catch (e) {
+      res.note = "engine error: " + errMsg(e), res.verdict = res.note;
+    }
+    return res;
+  }
+  function hierRowsFromAcc(acc, types) {
+    var rows = [];
+    try {
+      if (!isObj(acc)) return rows;
+      Object.keys(acc).forEach(function(id) {
+        var a = acc[id];
+        if (isObj(a)) {
+          var n = num(a.played, 0);
+          if (!(n <= 0)) {
+            var mean = num(a.pts, 0) / n, ss = num(a.pts2, NaN), v = isFinite(ss) && n >= 2 ? Math.max(0, (ss - n * mean * mean) / (n - 1)) : NaN;
+            rows.push({ id: num(id, 0), type: intOf(isObj(types) ? types[id] : 3, 3) || 3, n, mean, variance: v });
+          }
+        }
+      });
+    } catch {
+    }
+    return rows;
+  }
+  function hierGroups(rows) {
+    var out = { 1: null, 2: null, 3: null, 4: null, pooled: null, ok: !1 };
+    try {
+      var all = arr(rows).filter(function(r2) {
+        return isObj(r2) && num(r2.n, 0) > 0;
+      }), fit = function(list, fallbackPrior) {
+        var k = list.length, res = {
+          n: k,
+          players: k,
+          mu: num(fallbackPrior, 3.5),
+          sigma2: HIER_MIN_SIGMA2,
+          tau2: HIER_MIN_TAU2,
+          games: 0,
+          fitted: !1,
+          note: ""
+        };
+        if (!k)
+          return res.note = "no players in this group", res;
+        var sw = 0, swy = 0, ssw = 0, sn = 0;
+        list.forEach(function(r2) {
+          sn += num(r2.n, 0);
+        }), res.games = sn;
+        var wnum = 0, wden = 0;
+        if (list.forEach(function(r2) {
+          var v = num(r2.variance, NaN), n = num(r2.n, 0);
+          isFinite(v) && n >= 2 && (wnum += (n - 1) * v, wden += n - 1);
+        }), res.sigma2 = wden > 0 ? Math.max(HIER_MIN_SIGMA2, wnum / wden) : HIER_MIN_SIGMA2, list.forEach(function(r2) {
+          var w = num(r2.n, 0) / res.sigma2;
+          sw += w, swy += w * num(r2.mean, 0), ssw += w * w;
+        }), sw <= 0)
+          return res.note = "no usable precision", res;
+        var ybar = swy / sw;
+        if (k < HIER_MIN_PLAYERS)
+          return res.mu = ybar, res.note = k + " players is too few to estimate a between-player variance; the prior variance stays at its floor", res;
+        var Q = 0;
+        list.forEach(function(r2) {
+          var w = num(r2.n, 0) / res.sigma2, d = num(r2.mean, 0) - ybar;
+          Q += w * d * d;
+        });
+        var denom = sw - ssw / sw, tau2 = denom > 0 ? (Q - (k - 1)) / denom : 0;
+        res.tau2 = Math.max(HIER_MIN_TAU2, isFinite(tau2) ? tau2 : 0);
+        var sw2 = 0, swy2 = 0;
+        return list.forEach(function(r2) {
+          var w = 1 / (res.sigma2 / num(r2.n, 1) + res.tau2);
+          sw2 += w, swy2 += w * num(r2.mean, 0);
+        }), res.mu = sw2 > 0 ? swy2 / sw2 : ybar, res.fitted = !0, res.note = k + " players, " + sn + " player-gameweeks; within-player variance " + res.sigma2.toFixed(3) + ", between-player variance " + res.tau2.toFixed(3) + " (DerSimonian-Laird), group mean " + res.mu.toFixed(3), res;
+      };
+      [1, 2, 3, 4].forEach(function(t) {
+        out[t] = fit(all.filter(function(r2) {
+          return intOf(r2.type, 3) === t;
+        }), PRIOR_PPS[t]);
+      }), out.pooled = fit(all, 3.5), out.ok = all.length > 0;
+    } catch {
+    }
+    return out;
+  }
+  function hierPosterior(row, group) {
+    var res = { n: 0, mean: 0, postMean: 0, postVar: 0, postSd: 0, weight: 0, flatWeight: 0, flatMean: 0, shrinkGap: 0, ok: !1 };
+    try {
+      if (!isObj(row)) return res;
+      var t = intOf(row.type, 3) || 3, g = isObj(group) ? group : null, mu = g ? num(g.mu, PRIOR_PPS[t] || 3.5) : PRIOR_PPS[t] || 3.5, sigma2 = Math.max(HIER_MIN_SIGMA2, g ? num(g.sigma2, HIER_MIN_SIGMA2) : HIER_MIN_SIGMA2), tau2 = Math.max(HIER_MIN_TAU2, g ? num(g.tau2, HIER_MIN_TAU2) : HIER_MIN_TAU2), n = Math.max(0, num(row.n, 0)), mean = num(row.mean, 0);
+      res.n = n, res.mean = mean;
+      var prec = n / sigma2 + 1 / tau2;
+      if (!(prec > 0) || !isFinite(prec)) return res;
+      res.postMean = (n / sigma2 * mean + mu / tau2) / prec, res.postVar = 1 / prec, res.postSd = Math.sqrt(res.postVar), res.weight = clamp(n / sigma2 / prec, 0, 1), res.flatWeight = clamp(n / (n + SHRINK_K), 0, 1), res.flatMean = res.flatWeight * mean + (1 - res.flatWeight) * (PRIOR_PPS[t] || 3.5), res.shrinkGap = res.weight - res.flatWeight, res.ok = !0;
+    } catch {
+    }
+    return res;
+  }
+  function hierPool(live, opts) {
+    var res = {
+      ok: !1,
+      gws: [],
+      positions: {},
+      players: {},
+      rows: [],
+      n: 0,
+      thin: null,
+      thick: null,
+      varianceRange: [0, 0],
+      note: ""
+    };
+    try {
+      var o = isObj(opts) ? opts : {};
+      if (!isObj(live) || !isObj(live.gw))
+        return res.note = "no finished gameweeks in the snapshot", res;
+      var upto = o.upto === void 0 ? null : intOf(o.upto, 0), keys = Object.keys(live.gw).map(function(k) {
+        return num(k, NaN);
+      }).filter(isFinite).sort(sortNum).filter(function(g) {
+        return upto === null || g <= upto;
+      });
+      res.gws = keys.slice();
+      var types = {};
+      arr(live.elements).forEach(function(el2) {
+        isObj(el2) && (types[el2.id] = elType(el2));
+      });
+      var names = {};
+      arr(live.elements).forEach(function(el2) {
+        isObj(el2) && (names[el2.id] = String(el2.web_name || ""));
+      });
+      var acc = {};
+      keys.forEach(function(g) {
+        var rows2 = isObj(live.gw[g]) && isObj(live.gw[g].elements) ? live.gw[g].elements : {};
+        Object.keys(rows2).forEach(function(id) {
+          var r2 = rows2[id];
+          if (!(!Array.isArray(r2) || num(r2[0], 0) <= 0)) {
+            var a = acc[id] = acc[id] || { played: 0, pts: 0, pts2: 0 }, p = num(r2[2], 0);
+            a.played++, a.pts += p, a.pts2 += p * p;
+          }
+        });
+      });
+      var rows = hierRowsFromAcc(acc, types), groups = hierGroups(rows);
+      [1, 2, 3, 4].forEach(function(t) {
+        var g = groups[t];
+        res.positions[t] = g ? { pos: POS_NAME[t], players: g.players, games: g.games, mu: g.mu, sigma2: g.sigma2, tau2: g.tau2, fitted: g.fitted, flatPrior: PRIOR_PPS[t], note: g.note } : null;
+      });
+      var lo = null, hi = null;
+      rows.forEach(function(r2) {
+        var p = hierPosterior(r2, groups[r2.type]);
+        if (p.ok) {
+          var out = {
+            id: r2.id,
+            web_name: names[r2.id] || "",
+            pos: POS_NAME[r2.type] || "?",
+            n: r2.n,
+            mean: r2.mean,
+            variance: isFinite(r2.variance) ? r2.variance : null,
+            postMean: p.postMean,
+            postVar: p.postVar,
+            postSd: p.postSd,
+            weight: p.weight,
+            flatWeight: p.flatWeight,
+            flatMean: p.flatMean,
+            shrinkGap: p.shrinkGap
+          };
+          res.players[r2.id] = out, res.rows.push(out), res.n++, (lo === null || p.postVar < lo) && (lo = p.postVar), (hi === null || p.postVar > hi) && (hi = p.postVar);
+        }
+      }), res.varianceRange = [lo === null ? 0 : lo, hi === null ? 0 : hi];
+      var byN = res.rows.slice().sort(function(a, b) {
+        return a.n - b.n || b.postVar - a.postVar;
+      });
+      res.thin = byN.length ? byN[0] : null, res.thick = byN.length ? byN[byN.length - 1] : null, res.ok = res.n > 0, res.note = res.ok ? res.n + " players over " + keys.length + " finished gameweeks. Posterior variance runs from " + res.varianceRange[0].toFixed(3) + " to " + res.varianceRange[1].toFixed(3) + " points squared \u2014 the flat starts/(starts+" + SHRINK_K + ") shrinkage produces none at all, which is the point of the exercise. " + (res.thin && res.thick ? "Thinnest row " + res.thin.n + " game" + (res.thin.n === 1 ? "" : "s") + ": posterior sd " + res.thin.postSd.toFixed(2) + " against the thickest row's " + res.thick.postSd.toFixed(2) + ". " : "") + "A challenger only: E6 and the shared promotion gate bar it from driving anything." : "no player has a finished gameweek to pool";
+    } catch (e) {
+      res.note = "engine error: " + errMsg(e);
+    }
+    return res;
+  }
+  function dcTau(x, y, lamH, lamA, rho) {
+    var r2 = num(rho, 0), h = Math.max(0, num(lamH, 0)), a = Math.max(0, num(lamA, 0)), xi = intOf(x, -1), yi = intOf(y, -1);
+    return xi === 0 && yi === 0 ? Math.max(0, 1 - h * a * r2) : xi === 0 && yi === 1 ? Math.max(0, 1 + h * r2) : xi === 1 && yi === 0 ? Math.max(0, 1 + a * r2) : xi === 1 && yi === 1 ? Math.max(0, 1 - r2) : 1;
+  }
+  function dcRhoRange(lamH, lamA) {
+    var h = Math.max(1e-6, num(lamH, 1)), a = Math.max(1e-6, num(lamA, 1));
+    return { lo: Math.max(-1 / h, -1 / a), hi: Math.min(1, 1 / (h * a)) };
+  }
+  function poissonPmf(k, lam) {
+    var n = intOf(k, -1), L = Math.max(0, num(lam, 0));
+    if (n < 0) return 0;
+    if (L === 0) return n === 0 ? 1 : 0;
+    var lp = -L + n * Math.log(L) - logGamma(n + 1), v = Math.exp(lp);
+    return isFinite(v) ? clamp(v, 0, 1) : 0;
+  }
+  function dcCleanSheetProb(lamH, lamA, rho, side) {
+    var h = Math.max(1e-6, num(lamH, 0)), a = Math.max(1e-6, num(lamA, 0)), r2 = num(rho, 0), ph0 = poissonPmf(0, h), ph1 = poissonPmf(1, h), pa0 = poissonPmf(0, a), pa1 = poissonPmf(1, a), p;
+    return String(side) === "a" ? p = ph0 * (dcTau(0, 0, h, a, r2) * pa0 + dcTau(0, 1, h, a, r2) * pa1 + Math.max(0, 1 - pa0 - pa1)) : p = pa0 * (dcTau(0, 0, h, a, r2) * ph0 + dcTau(1, 0, h, a, r2) * ph1 + Math.max(0, 1 - ph0 - ph1)), clamp(p, 1e-6, 1 - 1e-6);
+  }
+  function dcMatches(live, opts) {
+    var out = [];
+    try {
+      if (!isObj(live)) return out;
+      var o = isObj(opts) ? opts : {}, basis2 = String(o.basis || "goals") === "xg" ? "xg" : "goals", upto = o.upto === void 0 || o.upto === null ? 1 / 0 : intOf(o.upto, 0), xgOf = {};
+      basis2 === "xg" && isObj(live.gw) && Object.keys(live.gw).forEach(function(g) {
+        if (!(num(g, NaN) > upto)) {
+          var fx = isObj(live.gw[g]) && isObj(live.gw[g].fixture_xg) ? live.gw[g].fixture_xg : null;
+          fx && Object.keys(fx).forEach(function(fid) {
+            isObj(fx[fid]) && (xgOf[fid] = fx[fid]);
+          });
+        }
+      }), arr(live.fixtures).forEach(function(f) {
+        if (isObj(f)) {
+          var ev = intOf(f.event, -1);
+          if (!(ev < 0 || ev > upto)) {
+            var h = num(f.team_h, NaN), a = num(f.team_a, NaN);
+            if (!(!isFinite(h) || !isFinite(a))) {
+              var hg, ag;
+              if (basis2 === "xg") {
+                var row = xgOf[f.id];
+                if (!isObj(row)) return;
+                hg = Math.max(0, num(row.h, 0)), ag = Math.max(0, num(row.a, 0));
+              } else if (!f.finished || (hg = num(f.team_h_score, NaN), ag = num(f.team_a_score, NaN), !isFinite(hg) || !isFinite(ag))) return;
+              var ko = Date.parse(f.kickoff_time);
+              out.push({ event: ev, fixture: f.id, h, a, hg, ag, ko: isFinite(ko) ? ko : 0, w: 1 });
+            }
+          }
+        }
+      });
+    } catch {
+    }
+    return out;
+  }
+  function dixonColes(live, opts) {
+    var res = {
+      ok: !1,
+      basis: "goals",
+      xi: DC_DECAY_PER_DAY,
+      upto: null,
+      mu: LBAR_PRIOR,
+      gamma: HOME_ADV,
+      att: {},
+      def: {},
+      rho: 0,
+      rhoRange: { lo: -1, hi: 1 },
+      rhoLogLik: 0,
+      matches: 0,
+      weightSum: 0,
+      iters: 0,
+      converged: !1,
+      loglik: 0,
+      tRef: 0,
+      teams: [],
+      fitCheck: { predicted: 0, observed: 0, gap: 0 },
+      note: ""
+    };
+    try {
+      var o = isObj(opts) ? opts : {};
+      res.basis = String(o.basis || "goals") === "xg" ? "xg" : "goals", res.xi = Math.max(0, num(o.xi, DC_DECAY_PER_DAY)), res.upto = o.upto === void 0 || o.upto === null ? null : intOf(o.upto, 0);
+      var ms = dcMatches(live, { basis: res.basis, upto: res.upto });
+      if (res.matches = ms.length, ms.length < 4)
+        return res.note = "a Dixon-Coles fit needs at least four matches; this cut carries " + ms.length, res;
+      var tRef = 0;
+      if (ms.forEach(function(m) {
+        m.ko > tRef && (tRef = m.ko);
+      }), o.now !== void 0 && o.now !== null) {
+        var t2 = nowMs(o.now);
+        t2 && (tRef = t2);
+      }
+      res.tRef = tRef, ms.forEach(function(m) {
+        var days = tRef && m.ko ? Math.max(0, (tRef - m.ko) / 864e5) : 0;
+        m.days = days, m.w = Math.exp(-res.xi * days);
+      });
+      var teams = {};
+      ms.forEach(function(m) {
+        teams[m.h] = !0, teams[m.a] = !0;
+      });
+      var ids = Object.keys(teams).map(Number).sort(sortNum);
+      res.teams = ids.slice();
+      var att = {}, def = {};
+      ids.forEach(function(t) {
+        att[t] = 1, def[t] = 1;
+      });
+      var sw = 0, sy = 0;
+      ms.forEach(function(m) {
+        sw += m.w * 2, sy += m.w * (m.hg + m.ag);
+      });
+      var mu = sw > 0 ? sy / sw : LBAR_PRIOR;
+      (!(mu > 0) || !isFinite(mu)) && (mu = LBAR_PRIOR);
+      var gamma2 = HOME_ADV, it = 0, moved = 1;
+      for (it = 0; it < DC_MAX_ITERS && moved > DC_TOL; it++) {
+        moved = 0, ids.forEach(function(t) {
+          var numr = 0, den = 0;
+          ms.forEach(function(m) {
+            m.h === t ? (numr += m.w * m.hg, den += m.w * mu * def[m.a] * gamma2) : m.a === t && (numr += m.w * m.ag, den += m.w * mu * def[m.h]);
+          });
+          var v = den > 0 ? numr / den : att[t];
+          v = clamp(isFinite(v) ? v : att[t], 0.05, 5), moved = Math.max(moved, Math.abs(v - att[t])), att[t] = v;
+        }), ids.forEach(function(t) {
+          var numr = 0, den = 0;
+          ms.forEach(function(m) {
+            m.h === t ? (numr += m.w * m.ag, den += m.w * mu * att[m.a]) : m.a === t && (numr += m.w * m.hg, den += m.w * mu * att[m.h] * gamma2);
+          });
+          var v = den > 0 ? numr / den : def[t];
+          v = clamp(isFinite(v) ? v : def[t], 0.05, 5), moved = Math.max(moved, Math.abs(v - def[t])), def[t] = v;
+        });
+        var gn = 0, gd = 0;
+        ms.forEach(function(m) {
+          gn += m.w * m.hg, gd += m.w * mu * att[m.h] * def[m.a];
+        });
+        var g2 = gd > 0 ? gn / gd : gamma2;
+        g2 = clamp(isFinite(g2) ? g2 : gamma2, 0.5, 2.5), moved = Math.max(moved, Math.abs(g2 - gamma2)), gamma2 = g2;
+        var sa = 0, sd = 0;
+        ids.forEach(function(t) {
+          sa += att[t], sd += def[t];
+        });
+        var ma = ids.length ? sa / ids.length : 1, md = ids.length ? sd / ids.length : 1;
+        ma > 0 && isFinite(ma) && (ids.forEach(function(t) {
+          att[t] = att[t] / ma;
+        }), mu = mu * ma), md > 0 && isFinite(md) && (ids.forEach(function(t) {
+          def[t] = def[t] / md;
+        }), mu = mu * md), mu = clamp(mu, 0.05, 20);
+      }
+      var predSum = 0, obsSum = 0;
+      ms.forEach(function(m) {
+        predSum += m.w * (mu * att[m.h] * def[m.a] * gamma2 + mu * att[m.a] * def[m.h]), obsSum += m.w * (m.hg + m.ag);
+      }), res.fitCheck = { predicted: predSum, observed: obsSum, gap: obsSum > 0 ? Math.abs(predSum - obsSum) / obsSum : 0 }, res.iters = it, res.converged = moved <= DC_TOL, res.att = att, res.def = def, res.mu = mu, res.gamma = gamma2, res.weightSum = sum(ms, function(m) {
+        return m.w;
+      });
+      var lo = -1, hi = 1;
+      ms.forEach(function(m) {
+        var lh = mu * att[m.h] * def[m.a] * gamma2, la = mu * att[m.a] * def[m.h], rr = dcRhoRange(lh, la);
+        rr.lo > lo && (lo = rr.lo), rr.hi < hi && (hi = rr.hi);
+      }), hi > lo || (lo = -0.05, hi = 0.05), res.rhoRange = { lo, hi };
+      for (var tauLL = function(r3) {
+        var s = 0;
+        return ms.forEach(function(m) {
+          if (res.basis !== "xg") {
+            var lh = mu * att[m.h] * def[m.a] * gamma2, la = mu * att[m.a] * def[m.h], t = dcTau(m.hg, m.ag, lh, la, r3);
+            s += m.w * Math.log(Math.max(1e-12, t));
+          }
+        }), s;
+      }, bestR = 0, bestL = -1 / 0, gi = 0; gi < DC_RHO_GRID; gi++) {
+        var r2 = lo + (hi - lo) * gi / (DC_RHO_GRID - 1), L = tauLL(r2);
+        L > bestL && (bestL = L, bestR = r2);
+      }
+      res.basis === "xg" && o.rho !== void 0 && o.rho !== null && (bestR = clamp(num(o.rho, 0), lo, hi), bestL = tauLL(bestR)), res.rho = res.basis === "xg" && (o.rho === void 0 || o.rho === null) ? 0 : bestR, res.rhoLogLik = isFinite(bestL) ? bestL : 0;
+      var ll = 0;
+      ms.forEach(function(m) {
+        var lh = mu * att[m.h] * def[m.a] * gamma2, la = mu * att[m.a] * def[m.h], base = -lh + m.hg * Math.log(Math.max(1e-12, lh)) - logGamma(m.hg + 1) - la + m.ag * Math.log(Math.max(1e-12, la)) - logGamma(m.ag + 1);
+        ll += m.w * (base + Math.log(Math.max(1e-12, dcTau(m.hg, m.ag, lh, la, res.rho))));
+      }), res.loglik = isFinite(ll) ? ll : 0, res.ok = !0, res.note = "Dixon-Coles on " + res.basis + ": " + ms.length + " matches, effective weight " + res.weightSum.toFixed(2) + " at a decay of " + res.xi + " per day (half-life " + (res.xi > 0 ? (Math.log(2) / res.xi).toFixed(0) : "infinite") + " days), home factor " + res.gamma.toFixed(3) + ", rho " + res.rho.toFixed(4) + " inside [" + res.rhoRange.lo.toFixed(3) + ", " + res.rhoRange.hi.toFixed(3) + "], mean rate " + res.mu.toFixed(3) + " per team-match (fitted total " + res.fitCheck.predicted.toFixed(2) + " against the observed " + res.fitCheck.observed.toFixed(2) + ", gap " + (res.fitCheck.gap * 100).toFixed(3) + "%)" + (res.basis === "xg" ? " (xG is not a scoreline, so the low-cell correction is applied at prediction time with a rho fitted on goals, never fitted on xG itself)" : "") + ", " + res.iters + " iterations" + (res.converged ? ", converged" : ", NOT converged") + ".";
+    } catch (e) {
+      res.note = "engine error: " + errMsg(e);
+    }
+    return res;
+  }
+  function dcLambdas(t, o, home, M) {
+    var res = { own: LBAR_PRIOR, opp: LBAR_PRIOR, lamH: LBAR_PRIOR, lamA: LBAR_PRIOR, side: home ? "h" : "a" };
+    try {
+      if (!isObj(M) || !isObj(M.att) || !isObj(M.def)) return res;
+      var mu = Math.max(0.05, num(M.mu, LBAR_PRIOR)), g = Math.max(0.1, num(M.gamma, HOME_ADV)), at = clamp(num(M.att[t], 1), 0.05, 5), df = clamp(num(M.def[t], 1), 0.05, 5), ao = clamp(num(M.att[o], 1), 0.05, 5), dfo = clamp(num(M.def[o], 1), 0.05, 5), own = home ? mu * at * dfo * g : mu * at * dfo, opp = home ? mu * ao * df : mu * ao * df * g;
+      res.own = own, res.opp = opp, res.lamH = home ? own : opp, res.lamA = home ? opp : own;
+    } catch {
+    }
+    return res;
+  }
+  function dcPcs(t, o, home, M) {
+    var L = dcLambdas(t, o, home, M);
+    return dcCleanSheetProb(L.lamH, L.lamA, isObj(M) ? num(M.rho, 0) : 0, home ? "h" : "a");
+  }
+  function cleanSheetCalibration(live, opts) {
+    var res = { ok: !1, gws: [], n: 0, models: [], baseRate: 0, rho: null, xi: DC_DECAY_PER_DAY, note: "" };
+    try {
+      var o = isObj(opts) ? opts : {};
+      if (!isObj(live) || !isObj(live.gw))
+        return res.note = "no finished gameweeks in the snapshot", res;
+      var xiD = Math.max(0, num(o.xi, DC_DECAY_PER_DAY));
+      res.xi = xiD;
+      var keys = Object.keys(live.gw).map(function(k) {
+        return num(k, NaN);
+      }).filter(isFinite).sort(sortNum);
+      if (keys.length < 2)
+        return res.note = "a walk-forward needs at least two finished gameweeks; this snapshot has " + keys.length, res;
+      var defs = [
+        { key: "lite", name: "TS lite (xG, no tau, no decay)" },
+        { key: "dc_goals", name: "Dixon-Coles on goals (tau + decay)" },
+        { key: "dc_xg", name: "Dixon-Coles on xG (tau from goals + decay)" }
+      ], P = {}, Y = [], perGw = [];
+      defs.forEach(function(d) {
+        P[d.key] = [];
+      });
+      for (var lastRho = null, i = 1; i < keys.length; i++) {
+        var g = keys[i], cut = keys[i - 1], cutLive = truncateLive(live, cut), st = teamStrength(cutLive), dcg = dixonColes(live, { basis: "goals", upto: cut, xi: xiD }), dcx = dixonColes(live, { basis: "xg", upto: cut, xi: xiD, rho: dcg.ok ? dcg.rho : 0 });
+        dcg.ok && (lastRho = dcg.rho);
+        var rowsGw = { gw: g, n: 0, rho: dcg.ok ? dcg.rho : null, matches: dcg.matches, byModel: {} };
+        defs.forEach(function(d) {
+          rowsGw.byModel[d.key] = { pred: [], y: [] };
+        }), arr(live.fixtures).forEach(function(f) {
+          if (!(!isObj(f) || intOf(f.event, -1) !== g || !f.finished)) {
+            var hs = num(f.team_h_score, NaN), as = num(f.team_a_score, NaN);
+            !isFinite(hs) || !isFinite(as) || [
+              { t: num(f.team_h, NaN), o: num(f.team_a, NaN), home: !0, conceded: as },
+              { t: num(f.team_a, NaN), o: num(f.team_h, NaN), home: !1, conceded: hs }
+            ].forEach(function(side) {
+              if (!(!isFinite(side.t) || !isFinite(side.o))) {
+                var y = side.conceded === 0 ? 1 : 0, preds = {
+                  lite: tsPcs(side.t, side.o, side.home, st.TS),
+                  dc_goals: dcg.ok ? dcPcs(side.t, side.o, side.home, dcg) : null,
+                  dc_xg: dcx.ok ? dcPcs(side.t, side.o, side.home, dcx) : null
+                };
+                preds.dc_goals === null || preds.dc_xg === null || (defs.forEach(function(d) {
+                  P[d.key].push(preds[d.key]), rowsGw.byModel[d.key].pred.push(preds[d.key]), rowsGw.byModel[d.key].y.push(y);
+                }), Y.push(y), rowsGw.n++);
+              }
+            });
+          }
+        }), rowsGw.n && (defs.forEach(function(d) {
+          rowsGw.byModel[d.key].brier = brier(rowsGw.byModel[d.key].pred, rowsGw.byModel[d.key].y).brier;
+        }), perGw.push(rowsGw), res.gws.push(g));
+      }
+      res.n = Y.length, res.rho = lastRho;
+      var nb = clamp(intOf(o.bins, 5), 2, 20);
+      res.models = defs.map(function(d) {
+        var b = brier(P[d.key], Y), rel = reliability(P[d.key], Y, nb);
+        return {
+          key: d.key,
+          name: d.name,
+          n: b.n,
+          brier: b.brier,
+          skill: b.skill,
+          baseRate: b.baseRate,
+          maxGap: rel.maxGap,
+          reliability: rel,
+          perGw: perGw.map(function(r2) {
+            return { gw: r2.gw, n: r2.n, brier: num(r2.byModel[d.key].brier, 0) };
+          })
+        };
+      }), res.baseRate = res.models.length ? res.models[0].baseRate : 0;
+      var ranked = res.models.slice().filter(function(m) {
+        return m.n > 0;
+      }).sort(function(a, b) {
+        return a.brier - b.brier;
+      });
+      res.ok = res.n > 0, res.note = res.ok ? "Clean-sheet calibration over " + res.n + " team-gameweeks in GW" + res.gws[0] + "-GW" + res.gws[res.gws.length - 1] + ", base rate " + (res.baseRate * 100).toFixed(1) + "%. Brier: " + res.models.map(function(m) {
+        return m.key + " " + m.brier.toFixed(4);
+      }).join(" \xB7 ") + ". Lowest is best, so " + (ranked.length ? ranked[0].key : "nothing") + " leads. Fitted rho " + (res.rho === null ? "none" : res.rho.toFixed(4)) + " at a decay of " + xiD + " per day. This measurement drives nothing: it is the evidence a promotion would need, not a promotion." : "no finished fixture with a score to calibrate against";
+    } catch (e) {
+      res.note = "engine error: " + errMsg(e);
+    }
+    return res;
+  }
+  function logGamma(x) {
+    var z = num(x, NaN);
+    if (!isFinite(z) || z <= 0) return 0;
+    var C = [
+      0.9999999999998099,
+      676.5203681218851,
+      -1259.1392167224028,
+      771.3234287776531,
+      -176.6150291621406,
+      12.507343278686905,
+      -0.13857109526572012,
+      9984369578019572e-21,
+      15056327351493116e-23
+    ];
+    if (z < 0.5) {
+      var s = Math.sin(Math.PI * z);
+      return Math.abs(s) > 1e-300 ? Math.log(Math.PI / Math.abs(s)) - logGamma(1 - z) : 0;
+    }
+    z -= 1;
+    for (var a = C[0], t = z + 7.5, i = 1; i < 9; i++) a += C[i] / (z + i);
+    var v = 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(a);
+    return isFinite(v) ? v : 0;
+  }
+  function nbDispersion(mean, variance, shift) {
+    var m = num(mean, 0) - num(shift, 0), v = num(variance, NaN);
+    if (!(m > 0) || !isFinite(v) || !(v > m)) return NB_MAX_R;
+    var r2 = m * m / (v - m);
+    return !isFinite(r2) || r2 <= 0 ? NB_MAX_R : clamp(r2, NB_MIN_R, NB_MAX_R);
+  }
+  function pointsPmf(mean, dispersion, opts) {
+    var res = { ok: !1, min: PTS_DIST_MIN, max: PTS_DIST_MAX, pmf: [], cdf: [], mean: 0, r: NB_MAX_R, shift: -PTS_DIST_MIN, mass: 0 };
+    try {
+      var o = isObj(opts) ? opts : {};
+      res.min = intOf(o.min, PTS_DIST_MIN), res.max = intOf(o.max, PTS_DIST_MAX), res.max <= res.min && (res.max = res.min + 1), res.shift = -res.min;
+      var r2 = clamp(num(dispersion, NB_MAX_R), NB_MIN_R, NB_MAX_R);
+      isFinite(r2) || (r2 = NB_MAX_R), res.r = r2;
+      var m = num(mean, 0) + res.shift;
+      isFinite(m) || (m = res.shift), m = clamp(m, 1e-3, 1e4), res.mean = m - res.shift;
+      var K = res.max - res.min, lr = Math.log(r2) - Math.log(r2 + m), lm = Math.log(m) - Math.log(r2 + m), s = 0, i;
+      for (i = 0; i <= K; i++) {
+        var lp = logGamma(i + r2) - logGamma(r2) - logGamma(i + 1) + r2 * lr + i * lm, p = Math.exp(lp);
+        (!isFinite(p) || p < 0) && (p = 0), res.pmf.push(p), s += p;
+      }
+      if (res.mass = s, !(s > 0))
+        res.pmf = res.pmf.map(function() {
+          return 1 / (K + 1);
+        }), s = 1;
+      else for (i = 0; i <= K; i++) res.pmf[i] = res.pmf[i] / s;
+      var c = 0;
+      for (i = 0; i <= K; i++)
+        c += res.pmf[i], res.cdf.push(clamp(c, 0, 1));
+      res.cdf[K] = 1, res.ok = !0;
+    } catch {
+    }
+    return res;
+  }
+  function crpsDiscrete(dist, y) {
+    try {
+      if (!isObj(dist) || !Array.isArray(dist.cdf) || !dist.cdf.length) return 0;
+      var obs = num(y, NaN);
+      if (!isFinite(obs)) return 0;
+      for (var s = 0, i = 0; i < dist.cdf.length; i++) {
+        var k = num(dist.min, PTS_DIST_MIN) + i, ind = obs <= k ? 1 : 0, d = num(dist.cdf[i], 0) - ind;
+        s += d * d;
+      }
+      return isFinite(s) && s >= 0 ? s : 0;
+    } catch {
+      return 0;
+    }
+  }
+  function logScoreDiscrete(dist, y) {
+    try {
+      if (!isObj(dist) || !Array.isArray(dist.pmf) || !dist.pmf.length) return -Math.log(LOG_SCORE_FLOOR);
+      var obs = Math.round(num(y, NaN));
+      if (!isFinite(obs)) return -Math.log(LOG_SCORE_FLOOR);
+      var idx = clamp(obs - num(dist.min, PTS_DIST_MIN), 0, dist.pmf.length - 1), p = num(dist.pmf[Math.round(idx)], 0);
+      return -Math.log(Math.max(LOG_SCORE_FLOOR, p));
+    } catch {
+      return -Math.log(LOG_SCORE_FLOOR);
+    }
+  }
   typeof module < "u" && module.exports && (module.exports = {
     ENGINE_VERSION,
     SCORING,
@@ -29803,6 +31102,8 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
     ftAvailable,
     sellPrice,
     bankAfter,
+    purchasePrices,
+    sellPrices,
     openClosers,
     salvageJson,
     stripFences,
@@ -29858,10 +31159,53 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
     bestElevenForEvent,
     chipValue,
     chipSolver,
+    MAX_SWAPS,
+    MAX_GREEDY_SWAPS,
+    autosubResolve,
+    permutations,
+    benchPlan,
+    picksOf,
+    gwSims,
+    bestEntryOverElevens,
+    leakBacktest,
+    truncateElements,
+    winnableLeagues,
+    leagueField,
+    candidateSquads,
+    winProbabilityCore,
+    winProbability,
+    objectiveCompare,
+    hierRowsFromAcc,
+    hierGroups,
+    hierPosterior,
+    hierPool,
+    dcTau,
+    dcRhoRange,
+    poissonPmf,
+    dcCleanSheetProb,
+    dcMatches,
+    dixonColes,
+    dcLambdas,
+    dcPcs,
+    cleanSheetCalibration,
+    logGamma,
+    nbDispersion,
+    pointsPmf,
+    crpsDiscrete,
+    logScoreDiscrete,
     MINUTES_FEATURES,
     CHIP_SETS,
     CHIP_NAMES,
-    PROMOTION_HOLDOUT_WEEKS
+    PROMOTION_HOLDOUT_WEEKS,
+    TOURNAMENT_PROMOTE_AT,
+    MC_MIN_GWS_FOR_PWIN,
+    WINNABLE_MAX_SIZE,
+    WINPROB_TOP_N,
+    AUTOSUB_MAX_BLANKS,
+    DC_DECAY_PER_DAY,
+    PTS_DIST_MIN,
+    PTS_DIST_MAX,
+    SHRINK_K
   });
   var WEEKLY = {
     version: 89,

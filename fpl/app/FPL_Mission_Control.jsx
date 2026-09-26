@@ -200,6 +200,63 @@ const APP_VERSION = "v89";
  *                                     total, sets[], windowNote, note, reasons[]} — the two chip sets
  *                                     solved jointly under their expiries, one chip per gameweek
  *
+ * The winning objective (A1, v89) — both objectives, priced, neither promoted
+ *   winnableLeagues(ctx, opts?)     → [{id, name, size, rank, standings}] (size <= WINNABLE_MAX_SIZE)
+ *   leagueField(ctx, leagueId)      → {ok, rows:[{entry,total,rank,me,xi,bench,cap}], meIndex,
+ *                                     missingPicks, simulated, myTotal, note}
+ *   candidateSquads(ctx, cands?)    → [{key,label,ids,xi,bench,cap,vice}] (no argument = his own fifteen)
+ *   winProbabilityCore(ctx, c, o?)  → the shared loop: every candidate on ONE set of draws
+ *   winProbability(ctx, opts?)      → {ok, leagues:[{pFirst, pFirstShown, pTop3, expRank, medianRank,
+ *                                     rankBand, currentRank, direction, headline}], pooled, candidate, note}
+ *                                     pFirstShown is null below MC_MIN_GWS_FOR_PWIN gameweeks (E-020):
+ *                                     the probability is computed because a comparison needs it, and
+ *                                     barred from being a headline
+ *   objectiveCompare(ctx, c, o?)    → {ok, candidates[], byEv, byWin, agree, disagree, pairs[], verdict}
+ *                                     a pair where EV falls and P(first) rises is named in those words
+ *
+ * Autosubs, the bench plan and the leak back-test (F3, corrected in v89)
+ *   autosubResolve(xi, bench, playedOf, ctx) → {starters, subsIn, subsOut, ok} — THE autosub rules
+ *   permutations(list)              → every ordering (capped at six elements)
+ *   benchPlan(squadIds, xiIds, ctx) → {ok, order, rows:[{pEnter, eGiven, value, replaces}],
+ *                                     expectedGain, bestGain, worstGain, orderValue, truncatedMass}
+ *                                     P(comes on) exact over the blank patterns, not simulated
+ *   picksOf(live, gw)               → {ok, xi, bench, ids, capId, viceId, chip} as submitted
+ *   gwSims(live, gw, ids)           → {id:{pts,mins}} for a finished gameweek, entryPoints' shape
+ *   bestEntryOverElevens(ids, capId, viceId, sims, ctx, mustCaptain) → the exact best total
+ *   leakBacktest(live, opts?)       → where the points actually leaked: bench ordering, XI selection
+ *                                     and captaincy, per gameweek, in points, with the engine's own
+ *                                     ex-ante answer beside each. Corrects the points_on_bench
+ *                                     misreading the roadmap was built on (ERRORS.md E-091)
+ *   truncateElements(live, uptoGw)  → the snapshot with every CUMULATIVE element field rebuilt from
+ *                                     the surviving gameweek rows. truncateLive alone leaves
+ *                                     total_points/starts at fetch time, which shrunkPps reads
+ *
+ * Hierarchical partial pooling (v89, the tenth tournament challenger; it drives nothing)
+ *   hierRowsFromAcc(acc, types)     → [{id, type, n, mean, variance}]
+ *   hierGroups(rows)                → {1..4, pooled}: {mu, sigma2, tau2, players, games, fitted}
+ *                                     empirical Bayes; tau2 by DerSimonian-Laird moments
+ *   hierPosterior(row, group)       → {postMean, postVar, postSd, weight, flatWeight, flatMean, shrinkGap}
+ *   hierPool(live, opts?)           → the panel: per-position hyperparameters, per-player posteriors,
+ *                                     the posterior-variance range, the thinnest and thickest rows
+ *
+ * Dixon-Coles, properly (E2, v89) — the tau correction and exponential time decay
+ *   dcTau(x, y, lamH, lamA, rho)    → the low-score correction on (0,0) (0,1) (1,0) (1,1)
+ *   dcRhoRange(lamH, lamA)          → {lo, hi}: where every tau cell stays non-negative
+ *   poissonPmf(k, lam)              → probability in [0,1]
+ *   dcCleanSheetProb(lamH, lamA, rho, side) → P(the named side concedes nothing), tau applied
+ *   dcMatches(live, opts?)          → the matches a cut may see, with their decay weights
+ *   dixonColes(live, opts?)         → {ok, basis:"goals"|"xg", xi, mu, gamma, att, def, rho, rhoRange,
+ *                                     matches, weightSum, iters, converged, loglik, note}
+ *   dcLambdas(t, o, home, M) / dcPcs(t, o, home, M) → the two rates, and the clean-sheet probability
+ *   cleanSheetCalibration(live, o?) → the incumbent tsPcs against both Dixon-Coles fits on Brier and
+ *                                     a reliability curve, walk-forward. Evidence, not a promotion
+ *
+ * Probabilistic scoring (E5, v89) — a proper score over the whole distribution
+ *   logGamma(x) / nbDispersion(mean, variance, shift) → Lanczos log-gamma, moment-matched dispersion
+ *   pointsPmf(mean, dispersion, o?) → {ok, min, max, pmf[], cdf[], r, mass}: shifted negative binomial
+ *   crpsDiscrete(dist, y)           → CRPS, non-negative
+ *   logScoreDiscrete(dist, y)       → -log p(observed), floored at LOG_SCORE_FLOOR
+ *
  * Tournament (E5)
  *   tournament(live)                → {models:[{key,name,spearman,mae,maeRaw,maeScale,
  *                                      maeCalibrated,transitions,wins,holdout,gate,promotable}],
@@ -211,6 +268,13 @@ const APP_VERSION = "v89";
  *                                      nothing about any model passing. promotable = at least one
  *                                      model's own gate is open, which is what the word reads as
  *                                      (E-086). Per model, `promotable` is that model's gate.
+ *                                      v89 adds crps, logScore and their per-transition arrays, and
+ *                                      the SAME gate decided on CRPS as gateCrps / promotableCrps /
+ *                                      transitionWinnersCrps. `authoritativeMetric` is "spearman":
+ *                                      the CRPS gate is published beside the verdict, never instead
+ *                                      of it, because moving the metric a gate runs on rewrites
+ *                                      every past verdict at once (A2 law 5). TEN models from v89:
+ *                                      the eight of E5, player_xg (F5) and hier_pool.
  *   calibrateToPoints(pred, actual) → {scale, calibrated, pred[]}
  *   spearman(a, b) / mae(a, b)      → numbers
  *
@@ -224,7 +288,7 @@ const APP_VERSION = "v89";
  *   applyRefresh(state, parsed)     → new state (throws on invalid input; never mutates)
  */
 
-var ENGINE_VERSION = "v88";
+var ENGINE_VERSION = "v89";
 
 var SCORING = {
   1: { play_short: 1, play_long: 2, goal: 6, assist: 3, cs: 4, gc_per2: -1, saves_per3: 1, pen_save: 5, pen_miss: -2, yc: -1, rc: -3, og: -2, dc: 0, dc_threshold: null, bonus: 1 },
@@ -248,7 +312,12 @@ var BUDGET_TENTHS = 1000;
 var MAX_PER_CLUB = 3;
 var MAX_INCOMING_PER_CLUB = 2;
 var HIT_COST = 4;
+/* The exhaustive part of the transfer search stops at three swaps: C(15,k) out-sets times the
+   candidates per slot grows past what a phone can run at four. Free transfers bank to five, so the
+   search does not stop there — MAX_GREEDY_SWAPS extends the best three-swap plan one swap at a
+   time. See transferProtocol and ERRORS.md E-090. */
 var MAX_SWAPS = 3;
+var MAX_GREEDY_SWAPS = 5;
 var SELL_GAIN_MIN = 4;
 var MARGIN_HIGH = 2.0;
 var MARGIN_MED = 0.8;
@@ -284,6 +353,28 @@ var REFRESH_PAIRS = {
   sonnet5: { model: "claude-sonnet-5", tool: "web_search_20260209" },
   opus5: { model: "claude-opus-5", tool: "web_search_20260209" }
 };
+// --- the winning objective (A1, v89) ---------------------------------------
+var WINNABLE_MAX_SIZE = 40;              // A1: a league this size or smaller is a league he can win
+var WINPROB_ITERS = 400;
+var WINPROB_TOP_N = 3;                   // the "top three" band the panel reports beside P(first)
+// --- autosubs and the bench plan (F3, v89) ---------------------------------
+var AUTOSUB_MAX_BLANKS = 4;              // four substitutes is the most that can ever come on
+// --- hierarchical partial pooling (v89 challenger) -------------------------
+var HIER_MIN_PLAYERS = 4;                // below this a group cannot estimate a between-player variance
+var HIER_MIN_SIGMA2 = 0.25;              // floor on the pooled within-player variance, points squared
+var HIER_MIN_TAU2 = 1e-3;                // floor on the between-player variance
+// --- Dixon-Coles, properly (E2, v89) --------------------------------------
+var DC_DECAY_PER_DAY = 0.0065;           // Dixon & Coles (1997): half-life about 107 days
+var DC_MAX_ITERS = 200;
+var DC_TOL = 1e-9;
+var DC_RHO_GRID = 81;
+// --- probabilistic scoring (E5, v89) --------------------------------------
+var PTS_DIST_MIN = -6;                   // a red card and an own goal is the realistic floor
+var PTS_DIST_MAX = 34;
+var NB_MIN_R = 0.05;
+var NB_MAX_R = 1e6;                      // the Poisson limit of the negative binomial
+var LOG_SCORE_FLOOR = 1e-9;
+var PMF_CACHE_STEP = 20;                 // predictive means are cached at a twentieth of a point
 var TOURNAMENT_MODELS = [
   { key: "season_mean", name: "Season mean" },
   { key: "last_gw", name: "Last GW" },
@@ -293,7 +384,8 @@ var TOURNAMENT_MODELS = [
   { key: "bps_rate", name: "BPS rate" },
   { key: "blend", name: "Blend" },
   { key: "component_xp", name: "Component xP" },
-  { key: "player_xg", name: "Player xG" }
+  { key: "player_xg", name: "Player xG" },
+  { key: "hier_pool", name: "Hierarchical pool" }
 ];
 
 // ---------------------------------------------------------------- helpers
@@ -1091,8 +1183,20 @@ function transferProtocol(state, ctx) {
     var protectedIds = {}; sells.forEach(function (s) { if (s.konsa && !s.forced) protectedIds[s.id] = true; });
     res.forced = sells.filter(function (s) { return s.forced; });
     var inSquad = {}; squad.forEach(function (id) { inSquad[id] = true; });
-    var maxK = Math.min(FT + 1, MAX_SWAPS);
-    if (forced.length > maxK) res.reasons.push(forced.length + " forced sells but at most " + maxK + " transfers this week; the lowest-xp forced sells go first");
+    /* E-090: this used to be min(FT + 1, 3) and the reason string said "at most 3 transfers this
+       week", printed under a header reading "FT 4". Both statements were true about different
+       things — the 3 was the search's own limit, not the week's — and together they told the
+       manager he could not do something the rules plainly allow. Free transfers bank to five
+       (v110 §4), so the week's limit is FT + 1 with one hit, and the search reaches it. */
+    var weekK = Math.min(FT + 1, MAX_GREEDY_SWAPS);
+    var maxK = Math.min(weekK, MAX_SWAPS);
+    res.weekLimit = weekK;
+    res.searchLimit = maxK;
+    if (forced.length > weekK) {
+      res.reasons.push(forced.length + " forced sells and the week allows " + weekK +
+        " transfer" + (weekK === 1 ? "" : "s") + " (" + FT + " free" + (weekK > FT ? " plus one hit" : "") +
+        "); the lowest-xp forced sells go first");
+    }
     forced.sort(function (a, b) { return ctx.xp[a].xp5 - ctx.xp[b].xp5; });
     var candByPos = { 1: [], 2: [], 3: [], 4: [] };
     ctx.elList.forEach(function (el) {
@@ -1153,6 +1257,38 @@ function transferProtocol(state, ctx) {
         rec(0, []);
       });
     }
+    /* Beyond three swaps the search is greedy, which is what v110 B4 asks for: take the best plan
+       so far and add the single best further swap, while the week still allows one. Exhaustive
+       would mean C(15,4) out-sets times the candidates per slot, and that is not a search a phone
+       finishes. Greedy is monotone here — a swap is only added when it raises the plan's value —
+       so a four-swap plan never scores worse than the three-swap plan it grew from. */
+    if (weekK > MAX_SWAPS && plans.length) {
+      plans.sort(function (a, b) { return b.value - a.value || a.k - b.k; });
+      var grown = plans[0];
+      for (var gk = MAX_SWAPS + 1; gk <= weekK; gk++) {
+        var used = {}; grown.outs.forEach(function (id) { used[id] = true; });
+        var usedIn = {}; grown.ins.forEach(function (id) { usedIn[id] = true; });
+        var bestNext = null;
+        var stillOut = squad.filter(function (id) { return !used[id] && !protectedIds[id]; });
+        // Forced sells still in the squad come first, then the rest by lowest five-week xp.
+        stillOut.sort(function (a, b) {
+          var fa = forced.indexOf(a) >= 0 ? 0 : 1, fb = forced.indexOf(b) >= 0 ? 0 : 1;
+          return (fa - fb) || ((ctx.xp[a] ? ctx.xp[a].xp5 : 0) - (ctx.xp[b] ? ctx.xp[b].xp5 : 0));
+        });
+        stillOut.slice(0, 8).forEach(function (outId) {
+          var cands = candByPos[elType(ctx.els[outId])] || [];
+          cands.slice(0, 8).forEach(function (inId) {
+            if (usedIn[inId]) return;
+            var p = evalPlan(grown.outs.concat([outId]), grown.ins.concat([inId]), gk);
+            if (!p) return;
+            if (!bestNext || p.value > bestNext.value) bestNext = p;
+          });
+        });
+        if (!bestNext || bestNext.value <= grown.value) break;   // adding a swap has to pay
+        plans.push(bestNext);
+        grown = bestNext;
+      }
+    }
     plans.sort(function (a, b) { return b.value - a.value || a.k - b.k; });
     // E-037: `order` is built on ONE path. The no-plan branch used to return early with the
     // captain and the vice set but the execution order empty, so a hold week handed the manager
@@ -1175,6 +1311,18 @@ function transferProtocol(state, ctx) {
       res.margin = alt ? best.value - alt.value : best.value;
       res.alternatives = different.slice(0, 3).map(function (p) { return { value: p.value, k: p.k, hits: p.hits, moves: p.moves.map(function (m) { return { out: m.out, in: m.in, outName: m.outName, inName: m.inName, gain: m.gain }; }) }; });
       var hasForced = best.moves.some(function (m) { return m.forced; });
+      /* A forced sell the plan chooses NOT to make has to be named, with its reason, or the
+         manager is looking at a squad that still holds a flagged player and nothing on screen
+         says why. E-082's rule cuts both ways: selling a starter on a doubt needs the reason on
+         screen, and so does keeping one. */
+      var keptForced = res.forced.filter(function (f) {
+        return best.outs.indexOf(f.id) < 0;
+      });
+      if (keptForced.length) {
+        res.keptForced = keptForced.map(function (f) { return { id: f.id, name: elName(f.id, ctx), reason: f.reason }; });
+        res.reasons.push("kept despite the flag, because the swap did not pay: " +
+          res.keptForced.map(function (f) { return f.name + " (" + f.reason + ")"; }).join(", "));
+      }
       if (res.margin >= MARGIN_HIGH) res.confidence = "HIGH";
       else if (res.margin >= MARGIN_MED) res.confidence = "MED";
       else res.confidence = hasForced ? "LOW" : "hold";
@@ -2320,6 +2468,87 @@ function sellPrice(now, purchase) {
   if (n > p) return p + Math.floor((n - p) / 2);
   return n;
 }
+/* What a player cost, and therefore what he sells for (v110 §4 Classic, §5 A3).
+
+   The rule: selling price is the price paid plus HALF of any rise, rounded down to £0.1m; a fall is
+   taken in full. `sellPrice` above is that arithmetic. The hard part is the price paid, and it has
+   two sources:
+
+     the original fifteen   `now_cost - cost_change_start`. The start price, worked back from
+                            today's price and the change since.
+     anyone bought since    `element_in_cost` from the entry transfers endpoint (the fetcher's job,
+                            never the app's — verify.sh forbids an account path in src for a
+                            reason). This is the price
+                            actually paid, logged by the game, and it is NOT recoverable from
+                            `cost_change_start`: a player bought after a rise was paid the risen
+                            price, and his start price would understate what he sells for.
+
+   Before this, the repo had no transfer log at all and took purchase prices from `state.squad[].
+   purchase` — hand-derived, which is why Calvert-Lewin sat in the state file as an estimate of 60
+   inferred from the bank delta. The log says `element_in_cost: 60`. The estimate was right and that
+   is not the point: an estimate that happens to be right is still an estimate, and a screenshot or
+   a derivation goes stale within days (§7.13).
+
+   Pure and array-shaped so a suite can drive it straight off recorded feeds.
+*/
+function purchasePrices(elements, transfers, squadIds) {
+  var res = { paid: {}, source: {}, bought: 0, original: 0, note: "" };
+  try {
+    var E = elMap(elements);
+    var ids = arr(squadIds).map(function (x) { return intOf(x, 0); }).filter(function (x) { return x > 0; });
+    if (!ids.length) ids = Object.keys(E).map(function (k) { return intOf(k, 0); });
+
+    /* The log is applied in time order, so the LAST price paid for a player who was bought,
+       sold and bought again is the one that counts. */
+    var log = arr(transfers).filter(isObj).slice().sort(function (a, b) {
+      return String(a.time || "").localeCompare(String(b.time || ""));
+    });
+    var byTransfer = {};
+    log.forEach(function (t) {
+      var inId = intOf(t.element_in, 0);
+      var cost = intOf(t.element_in_cost, NaN);
+      if (inId > 0 && isFinite(cost) && cost > 0) byTransfer[inId] = cost;
+    });
+
+    ids.forEach(function (id) {
+      var el = E[id];
+      if (!isObj(el)) return;
+      var now = intOf(el.now_cost, 0);
+      if (Object.prototype.hasOwnProperty.call(byTransfer, id)) {
+        res.paid[id] = byTransfer[id];
+        res.source[id] = "transfer";
+        res.bought++;
+      } else {
+        res.paid[id] = now - intOf(el.cost_change_start, 0);
+        res.source[id] = "start";
+        res.original++;
+      }
+    });
+    res.note = res.original + " priced from the start price, " + res.bought + " from the transfer log";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+/* {id: {now, paid, sell}} in TENTHS, which is what the API speaks. Callers divide by ten to show
+   a price; nothing internal ever rounds, because a display-rounded price in a budget check is how
+   a squad comes out £0.1m over (B3's "raw prices, never display-rounded"). */
+function sellPrices(elements, transfers, squadIds) {
+  var out = { rows: {}, paidSource: {}, note: "" };
+  try {
+    var E = elMap(elements);
+    var pp = purchasePrices(elements, transfers, squadIds);
+    Object.keys(pp.paid).forEach(function (id) {
+      var el = E[id];
+      if (!isObj(el)) return;
+      var now = intOf(el.now_cost, 0), paid = intOf(pp.paid[id], 0);
+      out.rows[id] = { now: now, paid: paid, sell: sellPrice(now, paid) };
+      out.paidSource[id] = pp.source[id];
+    });
+    out.note = pp.note;
+  } catch (e) { out.note = "engine error: " + errMsg(e); }
+  return out;
+}
+
 function bankAfter(state, moves, els) {
   try {
     var st = sanitiseState(state), E = elMap(els);
@@ -2570,20 +2799,11 @@ function entryPoints(xi, bench, capId, viceId, sims, ctx) {
   // xi: 11 ids in order; bench: [gkSub, b1, b2, b3] in order; sims: {id:{pts,mins}}
   if (!okCtx(ctx)) return 0;
   if (!isObj(sims)) sims = {};
-  var total = 0, starters = arr(xi).slice(), benchLeft = arr(bench).slice();
-  var counts = posCounts(starters, ctx.els);
-  starters.forEach(function (id, i) {
-    var s = sims[id] || { pts: 0, mins: 0 };
-    if (s.mins > 0) return;
-    var st = elType(ctx.els[id]);
-    for (var j = 0; j < benchLeft.length; j++) {
-      var b = benchLeft[j], bs = sims[b] || { pts: 0, mins: 0 }; if (bs.mins <= 0) continue;
-      var bt = elType(ctx.els[b]);
-      if (st === 1 || bt === 1) { if (st !== bt) continue; }
-      else { var c = { 2: counts[2], 3: counts[3], 4: counts[4] }; c[st]--; c[bt]++; if (!(c[2] >= 3 && c[3] >= 2 && c[4] >= 1)) continue; counts = c; }
-      starters[i] = b; benchLeft.splice(j, 1); break;
-    }
-  });
+  var total = 0;
+  // The autosub rules live in autosubResolve and nowhere else, so the Monte Carlo and the F3
+  // back-test cannot drift apart on them (E-089's lesson applied before it could recur here).
+  var sub = autosubResolve(xi, bench, function (id) { return (sims[id] || { mins: 0 }).mins > 0; }, ctx);
+  var starters = sub.ok ? sub.starters : arr(xi).slice();
   starters.forEach(function (id) { total += (sims[id] || { pts: 0 }).pts; });
   var cap = capId, capS = sims[cap] || { pts: 0, mins: 0 };
   if (capS.mins <= 0 && viceId) { cap = viceId; capS = sims[cap] || { pts: 0, mins: 0 }; }
@@ -2722,7 +2942,7 @@ function calibrateToPoints(pred, actual) {
   return res;
 }
 function tournament(live) {
-  var res = { models: TOURNAMENT_MODELS.map(function (m) { return { key: m.key, name: m.name, spearman: null, mae: null, maeRaw: null, maeScale: null, maeCalibrated: false, transitions: 0, perTransition: [], wins: 0, holdout: 0, gate: null, promotable: false }; }), leader: null, decidable: false, promotable: false, transitions: 0, transitionWinners: [], maeUnits: "points", maeNote: "", note: "" };
+  var res = { models: TOURNAMENT_MODELS.map(function (m) { return { key: m.key, name: m.name, spearman: null, mae: null, maeRaw: null, maeScale: null, maeCalibrated: false, transitions: 0, perTransition: [], wins: 0, holdout: 0, gate: null, promotable: false, crps: null, logScore: null, crpsPerTransition: [], logPerTransition: [], crpsWins: 0, crpsHoldout: 0, gateCrps: null, promotableCrps: false }; }), leader: null, decidable: false, promotable: false, transitions: 0, transitionWinners: [], maeUnits: "points", maeNote: "", crpsLeader: null, logScoreLeader: null, promotableCrps: false, transitionWinnersCrps: [], authoritativeMetric: "spearman", distNote: "", note: "" };
   try {
     if (!isObj(live) || !isObj(live.gw)) { res.note = "no finished gameweeks in the snapshot"; return res; }
     var keys = Object.keys(live.gw).map(function (k) { return num(k, NaN); }).filter(isFinite).sort(sortNum);
@@ -2741,12 +2961,18 @@ function tournament(live) {
       (fxOf[ka] = fxOf[ka] || []).push({ team: num(f.team_a, -1), opp: num(f.team_h, -1), home: false });
     });
     arr(live.elements).forEach(function (el) { if (isObj(el)) teamOf[el.id] = num(el.team, -1); });
-    var scores = {}; TOURNAMENT_MODELS.forEach(function (m) { scores[m.key] = { rho: [], mae: [], raw: [], scale: [], uncal: 0 }; });
+    var scores = {}; TOURNAMENT_MODELS.forEach(function (m) { scores[m.key] = { rho: [], mae: [], raw: [], scale: [], uncal: 0, crps: [], logs: [] }; });
+    // The spread of realised points over the gameweeks already seen, which is what the predictive
+    // distribution's dispersion is moment-matched to. Updated after each gameweek is scored, so it
+    // never contains the gameweek being predicted.
+    var dAcc = { n: 0, sum: 0, sum2: 0 };
     for (var i = 0; i < keys.length; i++) {
       var g = keys[i], rows = isObj(live.gw[g]) && isObj(live.gw[g].elements) ? live.gw[g].elements : {};
       var TSprev = strengthFromCounts(tacc);                            // strength from the gameweeks BEFORE g
       if (i > 0) {
         var preds = {}; TOURNAMENT_MODELS.forEach(function (m) { preds[m.key] = []; }); var actual = [];
+        var priors = [];                                              // each player's own prior per-game points
+        var hgroups = hierGroups(hierRowsFromAcc(acc, types));        // the hierarchy on gameweeks <= k only
         Object.keys(rows).forEach(function (id) {
           var a = acc[id]; if (!a || !a.played) return;
           var row = rows[id]; if (!Array.isArray(row) || num(row[0], 0) <= 0) return;
@@ -2758,6 +2984,8 @@ function tournament(live) {
           preds.season_mean.push(seasonMean); preds.last_gw.push(a.last); preds.per90.push(per90); preds.shrunk_per90.push(shrunk);
           preds.ict_rate.push(ict); preds.bps_rate.push(bps); preds.blend.push((seasonMean + shrunk + bps / 10) / 3); preds.component_xp.push(component);
           preds.player_xg.push(playerXgPredict(a, pacc[t], t, S, fxOf[g + ":" + teamOf[id]], TSprev));
+          preds.hier_pool.push(hierPosterior({ id: num(id, 0), type: t, n: a.played, mean: seasonMean, variance: a.played >= 2 ? Math.max(0, (num(a.pts2, 0) - a.played * seasonMean * seasonMean) / (a.played - 1)) : NaN }, hgroups[t]).postMean);
+          priors.push(seasonMean);
           actual.push(num(row[2], 0));
         });
         if (actual.length >= 10) TOURNAMENT_MODELS.forEach(function (m) {
@@ -2769,11 +2997,41 @@ function tournament(live) {
           S.scale.push(cal.scale);
           if (!cal.calibrated) S.uncal++;
         });
+        // CRPS and the logarithmic score over the whole predicted distribution. Every figure here
+        // comes from gameweeks <= k: the rescaling factor is the players' own prior per-game points
+        // against the model's own mean prediction, and the dispersion is moment-matched to the
+        // spread of points already observed. Neither reads the gameweek being scored.
+        if (actual.length >= 10) {
+          var dmean = dAcc.n ? dAcc.sum / dAcc.n : 0;
+          var dvar = dAcc.n > 1 ? Math.max(0, (dAcc.sum2 - dAcc.n * dmean * dmean) / (dAcc.n - 1)) : 0;
+          var disp = nbDispersion(dmean, dvar, PTS_DIST_MIN);
+          var priorMean = priors.length ? sum(priors) / priors.length : 0;
+          var pmfCache = {};
+          var distOf = function (mu) {
+            var key = Math.round(num(mu, 0) * PMF_CACHE_STEP);
+            if (!pmfCache[key]) pmfCache[key] = pointsPmf(key / PMF_CACHE_STEP, disp, {});
+            return pmfCache[key];
+          };
+          TOURNAMENT_MODELS.forEach(function (m) {
+            var pv = preds[m.key], pm = 0, c = 0, q;
+            for (q = 0; q < pv.length; q++) { var u = num(pv[q], NaN); if (isFinite(u)) { pm += u; c++; } }
+            pm = c ? pm / c : 0;
+            var k = (pm > 0 && priorMean > 0) ? priorMean / pm : 1;
+            if (!isFinite(k) || k <= 0) k = 1;
+            var sc = 0, sl = 0, n2 = 0;
+            for (q = 0; q < pv.length && q < actual.length; q++) {
+              var mu = num(pv[q], NaN); if (!isFinite(mu)) continue;
+              var d = distOf(mu * k);
+              sc += crpsDiscrete(d, actual[q]); sl += logScoreDiscrete(d, actual[q]); n2++;
+            }
+            if (n2) { scores[m.key].crps.push(sc / n2); scores[m.key].logs.push(sl / n2); }
+          });
+        }
       }
       Object.keys(rows).forEach(function (id) {
         var row = rows[id]; if (!Array.isArray(row)) return;
-        var a = acc[id] = acc[id] || { played: 0, min: 0, pts: 0, xg: 0, xa: 0, cs: 0, gc: 0, dcHits: 0, bps: 0, ict: 0, bonus: 0, last: 0 };
-        if (num(row[0], 0) > 0) { a.played++; a.min += num(row[0], 0); a.pts += num(row[2], 0); a.xg += num(row[3], 0); a.xa += num(row[4], 0); a.cs += num(row[11], 0); a.gc += num(row[12], 0); a.bps += num(row[7], 0); a.ict += num(row[8], 0); a.bonus += num(row[13], 0); var thr = SCORING[types[id] || 3].dc_threshold; if (thr && num(row[6], 0) >= thr) a.dcHits++; var pt = types[id] || 3; if (pacc[pt]) { pacc[pt].min += num(row[0], 0); pacc[pt].xg += num(row[3], 0); pacc[pt].xa += num(row[4], 0); } }
+        var a = acc[id] = acc[id] || { played: 0, min: 0, pts: 0, pts2: 0, xg: 0, xa: 0, cs: 0, gc: 0, dcHits: 0, bps: 0, ict: 0, bonus: 0, last: 0 };
+        if (num(row[0], 0) > 0) { var pv0 = num(row[2], 0); a.pts2 = num(a.pts2, 0) + pv0 * pv0; dAcc.n++; dAcc.sum += pv0; dAcc.sum2 += pv0 * pv0; a.played++; a.min += num(row[0], 0); a.pts += num(row[2], 0); a.xg += num(row[3], 0); a.xa += num(row[4], 0); a.cs += num(row[11], 0); a.gc += num(row[12], 0); a.bps += num(row[7], 0); a.ict += num(row[8], 0); a.bonus += num(row[13], 0); var thr = SCORING[types[id] || 3].dc_threshold; if (thr && num(row[6], 0) >= thr) a.dcHits++; var pt = types[id] || 3; if (pacc[pt]) { pacc[pt].min += num(row[0], 0); pacc[pt].xg += num(row[3], 0); pacc[pt].xa += num(row[4], 0); } }
         a.last = num(row[2], 0);
       });
       Object.keys(acc).forEach(function (id) { if (!rows[id]) acc[id].last = 0; });
@@ -2795,6 +3053,10 @@ function tournament(live) {
       m.maeRaw = sum(s.raw) / s.raw.length;
       m.maeScale = sum(s.scale) / s.scale.length;
       m.maeCalibrated = s.uncal === 0;
+      m.crpsPerTransition = s.crps.slice();
+      m.logPerTransition = s.logs.slice();
+      if (s.crps.length) m.crps = sum(s.crps) / s.crps.length;
+      if (s.logs.length) m.logScore = sum(s.logs) / s.logs.length;
     });
     res.maeNote = "MAE is reported in points: each predictor is rescaled by mean(points) / mean(prediction) over the gameweek it was fitted on, so the column ranks accuracy and not units. maeRaw keeps the unscaled figure. Spearman needs no rescaling.";
     res.transitions = Math.max.apply(null, [0].concat(res.models.map(function (m) { return m.transitions; })));
@@ -2829,6 +3091,40 @@ function tournament(live) {
     });
     // E-086: the top-level word now means what it says — at least one model's own gate is open.
     res.promotable = res.models.some(function (m) { return m.promotable === true; });
+    // The same gate, decided on CRPS instead of Spearman, computed and published BESIDE the
+    // authoritative verdict rather than in place of it. Lower CRPS wins a transition. Switching
+    // the metric the gate runs on rewrites every past verdict at once, so it is a decision with its
+    // own round and its own before-and-after, not a side effect of adding a column (A2 law 5).
+    var cw = [];
+    for (var ci = 0; ci < res.transitions; ci++) {
+      var bk = null, bv = null;
+      res.models.forEach(function (m) {
+        var v = Array.isArray(m.crpsPerTransition) && m.crpsPerTransition.length > ci ? num(m.crpsPerTransition[ci], NaN) : NaN;
+        if (!isFinite(v)) return;
+        if (bv === null || v < bv) { bv = v; bk = m.key; }
+      });
+      cw.push(bk);
+    }
+    res.transitionWinnersCrps = cw;
+    res.models.forEach(function (m) {
+      var w = 0, tr = 0;
+      cw.forEach(function (k) { if (k === m.key) w++; });
+      for (var ti = cw.length - 1; ti >= 0; ti--) { if (cw[ti] === m.key) tr++; else break; }
+      m.crpsWins = w; m.crpsHoldout = tr;
+      m.gateCrps = promotionGate({ transitions: Array.isArray(m.crpsPerTransition) ? m.crpsPerTransition.length : 0, wins: w, holdout: tr, challenger: m.name + " on CRPS", incumbent: "E1 xP in production" });
+      m.promotableCrps = m.gateCrps.promotable;
+    });
+    res.promotableCrps = res.models.some(function (m) { return m.promotableCrps === true; });
+    var scoredC = res.models.filter(function (m) { return m.crps !== null; }).sort(function (a, b) { return a.crps - b.crps; });
+    var scoredL = res.models.filter(function (m) { return m.logScore !== null; }).sort(function (a, b) { return a.logScore - b.logScore; });
+    res.crpsLeader = scoredC.length ? scoredC[0].key : null;
+    res.logScoreLeader = scoredL.length ? scoredL[0].key : null;
+    res.distNote = scoredC.length
+      ? ("CRPS and the logarithmic score run over the whole predicted distribution (lower is better, both walk-forward). CRPS leader " +
+         res.crpsLeader + " at " + scoredC[0].crps.toFixed(4) + "; log score leader " + res.logScoreLeader +
+         (scoredL.length ? " at " + scoredL[0].logScore.toFixed(4) : "") +
+         ". The gate this app promotes on is still Spearman (authoritativeMetric): the CRPS gate is published beside it as gateCrps and promotableCrps, and moving the gate onto it is its own decision with its own before-and-after.")
+      : "fewer than ten scored rows in any transition: no distributional score";
     res.note = res.transitions
       ? (res.transitions + " walk-forward transition" + (res.transitions === 1 ? "" : "s") + "; promotion needs " + TOURNAMENT_PROMOTE_AT +
          " with a " + PROMOTION_HOLDOUT_WEEKS + "-gameweek trailing hold-out. The gate is " +
@@ -3776,6 +4072,1326 @@ function chipSolver(ctx, opts) {
   return res;
 }
 
+// ---------------------------------------------------------------- autosubs, bench plan, leak back-test (F3, corrected)
+
+/* The autosub rules live here and nowhere else. A bench player enters only for a starter who
+ * played zero minutes, only if the formation stays legal after the swap, and a goalkeeper only
+ * ever replaces a goalkeeper. Bench order decides who is tried first, and a sub who did not play
+ * himself cannot come on. entryPoints (the Monte Carlo) and the back-test below both call this,
+ * so there is exactly one implementation of the rules — the E-089 lesson: a settlement order
+ * that exists twice is a settlement order that will differ once.
+ * playedOf(id) -> boolean. */
+function autosubResolve(xi, bench, playedOf, ctx) {
+  var res = { starters: [], subsIn: [], subsOut: [], ok: false };
+  try {
+    if (!okCtx(ctx)) return res;
+    var played = typeof playedOf === "function" ? playedOf : function () { return true; };
+    var starters = arr(xi).slice(), benchLeft = arr(bench).slice();
+    var counts = posCounts(starters, ctx.els);
+    var ins = [], outs = [];
+    starters.forEach(function (id, i) {
+      if (played(id)) return;
+      var st = elType(ctx.els[id]);
+      for (var j = 0; j < benchLeft.length; j++) {
+        var b = benchLeft[j];
+        if (!played(b)) continue;
+        var bt = elType(ctx.els[b]);
+        if (st === 1 || bt === 1) { if (st !== bt) continue; }
+        else {
+          var c = { 2: counts[2], 3: counts[3], 4: counts[4] };
+          c[st]--; c[bt]++;
+          if (!(c[2] >= 3 && c[3] >= 2 && c[4] >= 1)) continue;
+          counts = c;
+        }
+        starters[i] = b; benchLeft.splice(j, 1); ins.push(b); outs.push(id); break;
+      }
+    });
+    res.starters = starters; res.subsIn = ins; res.subsOut = outs; res.ok = true;
+  } catch (e) { /* total */ }
+  return res;
+}
+
+// Every ordering of a list, capped so junk cannot ask for 13! of anything.
+function permutations(list) {
+  var src = arr(list);
+  if (src.length > 6) return [src.slice()];
+  var out = [];
+  (function rec(rest, cur) {
+    if (!rest.length) { out.push(cur.slice()); return; }
+    for (var i = 0; i < rest.length; i++) {
+      var next = rest.slice(); var v = next.splice(i, 1)[0];
+      cur.push(v); rec(next, cur); cur.pop();
+    }
+  })(src, []);
+  return out;
+}
+
+/* benchPlan — roadmap F3, built to its own specification and reported honestly.
+ *
+ * Value of a bench slot = P(it actually comes on) x E[points | it plays], where P(it comes on) is
+ * computed exactly rather than simulated: every pattern of up to AUTOSUB_MAX_BLANKS simultaneous
+ * blanks among the eleven, crossed with every played/blanked pattern of the bench, is enumerated,
+ * the real autosub rules are run on each, and the probability of the patterns in which this sub
+ * entered is summed. Patterns with more simultaneous blanks than the bench could ever cover are
+ * left out and their probability is reported as `truncatedMass`, so the truncation is visible.
+ *
+ * What it is worth is a separate question from whether it is built, and on this manager's record
+ * the answer is nothing: leakBacktest finds 0 points of bench-ordering value over five finished
+ * gameweeks because not one of his starters has blanked. `orderValue` is the ex-ante spread
+ * between the best and the worst legal ordering — the expected points at stake in the ORDER.
+ */
+function benchPlan(squadIds, xiIds, ctx) {
+  var res = {
+    ok: false, xi: [], bench: [], gkSub: null, order: [], rows: [], patterns: 0, truncatedMass: 0,
+    expectedGain: 0, bestGain: 0, worstGain: 0, orderValue: 0, bestOrder: [], note: ""
+  };
+  try {
+    if (!okCtx(ctx)) { res.note = "no context"; return res; }
+    var squad = uniq(idList(squadIds)).filter(function (id) { return ctx.els[id]; });
+    var xi = uniq(idList(xiIds)).filter(function (id) { return ctx.els[id] && squad.indexOf(id) >= 0; });
+    if (xi.length !== 11 || !legalXI(xi, ctx.els).ok) xi = bestXI(squad, ctx).ids.slice();
+    if (xi.length !== 11) { res.note = "no legal eleven to plan a bench around"; return res; }
+    var xiSet = {}; xi.forEach(function (id) { xiSet[id] = true; });
+    var bench = squad.filter(function (id) { return !xiSet[id]; });
+    var gk = bench.filter(function (id) { return elType(ctx.els[id]) === 1; });
+    var outfield = bench.filter(function (id) { return elType(ctx.els[id]) !== 1; }).slice(0, 5);
+    res.xi = xi.slice(); res.bench = bench.slice(); res.gkSub = gk.length ? gk[0] : null;
+    var pOf = {}, eOf = {};
+    squad.forEach(function (id) {
+      var el = ctx.els[id];
+      var x = ctx.xp[id] || { shrunk: shrunkPps(el), pstart: pStart(el, ctx.gwStats) };
+      pOf[id] = clamp(num(x.pstart, 0), 0, 1);
+      eOf[id] = Math.max(0, num(x.shrunk, 0) * num((ctx.mults.TS[el.team] || [0])[0], 0));
+    });
+    // starter blank subsets, capped by how many subs could ever come on
+    var maxBlanks = Math.min(AUTOSUB_MAX_BLANKS, xi.length);
+    var subsets = [], mass = 0;
+    for (var k = 0; k <= maxBlanks; k++) {
+      combos(xi, k).forEach(function (set) {
+        var pr = 1, blank = {};
+        xi.forEach(function (id) { var isB = set.indexOf(id) >= 0; blank[id] = isB; pr *= isB ? 1 - pOf[id] : pOf[id]; });
+        if (pr <= 0) return;
+        subsets.push({ blank: blank, p: pr });
+        mass += pr;
+      });
+    }
+    var benchAll = (res.gkSub === null ? [] : [res.gkSub]).concat(outfield);
+    var benchPatterns = [];
+    var total = 1 << benchAll.length;
+    for (var m = 0; m < total; m++) {
+      var pr2 = 1, on = {};
+      for (var b = 0; b < benchAll.length; b++) {
+        var id = benchAll[b], up = (m & (1 << b)) === 0;
+        on[id] = up; pr2 *= up ? pOf[id] : 1 - pOf[id];
+      }
+      if (pr2 > 0) benchPatterns.push({ on: on, p: pr2 });
+    }
+    res.patterns = subsets.length * Math.max(1, benchPatterns.length);
+    res.truncatedMass = clamp(1 - mass, 0, 1);
+    var evaluate = function (order) {
+      var full = (res.gkSub === null ? [] : [res.gkSub]).concat(order);
+      var gain = 0, pEnter = {};
+      full.forEach(function (id) { pEnter[id] = 0; });
+      subsets.forEach(function (S) {
+        var anyBlank = false;
+        for (var i = 0; i < xi.length; i++) if (S.blank[xi[i]]) { anyBlank = true; break; }
+        if (!anyBlank) return;                                  // nobody to replace: no sub enters
+        benchPatterns.forEach(function (B) {
+          var p = S.p * B.p;
+          if (p <= 0) return;
+          var r = autosubResolve(xi, full, function (id) {
+            if (S.blank[id] !== undefined) return !S.blank[id];
+            if (B.on[id] !== undefined) return B.on[id];
+            return true;
+          }, ctx);
+          if (!r.ok) return;
+          r.subsIn.forEach(function (id) { pEnter[id] = num(pEnter[id], 0) + p; gain += p * num(eOf[id], 0); });
+        });
+      });
+      return { gain: gain, pEnter: pEnter, order: order.slice() };
+    };
+    var planned = benchOrder(squad, xi, ctx);
+    if (planned.length !== outfield.length) planned = outfield.slice();
+    var mine = evaluate(planned), best = null, worst = null;
+    permutations(outfield).forEach(function (o) {
+      var v = evaluate(o);
+      if (!best || v.gain > best.gain) best = v;
+      if (!worst || v.gain < worst.gain) worst = v;
+    });
+    res.order = planned.slice();
+    res.expectedGain = mine.gain;
+    res.bestGain = best ? best.gain : mine.gain;
+    res.worstGain = worst ? worst.gain : mine.gain;
+    res.bestOrder = best ? best.order.slice() : planned.slice();
+    res.orderValue = Math.max(0, res.bestGain - res.worstGain);
+    var counts = posCounts(xi, ctx.els);
+    benchAll.forEach(function (id) {
+      var el = ctx.els[id], bt = elType(el);
+      var replaces = xi.filter(function (s) {
+        var st = elType(ctx.els[s]);
+        if (st === 1 || bt === 1) return st === bt;
+        var c = { 2: counts[2], 3: counts[3], 4: counts[4] }; c[st]--; c[bt]++;
+        return c[2] >= 3 && c[3] >= 2 && c[4] >= 1;
+      });
+      var pe = clamp(num(mine.pEnter[id], 0), 0, 1);
+      res.rows.push({
+        id: id, web_name: String(el.web_name || ""), pos: POS_NAME[bt] || "?",
+        pStart: pOf[id], eGiven: eOf[id], pEnter: pe, value: pe * num(eOf[id], 0), replaces: replaces.slice()
+      });
+    });
+    res.ok = true;
+    res.note = "P(comes on) is exact over " + res.patterns + " played/blanked patterns under the real autosub rules (" +
+      (res.truncatedMass * 100).toFixed(4) + "% of the probability left out as more simultaneous blanks than the bench could cover). " +
+      "The bench is worth " + res.expectedGain.toFixed(2) + " expected points this gameweek and the ORDER is worth " +
+      res.orderValue.toFixed(2) + " of that. Back-tested over the finished gameweeks the ordering has returned 0 points, " +
+      "because no starter has blanked (leakBacktest, ERRORS.md E-091).";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+// The fifteen as it was submitted for a finished gameweek, in bench order.
+function picksOf(live, gw) {
+  var res = { ok: false, gw: intOf(gw, 0), xi: [], bench: [], ids: [], capId: null, viceId: null, chip: null };
+  try {
+    if (!isObj(live) || !isObj(live.picks)) return res;
+    var p = live.picks[gw] || live.picks[String(gw)];
+    if (!isObj(p) || !Array.isArray(p.picks)) return res;
+    var rows = p.picks.filter(isObj).slice().sort(function (a, b) { return num(a.position, 0) - num(b.position, 0); });
+    if (rows.length < 11) return res;
+    res.chip = p.active_chip === undefined ? null : p.active_chip;
+    rows.forEach(function (r, i) {
+      var id = num(r.element, NaN); if (!isFinite(id)) return;
+      res.ids.push(id);
+      if (i < 11) res.xi.push(id); else res.bench.push(id);
+      if (r.is_captain === true) res.capId = id;
+      if (r.is_vice_captain === true) res.viceId = id;
+    });
+    // A bench goalkeeper is tried only against the starting goalkeeper, so his place in the
+    // bench list does not matter; the outfield order does. Keep the submitted order verbatim.
+    res.ok = res.xi.length === 11;
+  } catch (e) { /* total */ }
+  return res;
+}
+
+// {id: {pts, mins}} for one finished gameweek, in the shape entryPoints reads. A player absent
+// from the block did not play: the snapshot omits zero-minute rows (CONTRACT §3).
+function gwSims(live, gw, ids) {
+  var out = {};
+  try {
+    var rows = isObj(live) && isObj(live.gw) && isObj(live.gw[gw] || live.gw[String(gw)])
+      ? (live.gw[gw] || live.gw[String(gw)]).elements : null;
+    arr(ids).forEach(function (id) {
+      var row = isObj(rows) ? rows[id] : null;
+      out[id] = Array.isArray(row) ? { pts: num(row[2], 0), mins: num(row[0], 0) } : { pts: 0, mins: 0 };
+    });
+  } catch (e) { /* total */ }
+  return out;
+}
+
+/* The best total a fifteen could have produced, exactly: every legal eleven of the fifteen, every
+ * ordering of the outfield substitutes, scored through entryPoints — the same function the Monte
+ * Carlo uses, so the autosub rules, the captain double and the vice fallback are the shipped ones
+ * and not a second copy of them. `mustCaptain` holds the armband, which is what isolates the
+ * eleven-selection leak from the captaincy leak. */
+function bestEntryOverElevens(ids, capId, viceId, sims, ctx, mustCaptain) {
+  var res = { best: null, xi: [], bench: [], formation: "", elevens: 0, ok: false };
+  try {
+    if (!okCtx(ctx)) return res;
+    var list = uniq(idList(ids)).filter(function (id) { return ctx.els[id]; });
+    if (list.length < 11 || list.length > 15) return res;
+    var cap = num(capId, NaN), force = mustCaptain === false ? false : true;
+    combos(list, 11).forEach(function (xi) {
+      if (!legalXI(xi, ctx.els).ok) return;
+      if (force && isFinite(cap) && xi.indexOf(cap) < 0) return;
+      res.elevens++;
+      var rest = list.filter(function (id) { return xi.indexOf(id) < 0; });
+      var bgk = rest.filter(function (id) { return elType(ctx.els[id]) === 1; });
+      var bof = rest.filter(function (id) { return elType(ctx.els[id]) !== 1; });
+      permutations(bof).forEach(function (ord) {
+        var t = entryPoints(xi, bgk.concat(ord), capId, viceId, sims, ctx);
+        if (res.best === null || t > res.best) { res.best = t; res.xi = xi.slice(); res.bench = bgk.concat(ord); res.formation = formationOf(xi, ctx.els); }
+      });
+    });
+    res.ok = res.best !== null;
+    if (!res.ok) res.best = 0;
+  } catch (e) { /* total */ }
+  return res;
+}
+
+/* leakBacktest — where the points actually leaked, measured against every finished gameweek.
+ *
+ * This function exists because a headline statistic in this project was wrong for three
+ * versions. CLAUDE.md roadmap F3 justified a bench-order optimiser with "21 bench points wasted
+ * to date" (43 by GW5). That figure is `history.current[].points_on_bench`, which is what the
+ * bench SCORED while benched. None of it is receivable: a sub's points only ever reach the total
+ * when a starter plays zero minutes and an autosub fires. It is not a loss and reordering
+ * nothing recovers it (ERRORS.md E-091).
+ *
+ * What is measured here instead, per gameweek, with perfect hindsight and the real rules:
+ *   bench   — the best legal ORDERING of the outfield substitutes against the one submitted
+ *   xi      — the best legal ELEVEN of his own fifteen, captain held at the one he chose
+ *   captain — the best armband from the eleven he actually fielded, XI held
+ * and beside each, what the engine would have chosen ex ante from a snapshot truncated to the
+ * gameweeks before it. Perfect hindsight is an upper bound no model reaches: the three figures
+ * are a ranking of where the effort belongs, not a target.
+ */
+function leakBacktest(live, opts) {
+  var res = {
+    ok: false, gws: [], totals: { bench: 0, xi: 0, captain: 0, actual: 0, engineXi: 0, engineCaptain: 0 },
+    reconciles: true, reported: { pointsOnBench: 0, note: "" }, engineAvailable: 0, flaggedToday: 0, note: ""
+  };
+  try {
+    var o = isObj(opts) ? opts : {};
+    if (!isObj(live) || !isObj(live.gw) || !isObj(live.picks)) { res.note = "no finished gameweeks with picks in the snapshot"; return res; }
+    var gws = Object.keys(live.gw).map(function (k) { return num(k, NaN); }).filter(isFinite).sort(sortNum);
+    var histRows = isObj(live.history) && Array.isArray(live.history.current) ? live.history.current : [];
+    var histOf = {}; histRows.forEach(function (r) { if (isObj(r)) histOf[intOf(r.event, -1)] = r; });
+    var ctxNow = isObj(o.ctx) && o.ctx.ok ? o.ctx : buildCtx(live, o.state || null, o.now || live.fetched_at);
+    if (!ctxNow.ok) { res.note = "context could not be built"; return res; }
+    gws.forEach(function (g) {
+      var pk = picksOf(live, g);
+      if (!pk.ok) return;
+      var sims = gwSims(live, g, pk.ids);
+      var playedOf = function (id) { return num((sims[id] || {}).mins, 0) > 0; };
+      var ptsOf = function (id) { return num((sims[id] || {}).pts, 0); };
+      var actual = entryPoints(pk.xi, pk.bench, pk.capId, pk.viceId, sims, ctxNow);
+      var hist = histOf[g] || null;
+      var reported = hist ? num(hist.points, NaN) : NaN;
+      var recon = !isFinite(reported) || Math.abs(reported - actual) < 1e-9;
+      if (!recon) res.reconciles = false;
+      // bench ordering, perfect hindsight
+      var gkSub = pk.bench.filter(function (id) { return elType(ctxNow.els[id]) === 1; });
+      var outSub = pk.bench.filter(function (id) { return elType(ctxNow.els[id]) !== 1; });
+      var benchBest = actual;
+      permutations(outSub).forEach(function (ord) {
+        var t = entryPoints(pk.xi, gkSub.concat(ord), pk.capId, pk.viceId, sims, ctxNow);
+        if (t > benchBest) benchBest = t;
+      });
+      var blanks = pk.xi.filter(function (id) { return !playedOf(id); });
+      var fired = autosubResolve(pk.xi, pk.bench, playedOf, ctxNow).subsIn.length;
+      // XI selection, captain held at his own choice
+      var hind = bestEntryOverElevens(pk.ids, pk.capId, pk.viceId, sims, ctxNow, true);
+      var xiBest = hind.ok && hind.best > actual ? hind.best : actual;
+      // captaincy, XI held
+      var capBest = actual, capBestId = pk.capId;
+      pk.xi.forEach(function (id) {
+        var t = entryPoints(pk.xi, pk.bench, id, pk.viceId, sims, ctxNow);
+        if (t > capBest) { capBest = t; capBestId = id; }
+      });
+      // the engine's own ex-ante answer, from a snapshot truncated to the gameweeks before g
+      var eng = { available: false, xi: null, capId: null, viceId: null, xiPoints: null, capPoints: null, note: "" };
+      if (g > gws[0]) {
+        var cut = truncateElements(truncateLive(live, g - 1), g - 1);
+        var evObj = arr(live.events).filter(function (e) { return isObj(e) && intOf(e.id, -1) === g; })[0];
+        var ctxK = buildCtx(cut, { squad: pk.ids.map(function (id) { return { id: id, purchase: num((ctxNow.els[id] || {}).now_cost, 0) }; }), confirmed_gw: g - 1 }, evObj && evObj.deadline_time ? evObj.deadline_time : null);
+        if (ctxK.ok) {
+          var bx = bestXI(pk.ids, ctxK);
+          if (bx.ids.length === 11) {
+            var ebGk = bx.bench.filter(function (id) { return elType(ctxK.els[id]) === 1; });
+            var ebOut = benchOrder(pk.ids, bx.ids, ctxK);
+            eng.available = true; eng.xi = bx.ids.slice(); eng.capId = bx.capId; eng.viceId = bx.viceId;
+            eng.xiPoints = entryPoints(bx.ids, ebGk.concat(ebOut), pk.capId, pk.viceId, sims, ctxNow);
+            eng.capPoints = entryPoints(pk.xi, pk.bench, bx.capId === null ? pk.capId : bx.capId, pk.viceId, sims, ctxNow);
+            res.engineAvailable++;
+          } else eng.note = "the engine could not field a legal eleven from the fifteen";
+        } else eng.note = "the truncated context did not build";
+      } else eng.note = "no gameweek of history exists before the first finished gameweek";
+      var flagged = pk.ids.filter(function (id) { return (ctxNow.flags[id] || flagInfo(ctxNow.els[id])).flagged; }).length;
+      res.flaggedToday += flagged;
+      var row = {
+        gw: g, actual: actual, reported: isFinite(reported) ? reported : null, reconciles: recon,
+        pointsOnBench: hist ? num(hist.points_on_bench, 0) : 0,
+        blanks: blanks.length, autosubsFired: fired,
+        bench: { best: benchBest, leak: benchBest - actual, orderings: permutations(outSub).length },
+        xi: { best: xiBest, leak: xiBest - actual, formationHindsight: hind.formation, elevens: hind.elevens, engine: eng.xiPoints, engineLeak: eng.xiPoints === null ? null : eng.xiPoints - actual },
+        captain: {
+          playedId: pk.capId, best: capBest, bestId: capBestId, leak: capBest - actual,
+          engineId: eng.capId, engine: eng.capPoints, engineLeak: eng.capPoints === null ? null : eng.capPoints - actual
+        },
+        engine: { available: eng.available, capId: eng.capId, note: eng.note },
+        flaggedToday: flagged
+      };
+      res.gws.push(row);
+      res.totals.actual += actual;
+      res.totals.bench += row.bench.leak;
+      res.totals.xi += row.xi.leak;
+      res.totals.captain += row.captain.leak;
+      if (row.xi.engineLeak !== null) res.totals.engineXi += row.xi.engineLeak;
+      if (row.captain.engineLeak !== null) res.totals.engineCaptain += row.captain.engineLeak;
+      res.reported.pointsOnBench += row.pointsOnBench;
+    });
+    res.ok = res.gws.length > 0;
+    res.reported.note = "points_on_bench over these gameweeks sums to " + res.reported.pointsOnBench +
+      ", which is what the bench scored while benched. None of it was receivable: " +
+      res.gws.reduce(function (s, r) { return s + r.autosubsFired; }, 0) + " autosubs fired across " +
+      res.gws.length + " gameweeks. The recoverable bench figure is " + res.totals.bench.toFixed(0) + " (ERRORS.md E-091).";
+    res.note = res.ok
+      ? ("Perfect hindsight over GW" + res.gws[0].gw + "-GW" + res.gws[res.gws.length - 1].gw + " on " +
+         res.totals.actual + " points scored: bench ordering " + res.totals.bench.toFixed(0) +
+         ", XI selection " + res.totals.xi.toFixed(0) + ", captaincy " + res.totals.captain.toFixed(0) +
+         ". Hindsight is an upper bound no model reaches — read the three as a ranking of where the effort belongs. " +
+         "The engine's own ex-ante choices, scored on the same gameweeks, are " + res.totals.engineXi.toFixed(0) +
+         " for the eleven and " + res.totals.engineCaptain.toFixed(0) + " for the armband against what he played. " +
+         "Today's injury flags are the only present-tense input (E-069): " + res.flaggedToday + " flagged player-gameweeks.")
+      : "no finished gameweek carried both picks and a live block";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+/* truncateLive cuts the per-gameweek blocks and un-finishes later fixtures, but it leaves
+ * `elements[]` alone — and those carry SEASON-CUMULATIVE totals taken at fetch time. shrunkPps
+ * reads total_points/starts straight off the element, so a walk-forward built on truncateLive
+ * alone reads the gameweek it is predicting through the back door. This rebuilds every
+ * cumulative field from the gameweek rows that survive the cut.
+ *
+ * What cannot be historised, and is left present-tense on purpose: `status`, `chance` and `news`
+ * (the snapshot carries one availability per player, not one per gameweek — E-069) and prices.
+ * Callers report the flag count so the concession is visible rather than silent.
+ */
+function truncateElements(live, uptoGw) {
+  try {
+    if (!isObj(live)) return live;
+    var upto = intOf(uptoGw, 0);
+    var gw = isObj(live.gw) ? live.gw : {};
+    var keys = Object.keys(gw).map(function (k) { return num(k, NaN); }).filter(isFinite).filter(function (k) { return k <= upto; }).sort(sortNum);
+    var acc = {};
+    keys.forEach(function (g) {
+      var rows = isObj(gw[g]) && isObj(gw[g].elements) ? gw[g].elements : (isObj(gw[String(g)]) && isObj(gw[String(g)].elements) ? gw[String(g)].elements : {});
+      Object.keys(rows).forEach(function (id) {
+        var r = rows[id]; if (!Array.isArray(r)) return;
+        var a = acc[id] = acc[id] || { minutes: 0, starts: 0, total_points: 0, xg: 0, xa: 0, xgc: 0, dc: 0, bps: 0, ict: 0, goals: 0, assists: 0, cs: 0, gc: 0, bonus: 0, yc: 0, rc: 0, og: 0, pen_miss: 0, pen_save: 0, saves: 0 };
+        a.minutes += num(r[0], 0); a.starts += num(r[1], 0); a.total_points += num(r[2], 0);
+        a.xg += num(r[3], 0); a.xa += num(r[4], 0); a.xgc += num(r[5], 0); a.dc += num(r[6], 0);
+        a.bps += num(r[7], 0); a.ict += num(r[8], 0); a.goals += num(r[9], 0); a.assists += num(r[10], 0);
+        a.cs += num(r[11], 0); a.gc += num(r[12], 0); a.bonus += num(r[13], 0); a.yc += num(r[14], 0);
+        a.rc += num(r[15], 0); a.og += num(r[16], 0); a.pen_miss += num(r[17], 0); a.pen_save += num(r[18], 0);
+        a.saves += num(r[19], 0);
+      });
+    });
+    var out = {}; Object.keys(live).forEach(function (k) { out[k] = live[k]; });
+    out.elements = arr(live.elements).map(function (el) {
+      if (!isObj(el)) return el;
+      var c = {}; Object.keys(el).forEach(function (k) { c[k] = el[k]; });
+      var a = acc[el.id];
+      ["minutes", "starts", "total_points", "xg", "xa", "xgc", "dc", "bps", "ict", "goals", "assists", "cs", "gc", "bonus", "yc", "rc", "og", "pen_miss", "pen_save", "saves"].forEach(function (k) {
+        c[k] = a ? a[k] : 0;
+      });
+      c.truncated_to_gw = upto;
+      return c;
+    });
+    return out;
+  } catch (e) { return live; }
+}
+
+// ---------------------------------------------------------------- the winning objective (A1)
+
+/* The app has always maximised expected points. That is not the stated objective. CLAUDE.md A1
+ * says: win the overall competition, every mini-league and the draft pool — first, not top-10k.
+ * Those are different problems. In a seven-team league against known squads the fifteen that
+ * maximises expected points is often not the fifteen that maximises P(first), because finishing
+ * first depends on variance and on CORRELATION with what the rivals already own: a player 100% of
+ * the field owns adds points to everyone's total and moves nobody's rank.
+ *
+ * Both objectives are computed, both are shown and the difference is priced. Neither replaces the
+ * other and neither is silently promoted — the same discipline the convergence lock uses.
+ *
+ * E4's reporting rule still binds. Below MC_MIN_GWS_FOR_PWIN finished gameweeks a win probability
+ * compounds a short edge into false certainty (the "99% to win" result, E-020), so `pFirstShown`
+ * is null and the headline carries direction and a rank band. `pFirst` is still computed, because
+ * comparing two candidate squads requires it; what is barred is printing it as a headline.
+ */
+function winnableLeagues(ctx, opts) {
+  var out = [];
+  try {
+    if (!okCtx(ctx)) return out;
+    var o = isObj(opts) ? opts : {};
+    var cap = intOf(o.maxSize, WINNABLE_MAX_SIZE);
+    var only = Array.isArray(o.leagues) ? o.leagues.map(function (v) { return num(v, NaN); }).filter(isFinite) : null;
+    arr(ctx.leagues).forEach(function (L) {
+      if (!isObj(L)) return;
+      var id = num(L.id, NaN); if (!isFinite(id)) return;
+      var size = intOf(L.size, arr(L.standings).length);
+      if (only && only.indexOf(id) < 0) return;
+      if (!only && size > cap) return;
+      out.push({ id: id, name: String(L.name || ""), size: size, rank: intOf(L.rank, 0) || null, standings: arr(L.standings).length });
+    });
+  } catch (e) { /* total */ }
+  return out;
+}
+
+// One league's field: the rivals' actual submitted fifteens, keyed the way mcLeague keys them.
+// A rival whose picks are not in the snapshot is carried as null and scores the simulated field
+// mean in every draw, which is stated rather than hidden.
+function leagueField(ctx, leagueId) {
+  var res = { ok: false, leagueId: null, name: "", size: 0, rows: [], meIndex: -1, missingPicks: 0, simulated: 0, myTotal: 0, note: "" };
+  try {
+    if (!okCtx(ctx)) return res;
+    var L = arr(ctx.leagues).filter(function (l) { return isObj(l) && num(l.id, NaN) === num(leagueId, NaN); })[0];
+    if (!L) { res.note = "league not in the snapshot"; return res; }
+    res.leagueId = num(L.id); res.name = String(L.name || ""); res.size = intOf(L.size, arr(L.standings).length);
+    var me = isObj(ctx.live) && isObj(ctx.live.entry) ? num(ctx.live.entry.id, NaN) : NaN;
+    var rivals = isObj(ctx.live) && isObj(ctx.live.rivals) ? ctx.live.rivals : {};
+    arr(L.standings).forEach(function (r) {
+      if (!isObj(r)) return;
+      var e = num(r.entry, NaN); if (!isFinite(e)) return;
+      var row = { entry: e, total: num(r.total, 0), rank: intOf(r.rank, 0), me: e === me, xi: null, bench: [], cap: null };
+      if (!row.me && isObj(rivals[e]) && Array.isArray(rivals[e].picks)) {
+        var pk = rivals[e].picks.filter(isObj).slice().sort(function (a, b) { return num(a.position, 0) - num(b.position, 0); });
+        var ids = pk.map(function (p) { return num(p.element, NaN); }).filter(function (id) { return isFinite(id) && ctx.els[id]; });
+        if (ids.length >= 11 && legalXI(ids.slice(0, 11), ctx.els).ok) {
+          row.xi = ids.slice(0, 11); row.bench = ids.slice(11);
+          var cp = pk.filter(function (p) { return p.is_captain === true || num(p.multiplier, 1) >= 2; })[0];
+          row.cap = cp ? num(cp.element) : null;
+        }
+      }
+      res.rows.push(row);
+    });
+    res.meIndex = res.rows.map(function (r) { return r.me; }).indexOf(true);
+    if (res.meIndex < 0) {
+      res.rows.push({ entry: isFinite(me) ? me : 0, total: isObj(ctx.live) && isObj(ctx.live.entry) ? num(ctx.live.entry.summary_overall_points, 0) : 0, rank: res.rows.length + 1, me: true, xi: null, bench: [], cap: null });
+      res.meIndex = res.rows.length - 1;
+    }
+    res.myTotal = res.rows[res.meIndex].total;
+    res.missingPicks = res.rows.filter(function (r) { return !r.me && !r.xi; }).length;
+    res.simulated = res.rows.filter(function (r) { return !r.me && r.xi; }).length;
+    res.ok = res.rows.length > 0;
+    res.note = res.simulated + " of " + (res.rows.length - 1) + " rivals carry submitted picks; " + res.missingPicks + " score the simulated field mean.";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+// Candidates in, {key,label,xi,bench,cap,vice,ids} out. Accepts an id array, an object with ids,
+// or nothing at all — in which case the manager's own submitted fifteen is the one candidate.
+function candidateSquads(ctx, candidates) {
+  var out = [];
+  try {
+    if (!okCtx(ctx)) return out;
+    var list = Array.isArray(candidates) && candidates.length ? candidates : [null];
+    list.forEach(function (c, i) {
+      var ids, key, label, capId = null, viceId = null;
+      if (Array.isArray(c)) { ids = c; key = "c" + (i + 1); label = "candidate " + (i + 1); }
+      else if (isObj(c)) {
+        ids = Array.isArray(c.ids) ? c.ids : (Array.isArray(c.squad) ? c.squad : []);
+        key = String(c.key || ("c" + (i + 1))); label = String(c.label || key);
+        capId = c.capId === undefined ? null : c.capId; viceId = c.viceId === undefined ? null : c.viceId;
+      } else {
+        ids = arr(ctx.picks).length ? arr(ctx.picks).slice().sort(function (a, b) { return num(a.position, 0) - num(b.position, 0); }).map(function (p) { return num(p.element, NaN); }) : ctx.squadIds;
+        key = "current"; label = "the fifteen he submitted";
+        var cp = arr(ctx.picks).filter(function (p) { return isObj(p) && (p.is_captain === true || num(p.multiplier, 1) >= 2); })[0];
+        var vp = arr(ctx.picks).filter(function (p) { return isObj(p) && p.is_vice_captain === true; })[0];
+        if (cp) capId = num(cp.element, NaN); if (vp) viceId = num(vp.element, NaN);
+      }
+      var so = squadOrder(ids, capId, ctx);
+      if (!so) return;
+      var vice = num(viceId, NaN);
+      if (!isFinite(vice) || so.xi.indexOf(vice) < 0) {
+        var cpk = captainPick(so.xi, ctx); vice = cpk.viceId === null ? null : cpk.viceId;
+      }
+      out.push({ key: key, label: label, ids: uniq(idList(ids)), xi: so.xi, bench: so.bench, cap: so.cap, vice: vice });
+    });
+  } catch (e) { /* total */ }
+  return out;
+}
+
+/* The shared loop. Every candidate is scored on THE SAME fixture and player draws (common random
+ * numbers), so the EV comparison and the P(first) comparison are both paired: a difference between
+ * two candidates is a difference between the squads and not between two sets of dice. */
+function winProbabilityCore(ctx, candidates, opts) {
+  var res = {
+    ok: false, iters: 0, seed: 0, gwsOfData: 0, reportable: false, event: 0,
+    leagues: [], candidates: [], note: ""
+  };
+  try {
+    if (!okCtx(ctx)) { res.note = "no context"; return res; }
+    var o = isObj(opts) ? opts : {};
+    var cands = candidateSquads(ctx, candidates);
+    if (!cands.length) { res.note = "no legal candidate squad to simulate"; return res; }
+    var Ls = winnableLeagues(ctx, o);
+    var fields = [];
+    Ls.forEach(function (L) { var f = leagueField(ctx, L.id); if (f.ok) fields.push(f); });
+    if (!fields.length) { res.note = "no winnable league in the snapshot to simulate against"; return res; }
+    var n = clamp(intOf(o.iters, WINPROB_ITERS), MC_MIN_ITERS, 20000);
+    var seed = intOf(o.seed, 89);
+    var R = mulberry32(seed);
+    res.iters = n; res.seed = seed; res.event = ctx.nextEvent;
+    res.gwsOfData = arr(ctx.finishedGws).length;
+    res.reportable = res.gwsOfData >= MC_MIN_GWS_FOR_PWIN;
+    // the union of every player who has to be simulated
+    var union = {};
+    cands.forEach(function (c) { c.xi.concat(c.bench).forEach(function (id) { union[id] = true; }); });
+    fields.forEach(function (f) { f.rows.forEach(function (r) { if (r.xi) r.xi.concat(r.bench).forEach(function (id) { union[id] = true; }); }); });
+    var unionIds = Object.keys(union).map(Number).filter(function (id) { return ctx.els[id]; });
+    // accumulators
+    var acc = cands.map(function () {
+      return { pts: [], leagues: fields.map(function () { return { first: 0, top: 0, rankSum: 0, ranks: [] }; }), anyFirst: 0, allFirst: 0 };
+    });
+    for (var i = 0; i < n; i++) {
+      var draws = fixtureDraws(ctx, R), sims = {};
+      unionIds.forEach(function (id) { sims[id] = simPlayerDetail(ctx.els[id], ctx, R, draws); });
+      var myPts = cands.map(function (c) { return entryPoints(c.xi, c.bench, c.cap, c.vice, sims, ctx); });
+      myPts.forEach(function (p, ci) { acc[ci].pts.push(p); });
+      for (var li = 0; li < fields.length; li++) {
+        var f = fields[li], rivalTotals = [], known = [];
+        for (var ri = 0; ri < f.rows.length; ri++) {
+          var row = f.rows[ri];
+          if (row.me) continue;
+          if (row.xi) { var p2 = entryPoints(row.xi, row.bench, row.cap, null, sims, ctx); known.push(p2); rivalTotals.push({ base: row.total, pts: p2, filled: false }); }
+          else rivalTotals.push({ base: row.total, pts: null, filled: true });
+        }
+        var fillMean = known.length ? sum(known) / known.length : 0;
+        for (var ci2 = 0; ci2 < cands.length; ci2++) {
+          var mine = f.myTotal + myPts[ci2], rank = 1;
+          for (var k = 0; k < rivalTotals.length; k++) {
+            var t = rivalTotals[k].base + (rivalTotals[k].pts === null ? fillMean : rivalTotals[k].pts);
+            if (t > mine) rank++;
+          }
+          var a = acc[ci2].leagues[li];
+          a.rankSum += rank; a.ranks.push(rank);
+          if (rank === 1) a.first++;
+          if (rank <= WINPROB_TOP_N) a.top++;
+        }
+      }
+      for (var ci3 = 0; ci3 < cands.length; ci3++) {
+        var anyF = false, allF = true;
+        for (var lj = 0; lj < fields.length; lj++) {
+          var last = acc[ci3].leagues[lj].ranks[acc[ci3].leagues[lj].ranks.length - 1];
+          if (last === 1) anyF = true; else allF = false;
+        }
+        if (anyF) acc[ci3].anyFirst++;
+        if (allF) acc[ci3].allFirst++;
+      }
+    }
+    res.leagues = fields.map(function (f) { return { leagueId: f.leagueId, name: f.name, size: f.size, entries: f.rows.length, rivalsSimulated: f.simulated, missingPicks: f.missingPicks, currentRank: f.rows[f.meIndex].rank || null, note: f.note }; });
+    res.candidates = cands.map(function (c, ci) {
+      var a = acc[ci];
+      var ev = distStats(a.pts);
+      var per = a.leagues.map(function (g, li) {
+        var ranks = g.ranks.slice().sort(sortNum);
+        var cur = res.leagues[li].currentRank;
+        var med = quantile(ranks, 0.5);
+        var band = [quantile(ranks, 0.1), quantile(ranks, 0.9)];
+        var dir = cur === null ? "hold" : (med < cur - 0.5 ? "up" : (med > cur + 0.5 ? "down" : "hold"));
+        return {
+          leagueId: res.leagues[li].leagueId, name: res.leagues[li].name, size: res.leagues[li].size,
+          pFirst: clamp(g.first / n, 0, 1), pTop3: clamp(g.top / n, 0, 1),
+          pFirstShown: res.reportable ? clamp(g.first / n, 0, 1) : null,
+          expRank: g.rankSum / n, medianRank: med, rankBand: band, currentRank: cur, direction: dir,
+          headline: "GW" + ctx.nextEvent + " " + res.leagues[li].name + ": rank " + (cur === null ? "unknown" : cur) +
+            " → median " + med.toFixed(1) + ", tenth to ninetieth " + band[0].toFixed(0) + " to " + band[1].toFixed(0) +
+            " (" + dir + ")" + (res.reportable ? ", P(first) " + (100 * g.first / n).toFixed(1) + "%" : "")
+        };
+      });
+      var pf = per.map(function (p) { return p.pFirst; });
+      return {
+        key: c.key, label: c.label, ids: c.ids.slice(), capId: c.cap, viceId: c.vice,
+        ev: ev, leagues: per,
+        pooled: {
+          pFirstMean: pf.length ? sum(pf) / pf.length : 0,
+          pFirstBest: pf.length ? Math.max.apply(null, pf) : 0,
+          pFirstWorst: pf.length ? Math.min.apply(null, pf) : 0,
+          pAnyFirst: clamp(a.anyFirst / n, 0, 1), pAllFirst: clamp(a.allFirst / n, 0, 1),
+          expRankMean: per.length ? sum(per, function (p) { return p.expRank; }) / per.length : 0
+        }
+      };
+    });
+    res.ok = true;
+    res.note = "One gameweek (GW" + ctx.nextEvent + ") simulated " + n + " times against the rivals' actual GW" + ctx.currentEvent +
+      " fifteens, over " + fields.length + " winnable league" + (fields.length === 1 ? "" : "s") + " and " + unionIds.length +
+      " players, on shared per-fixture goal draws. " +
+      (res.reportable
+        ? ("P(first) is reported: " + res.gwsOfData + " finished gameweeks.")
+        : ("Direction and rank band only: " + res.gwsOfData + " of the " + MC_MIN_GWS_FOR_PWIN +
+           " finished gameweeks a win probability needs before it can be a headline (E-020). The probabilities are computed — a squad comparison cannot be made without them — and pFirstShown is null."));
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+function winProbability(ctx, opts) {
+  var o = isObj(opts) ? opts : {};
+  var cands = Array.isArray(o.candidates) ? o.candidates : (Array.isArray(o.ids) && o.ids.length ? [{ key: "candidate", label: "candidate fifteen", ids: o.ids, capId: o.capId, viceId: o.viceId }] : null);
+  var core = winProbabilityCore(ctx, cands, o);
+  var res = {
+    ok: core.ok, iters: core.iters, seed: core.seed, gwsOfData: core.gwsOfData, reportable: core.reportable,
+    event: core.event, leagues: [], pooled: null, candidate: null, note: core.note
+  };
+  if (core.ok && core.candidates.length) {
+    res.candidate = { key: core.candidates[0].key, label: core.candidates[0].label, ids: core.candidates[0].ids, capId: core.candidates[0].capId, viceId: core.candidates[0].viceId, ev: core.candidates[0].ev };
+    res.leagues = core.candidates[0].leagues;
+    res.pooled = core.candidates[0].pooled;
+  }
+  return res;
+}
+
+/* objectiveCompare — the two objectives side by side, priced.
+ *
+ * Every candidate is scored under expected points and under P(first), from one set of shared
+ * draws. Where they disagree the panel says so in the words that describe what is happening: a
+ * differential that LOWERS EV BUT RAISES P(FIRST) is the whole point of the exercise, and the
+ * opposite — a safe pick that raises EV and lowers P(first) — is the trap. Nothing is promoted:
+ * both columns are shown and the manager chooses.
+ */
+function objectiveCompare(ctx, candidates, opts) {
+  var res = {
+    ok: false, iters: 0, seed: 0, gwsOfData: 0, reportable: false, event: 0, leagues: [],
+    candidates: [], byEv: null, byWin: null, agree: true, disagree: false, pairs: [], note: "", verdict: ""
+  };
+  try {
+    var o = isObj(opts) ? opts : {};
+    var core = winProbabilityCore(ctx, candidates, o);
+    res.ok = core.ok; res.iters = core.iters; res.seed = core.seed; res.gwsOfData = core.gwsOfData;
+    res.reportable = core.reportable; res.event = core.event; res.leagues = core.leagues;
+    res.note = core.note;
+    if (!core.ok) { res.verdict = core.note; return res; }
+    var byEv = core.candidates.slice().sort(function (a, b) { return b.ev.mean - a.ev.mean; });
+    var byWin = core.candidates.slice().sort(function (a, b) { return b.pooled.pAnyFirst - a.pooled.pAnyFirst || b.pooled.pFirstMean - a.pooled.pFirstMean; });
+    var evRank = {}, winRank = {};
+    byEv.forEach(function (c, i) { evRank[c.key] = i + 1; });
+    byWin.forEach(function (c, i) { winRank[c.key] = i + 1; });
+    res.candidates = core.candidates.map(function (c) {
+      return {
+        key: c.key, label: c.label, ids: c.ids.slice(), capId: c.capId, viceId: c.viceId,
+        ev: c.ev, leagues: c.leagues, pooled: c.pooled,
+        evRank: evRank[c.key], winRank: winRank[c.key], objectivesAgree: evRank[c.key] === winRank[c.key]
+      };
+    });
+    res.byEv = byEv[0].key; res.byWin = byWin[0].key;
+    res.agree = res.byEv === res.byWin; res.disagree = !res.agree;
+    // every ordered pair, priced
+    for (var a = 0; a < core.candidates.length; a++) for (var b = 0; b < core.candidates.length; b++) {
+      if (a === b) continue;
+      var A = core.candidates[a], B = core.candidates[b];
+      var dEv = A.ev.mean - B.ev.mean;
+      var dWin = A.pooled.pFirstMean - B.pooled.pFirstMean;
+      var dAny = A.pooled.pAnyFirst - B.pooled.pAnyFirst;
+      var verdict;
+      if (dEv < 0 && dWin > 0) verdict = A.label + " lowers EV but raises P(first) against " + B.label + ": " + Math.abs(dEv).toFixed(2) + " expected points given up for " + (dWin * 100).toFixed(2) + " percentage points of P(first). That is the differential trade, and it is the whole point of comparing the two objectives.";
+      else if (dEv > 0 && dWin < 0) verdict = A.label + " raises EV but lowers P(first) against " + B.label + ": " + dEv.toFixed(2) + " expected points bought for " + Math.abs(dWin * 100).toFixed(2) + " percentage points of P(first). That is the safe-pick trap — more points, less chance of finishing first.";
+      else if (dEv === 0 && dWin === 0) verdict = A.label + " and " + B.label + " are indistinguishable under both objectives on these draws.";
+      else verdict = "the two objectives agree between " + A.label + " and " + B.label + " (" + (dEv >= 0 ? "+" : "") + dEv.toFixed(2) + " EV, " + (dWin >= 0 ? "+" : "") + (dWin * 100).toFixed(2) + "pp P(first)).";
+      res.pairs.push({ a: A.key, b: B.key, evDelta: dEv, pFirstDelta: dWin, pAnyFirstDelta: dAny, conflict: (dEv < 0 && dWin > 0) || (dEv > 0 && dWin < 0), verdict: verdict });
+    }
+    var conflicts = res.pairs.filter(function (p) { return p.conflict; });
+    res.verdict = (res.agree
+      ? "Both objectives name " + byEv[0].label + "."
+      : "The objectives disagree: expected points names " + byEv[0].label + " and P(first) names " + byWin[0].label + ".") +
+      " " + conflicts.length + " of " + res.pairs.length + " ordered pairs trade one objective against the other. " +
+      (res.reportable ? "" : "Under " + MC_MIN_GWS_FOR_PWIN + " finished gameweeks the win probabilities are a direction and a rank band, not a headline percentage (E-020); the DIFFERENCE between two candidates on shared draws is what is being read here, not its level. ") +
+      "Neither objective replaces the other: both are shown, the difference is priced, and the manager chooses.";
+  } catch (e) { res.note = "engine error: " + errMsg(e); res.verdict = res.note; }
+  return res;
+}
+
+// ---------------------------------------------------------------- hierarchical partial pooling
+
+/* E1 shrinks a player's points per start towards a position prior with w = starts/(starts+4).
+ * The 4 is an assumption, the prior is a constant typed into the file, and — the part that
+ * matters — the result carries no uncertainty at all, so the Monte Carlo treats a three-start
+ * player and a thirty-start player as equally certain.
+ *
+ * This is the same idea done properly: an empirical-Bayes two-level model. A player's per-game
+ * scoring rate is drawn from a position-level distribution whose mean AND variance are estimated
+ * from the data (DerSimonian-Laird moments), the within-player variance is pooled across the
+ * position, and every player comes back with a posterior mean and a POSTERIOR VARIANCE. The
+ * shrinkage weight is then derived rather than assumed.
+ *
+ * It enters the tournament as the tenth challenger, `hier_pool`. It drives nothing: E6 and the
+ * shared promotion gate apply to it exactly as they apply to player_xg.
+ */
+function hierRowsFromAcc(acc, types) {
+  var rows = [];
+  try {
+    if (!isObj(acc)) return rows;
+    Object.keys(acc).forEach(function (id) {
+      var a = acc[id]; if (!isObj(a)) return;
+      var n = num(a.played, 0); if (n <= 0) return;
+      var mean = num(a.pts, 0) / n;
+      var ss = num(a.pts2, NaN);
+      var v = (isFinite(ss) && n >= 2) ? Math.max(0, (ss - n * mean * mean) / (n - 1)) : NaN;
+      rows.push({ id: num(id, 0), type: intOf(isObj(types) ? types[id] : 3, 3) || 3, n: n, mean: mean, variance: v });
+    });
+  } catch (e) { /* total */ }
+  return rows;
+}
+function hierGroups(rows) {
+  var out = { 1: null, 2: null, 3: null, 4: null, pooled: null, ok: false };
+  try {
+    var all = arr(rows).filter(function (r) { return isObj(r) && num(r.n, 0) > 0; });
+    var fit = function (list, fallbackPrior) {
+      var k = list.length;
+      var res = {
+        n: k, players: k, mu: num(fallbackPrior, 3.5), sigma2: HIER_MIN_SIGMA2, tau2: HIER_MIN_TAU2,
+        games: 0, fitted: false, note: ""
+      };
+      if (!k) { res.note = "no players in this group"; return res; }
+      var sw = 0, swy = 0, ssw = 0, sn = 0;
+      list.forEach(function (r) { sn += num(r.n, 0); });
+      res.games = sn;
+      // pooled within-player variance
+      var wnum = 0, wden = 0;
+      list.forEach(function (r) { var v = num(r.variance, NaN), n = num(r.n, 0); if (isFinite(v) && n >= 2) { wnum += (n - 1) * v; wden += (n - 1); } });
+      res.sigma2 = wden > 0 ? Math.max(HIER_MIN_SIGMA2, wnum / wden) : HIER_MIN_SIGMA2;
+      // precision-weighted grand mean
+      list.forEach(function (r) { var w = num(r.n, 0) / res.sigma2; sw += w; swy += w * num(r.mean, 0); ssw += w * w; });
+      if (sw <= 0) { res.note = "no usable precision"; return res; }
+      var ybar = swy / sw;
+      if (k < HIER_MIN_PLAYERS) {
+        res.mu = ybar; res.note = k + " players is too few to estimate a between-player variance; the prior variance stays at its floor";
+        return res;
+      }
+      var Q = 0;
+      list.forEach(function (r) { var w = num(r.n, 0) / res.sigma2, d = num(r.mean, 0) - ybar; Q += w * d * d; });
+      var denom = sw - ssw / sw;
+      var tau2 = denom > 0 ? (Q - (k - 1)) / denom : 0;
+      res.tau2 = Math.max(HIER_MIN_TAU2, isFinite(tau2) ? tau2 : 0);
+      // re-weight the grand mean with the between-player variance in place
+      var sw2 = 0, swy2 = 0;
+      list.forEach(function (r) { var w = 1 / (res.sigma2 / num(r.n, 1) + res.tau2); sw2 += w; swy2 += w * num(r.mean, 0); });
+      res.mu = sw2 > 0 ? swy2 / sw2 : ybar;
+      res.fitted = true;
+      res.note = k + " players, " + sn + " player-gameweeks; within-player variance " + res.sigma2.toFixed(3) +
+        ", between-player variance " + res.tau2.toFixed(3) + " (DerSimonian-Laird), group mean " + res.mu.toFixed(3);
+      return res;
+    };
+    [1, 2, 3, 4].forEach(function (t) {
+      out[t] = fit(all.filter(function (r) { return intOf(r.type, 3) === t; }), PRIOR_PPS[t]);
+    });
+    out.pooled = fit(all, 3.5);
+    out.ok = all.length > 0;
+  } catch (e) { /* total */ }
+  return out;
+}
+function hierPosterior(row, group) {
+  var res = { n: 0, mean: 0, postMean: 0, postVar: 0, postSd: 0, weight: 0, flatWeight: 0, flatMean: 0, shrinkGap: 0, ok: false };
+  try {
+    if (!isObj(row)) return res;
+    var t = intOf(row.type, 3) || 3;
+    var g = isObj(group) ? group : null;
+    var mu = g ? num(g.mu, PRIOR_PPS[t] || 3.5) : (PRIOR_PPS[t] || 3.5);
+    var sigma2 = Math.max(HIER_MIN_SIGMA2, g ? num(g.sigma2, HIER_MIN_SIGMA2) : HIER_MIN_SIGMA2);
+    var tau2 = Math.max(HIER_MIN_TAU2, g ? num(g.tau2, HIER_MIN_TAU2) : HIER_MIN_TAU2);
+    var n = Math.max(0, num(row.n, 0)), mean = num(row.mean, 0);
+    res.n = n; res.mean = mean;
+    var prec = n / sigma2 + 1 / tau2;
+    if (!(prec > 0) || !isFinite(prec)) return res;
+    res.postMean = (n / sigma2 * mean + mu / tau2) / prec;
+    res.postVar = 1 / prec;
+    res.postSd = Math.sqrt(res.postVar);
+    res.weight = clamp((n / sigma2) / prec, 0, 1);
+    res.flatWeight = clamp(n / (n + SHRINK_K), 0, 1);
+    res.flatMean = res.flatWeight * mean + (1 - res.flatWeight) * (PRIOR_PPS[t] || 3.5);
+    res.shrinkGap = res.weight - res.flatWeight;
+    res.ok = true;
+  } catch (e) { /* total */ }
+  return res;
+}
+function hierPool(live, opts) {
+  var res = {
+    ok: false, gws: [], positions: {}, players: {}, rows: [], n: 0,
+    thin: null, thick: null, varianceRange: [0, 0], note: ""
+  };
+  try {
+    var o = isObj(opts) ? opts : {};
+    if (!isObj(live) || !isObj(live.gw)) { res.note = "no finished gameweeks in the snapshot"; return res; }
+    var upto = o.upto === undefined ? null : intOf(o.upto, 0);
+    var keys = Object.keys(live.gw).map(function (k) { return num(k, NaN); }).filter(isFinite).sort(sortNum)
+      .filter(function (g) { return upto === null || g <= upto; });
+    res.gws = keys.slice();
+    var types = {}; arr(live.elements).forEach(function (el) { if (isObj(el)) types[el.id] = elType(el); });
+    var names = {}; arr(live.elements).forEach(function (el) { if (isObj(el)) names[el.id] = String(el.web_name || ""); });
+    var acc = {};
+    keys.forEach(function (g) {
+      var rows = isObj(live.gw[g]) && isObj(live.gw[g].elements) ? live.gw[g].elements : {};
+      Object.keys(rows).forEach(function (id) {
+        var r = rows[id]; if (!Array.isArray(r) || num(r[0], 0) <= 0) return;
+        var a = acc[id] = acc[id] || { played: 0, pts: 0, pts2: 0 };
+        var p = num(r[2], 0);
+        a.played++; a.pts += p; a.pts2 += p * p;
+      });
+    });
+    var rows = hierRowsFromAcc(acc, types);
+    var groups = hierGroups(rows);
+    [1, 2, 3, 4].forEach(function (t) {
+      var g = groups[t];
+      res.positions[t] = g ? { pos: POS_NAME[t], players: g.players, games: g.games, mu: g.mu, sigma2: g.sigma2, tau2: g.tau2, fitted: g.fitted, flatPrior: PRIOR_PPS[t], note: g.note } : null;
+    });
+    var lo = null, hi = null;
+    rows.forEach(function (r) {
+      var p = hierPosterior(r, groups[r.type]);
+      if (!p.ok) return;
+      var out = {
+        id: r.id, web_name: names[r.id] || "", pos: POS_NAME[r.type] || "?", n: r.n, mean: r.mean,
+        variance: isFinite(r.variance) ? r.variance : null,
+        postMean: p.postMean, postVar: p.postVar, postSd: p.postSd,
+        weight: p.weight, flatWeight: p.flatWeight, flatMean: p.flatMean, shrinkGap: p.shrinkGap
+      };
+      res.players[r.id] = out; res.rows.push(out); res.n++;
+      if (lo === null || p.postVar < lo) lo = p.postVar;
+      if (hi === null || p.postVar > hi) hi = p.postVar;
+    });
+    res.varianceRange = [lo === null ? 0 : lo, hi === null ? 0 : hi];
+    var byN = res.rows.slice().sort(function (a, b) { return a.n - b.n || b.postVar - a.postVar; });
+    res.thin = byN.length ? byN[0] : null;
+    res.thick = byN.length ? byN[byN.length - 1] : null;
+    res.ok = res.n > 0;
+    res.note = res.ok
+      ? (res.n + " players over " + keys.length + " finished gameweeks. Posterior variance runs from " +
+         res.varianceRange[0].toFixed(3) + " to " + res.varianceRange[1].toFixed(3) + " points squared — the flat " +
+         "starts/(starts+" + SHRINK_K + ") shrinkage produces none at all, which is the point of the exercise. " +
+         (res.thin && res.thick ? ("Thinnest row " + res.thin.n + " game" + (res.thin.n === 1 ? "" : "s") + ": posterior sd " +
+           res.thin.postSd.toFixed(2) + " against the thickest row's " + res.thick.postSd.toFixed(2) + ". ") : "") +
+         "A challenger only: E6 and the shared promotion gate bar it from driving anything.")
+      : "no player has a finished gameweek to pool";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+// ---------------------------------------------------------------- Dixon-Coles, properly (E2)
+
+/* E2 ships a "Dixon-Coles-lite": shrunken attack and defence rates on xG, with no low-score
+ * dependence correction and no time decay. The two missing pieces are exactly the two the 1997
+ * paper is known for.
+ *
+ * 1. The tau correction. Independent Poisson margins under-state 0-0, 1-0, 0-1 and 1-1. Those
+ *    four cells are where clean-sheet probability lives, and a clean sheet is most of a defender's
+ *    value (B1: CS 4 for DEF and GKP), so getting them wrong is not a rounding error.
+ *      tau(0,0) = 1 - lam*mu*rho ; tau(0,1) = 1 + lam*rho ; tau(1,0) = 1 + mu*rho ; tau(1,1) = 1 - rho
+ * 2. Exponential time decay. A match played eight weeks ago is not the same evidence as one
+ *    played on Saturday: every match carries weight exp(-xi * days).
+ *
+ * Both are added here, the existing TS stays exactly as it is, and the two are scored against each
+ * other on clean-sheet calibration specifically — see cleanSheetCalibration. This drives nothing:
+ * E-011 retired team strength on goals for CAPTAINCY, and that verdict stands until this
+ * measurement, or another, overturns it through the gate.
+ */
+function dcTau(x, y, lamH, lamA, rho) {
+  var r = num(rho, 0), h = Math.max(0, num(lamH, 0)), a = Math.max(0, num(lamA, 0));
+  var xi = intOf(x, -1), yi = intOf(y, -1);
+  if (xi === 0 && yi === 0) return Math.max(0, 1 - h * a * r);
+  if (xi === 0 && yi === 1) return Math.max(0, 1 + h * r);
+  if (xi === 1 && yi === 0) return Math.max(0, 1 + a * r);
+  if (xi === 1 && yi === 1) return Math.max(0, 1 - r);
+  return 1;
+}
+// The range in which every one of the four tau cells stays non-negative for these rates.
+function dcRhoRange(lamH, lamA) {
+  var h = Math.max(1e-6, num(lamH, 1)), a = Math.max(1e-6, num(lamA, 1));
+  return { lo: Math.max(-1 / h, -1 / a), hi: Math.min(1, 1 / (h * a)) };
+}
+function poissonPmf(k, lam) {
+  var n = intOf(k, -1), L = Math.max(0, num(lam, 0));
+  if (n < 0) return 0;
+  if (L === 0) return n === 0 ? 1 : 0;
+  var lp = -L + n * Math.log(L) - logGamma(n + 1);
+  var v = Math.exp(lp);
+  return isFinite(v) ? clamp(v, 0, 1) : 0;
+}
+// P(the named side concedes nothing), with the tau correction applied to the low cells.
+function dcCleanSheetProb(lamH, lamA, rho, side) {
+  var h = Math.max(1e-6, num(lamH, 0)), a = Math.max(1e-6, num(lamA, 0)), r = num(rho, 0);
+  var ph0 = poissonPmf(0, h), ph1 = poissonPmf(1, h), pa0 = poissonPmf(0, a), pa1 = poissonPmf(1, a);
+  var p;
+  if (String(side) === "a") {
+    // the away side keeps it: the home side scores 0, summed over every away scoreline
+    p = ph0 * (dcTau(0, 0, h, a, r) * pa0 + dcTau(0, 1, h, a, r) * pa1 + Math.max(0, 1 - pa0 - pa1));
+  } else {
+    p = pa0 * (dcTau(0, 0, h, a, r) * ph0 + dcTau(1, 0, h, a, r) * ph1 + Math.max(0, 1 - ph0 - ph1));
+  }
+  return clamp(p, 1e-6, 1 - 1e-6);
+}
+// The matches a fit may see: finished, at or before the cut, with the chosen basis available.
+function dcMatches(live, opts) {
+  var out = [];
+  try {
+    if (!isObj(live)) return out;
+    var o = isObj(opts) ? opts : {};
+    var basis = String(o.basis || "goals") === "xg" ? "xg" : "goals";
+    var upto = o.upto === undefined || o.upto === null ? Infinity : intOf(o.upto, 0);
+    var xgOf = {};
+    if (basis === "xg" && isObj(live.gw)) Object.keys(live.gw).forEach(function (g) {
+      if (num(g, NaN) > upto) return;
+      var fx = isObj(live.gw[g]) && isObj(live.gw[g].fixture_xg) ? live.gw[g].fixture_xg : null;
+      if (fx) Object.keys(fx).forEach(function (fid) { if (isObj(fx[fid])) xgOf[fid] = fx[fid]; });
+    });
+    arr(live.fixtures).forEach(function (f) {
+      if (!isObj(f)) return;
+      var ev = intOf(f.event, -1);
+      if (ev < 0 || ev > upto) return;
+      var h = num(f.team_h, NaN), a = num(f.team_a, NaN);
+      if (!isFinite(h) || !isFinite(a)) return;
+      var hg, ag;
+      if (basis === "xg") {
+        var row = xgOf[f.id]; if (!isObj(row)) return;
+        hg = Math.max(0, num(row.h, 0)); ag = Math.max(0, num(row.a, 0));
+      } else {
+        if (!f.finished) return;
+        hg = num(f.team_h_score, NaN); ag = num(f.team_a_score, NaN);
+        if (!isFinite(hg) || !isFinite(ag)) return;
+      }
+      var ko = Date.parse(f.kickoff_time);
+      out.push({ event: ev, fixture: f.id, h: h, a: a, hg: hg, ag: ag, ko: isFinite(ko) ? ko : 0, w: 1 });
+    });
+  } catch (e) { /* total */ }
+  return out;
+}
+function dixonColes(live, opts) {
+  var res = {
+    ok: false, basis: "goals", xi: DC_DECAY_PER_DAY, upto: null, mu: LBAR_PRIOR, gamma: HOME_ADV,
+    att: {}, def: {}, rho: 0, rhoRange: { lo: -1, hi: 1 }, rhoLogLik: 0, matches: 0, weightSum: 0,
+    iters: 0, converged: false, loglik: 0, tRef: 0, teams: [], fitCheck: { predicted: 0, observed: 0, gap: 0 }, note: ""
+  };
+  try {
+    var o = isObj(opts) ? opts : {};
+    res.basis = String(o.basis || "goals") === "xg" ? "xg" : "goals";
+    res.xi = Math.max(0, num(o.xi, DC_DECAY_PER_DAY));
+    res.upto = o.upto === undefined || o.upto === null ? null : intOf(o.upto, 0);
+    var ms = dcMatches(live, { basis: res.basis, upto: res.upto });
+    res.matches = ms.length;
+    if (ms.length < 4) { res.note = "a Dixon-Coles fit needs at least four matches; this cut carries " + ms.length; return res; }
+    var tRef = 0; ms.forEach(function (m) { if (m.ko > tRef) tRef = m.ko; });
+    if (o.now !== undefined && o.now !== null) { var t2 = nowMs(o.now); if (t2) tRef = t2; }
+    res.tRef = tRef;
+    ms.forEach(function (m) {
+      var days = tRef && m.ko ? Math.max(0, (tRef - m.ko) / 86400000) : 0;
+      m.days = days; m.w = Math.exp(-res.xi * days);
+    });
+    var teams = {};
+    ms.forEach(function (m) { teams[m.h] = true; teams[m.a] = true; });
+    var ids = Object.keys(teams).map(Number).sort(sortNum);
+    res.teams = ids.slice();
+    var att = {}, def = {};
+    ids.forEach(function (t) { att[t] = 1; def[t] = 1; });
+    var sw = 0, sy = 0;
+    ms.forEach(function (m) { sw += m.w * 2; sy += m.w * (m.hg + m.ag); });
+    var mu = sw > 0 ? sy / sw : LBAR_PRIOR;
+    if (!(mu > 0) || !isFinite(mu)) mu = LBAR_PRIOR;
+    var gamma = HOME_ADV, it = 0, moved = 1;
+    for (it = 0; it < DC_MAX_ITERS && moved > DC_TOL; it++) {
+      moved = 0;
+      // attack
+      ids.forEach(function (t) {
+        var numr = 0, den = 0;
+        ms.forEach(function (m) {
+          if (m.h === t) { numr += m.w * m.hg; den += m.w * mu * def[m.a] * gamma; }
+          else if (m.a === t) { numr += m.w * m.ag; den += m.w * mu * def[m.h]; }
+        });
+        var v = den > 0 ? numr / den : att[t];
+        v = clamp(isFinite(v) ? v : att[t], 0.05, 5);
+        moved = Math.max(moved, Math.abs(v - att[t])); att[t] = v;
+      });
+      // defence (rates conceded)
+      ids.forEach(function (t) {
+        var numr = 0, den = 0;
+        ms.forEach(function (m) {
+          if (m.h === t) { numr += m.w * m.ag; den += m.w * mu * att[m.a]; }
+          else if (m.a === t) { numr += m.w * m.hg; den += m.w * mu * att[m.h] * gamma; }
+        });
+        var v = den > 0 ? numr / den : def[t];
+        v = clamp(isFinite(v) ? v : def[t], 0.05, 5);
+        moved = Math.max(moved, Math.abs(v - def[t])); def[t] = v;
+      });
+      // home factor
+      var gn = 0, gd = 0;
+      ms.forEach(function (m) { gn += m.w * m.hg; gd += m.w * mu * att[m.h] * def[m.a]; });
+      var g2 = gd > 0 ? gn / gd : gamma;
+      g2 = clamp(isFinite(g2) ? g2 : gamma, 0.5, 2.5);
+      moved = Math.max(moved, Math.abs(g2 - gamma)); gamma = g2;
+      /* Identification. lam = mu * att_i * def_j * gamma has TWO scale redundancies: att against mu
+         and def against mu. Normalising att alone leaves the defence scale free to drift, mu grows
+         with it, and the moment a def value reaches its clamp the fitted rates stop meaning
+         anything — which is exactly what the first version of this function did (it produced a mu
+         of 3.35 and a home scoring rate of 3.7 goals). Both vectors are normalised to mean one and
+         the whole level lives in mu, which is then the mean rate per team-match. */
+      var sa = 0, sd = 0;
+      ids.forEach(function (t) { sa += att[t]; sd += def[t]; });
+      var ma = ids.length ? sa / ids.length : 1, md = ids.length ? sd / ids.length : 1;
+      if (ma > 0 && isFinite(ma)) { ids.forEach(function (t) { att[t] = att[t] / ma; }); mu = mu * ma; }
+      if (md > 0 && isFinite(md)) { ids.forEach(function (t) { def[t] = def[t] / md; }); mu = mu * md; }
+      mu = clamp(mu, 0.05, 20);
+    }
+    /* The MLE's own first-order condition: the weighted sum of the fitted rates equals the weighted
+       sum of the goals actually scored. A fit that misses this has not converged, whatever the
+       iteration counter says, so the check is published rather than trusted. */
+    var predSum = 0, obsSum = 0;
+    ms.forEach(function (m) {
+      predSum += m.w * (mu * att[m.h] * def[m.a] * gamma + mu * att[m.a] * def[m.h]);
+      obsSum += m.w * (m.hg + m.ag);
+    });
+    res.fitCheck = { predicted: predSum, observed: obsSum, gap: obsSum > 0 ? Math.abs(predSum - obsSum) / obsSum : 0 };
+    res.iters = it; res.converged = moved <= DC_TOL;
+    res.att = att; res.def = def; res.mu = mu; res.gamma = gamma;
+    res.weightSum = sum(ms, function (m) { return m.w; });
+    // rho: one-dimensional search inside the range in which every tau cell stays non-negative
+    var lo = -1, hi = 1;
+    ms.forEach(function (m) {
+      var lh = mu * att[m.h] * def[m.a] * gamma, la = mu * att[m.a] * def[m.h];
+      var rr = dcRhoRange(lh, la);
+      if (rr.lo > lo) lo = rr.lo;
+      if (rr.hi < hi) hi = rr.hi;
+    });
+    if (!(hi > lo)) { lo = -0.05; hi = 0.05; }
+    res.rhoRange = { lo: lo, hi: hi };
+    var tauLL = function (r) {
+      var s = 0;
+      ms.forEach(function (m) {
+        if (res.basis === "xg") return;                     // xG is not a scoreline: no cell to correct
+        var lh = mu * att[m.h] * def[m.a] * gamma, la = mu * att[m.a] * def[m.h];
+        var t = dcTau(m.hg, m.ag, lh, la, r);
+        s += m.w * Math.log(Math.max(1e-12, t));
+      });
+      return s;
+    };
+    var bestR = 0, bestL = -Infinity;
+    for (var gi = 0; gi < DC_RHO_GRID; gi++) {
+      var r = lo + (hi - lo) * gi / (DC_RHO_GRID - 1);
+      var L = tauLL(r);
+      if (L > bestL) { bestL = L; bestR = r; }
+    }
+    if (res.basis === "xg" && o.rho !== undefined && o.rho !== null) {
+      bestR = clamp(num(o.rho, 0), lo, hi); bestL = tauLL(bestR);
+    }
+    res.rho = res.basis === "xg" && (o.rho === undefined || o.rho === null) ? 0 : bestR;
+    res.rhoLogLik = isFinite(bestL) ? bestL : 0;
+    // the weighted log-likelihood of the fitted model, tau included
+    var ll = 0;
+    ms.forEach(function (m) {
+      var lh = mu * att[m.h] * def[m.a] * gamma, la = mu * att[m.a] * def[m.h];
+      var base = -lh + m.hg * Math.log(Math.max(1e-12, lh)) - logGamma(m.hg + 1)
+        - la + m.ag * Math.log(Math.max(1e-12, la)) - logGamma(m.ag + 1);
+      ll += m.w * (base + Math.log(Math.max(1e-12, dcTau(m.hg, m.ag, lh, la, res.rho))));
+    });
+    res.loglik = isFinite(ll) ? ll : 0;
+    res.ok = true;
+    res.note = "Dixon-Coles on " + res.basis + ": " + ms.length + " matches, effective weight " + res.weightSum.toFixed(2) +
+      " at a decay of " + res.xi + " per day (half-life " + (res.xi > 0 ? (Math.log(2) / res.xi).toFixed(0) : "infinite") +
+      " days), home factor " + res.gamma.toFixed(3) + ", rho " + res.rho.toFixed(4) +
+      " inside [" + res.rhoRange.lo.toFixed(3) + ", " + res.rhoRange.hi.toFixed(3) + "]" +
+      ", mean rate " + res.mu.toFixed(3) + " per team-match (fitted total " + res.fitCheck.predicted.toFixed(2) +
+      " against the observed " + res.fitCheck.observed.toFixed(2) + ", gap " + (res.fitCheck.gap * 100).toFixed(3) + "%)" +
+      (res.basis === "xg" ? " (xG is not a scoreline, so the low-cell correction is applied at prediction time with a rho fitted on goals, never fitted on xG itself)" : "") +
+      ", " + res.iters + " iterations" + (res.converged ? ", converged" : ", NOT converged") + ".";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+// The two scoring rates of one fixture under a fitted model.
+function dcLambdas(t, o, home, M) {
+  var res = { own: LBAR_PRIOR, opp: LBAR_PRIOR, lamH: LBAR_PRIOR, lamA: LBAR_PRIOR, side: home ? "h" : "a" };
+  try {
+    if (!isObj(M) || !isObj(M.att) || !isObj(M.def)) return res;
+    var mu = Math.max(0.05, num(M.mu, LBAR_PRIOR)), g = Math.max(0.1, num(M.gamma, HOME_ADV));
+    var at = clamp(num(M.att[t], 1), 0.05, 5), df = clamp(num(M.def[t], 1), 0.05, 5);
+    var ao = clamp(num(M.att[o], 1), 0.05, 5), dfo = clamp(num(M.def[o], 1), 0.05, 5);
+    var own = home ? mu * at * dfo * g : mu * at * dfo;
+    var opp = home ? mu * ao * df : mu * ao * df * g;
+    res.own = own; res.opp = opp;
+    res.lamH = home ? own : opp; res.lamA = home ? opp : own;
+  } catch (e) { /* total */ }
+  return res;
+}
+function dcPcs(t, o, home, M) {
+  var L = dcLambdas(t, o, home, M);
+  return dcCleanSheetProb(L.lamH, L.lamA, isObj(M) ? num(M.rho, 0) : 0, home ? "h" : "a");
+}
+
+/* cleanSheetCalibration — the tau correction and the time decay, measured where they are supposed
+ * to matter. Walk-forward: fit on the gameweeks strictly before g, predict "does this team concede
+ * nothing in g" for both sides of every fixture in g, score with Brier and a reliability curve.
+ *
+ * Three predictors, so the two questions do not get confounded:
+ *   lite      — the shipped tsPcs: exp(-xG conceded), on xG, no decay, no tau (the incumbent)
+ *   dc_goals  — Dixon-Coles on goals, tau fitted, exponential decay
+ *   dc_xg     — the same decay-weighted fit on xG with the goals-fitted rho applied at prediction
+ * This is a team-level clean sheet (conceded nothing). A player also needs 60 minutes for the
+ * points, which pStart and the Monte Carlo handle; the probability being scored here is the team's.
+ */
+function cleanSheetCalibration(live, opts) {
+  var res = { ok: false, gws: [], n: 0, models: [], baseRate: 0, rho: null, xi: DC_DECAY_PER_DAY, note: "" };
+  try {
+    var o = isObj(opts) ? opts : {};
+    if (!isObj(live) || !isObj(live.gw)) { res.note = "no finished gameweeks in the snapshot"; return res; }
+    var xiD = Math.max(0, num(o.xi, DC_DECAY_PER_DAY));
+    res.xi = xiD;
+    var keys = Object.keys(live.gw).map(function (k) { return num(k, NaN); }).filter(isFinite).sort(sortNum);
+    if (keys.length < 2) { res.note = "a walk-forward needs at least two finished gameweeks; this snapshot has " + keys.length; return res; }
+    var defs = [
+      { key: "lite", name: "TS lite (xG, no tau, no decay)" },
+      { key: "dc_goals", name: "Dixon-Coles on goals (tau + decay)" },
+      { key: "dc_xg", name: "Dixon-Coles on xG (tau from goals + decay)" }
+    ];
+    var P = {}, Y = [], perGw = [];
+    defs.forEach(function (d) { P[d.key] = []; });
+    var lastRho = null;
+    for (var i = 1; i < keys.length; i++) {
+      var g = keys[i], cut = keys[i - 1];
+      var cutLive = truncateLive(live, cut);
+      var st = teamStrength(cutLive);
+      var dcg = dixonColes(live, { basis: "goals", upto: cut, xi: xiD });
+      var dcx = dixonColes(live, { basis: "xg", upto: cut, xi: xiD, rho: dcg.ok ? dcg.rho : 0 });
+      if (dcg.ok) lastRho = dcg.rho;
+      var rowsGw = { gw: g, n: 0, rho: dcg.ok ? dcg.rho : null, matches: dcg.matches, byModel: {} };
+      defs.forEach(function (d) { rowsGw.byModel[d.key] = { pred: [], y: [] }; });
+      arr(live.fixtures).forEach(function (f) {
+        if (!isObj(f) || intOf(f.event, -1) !== g || !f.finished) return;
+        var hs = num(f.team_h_score, NaN), as = num(f.team_a_score, NaN);
+        if (!isFinite(hs) || !isFinite(as)) return;
+        [{ t: num(f.team_h, NaN), o: num(f.team_a, NaN), home: true, conceded: as },
+         { t: num(f.team_a, NaN), o: num(f.team_h, NaN), home: false, conceded: hs }].forEach(function (side) {
+          if (!isFinite(side.t) || !isFinite(side.o)) return;
+          var y = side.conceded === 0 ? 1 : 0;
+          var preds = {
+            lite: tsPcs(side.t, side.o, side.home, st.TS),
+            dc_goals: dcg.ok ? dcPcs(side.t, side.o, side.home, dcg) : null,
+            dc_xg: dcx.ok ? dcPcs(side.t, side.o, side.home, dcx) : null
+          };
+          if (preds.dc_goals === null || preds.dc_xg === null) return;
+          defs.forEach(function (d) { P[d.key].push(preds[d.key]); rowsGw.byModel[d.key].pred.push(preds[d.key]); rowsGw.byModel[d.key].y.push(y); });
+          Y.push(y); rowsGw.n++;
+        });
+      });
+      if (rowsGw.n) {
+        defs.forEach(function (d) { rowsGw.byModel[d.key].brier = brier(rowsGw.byModel[d.key].pred, rowsGw.byModel[d.key].y).brier; });
+        perGw.push(rowsGw);
+        res.gws.push(g);
+      }
+    }
+    res.n = Y.length;
+    res.rho = lastRho;
+    var nb = clamp(intOf(o.bins, 5), 2, 20);
+    res.models = defs.map(function (d) {
+      var b = brier(P[d.key], Y), rel = reliability(P[d.key], Y, nb);
+      return {
+        key: d.key, name: d.name, n: b.n, brier: b.brier, skill: b.skill, baseRate: b.baseRate,
+        maxGap: rel.maxGap, reliability: rel,
+        perGw: perGw.map(function (r) { return { gw: r.gw, n: r.n, brier: num(r.byModel[d.key].brier, 0) }; })
+      };
+    });
+    res.baseRate = res.models.length ? res.models[0].baseRate : 0;
+    var ranked = res.models.slice().filter(function (m) { return m.n > 0; }).sort(function (a, b) { return a.brier - b.brier; });
+    res.ok = res.n > 0;
+    res.note = res.ok
+      ? ("Clean-sheet calibration over " + res.n + " team-gameweeks in GW" + res.gws[0] + "-GW" + res.gws[res.gws.length - 1] +
+         ", base rate " + (res.baseRate * 100).toFixed(1) + "%. Brier: " +
+         res.models.map(function (m) { return m.key + " " + m.brier.toFixed(4); }).join(" · ") +
+         ". Lowest is best, so " + (ranked.length ? ranked[0].key : "nothing") + " leads. " +
+         "Fitted rho " + (res.rho === null ? "none" : res.rho.toFixed(4)) + " at a decay of " + xiD +
+         " per day. This measurement drives nothing: it is the evidence a promotion would need, not a promotion.")
+      : "no finished fixture with a score to calibrate against";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+// ---------------------------------------------------------------- probabilistic scoring (E5)
+
+/* Spearman and MAE score a point estimate. They say nothing about whether the model knows how
+ * uncertain it is, and an FPL decision is a decision under uncertainty: a captain with a mean of 6
+ * and a fat tail is not the same bet as a captain with a mean of 6 and no tail.
+ *
+ * CRPS and the logarithmic score are proper scoring rules over the whole predicted distribution.
+ * Both are reported per model, both in points-like units (lower is better), both computed
+ * walk-forward. Each model's point prediction is turned into a distribution the same way, so the
+ * comparison is of the models and not of three different distribution families:
+ *   · the prediction is rescaled into points by a factor built ONLY from gameweeks <= k
+ *     (mean of the players' own prior per-game points over the scored rows / mean prediction),
+ *     which is stricter than the MAE calibration, which uses the scored gameweek's mean (E-047);
+ *   · points are shifted to be non-negative and given a negative-binomial shape whose dispersion
+ *     is moment-matched to the observed spread of points in the gameweeks BEFORE the one scored.
+ *
+ * THE GATE DOES NOT MOVE ON THIS. Promotion still runs on the Spearman winners, because changing
+ * the metric a gate is decided on changes every past verdict at once, and player_xg is one
+ * gameweek away from deciding its own gate on the metric it has been scored on all season. The
+ * CRPS gate is computed and published beside it (`gateCrps`, `promotableCrps`) so the switch can be
+ * made on evidence, in its own round, with its own before-and-after. A2 law 5.
+ */
+function logGamma(x) {
+  var z = num(x, NaN);
+  if (!isFinite(z) || z <= 0) return 0;
+  // Lanczos, g=7, n=9
+  var C = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+    -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6,
+    1.5056327351493116e-7];
+  if (z < 0.5) {
+    // reflection: Gamma(z)Gamma(1-z) = pi / sin(pi z)
+    var s = Math.sin(Math.PI * z);
+    if (!(Math.abs(s) > 1e-300)) return 0;
+    return Math.log(Math.PI / Math.abs(s)) - logGamma(1 - z);
+  }
+  z -= 1;
+  var a = C[0], t = z + 7.5;
+  for (var i = 1; i < 9; i++) a += C[i] / (z + i);
+  var v = 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(a);
+  return isFinite(v) ? v : 0;
+}
+// Moment matching for the shifted negative binomial: variance = m + m^2/r.
+function nbDispersion(mean, variance, shift) {
+  var m = num(mean, 0) - num(shift, 0), v = num(variance, NaN);
+  if (!(m > 0) || !isFinite(v) || !(v > m)) return NB_MAX_R;                 // no over-dispersion: Poisson
+  var r = m * m / (v - m);
+  if (!isFinite(r) || r <= 0) return NB_MAX_R;
+  return clamp(r, NB_MIN_R, NB_MAX_R);
+}
+/* The predictive distribution of one player's gameweek points: a negative binomial on points
+ * shifted up by -PTS_DIST_MIN, truncated to [PTS_DIST_MIN, PTS_DIST_MAX] and renormalised. */
+function pointsPmf(mean, dispersion, opts) {
+  var res = { ok: false, min: PTS_DIST_MIN, max: PTS_DIST_MAX, pmf: [], cdf: [], mean: 0, r: NB_MAX_R, shift: -PTS_DIST_MIN, mass: 0 };
+  try {
+    var o = isObj(opts) ? opts : {};
+    res.min = intOf(o.min, PTS_DIST_MIN); res.max = intOf(o.max, PTS_DIST_MAX);
+    if (res.max <= res.min) { res.max = res.min + 1; }
+    res.shift = -res.min;
+    var r = clamp(num(dispersion, NB_MAX_R), NB_MIN_R, NB_MAX_R);
+    if (!isFinite(r)) r = NB_MAX_R;
+    res.r = r;
+    var m = num(mean, 0) + res.shift;
+    if (!isFinite(m)) m = res.shift;
+    m = clamp(m, 1e-3, 1e4);
+    res.mean = m - res.shift;
+    var K = res.max - res.min;
+    var lr = Math.log(r) - Math.log(r + m), lm = Math.log(m) - Math.log(r + m);
+    var s = 0, i;
+    for (i = 0; i <= K; i++) {
+      var lp = logGamma(i + r) - logGamma(r) - logGamma(i + 1) + r * lr + i * lm;
+      var p = Math.exp(lp);
+      if (!isFinite(p) || p < 0) p = 0;
+      res.pmf.push(p); s += p;
+    }
+    res.mass = s;
+    if (!(s > 0)) { res.pmf = res.pmf.map(function () { return 1 / (K + 1); }); s = 1; }
+    else for (i = 0; i <= K; i++) res.pmf[i] = res.pmf[i] / s;
+    var c = 0;
+    for (i = 0; i <= K; i++) { c += res.pmf[i]; res.cdf.push(clamp(c, 0, 1)); }
+    res.cdf[K] = 1;
+    res.ok = true;
+  } catch (e) { /* total */ }
+  return res;
+}
+// CRPS of a discrete distribution against an observation: sum over the support of (F(k) - 1{y<=k})^2.
+// Non-negative by construction, zero only for a point mass on the observation.
+function crpsDiscrete(dist, y) {
+  try {
+    if (!isObj(dist) || !Array.isArray(dist.cdf) || !dist.cdf.length) return 0;
+    var obs = num(y, NaN); if (!isFinite(obs)) return 0;
+    var s = 0;
+    for (var i = 0; i < dist.cdf.length; i++) {
+      var k = num(dist.min, PTS_DIST_MIN) + i;
+      var ind = obs <= k ? 1 : 0;
+      var d = num(dist.cdf[i], 0) - ind;
+      s += d * d;
+    }
+    return isFinite(s) && s >= 0 ? s : 0;
+  } catch (e) { return 0; }
+}
+// The logarithmic score: -log p(observed). Floored so a zero probability is a large finite penalty
+// rather than an infinity that would make one row decide the whole column.
+function logScoreDiscrete(dist, y) {
+  try {
+    if (!isObj(dist) || !Array.isArray(dist.pmf) || !dist.pmf.length) return -Math.log(LOG_SCORE_FLOOR);
+    var obs = Math.round(num(y, NaN));
+    if (!isFinite(obs)) return -Math.log(LOG_SCORE_FLOOR);
+    var idx = clamp(obs - num(dist.min, PTS_DIST_MIN), 0, dist.pmf.length - 1);
+    var p = num(dist.pmf[Math.round(idx)], 0);
+    return -Math.log(Math.max(LOG_SCORE_FLOOR, p));
+  } catch (e) { return -Math.log(LOG_SCORE_FLOOR); }
+}
+
 // ---------------------------------------------------------------- exports
 
 if (typeof module !== "undefined" && module.exports) {
@@ -3796,6 +5412,7 @@ if (typeof module !== "undefined" && module.exports) {
     waiverOrder: waiverOrder, waiverSim: waiverSim, waiverOutcomeFor: waiverOutcomeFor, h2hOpponent: h2hOpponent, draftRoster: draftRoster, playerSpread: playerSpread,
     distStats: distStats, mcDraftXI: mcDraftXI, mcH2H: mcH2H, h2hProjection: h2hProjection,
     sanitiseState: sanitiseState, detectSquadChange: detectSquadChange, ftAvailable: ftAvailable, sellPrice: sellPrice, bankAfter: bankAfter,
+    purchasePrices: purchasePrices, sellPrices: sellPrices,
     openClosers: openClosers, salvageJson: salvageJson, stripFences: stripFences, parseJson: parseJson, blocksOf: blocksOf, pickText: pickText, blockTypes: blockTypes, refreshRequest: refreshRequest, applyRefresh: applyRefresh,
     mulberry32: mulberry32, rngOf: rngOf, poisson: poisson, binomial: binomial, posRates: posRates, playerRates: playerRates, likelyXI: likelyXI, simFixture: simFixture, simPlayerDetail: simPlayerDetail, simPlayer: simPlayer, fixtureDraws: fixtureDraws, entryPoints: entryPoints, squadOrder: squadOrder, mcSquad: mcSquad, mcLeague: mcLeague,
     ranksOf: ranksOf, spearman: spearman, mae: mae, calibrateToPoints: calibrateToPoints, tournament: tournament,
@@ -3805,7 +5422,20 @@ if (typeof module !== "undefined" && module.exports) {
     minutesFit: minutesFit, ctxMinutesFit: ctxMinutesFit, minutesModel: minutesModel, truncateLive: truncateLive, minutesWalkForward: minutesWalkForward,
     minutesPromotion: minutesPromotion, MINUTES_TAIL_LIMIT: MINUTES_TAIL_LIMIT, MINUTES_PRODUCTION_ROUTED: MINUTES_PRODUCTION_ROUTED,
     playerXg: playerXg, eventMult: eventMult, xpEvent: xpEvent, bestElevenForEvent: bestElevenForEvent, chipValue: chipValue, chipSolver: chipSolver,
-    MINUTES_FEATURES: MINUTES_FEATURES, CHIP_SETS: CHIP_SETS, CHIP_NAMES: CHIP_NAMES, PROMOTION_HOLDOUT_WEEKS: PROMOTION_HOLDOUT_WEEKS
+    MAX_SWAPS: MAX_SWAPS, MAX_GREEDY_SWAPS: MAX_GREEDY_SWAPS,
+    autosubResolve: autosubResolve, permutations: permutations, benchPlan: benchPlan, picksOf: picksOf, gwSims: gwSims,
+    bestEntryOverElevens: bestEntryOverElevens, leakBacktest: leakBacktest, truncateElements: truncateElements,
+    winnableLeagues: winnableLeagues, leagueField: leagueField, candidateSquads: candidateSquads,
+    winProbabilityCore: winProbabilityCore, winProbability: winProbability, objectiveCompare: objectiveCompare,
+    hierRowsFromAcc: hierRowsFromAcc, hierGroups: hierGroups, hierPosterior: hierPosterior, hierPool: hierPool,
+    dcTau: dcTau, dcRhoRange: dcRhoRange, poissonPmf: poissonPmf, dcCleanSheetProb: dcCleanSheetProb,
+    dcMatches: dcMatches, dixonColes: dixonColes, dcLambdas: dcLambdas, dcPcs: dcPcs,
+    cleanSheetCalibration: cleanSheetCalibration,
+    logGamma: logGamma, nbDispersion: nbDispersion, pointsPmf: pointsPmf, crpsDiscrete: crpsDiscrete, logScoreDiscrete: logScoreDiscrete,
+    MINUTES_FEATURES: MINUTES_FEATURES, CHIP_SETS: CHIP_SETS, CHIP_NAMES: CHIP_NAMES, PROMOTION_HOLDOUT_WEEKS: PROMOTION_HOLDOUT_WEEKS,
+    TOURNAMENT_PROMOTE_AT: TOURNAMENT_PROMOTE_AT, MC_MIN_GWS_FOR_PWIN: MC_MIN_GWS_FOR_PWIN,
+    WINNABLE_MAX_SIZE: WINNABLE_MAX_SIZE, WINPROB_TOP_N: WINPROB_TOP_N, AUTOSUB_MAX_BLANKS: AUTOSUB_MAX_BLANKS,
+    DC_DECAY_PER_DAY: DC_DECAY_PER_DAY, PTS_DIST_MIN: PTS_DIST_MIN, PTS_DIST_MAX: PTS_DIST_MAX, SHRINK_K: SHRINK_K
   };
 }
 // ENGINE — END

@@ -1674,12 +1674,15 @@ check("MC-league-returns-a-direction-and-a-rank-band", function () {
 });
 
 const TOUR = E.tournament(SYN);
-check("TOURNAMENT-returns-exactly-the-nine-named-models", function () {
-  // Eight at v87; player_xg is the F5 challenger added at v88 and is barred from driving
-  // anything by E6 and by the shared promotion gate until it clears three transitions.
+check("TOURNAMENT-returns-exactly-the-models-the-engine-declares", function () {
+  // Eight at v87, nine at v88 (player_xg), ten at v89 (hier_pool). The count was pinned here and a
+  // tenth challenger turned a correct tournament red — E-084's class applied to a registry rather
+  // than to a date. The registry is the source of truth, so adding a model is one line in the
+  // engine and no churn here; what is asserted is that the tournament returns exactly it, in order.
   const keys = TOUR.models.map(function (m) { return m.key; });
-  const want = ["season_mean", "last_gw", "per90", "shrunk_per90", "ict_rate", "bps_rate", "blend", "component_xp", "player_xg"];
-  return { ok: keys.length === 9 && keys.join(",") === want.join(","), detail: "keys: " + keys.join(", ") };
+  const want = E.TOURNAMENT_MODELS.map(function (m) { return m.key; });
+  return { ok: keys.length === want.length && keys.join(",") === want.join(","),
+    detail: keys.length + " models: " + keys.join(", ") + (keys.join(",") === want.join(",") ? "" : " · the registry declares " + want.join(", ")) };
 });
 check("TOURNAMENT-spearman-values-are-inside-minus-1-and-1", function () {
   const bad = TOUR.models.filter(function (m) { return m.spearman !== null && !(m.spearman >= -1 && m.spearman <= 1); });
@@ -1994,12 +1997,13 @@ check("F5-playerXg-answers-zero-on-a-blank-and-names-it", function () {
     detail: "team 1 blank in GW4 → xp " + px.xp + " (" + px.note + "); a club that still plays scores " + r4(still.xp) };
 });
 
-check("F5-player-xg-is-the-ninth-model-and-is-scored-like-the-other-eight", function () {
+check("F5-player-xg-is-in-the-tournament-and-is-scored-like-every-other-model", function () {
   const m = TOUR.models.filter(function (x) { return x.key === "player_xg"; })[0];
   const scored = TOUR.models.filter(function (x) { return x.spearman !== null; });
   const ok = !!m && m.name === "Player xG" && m.transitions === TOUR.transitions && m.spearman !== null &&
     m.spearman >= -1 && m.spearman <= 1 && m.mae !== null && m.mae > 0 &&
-    Array.isArray(m.perTransition) && m.perTransition.length === TOUR.transitions && scored.length === 9;
+    Array.isArray(m.perTransition) && m.perTransition.length === TOUR.transitions &&
+    scored.length === E.TOURNAMENT_MODELS.length;
   return { ok: ok, detail: m ? "player_xg ρ " + r4(m.spearman) + " over " + m.transitions + " transitions, MAE " + r2(m.mae) +
     " points, per transition [" + m.perTransition.map(r4).join(", ") + "]" : "player_xg is missing from the tournament" };
 });
@@ -2567,7 +2571,7 @@ if (!LIVE) {
     const lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
     const raws = scored.map(function (m) { return m.maeRaw; });
     const rlo = Math.min.apply(null, raws), rhi = Math.max.apply(null, raws);
-    return { ok: scored.length === 9 && lo > 0 && hi <= 10 * lo,
+    return { ok: scored.length === E.TOURNAMENT_MODELS.length && lo > 0 && hi <= 10 * lo,
       detail: "calibrated spread " + r2(lo) + "–" + r2(hi) + " (ratio " + r2(hi / lo) + "); raw spread " + r2(rlo) + "–" + r2(rhi) + " (ratio " + r2(rhi / rlo) + ")" };
   });
   check("LIVE-the-BPS-rate-model-is-the-one-the-rescaling-moves", function () {
@@ -2582,14 +2586,15 @@ if (!LIVE) {
   // promoted". The transition count is now derived from the snapshot's own finished gameweeks,
   // `decidable` carries the transition-count half, and `promotable` means at least one model's
   // own gate is open — which is the arithmetic asserted here, at any gameweek.
-  check("LIVE-tournament-has-nine-models-and-separates-decidable-from-promotable", function () {
+  check("LIVE-tournament-carries-every-declared-model-and-separates-decidable-from-promotable", function () {
     const want = Math.max(0, Object.keys(LIVE.gw).length - 1);
     const anyOpen = ltour.models.some(function (m) { return m.promotable === true; });
-    return { ok: ltour.models.length === 9 && ltour.transitions === want &&
+    const n = E.TOURNAMENT_MODELS.length;
+    return { ok: ltour.models.length === n && ltour.transitions === want &&
         ltour.decidable === (ltour.transitions >= 3) && ltour.promotable === anyOpen,
-      detail: ltour.models.length + " models · " + ltour.transitions + " transitions from " + Object.keys(LIVE.gw).length +
-        " finished gameweeks · decidable " + ltour.decidable + " · promotable " + ltour.promotable +
-        " (" + ltour.models.filter(function (m) { return m.promotable; }).length + " of 9 models past their own gate)" };
+      detail: ltour.models.length + " of " + n + " declared models · " + ltour.transitions + " transitions from " +
+        Object.keys(LIVE.gw).length + " finished gameweeks · decidable " + ltour.decidable + " · promotable " + ltour.promotable +
+        " (" + ltour.models.filter(function (m) { return m.promotable; }).length + " of " + n + " models past their own gate)" };
   });
   // E-054: CLAUDE.md Part M and data/weekly.js both carry a written tournament leader
   // ("bps_rate", recorded at v86). The engine recomputes the walk-forward from the snapshot and
@@ -2764,6 +2769,44 @@ if (!LIVE) {
       detail: "src/ui.jsx quotes " + (quoted ? quoted[1] : "nothing") + " tenths, data/weekly.js records " +
         (recorded ? recorded[1] : "nothing") + (reads ? " — the panel reads the block" : agrees ? " — they agree" :
         " — they disagree, and E-088 " + (logged ? "records it" : "IS MISSING from ERRORS.md")) };
+  });
+
+  // E-090: the search used to stop at three swaps and SAY SO, under a header reading "FT 4".
+  check("LIVE-the-transfer-plan-reaches-the-week's-limit-not-the-search's", function () {
+    const rows = [0, 1, 2, 3, 4, 5].map(function (ft) {
+      const tp = E.transferProtocol(Object.assign({}, LSTATE, { ft: ft }), LCTX);
+      return { ft: ft, k: tp.k, week: tp.weekLimit, search: tp.searchLimit, hits: tp.hits, value: tp.value };
+    });
+    const ok = rows.every(function (r) {
+      return r.week === Math.min(r.ft + 1, E.MAX_GREEDY_SWAPS) &&
+        r.search === Math.min(r.week, E.MAX_SWAPS) &&
+        r.k <= r.week &&
+        r.hits === Math.max(0, r.k - r.ft) * 4;
+    }) && rows[4].k > E.MAX_SWAPS;               // at four free transfers it must get past three
+    return { ok: ok, detail: rows.map(function (r) { return "FT" + r.ft + "→" + r.k + "/" + r.week + " (hit " + r.hits + ")"; }).join(" · ") +
+      " · search limit " + E.MAX_SWAPS + ", week limit at FT4 " + rows[4].week };
+  });
+  // Greedy has to pay for itself: a plan grown past three swaps never scores worse than the plan
+  // it grew from, or the extension is costing points to look busy.
+  check("LIVE-growing-a-plan-past-three-swaps-never-lowers-its-value", function () {
+    const three = E.transferProtocol(Object.assign({}, LSTATE, { ft: 2 }), LCTX);   // week limit 3
+    const five = E.transferProtocol(Object.assign({}, LSTATE, { ft: 4 }), LCTX);    // week limit 5
+    const ok = five.k >= three.k && five.value >= three.value - 1e-9;
+    return { ok: ok, detail: "at FT2 " + three.k + " swaps worth " + r2(three.value) +
+      "; at FT4 " + five.k + " swaps worth " + r2(five.value) };
+  });
+  // And a forced sell the plan declines to make is named with its reason, not left silent (E-082).
+  check("LIVE-a-forced-sell-the-plan-keeps-is-named-with-its-reason", function () {
+    const tp = E.transferProtocol(null, LCTX);
+    const soldIds = tp.moves.map(function (m) { return m.out; });
+    const kept = (tp.forced || []).filter(function (f) { return soldIds.indexOf(f.id) < 0; });
+    const named = (tp.keptForced || []).map(function (f) { return f.id; }).sort(function (a, b) { return a - b; }).join(",");
+    const want = kept.map(function (f) { return f.id; }).sort(function (a, b) { return a - b; }).join(",");
+    const onScreen = !kept.length || tp.reasons.some(function (r) { return /kept despite the flag/.test(r); });
+    return { ok: named === want && onScreen,
+      detail: (tp.forced || []).length + " forced, " + kept.length + " kept: " +
+        ((tp.keptForced || []).map(function (f) { return f.name + " (" + f.reason + ")"; }).join(", ") || "none") +
+        (onScreen ? " — on screen" : " — NOT on screen") };
   });
 
   check("LIVE-deadline-is-read-from-is_next-never-hard-coded", function () {

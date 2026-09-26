@@ -1,6 +1,7 @@
 # GAP_v110 — what the repo has, what v109 has, what has to be built
 
-Written 26 Sep 2026, before any v110 code. Governing spec: `reference/v110/UPDATE_PROMPT.md`.
+Written 26 Sep 2026 before any v110 code, and kept current as items close. A row marked **done**
+carries its proving number; `retests/RETEST_v110.md` has the working. Governing spec: `reference/v110/UPDATE_PROMPT.md`.
 Reference implementation: `reference/v109/` (read-only; the app never imports from it).
 
 Preflight is complete and recorded in `retests/RETEST_v110.md`. Reference gate: **189/189, 3,920
@@ -19,7 +20,7 @@ hour, M = a few hours, L = most of a session.
 
 ## 0. Two findings that come before A1
 
-### P0 · Rival managers' personal names are in committed data
+### P0 · Rival managers' personal names are in committed data — **closed, then reopened, then closed**
 
 `data/live.json` carries **115 `player_name` fields, 84 distinct real people's names**, inside
 `leagues[].standings`. They have propagated into `app/FPL_Mission_Control.jsx` and
@@ -29,12 +30,21 @@ was not visible, but the rule is about committing, not about rendering:
 > "Never commit rival managers' personal names (`player_first_name`, `player_last_name`,
 > `player_name`, initials)." — v110 §1.5, repeated in §6 and §7.14.
 
-`data/fetch_live.cjs` is the writer. This is the first change of the session, ahead of A1, and it
-carries the §7.14 test: a privacy grep over everything committed, wired into the gate so it can
-never come back. The names are also in this branch's earlier commits; the scrub stops them being
-shipped from here, and rewriting the branch history is a separate decision for the manager.
+`data/fetch_live.cjs` was the writer. Closed as E-085: `data/scrub.cjs` scrubs the whole payload at
+the write, a league entry no longer carries `manager` or `shortName` (a Draft `short_name` is the
+manager's initials), and `qa/privacy.cjs` runs first in both `qa/run.sh` and `gate.yml`.
 
-### P0 · The baseline gate is red
+Then **reopened by my own next commit**, which tracked 53 raw feeds carrying **489** name fields,
+because the ignore rule was written inside `pipeline/.gitignore` as `pipeline/feeds/` — relative to
+that directory, so it meant `pipeline/pipeline/feeds/` and matched nothing — and because the suite
+walked the working tree, where tracked and untracked look identical. Closed again as E-091: the
+scope is `git ls-files`, the ignore rule is proved with `git check-ignore`, and the offending commit
+was rewritten rather than followed by a deletion. `qa/privacy.cjs` **25/25**.
+
+Still open, and the manager's call: the 84 rival names in `data/live.json` in commits **before**
+`baac4bc`. Removing those means rewriting further back than my own work.
+
+### P0 · The baseline gate is red — **closed**
 
 `bash qa/run.sh` fails at step 8: **smoke 51/60**. The nine failures split into two kinds, and
 neither is a v110 defect — both were introduced by refreshing the snapshot from GW4 to GW5 on
@@ -49,8 +59,9 @@ neither is a v110 defect — both were introduced by refreshing the snapshot fro
   and the F5 tournament panel's `promotable` verdict (`player_xg` now leads 3 of 4 transitions
   at ρ 0.3054).
 
-Both are logged in `ERRORS.md` and fixed before A1 code lands, because §1.3 puts the failing
-assertion first and §9 needs a green gate.
+Both are logged in `ERRORS.md` (E-084) and fixed. `bash qa/run.sh` prints **ALL PASS**, and the
+rule is now machine-checked by `qa/no_frozen.cjs` 6/6 so it cannot recur: no check compares a
+live-sourced field, or the length of a live-sourced collection, to a literal number or ISO instant.
 
 ---
 
@@ -58,9 +69,9 @@ assertion first and §9 needs a green gate.
 
 | Item | Status | Where it is / goes | Failing test to write first | Effort |
 |---|---|---|---|---|
-| **A1 Pull** | partial | `data/fetch_live.cjs` (Classic + Draft, 667 elements, 83 rivals) → `pipeline/pull.sh` | Two runs against a blocked network leave the previous files intact — the repo writer has no last-good-file fallback and no gameweek auto-detect assertion | M |
+| **A1 Pull** | **done** | `pipeline/pull.sh` | `qa/pull_guard.cjs` **22/22** — blocked, HTML-with-200 and truncated all leave every file byte-identical and exit non-zero; a good feed **does** overwrite; gameweek detected from `is_current` → highest finished → `is_next − 1`; refuses rather than guessing with no bootstrap. Proven live: 53 feeds, gameweek 5, exit 0 | M |
 | **A2 Bake** | partial | `data/fetch_live.cjs` → `pipeline/bake.js`, feeding the existing `data/weekly.js` path | Snapshot equality against `reference/v109/app/data.json` on the reference feeds | L |
-| **A3 Selling prices** | partial | `sellPrice()` in `src/engine.js` | Every player held since 18 Sep matches `golden.classic.sell` — the repo has `cost_change_start` but **no `element_in_cost`** anywhere, so anyone bought since GW1 is priced by the wrong rule | M |
+| **A3 Selling prices** | **done, engine side** | `purchasePrices`, `sellPrices` in `src/engine.js` | `qa/prices.cjs` **12/12** — all **15 of 15** match `golden.classic.sell`, 14 from the start price and 1 from the transfer log, with the source named per player. Four mutations (full rise, rounding up, a fall halved, the price paid ignored) each break the match. Still to wire: the fetcher must carry the transfer log into `data/live.json` so the app uses it instead of hand-typed `state.squad[].purchase` | M |
 | **A4 Reconciliation** | absent | `pipeline/bake.js` + `qa/recon.cjs` | Σ(points × multiplier) − hits equals the official total, 5 of 5 on the snapshot | M |
 | **A5 Free-transfer ledger** | partial | `ftAvailable()` in `src/engine.js`; `ft_available: 4` is currently **read from the feed, not replayed** | 4 free transfers for GW6 replayed from history, with a wildcard week keeping the count | S |
 | **A6 Transfer ledger** | absent | `pipeline/bake.js` | Every transfer with points scored since, against the one GW5 transfer on the snapshot | S |
@@ -84,9 +95,9 @@ gains the new keys.
 | **B1 Team ratings** | partial | `teamStrength`, `tsXg`, `tsMult` in `src/engine.js` — fitted to **season counts only** | `golden.calib` = {ka 1.5, kd 2, rmse 0.1687, 42 anchors, weeks 5–7} and `golden.ratings` to 0.001. No price prior, no log-space blend, no fitted exponents exist | L |
 | **B2 Match prices to goals** | absent | `src/engine.js` | Margin removed proportionally, Poisson grid at 0.05 then 0.01; round-trip inside 1.2 pp and `golden.odds` to 0.01. **No `odds` anywhere in the repo** | M |
 | **B3 Player expected points** | partial | `xp1`, `xp5`, `minutesModel`, `playerXg` | Every player GW6–20 within 0.01 of `solver_in.json`. The repo has appearance/goals/assists/CS/bonus and a real minutes model, and `defensive_contribution` is read — but there is no empirical-Bayes DC hit rate, no parsed return dates, no dated start overrides | L |
-| **B4 Searches** | present | `bestXI`, `pickXI`, `transferProtocol`, `wildcardSolver`, `wcLocalOptimum` | Matches `golden.classic.greedyTransfers`; and §7.11 — search up to min(free transfers, 5), the repo's protocol needs re-checking at 5 | M |
+| **B4 Searches** | partial | `bestXI`, `pickXI`, `transferProtocol`, `wildcardSolver`, `wcLocalOptimum` | §7.11 **done**: the week's limit is FT + 1 capped at five, exhaustive to three then greedy, and the plan goes 3 swaps worth 37.54 at LOW to **5 worth 54.01 at HIGH** with one hit (E-090). Still to do: match `golden.classic.greedyTransfers` | M |
 | **B5 Claimability** | partial | `draftPool`, `draftOwnership` (real league pool, closed in v88) | A phase-aware "how to get him": `waivers_processed` is read but the `o`/`a`/`l` distinction is not turned into a label | S |
-| **B6 Waiver simulator** | partial | `draftWaivers`, `waiverOrder` | Replaying `reference/v109/live/d_tx.json` reproduces **74/74**, reading each round's order off the log's `index`; denial reasons ordered "already claimed" first (§7.8) | L |
+| **B6 Waiver simulator** | **done** | `waiverSim`, `waiverOutcomeFor` in `src/engine.js` | `qa/waiver_log.cjs` **13/13 · 74/74 claims across four gameweeks**, on the committed snapshot and the live log. Four mutations: denial order reversed 72/74 (§7.8's own number), rotate-to-bottom 73/74, one attempt per round 62/69, order reversed 52/74 | L |
 | **B7 Claims sheet** | absent | `src/engine.js` | `golden.draft.claims`: 13 lines, strategy "firsts", 578 now / 620 stressed / 617 other ordering / 646 all-first-choices | L |
 | **B8 Monte Carlo** | partial | `mcSquad`, `mcH2H`, `mcLeague`, `simFixture`, `fixtureDraws` | GW6 v Isak at this game 51.9% ± 2 pp win, 3.1% ± 1 pp draw; Classic GW6 p10/p50/p90 37/52/71 ± 2. Scorelines are not yet shared per fixture across owners | M |
 | **B9 Post-mortems** | partial | leak analysis exists as session work, not as engine code | Bench points scored against **avoidable** ones, the captain gap, and Draft results a better eleven would have flipped — over five gameweeks per game | M |
@@ -146,7 +157,7 @@ so the repo keeps its seven and gains **odds** and **review** → nine. The tab 
 | **E1 Ported suites** | partial | Sixteen suites by the reference's names — data, maths, projections, rules, separation, property (≥3,900 cases), simulation, optimisers, reconciliation, prices, market, waivers, plan, render, actions, page. The repo has ten suites of its own (`unit_engine`, `smoke`, `smoke_wk`, `realistic`, `components`, `buttons`, `mc_full`, `mc_all`, `webkit`, `tdz_check`) — all keep running | L |
 | **E2 Parity** | absent | `qa/parity.cjs` against `golden.json` and `solver_in.json` at the tolerances above | M |
 | **E3 Plan legality** | absent | `qa/plan_legality.cjs` over every week of `data/plan.json`: shape, club cap, legal eleven with captain and vice in it, transfers equal to the squad difference, no sell-then-rebuy (§7.10), bank never negative at selling prices, replayed hits, one chip per week and each once, expected points re-derived within 0.05, free-hit weeks carrying no other chip | L |
-| **E4 Waiver log** | absent | `qa/waiver_log.cjs` — 74/74 on the snapshot, re-run on the live log at every build | M |
+| **E4 Waiver log** | **done** | `qa/waiver_log.cjs` 13/13, 74/74 on both the committed snapshot and the log pulled today; wired into `qa/run.sh` and `gate.yml` | M |
 | **E5 Phone render** | partial | `qa/browser.py` at 390×844, light and dark, every tab, zero page errors, no overflow, self-test pressed. `qa/webkit.js` does Safari-engine acceptance and light mode only | M |
 | **E6 `gate.yml`** | partial | E1–E4 added, plus a 20-second solver smoke that must return a legal plan; the full solve never runs on push | S |
 | **E7 `refresh.yml`** | partial | Exists, uncommitted, from the superseded v89 wave. It commits straight to the branch; §5 E7 wants pull → bake → export → solve → build → gate and then **a pull request** with a one-paragraph note. It must not be enabled before the P0 privacy scrub, because it commits `data/live.json` | M |
@@ -169,6 +180,26 @@ Two loose ends inherited from the v89 wave, both in files v110 rewrites:
 
 P0 privacy scrub → P0 red-gate repair → A (data) → B (engine) → C (optimiser, solved detached) →
 D (interface) → E (QA and CI) → refresh on live feeds if the network holds.
+
+**Where it stands.** Both P0 items are closed. **A1, A3 (engine side), B6 and E4 are done**, §7.11 is
+done inside B4, and E-087, E-088, E-090 and E-091 are closed with their numbers. Four suites are new
+and wired into `qa/run.sh` and `gate.yml`: `privacy` 25/25, `no_frozen` 6/6, `pull_guard` 22/22,
+`waiver_log` 13/13 and `prices` 12/12.
+
+**One thing a reader of this file needs to know.** A concurrent wave of subagents was editing
+`src/engine.js`, `qa/` and `data/` for part of this session, and about 1,400 lines of theirs arrived
+in the working tree — autosub resolution, a bench planner, a leak backtest, a win-probability
+objective, hierarchical pooling and Dixon-Coles tau/rho, plus a tenth tournament model. It is
+committed because discarding it would destroy real work and the suites cover it (mc_all's 135
+property invariants over a million iterations, and unit_engine), but it has **not** had a
+line-by-line review from me, and that review is the first thing after this. It cost two gate runs to
+notice, because the engine changed between them: the tenth model turned four checks red that had
+pinned "nine models" — E-084's class applied to a registry rather than to a date, now fixed by
+reading `TOURNAMENT_MODELS`. The next item is the Draft ground truth
+— `state/kwezi.json` still carries `draft.league_id: null` and a roster of twelve guessed codes,
+while §3's entry 279275 in league 46148 verifies against the live API — because it unlocks B5, B7,
+C5 and D3, and those are what the manager needs before the waivers settle on 9 October. Then A2
+(the bake), then B1–B3 against `golden.json`, then C.
 
 Parity is the spine: B1, B2 and B3 are graded against `golden.json` and `solver_in.json`, and
 nothing downstream is trustworthy until they match. Per the stop rule, a parity target that

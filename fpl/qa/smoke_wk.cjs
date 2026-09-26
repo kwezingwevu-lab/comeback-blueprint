@@ -722,14 +722,19 @@ async function main() {
 
   // ---- 32 · E-004: the free-transfer budget is respected, and a hit is charged when it is not
   {
-    const ok1 = tp.k <= Math.min(ctx.ft + 1, 3) && tp.hits === Math.max(0, tp.k - ctx.ft) * 4;
+    // E-090: this used to pin the search's own three-swap limit, so raising the plan to the week's
+    // real limit turned a correct plan red. The invariant is the WEEK's limit — free transfers plus
+    // one hit, capped at five — read from the engine rather than retyped here.
+    const weekCap = Math.min(ctx.ft + 1, E.MAX_GREEDY_SWAPS);
+    const ok1 = tp.k <= weekCap && tp.hits === Math.max(0, tp.k - ctx.ft) * 4;
     const zero = E.transferProtocol(Object.assign({}, STATE, { ft: 0 }), ctx);
     const ok2 = zero.moves.length === 0 || (zero.k <= 1 && zero.hits === zero.k * 4);
     const two = E.transferProtocol(Object.assign({}, STATE, { ft: 1 }), ctx);
     const ok3 = two.k <= 2 && two.hits === Math.max(0, two.k - 1) * 4;
     assert("ft-budget-respected",
       ok1 && ok2 && ok3,
-      "at FT " + ctx.ft + ": " + tp.k + " transfers, hit " + tp.hits + "; forced to FT 0: " + zero.k + " transfers, hit " + zero.hits + " (" + zero.confidence + "); at FT 1: " + two.k + " transfers, hit " + two.hits);
+      "at FT " + ctx.ft + ": " + tp.k + " transfers of a week limit of " + weekCap + ", hit " + tp.hits +
+      "; forced to FT 0: " + zero.k + " transfers, hit " + zero.hits + " (" + zero.confidence + "); at FT 1: " + two.k + " transfers, hit " + two.hits);
   }
 
   // ---- 33 · the draft league endpoints this build depends on are still public and still shaped

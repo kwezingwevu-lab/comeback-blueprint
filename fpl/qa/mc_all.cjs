@@ -760,9 +760,20 @@ function tp(u) {
   if (u._tp === undefined) u._tp = E.transferProtocol(u.state, u.ctx);
   return u._tp;
 }
-inv("I53", "the free-transfer budget is never exceeded (E-004)", 6, function (u) {
+inv("I53", "the free-transfer budget is never exceeded (E-004, E-090)", 6, function (u) {
+  // E-090: this pinned the SEARCH's three-swap limit, not the WEEK's. Free transfers bank to five,
+  // so the week allows FT + 1 with one hit up to five, and a plan that uses the fourth free
+  // transfer is correct rather than a budget breach. The limit is read from the engine.
   const r = tp(u);
-  return r.k <= Math.min(r.ft + 1, 3) ? OK : bad("k " + r.k + " with ft " + r.ft);
+  const week = Math.min(r.ft + 1, E.MAX_GREEDY_SWAPS);
+  return r.k <= week ? OK : bad("k " + r.k + " with ft " + r.ft + " against a week limit of " + week);
+});
+inv("I53b", "the plan reports the week's limit and the search's, and never confuses them", 6, function (u) {
+  const r = tp(u);
+  const week = Math.min(r.ft + 1, E.MAX_GREEDY_SWAPS), search = Math.min(week, E.MAX_SWAPS);
+  if (r.weekLimit !== week) return bad("weekLimit " + r.weekLimit + " for ft " + r.ft + ", want " + week);
+  if (r.searchLimit !== search) return bad("searchLimit " + r.searchLimit + ", want " + search);
+  return OK;
 });
 inv("I54", "a hit is priced at exactly −4 per extra transfer", 6, function (u) {
   const r = tp(u);

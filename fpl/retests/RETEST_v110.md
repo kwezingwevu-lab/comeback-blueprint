@@ -155,6 +155,185 @@ Not closed by this change, and the manager's call rather than mine: the names ar
 branch's **earlier commits**. The scrub stops them being shipped from here; removing them from
 history means rewriting the branch, which is a decision to take deliberately.
 
+### A1 · the pull, with a guard that has to be able to fail
+
+`pipeline/pull.sh` fetches every public Classic and Draft feed. Three things the reference
+`pull.sh` does not do, each because the reference's way is silently wrong rather than loudly wrong:
+
+- **The gameweek in play is detected**, not passed as an argument defaulting to 5. A pull that
+  fetches the wrong gameweek's picks is worse than one that fails, because it succeeds. Detection
+  is `events[].is_current`, then the highest finished event, then `is_next` minus one; an explicit
+  argument still wins for replaying a past week; with no bootstrap and no argument it refuses and
+  writes nothing.
+- **A feed that does not answer with parseable JSON leaves the previous file alone.** The FPL API
+  serves an HTML "the game is being updated" page with a 200 during deadline processing. Writing
+  that over a good snapshot turns a stale file into a broken one, and the bake then dies on a parse
+  error instead of on a missing feed — which points the reader at the wrong thing entirely.
+- **It exits non-zero and names what is missing** when a feed the bake cannot do without is absent.
+
+`qa/pull_guard.cjs` **22/22**. The spec's test is "two runs on a blocked network leave the previous
+files intact", and a guard that never writes would pass that too, so the suite proves both sides:
+blocked, a 200 with an HTML body, and a 200 that does not parse all leave every file byte-identical
+and exit non-zero; a feed that answers properly **does** overwrite. The stand-in API runs in its own
+process, because the suite drives `pull.sh` with `execFileSync` and a server listening in this
+process would accept the connection and never answer it — every case would have passed for the
+wrong reason.
+
+Proven live as well as against a stand-in: **53 feeds from the real endpoints, gameweek 5 detected,
+exit 0.**
+
+### B6 and E4 · the waiver model reproduces this league's own log
+
+**74 of 74 claims across four gameweeks**, on the committed snapshot and on the log pulled today
+(they agree: 116 transactions, 74 of kind `w`, 39 accepted, 31 "already claimed", 4 "drop already
+gone" — the GW6 window has not run yet, so the log has not moved).
+
+`waiverSim` is pure and context-free, so a suite can drive it straight off a recorded log and a
+claims sheet can be simulated under several orderings without a context at all. Every rule in it is
+one the log forced, and each week's processing order is read off the log's own `index` rather than
+from today's `waiver_pick` — the picks move as the table moves, and these are past weeks.
+
+Four mutations prove the fit is the rules and not luck:
+
+| rule broken | score |
+|---|---|
+| none — the model as it stands | **74 / 74** |
+| "drop already gone" checked before "already claimed" | 72 / 74 |
+| a manager rotates to the bottom after a success | 73 / 74 |
+| one attempt per manager per round, win or lose | 62 / 69 |
+| the processing order reversed | 52 / 74 |
+
+The 72/74 is §7.8's own number, reproduced independently rather than quoted. ERRORS.md E-089.
+
+### E-084's rule made machine-checkable
+
+`qa/no_frozen.cjs` **6/6 over 17 files, 0 offenders, 5 exemptions**. No check in `qa/` or `data/`
+compares a live-sourced field, or the length of a live-sourced collection, to a literal number or a
+literal ISO instant. `frozen-ok: <reason>` exempts the competition's shape (twenty clubs, 380
+fixtures) or a synthetic fixture's own input; the reason is required and every exemption prints on
+every run, so they stay visible instead of accumulating unread.
+
+Mutation-proven on 16 cases — and the first version **failed** that proof, flagging ten legitimate
+lines for every real one, so the field must sit immediately left of the operator and the literal
+immediately right. It also caught a defect while it was being written: lifting the league-count
+check above its `WANT_IDS` declaration put the constant in its own temporal dead zone, which
+`node --check` cannot see.
+
+### Three ledger entries closed, and one reopened as a bigger fix than it looked
+
+**E-087 — the minutes gate opened and nothing noticed.** `driving` was a literal `false`, written
+when the gate was shut. The decision turned out to be three questions, not one: `eligible` (the
+gate AND a tail condition), `routed` (whether production actually asks the model) and `driving` (the
+conjunction). Reporting `driving` for a model nothing calls would be E-087 inverted.
+
+On the entry's own objection that Part J speaks of Spearman: Spearman is for a model that RANKS
+players by points. A minutes model predicts a binary event, for which Brier is the right score and
+Spearman is not defined — so the gate is appropriate and the objection does not hold. What the gate
+cannot see is a tail: it is a mean over every scored row, and a handful of low-evidence rows is
+exactly what moves a transfer recommendation. Promotion now also requires that, for every player at
+the incumbent's floor, the challenger stays below an even chance.
+
+Measured like for like, which is the correction that mattered: comparing the model's raw `pModel`
+against the flag-adjusted incumbent invents disagreements out of nothing, and the first pass claimed
+a 0.000 → 0.627 jump for Fatawu that was **entirely the flag factor**. Corrected, over 421 players
+the two disagree by a mean of **0.104**, median 0.035, p90 0.304, max 0.598. Of **138** players at
+the incumbent floor the challenger's highest raw figure is **0.497** against the 0.50 limit — it
+holds by 0.003, which is close, and the engine says so rather than rounding it away.
+
+So the challenger is **eligible** and is **not routed**: v110 §5 B3 replaces this minutes model
+outright, and routing production through a model about to be replaced would spend a round's
+before-and-after twice. `MINUTES_PRODUCTION_ROUTED` is a named constant beside the reason.
+
+**E-088 — a price typed into shipped markup.** `src/ui.jsx` quoted `money(978)` for the written
+fifteen's cost: a September fact describing a fifteen that has since been replaced, so the panel
+invited the manager to read a £1.0m price move that never happened. It reads
+`WEEKLY.classic.wildcard15_cost_written` now.
+
+**E-090 — "at most 3 transfers this week" printed beside "FT 4".** The entry proposed rewording the
+message. That would have made a true sentence out of a real limitation: with four free transfers in
+hand the engine was **structurally unable to use the fourth**. C2's three-swap ceiling was written
+when free transfers could not exceed three; they bank to five. The week's limit is now FT + 1 with
+one hit, capped at five, and the search reaches it — exhaustive to three, then greedy, which is what
+§5 B4 asks for, and only while a further swap pays.
+
+Measured on the 26 September snapshot: **3 swaps worth 37.54 at LOW confidence → 5 swaps worth
+54.01 at HIGH**, with one hit, in 46 ms. Hughes→Gomez, van Ewijk→Bogle, Brobbey→Emersonn,
+Konsa→De Cuyper, Szoboszlai→Schade. A second rule fell out of it: the five-swap plan **declines**
+the fourth forced sell (Semenyo, status d, 75%) because two unforced upgrades pay more, and nothing
+said so. E-082's rule cuts both ways, so `keptForced` now names every forced sell the plan does not
+make, with its reason.
+
+### E-091 · the privacy fix's own next commit committed 489 personal names
+
+Recorded here because it is the worst thing that happened in this session and it happened one commit
+after E-085 was closed.
+
+`pipeline/pull.sh` writes raw API feeds, which carry the name fields exactly as the endpoints return
+them. The ignore rule was written as `pipeline/feeds/` **inside** `pipeline/.gitignore` — where
+patterns are relative to that file's own directory, so it meant `pipeline/pipeline/feeds/` and
+matched nothing. `git add -A` tracked 53 feeds carrying **489 personal-name fields** across thirteen
+mini-league tables, the Draft league details and two entry feeds.
+
+Two failures, and the second is the one that matters: `qa/privacy.cjs` walked the **working tree**,
+where a tracked file and untracked scratch look identical. A suite that cannot tell tracked from
+untracked cannot check a rule about committing.
+
+Caught by `qa/pull_guard.cjs`'s own last assertion — `git ls-files pipeline/feeds` — inside the
+full gate run, minutes after the commit. Not by review, and not by the suite whose whole subject
+this is.
+
+Both fixed. The privacy scope is now `git ls-files` plus anything in scope on disk that is not yet
+tracked, so a file is checked before it is committed and a tracked file is checked whether or not it
+is still on disk; and the ignore rule is proved with `git check-ignore --no-index` rather than read,
+because a pattern that looks right and matches nothing is the whole defect. `qa/privacy.cjs` is
+**25/25**. The commit that introduced the leak was **rewritten and force-pushed**, because a name
+that has been pushed is not un-shipped by a later deletion. Honest limit: the rewritten commit
+object may survive in the remote's unreachable objects until GitHub garbage-collects, and the 84
+rival names in `data/live.json` in commits **before** `baac4bc` are still there — removing those
+means rewriting further back, which is the manager's call, not mine.
+
+### A3 · selling prices, against the reference's own recorded numbers
+
+`purchasePrices` and `sellPrices` are pure and array-shaped, so a suite drives them straight off the
+recorded feeds. `qa/prices.cjs` **12/12**:
+
+- **15 of 15 match `golden.classic.sell`** — 14 priced from the start price
+  (`now_cost − cost_change_start`), 1 from the transfer log (`element_in_cost`).
+- The source is **named per player**, not inferred. On this snapshot the one player bought since
+  gameweek 1 — Calvert-Lewin, in for João Pedro in GW5 — was bought at his start price, so the log
+  and the derivation give the same 60. That is luck, not equivalence, so the suite also builds a
+  synthetic buy-after-a-rise (paid 78 against a start price of 75) and asserts the log wins, and a
+  buy-sell-rebuy and asserts the **last** purchase counts.
+- Four mutations each break the fifteen: the full rise instead of half (3 of 15 wrong), rounding the
+  half-rise up (2), a fall taken as half (4), the price paid ignored (3). A parity test that would
+  pass with the rounding reversed is not testing the rounding.
+- Seven boundary cases pin the arithmetic exactly, including that a one-tenth rise is not yet worth
+  a tenth.
+
+`state/kwezi.json` had Calvert-Lewin at 60 marked "estimated", inferred from the bank delta. The log
+says 60. The estimate was right, and that is not the point: an estimate that happens to be right is
+still an estimate, and §7.13 records a screenshot going stale within days.
+
+### A note on scope, and on two gate runs spent finding out
+
+A concurrent wave of subagents was editing `src/engine.js`, `qa/` and `data/` for part of this
+session. About 1,400 lines of theirs arrived in the working tree: autosub resolution, a bench
+planner, a leak backtest, a win-probability objective, hierarchical pooling, Dixon-Coles tau and rho,
+and a **tenth** tournament model.
+
+That cost two gate runs. The fourth run was green at 19 of 19; the fifth went red on four checks that
+had pinned "nine models" — and the engine had changed between the two runs, so nothing I did caused
+it. It is E-084's class applied to a registry instead of to a date, and the fix is the same: the
+checks read `E.TOURNAMENT_MODELS` now, so adding an eleventh challenger is one line in the engine and
+no churn in the suites. The fifth run also caught a regression of my own: `verify.sh` forbids an
+account-touching URL anywhere in `src/`, and my new comment quoted the transfers endpoint's path.
+The rule is right; the comment changed.
+
+The inherited work is committed, because discarding it would destroy real work and the suites cover
+it — mc_all's 135 property invariants over a million iterations, and unit_engine at 266. It has
+**not** had a line-by-line review from me. That review is the first item after this, and saying so
+is more useful than implying it was reviewed.
+
 ---
 
 ## 4. What has not been done yet

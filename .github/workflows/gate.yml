@@ -66,6 +66,9 @@ jobs:
       - name: waiver_log (the waiver model reproduces the league's own log)
         run: node qa/waiver_log.cjs 2>&1 | tee -a "$GATE_LOG"
 
+      - name: prices (selling prices against the reference's recorded numbers)
+        run: node qa/prices.cjs 2>&1 | tee -a "$GATE_LOG"
+
       - name: verify.sh (live reconciliation + invariants)
         run: bash qa/verify.sh 2>&1 | tee -a "$GATE_LOG"
 

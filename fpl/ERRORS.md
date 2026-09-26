@@ -842,7 +842,7 @@ scores 72/74, a manager rotating to the bottom after a success 73/74, one attemp
 round 62/69, and the processing order reversed 52/74. A model that still scored 74 with a rule
 broken would be fitting something else.
 
-### E-090 · v89 · open · "at most 3 transfers this week" printed beside "FT 4"
+### E-090 · v89 · "at most 3 transfers this week" printed beside "FT 4"
 CAUSE: `transferProtocol` computes `maxK = Math.min(FT + 1, MAX_SWAPS)` — C2 step 2 searches one to
 three swaps and no more — and when there are more forced sells than slots it pushes the reason
 `forced.length + " forced sells but at most " + maxK + " transfers this week; the lowest-xp forced
@@ -854,18 +854,40 @@ the rules plainly allow.
 CAUGHT: v89, reading the shipped Transfers panel against the header after the state file was
 corrected. No suite could see it — `smoke_wk` asserts that the reasons are shown, never that they
 agree with the free-transfer count.
-RULE: a message names the constraint that actually bound. Where the binding constraint is
-`MAX_SWAPS` the copy says so ("the protocol searches at most three swaps a week"), and where it is
-the free-transfer count it says that instead. Proposed fix, one line in `src/engine.js`:
-`res.reasons.push(forced.length + " forced sells; the protocol searches at most " + MAX_SWAPS +
-" swaps a week (" + FT + " free transfers available), so the lowest-xP forced sells go first")`.
-STATUS: **open.** `src/engine.js` is scoped to one rename this round, so the wording was not
-changed. Nothing in the app is wrong — three transfers is what the protocol will propose — only the
-reason given for it.
-TEST: pending with the fix. The check to write is in `qa/smoke_wk.cjs`: whenever the Transfers
-panel names a transfer cap, that number must either equal the free transfers the header shows or
-the copy must name the protocol as the thing that capped it. It is not written yet, because a check
-whose behaviour has not been fixed would be red, and this round does not own the file that fixes it.
+RULE: a message names the constraint that actually bound — but the wording was the smaller half of
+this, and fixing only the wording would have been the wrong fix. The entry as first written proposed
+rephrasing the reason to blame `MAX_SWAPS`. That would have made a true sentence out of a real
+limitation: with four free transfers in hand the engine was structurally unable to use the fourth,
+and telling the manager so more precisely is not the same as letting him do it. The rule is that a
+search limit is not allowed to masquerade as a rule of the game. C2's three-swap ceiling was written
+when free transfers could not exceed three; they bank to five (v110 §4), so the week's limit is
+FT + 1 with one hit, capped at five, and the search reaches it.
+  How, without an exhaustive search nobody can run: exhaustive stays at three, because C(15,4)
+out-sets times the candidates per slot is not a search a phone finishes. Past three the search is
+greedy, which is what v110 §5 B4 asks for — take the best plan so far and add the single best
+further swap, and only while it pays. `weekLimit` and `searchLimit` are both reported, so the two
+numbers can never be confused again.
+  A second rule fell out of it. On the GW6 snapshot the five-swap plan declines the fourth forced
+sell (Semenyo, status d, 75%) because two unforced upgrades pay more, and nothing on screen said so.
+E-082's rule cuts both ways: selling a starter on a doubt needs the reason on screen with his name,
+and so does KEEPING one. `keptForced` names every forced sell the plan does not make, with its
+reason.
+STATUS: **closed in v110.** Measured on the 26 September snapshot: the plan goes from 3 swaps worth
+37.54 at LOW confidence to **5 swaps worth 54.01 at HIGH**, with one hit — Hughes→Gomez,
+van Ewijk→Bogle, Brobbey→Emersonn, Konsa→De Cuyper, Szoboszlai→Schade — and Semenyo named as kept
+despite the flag. 46 ms.
+TEST: `qa/unit_engine.cjs` 266/266, three checks.
+"LIVE-the-transfer-plan-reaches-the-week's-limit-not-the-search's" sweeps FT 0 to 5 and asserts
+`weekLimit === min(FT + 1, 5)`, `searchLimit === min(weekLimit, 3)`, `k <= weekLimit`, that a hit is
+charged for every transfer beyond the free ones, and — the part that would have failed before the
+fix — that at four free transfers the plan gets past three swaps.
+"LIVE-growing-a-plan-past-three-swaps-never-lowers-its-value" asserts the greedy extension is
+monotone, so it cannot spend points to look busy.
+"LIVE-a-forced-sell-the-plan-keeps-is-named-with-its-reason" asserts `keptForced` is exactly the
+forced sells not in the plan, and that the reason reaches the copy.
+`qa/smoke_wk.cjs` "ft-budget-respected" had pinned the three-swap limit itself, so a correct plan
+turned it red; it reads `E.MAX_GREEDY_SWAPS` now and asserts the week's limit instead of the
+search's — which is E-084's rule applied to a constant rather than to a date.
 
 ### E-091 · v110 · the privacy fix's own next commit committed 489 personal names
 CAUSE: `pipeline/pull.sh` writes raw API feeds, which carry `player_first_name`,
