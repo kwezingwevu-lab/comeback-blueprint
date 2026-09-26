@@ -656,9 +656,33 @@ RULE: derive, never freeze. What is invariant is the snapshot's internal consist
 events, history and picks — the gameweek keys are exactly the finished events, `ft_available` is
 the replayed ledger, the deadline is the `is_next` event's own — not the values any one pull
 happened to carry. A dated observation is reported in the detail string, never asserted.
-TEST: `data/validate_live.cjs` 86/86 on the GW5 snapshot with every check derived from the file
-under test; `qa/verify.sh` reconciles the same fields against the live API. A future refresh moves
+  E-064 already said that in prose, and prose did not reach this file. So the rule is now
+  something a machine checks, and it is stated in a form that cannot be satisfied by wording:
+  **no check anywhere in `qa/` or `data/` compares a live-sourced field, or the length of a
+  live-sourced collection, to a literal number or a literal ISO instant.** A line may carry
+  `frozen-ok: <reason>` where the constant is a rule of the competition rather than an
+  observation (twenty clubs, 380 fixtures) or where the literal is a synthetic fixture's own
+  input; the reason is required and every exemption is printed on every run, so they stay
+  visible instead of accumulating unread.
+TEST: `qa/no_frozen.cjs`, 6/6 over 16 files, 0 offenders and 5 exemptions each with its reason.
+It is mutation-proven on 16 cases: it flags a frozen gameweek number, free-transfer count,
+deadline instant, collection length and `Object.keys(...).length`, and does not flag a game rule
+(a squad is fifteen), a derived comparison, a range with the value reported, an object literal
+building a fixture, an assignment, a locally computed array or a commented-out line. It also
+caught a defect while being written: lifting the league-count check above `WANT_IDS` put the
+constant in its own temporal dead zone, which `node --check` cannot see (E-004's class).
+Alongside it, `data/validate_live.cjs` is 86/86 with every check derived from the file under
+test, and `qa/verify.sh` reconciles the same fields against the live API. A future refresh moves
 the numbers in the detail strings and changes no assertion.
+FOLLOW-THROUGH (same round): the rule was then carried to every other place the class lived, which
+is the part E-084's own CAUSE says gets missed. `qa/unit_engine.cjs` had four more — "59 shifted
+codes", Hull's "xGA per game above 1.5", Arsenal's "def 0.73 ± 0.02" and the F4/F5 gate verdicts
+pinned as "shut" — each replaced by the property it stood for or by the gate's own arithmetic.
+`qa/smoke.cjs` had three mocked clocks frozen to the GW4 weekend, now derived from
+`events[is_next]`, and its flag pair named one player, now chosen from the snapshot.
+`qa/webkit.js` had the last one: `NOW = "2026-09-11T08:00:00Z"`, so its Safari screenshots were
+counting down to a deadline fifteen days in the past ("29d to deadline" on a GW6 snapshot). It is
+derived too, and the same shot now reads "26h to deadline".
 
 ### E-085 · v110 · rival managers' personal names were committed, and a suite held them in place
 CAUSE: `data/fetch_live.cjs` mapped `player_name` straight from the Classic league standings into
@@ -685,3 +709,190 @@ build inlines its data as a JavaScript object literal. It plants a violation in 
 asserts the scanner finds it, and asserts it does not fire on the key name used in prose, so a
 scanner that stops looking cannot pass (E-070's lesson). `data/validate_live.cjs` now requires the
 standings row's keys to be exactly {entry, entry_name, total, rank}.
+
+### E-086 · v89 · a tournament field called `promotable` that meant something else
+CAUSE: `tournament(live)` returned a top-level `promotable` boolean that was set to
+`transitions >= TOURNAMENT_PROMOTE_AT` — the transition-COUNT half of the promotion gate, and
+nothing about any model passing it. On the GW5 snapshot it read `true` while all nine models'
+own `promotable` flags read `false`, and the Lab panel rendered it as "Promotable: yes" under a
+table in which nothing was promotable. The word said one thing and the value meant another, which
+is the A2 law-1 failure mode in a field name rather than in a number.
+CAUGHT: v89, reading the Lab tournament panel against the engine's own per-model gates on the
+refreshed snapshot: `tournament(LIVE).promotable === true` with
+`tournament(LIVE).models.every(m => m.promotable === false)`.
+RULE: a field is named for what it means. The transition-count half is `decidable` — enough
+transitions exist for the gate to be DECIDED — and `promotable` now means what the word reads as:
+at least one model's own gate is open (`models.some(m => m.promotable)`). Per model, `promotable`
+stays that model's own `promotionGate` verdict, so the two never disagree in the same direction.
+The engine's `note` states both in words, and the panel, which renders the top-level flag, became
+correct without being edited: it now reads "Promotable: not yet" because no model has passed.
+TEST: `qa/mc_all.cjs` I97 asserts the two separately over random universes —
+`decidable === (transitions >= 3)`, `promotable === models.some(...)`, and a model may never pass
+a gate that is not even decidable; `qa/unit_engine.cjs`
+"LIVE-tournament-has-nine-models-and-separates-decidable-from-promotable" asserts the same
+arithmetic on the shipped snapshot with the transition count derived from its finished gameweeks.
+Mutation-proven: setting `res.promotable = res.decidable` again turns I97 and both unit checks red
+with "promotable true while 0 models are past their gate".
+
+### E-087 · v89 · the minutes gate opened and nothing in the app noticed
+CAUSE: F4's `minutesModel` returns `driving: false` and `driver: "pStart"` as literals. They were
+written in v88 when the walk-forward had one fittable transition against a gate that wants three,
+so the literal and the gate agreed and nobody had to look again. Five finished gameweeks make four
+folds, three of them fittable, three of them won by the logistic and a three-gameweek trailing
+hold-out, so `minutesWalkForward(LIVE).gate.promotable` is now **true** — the shared
+`promotionGate` says the challenger may be promoted — and the engine still reports that it is not
+driving anything, because the flag is a constant rather than a read of the gate. Measured on the
+26 September snapshot: Laplace Brier 0.1142 · 0.0954 · 0.0953 · 0.0968, logistic — · 0.0874 ·
+0.0768 · 0.0764, so the logistic is ahead on every fold it can be fitted on.
+CAUGHT: v89, by rewriting the two v88 checks that had frozen the gate as shut. The arithmetic came
+out the other way and the model's own report had not moved with it.
+RULE: a flag that answers a question the engine can compute is computed, not typed. `driving` must
+be derived from the gate that decides it, and promoting P(start) from the Laplace rate to the
+logistic changes every recommendation in the app, so it is a deliberate act with its own round,
+its own before-and-after on the shipped plan, and its own retest — not a side effect of a suite fix.
+STATUS: **closed in v110, and the answer is the third option neither of those two allowed for.**
+`driving` is computed, and the promotion decision turned out to be three questions rather than one:
+`eligible` (the gate AND a tail condition), `routed` (whether production actually asks the model),
+and `driving` (the conjunction). Reporting `driving: true` for a model nothing calls would be this
+entry inverted and no better than it, so the code answers each separately and the note says which
+word is false.
+  On Part J and Spearman: Spearman is the right score for a model that RANKS players by points; a
+minutes model predicts a binary event, for which Brier is the right score and Spearman is not
+defined. So the gate is appropriate, and the objection this entry raised does not hold. What the
+gate could not see is a tail: it is a mean over every scored row, and a handful of rows where the
+challenger has almost no evidence is exactly what moves a transfer recommendation. Promotion now
+also requires that, for every player whose incumbent probability is at the floor, the challenger
+stays below an even chance.
+  Measured like for like on the 26 September snapshot — and "like for like" is the correction this
+entry needed, because comparing the model's raw `pModel` against the flag-adjusted incumbent invents
+disagreements out of nothing: the first version of this analysis claimed a 0.000 to 0.627 jump for
+Fatawu that was entirely the flag factor and not the model. Corrected, over 421 players the two
+disagree by a mean of 0.104, median 0.035, p90 0.304, max 0.598. Of 138 players at the incumbent
+floor the challenger's highest RAW probability is 0.497 against the 0.50 limit — it holds by 0.003,
+which is close, and the engine says so rather than rounding it away. Flag-adjusted the same row is
+0.305.
+  So the challenger is ELIGIBLE and is NOT routed. v110 §5 B3 replaces this minutes model outright —
+recent starts weighted, flags, parsed return dates and dated overrides — and the tournament
+re-scores against that, so routing production through a model about to be replaced would spend a
+round's worth of before-and-after on the shipped plan twice. `MINUTES_PRODUCTION_ROUTED` is a named
+constant beside the reason, and flipping it means routing the xp path and putting the
+before-and-after in the retest, because every recommendation in the app moves with it.
+TEST: `qa/unit_engine.cjs`, three checks, 263/263 on the suite.
+"LIVE-F4-driving-is-computed-from-eligibility-and-routing-not-typed" asserts
+`eligible === (gate.promotable && tail.ok)`, `driving === (eligible && routed)`,
+`minutesModel.driving === promotion.driving`, that the driver name follows, and that `routed` is the
+named constant — so no part of the verdict can be typed.
+"LIVE-F4-the-tail-condition-binds-on-the-raw-probability-of-a-thin-row" asserts there are thin rows
+to check at all, that every one was scored, that the condition is exactly `max <= limit`, that the
+raw maximum is at least the flag-adjusted one, and that the reported margin is the arithmetic.
+"LIVE-F4-an-eligible-model-that-production-does-not-use-is-recorded-in-the-ledger" keeps the
+decision tied to this entry: eligible-and-not-routed passes only while the heading stands.
+"LIVE-F4-both-models-are-scored-and-the-gate-is-arithmetic" asserts
+`gate.promotable === (comparable >= 3 && wins >= 3 && holdout >= 2)` at any gameweek instead of
+pinning the verdict. Mutation-proven: demoting the E-087 heading turns the third check red with
+"IS MISSING from ERRORS.md". The first version of that check searched for the substring "E-087",
+which this entry's own body carries several times, so it could not fail — E-066's lesson, caught by
+running the mutation rather than by reasoning about it. It matches the heading.
+
+### E-088 · v89 · the Plan tab quotes a price that is typed into the markup
+CAUSE: `src/ui.jsx` renders, in the "Fallback, without the chip" panel, `The written plan quotes
+{money(978)} for that fifteen. Today it is {money(fbCost)}…`. The 978 is a literal: it was the
+£97.8m of the v86 Part M wildcard fifteen. Every other number in that panel is computed from the
+snapshot; this one is a September fact welded into the markup, and the fifteen it described has been
+replaced. With the v89 plan of record the line reads "the written plan quotes £97.8m … today it is
+£98.8m", which invites the manager to read a £1.0m price move that never happened: the fifteen
+changed, not its price. A number with no source in shipped copy is an A2 law-1 breach whatever its
+size.
+CAUGHT: v89, while rewriting `data/weekly.js`. Not by any suite — the Part G copy gates count words,
+measure type and touch floors and scan for hex, and none of them asks where a number came from.
+RULE: a figure in the markup comes from the data or it does not appear. `data/weekly.js` now records
+`classic.wildcard15_cost_written` (988 tenths on the 26 September snapshot), so the panel can read
+the cost out of the plan it is describing.
+STATUS: **closed in v110.** `src/ui.jsx` now reads
+`money(WEEKLY.classic.wildcard15_cost_written)`, so the sentence is true for every future plan
+without anyone remembering to retype it. The check passes on its first branch — the panel reads the
+block — rather than on the ledger branch, which is the outcome that branch existed to reach.
+TEST: `qa/unit_engine.cjs`
+"LIVE-the-fallback-panel-quotes-the-written-fifteen's-own-recorded-cost" passes when the panel reads
+the figure out of the block, or when the literal equals the recorded cost, or while this entry
+stands. Mutation-proven: demoting the E-088 heading turns it red with "they disagree, and E-088 IS
+MISSING from ERRORS.md", and setting `wildcard15_cost_written: 978` turns it green for the right
+reason (they agree), which is the second thing the check is for.
+
+### E-089 · v110 · the waiver model matched 72 of 74 because two denial reasons were checked in the wrong order
+CAUSE: a waiver claim can fail two ways at once — its target has already gone to a manager ahead in
+the order, AND the player it was going to drop has already left the roster on an earlier claim of
+the same manager's. The game reports one reason, and it reports "already claimed" first. A model
+that checks "drop already gone" first agrees with the game on every claim where only one reason
+applies and disagrees on every claim where both do.
+CAUGHT: v110, by replaying this league's own transaction log rather than reasoning about it. With
+the order wrong the model reproduces 72 of 74 claims; with it right, 74 of 74. Two claims is the
+entire signal, which is exactly why this needed a log and not a code review — a model at 97% looks
+like a model that works.
+RULE: the settlement order is not inferred from what seems reasonable. Every rule in `waiverSim` is
+one the log forced, and the function documents which: claims settle in rounds; a manager keeps
+trying their own claims, in the order lodged, until one lands; "already claimed" is checked before
+"drop already gone"; nobody moves to the bottom after a success; a failed claim is consumed and not
+retried.
+TEST: `qa/waiver_log.cjs`, 13/13, replaying **74 of 74 claims across four gameweeks** on both the
+committed snapshot and the live log pulled today, with each week's processing order read off the
+log's own `index` rather than from today's `waiver_pick` — the picks move as the table moves, and
+these are past weeks. Four mutations prove the fit is the rules and not luck: denial order reversed
+scores 72/74, a manager rotating to the bottom after a success 73/74, one attempt per manager per
+round 62/69, and the processing order reversed 52/74. A model that still scored 74 with a rule
+broken would be fitting something else.
+
+### E-090 · v89 · open · "at most 3 transfers this week" printed beside "FT 4"
+CAUSE: `transferProtocol` computes `maxK = Math.min(FT + 1, MAX_SWAPS)` — C2 step 2 searches one to
+three swaps and no more — and when there are more forced sells than slots it pushes the reason
+`forced.length + " forced sells but at most " + maxK + " transfers this week; the lowest-xp forced
+sells go first"`. The cap is the protocol's own search limit, not the week's. On the GW6 snapshot he
+holds **four** free transfers, so the Plan tab prints "4 forced sells but at most 3 transfers this
+week" directly under a header that reads "FT 4". Both statements are true about different things
+and the sentence makes them look like the same thing: the manager is told he cannot do something
+the rules plainly allow.
+CAUGHT: v89, reading the shipped Transfers panel against the header after the state file was
+corrected. No suite could see it — `smoke_wk` asserts that the reasons are shown, never that they
+agree with the free-transfer count.
+RULE: a message names the constraint that actually bound. Where the binding constraint is
+`MAX_SWAPS` the copy says so ("the protocol searches at most three swaps a week"), and where it is
+the free-transfer count it says that instead. Proposed fix, one line in `src/engine.js`:
+`res.reasons.push(forced.length + " forced sells; the protocol searches at most " + MAX_SWAPS +
+" swaps a week (" + FT + " free transfers available), so the lowest-xP forced sells go first")`.
+STATUS: **open.** `src/engine.js` is scoped to one rename this round, so the wording was not
+changed. Nothing in the app is wrong — three transfers is what the protocol will propose — only the
+reason given for it.
+TEST: pending with the fix. The check to write is in `qa/smoke_wk.cjs`: whenever the Transfers
+panel names a transfer cap, that number must either equal the free transfers the header shows or
+the copy must name the protocol as the thing that capped it. It is not written yet, because a check
+whose behaviour has not been fixed would be red, and this round does not own the file that fixes it.
+
+### E-091 · v110 · the privacy fix's own next commit committed 489 personal names
+CAUSE: `pipeline/pull.sh` writes raw API feeds, which carry `player_first_name`,
+`player_last_name`, `player_name` and league-entry `short_name` exactly as the endpoints return
+them, so they must never be tracked. The ignore rule was written as `pipeline/feeds/` INSIDE
+`pipeline/.gitignore` — where patterns are relative to the file's own directory, so it meant
+`pipeline/pipeline/feeds/` and matched nothing at all. `git add -A` then tracked 53 feeds carrying
+**489 personal-name fields** across thirteen mini-league tables, the Draft league details and two
+entry feeds. One commit after closing E-085, in a commit whose own message described the feeds as
+gitignored.
+  Two failures, and the second is the one that matters. `qa/privacy.cjs` walked the WORKING TREE,
+so `pipeline/feeds/` looked like untracked scratch to it whether it was tracked or not. A suite that
+cannot tell tracked from untracked cannot check a rule about committing.
+CAUGHT: by `qa/pull_guard.cjs`, on its last assertion — "and no feed is tracked", which runs
+`git ls-files pipeline/feeds` — inside the full gate run, minutes after the commit. Not by review,
+and not by the suite whose whole subject this is.
+RULE: two rules, because one would not have caught it.
+  1. "Committed" means TRACKED. `qa/privacy.cjs` takes its scope from `git ls-files`, then adds
+     anything in scope on disk that is not yet tracked, so a file is checked before it is committed
+     and a tracked file is checked whether or not it is still on disk.
+  2. An ignore rule is proved, not read. The suite runs `git check-ignore --no-index` against a path
+     under `pipeline/feeds/` and fails if git does not agree, because a pattern that looks right and
+     matches nothing is the whole defect.
+TEST: `qa/privacy.cjs` 25/25 — "no raw feed is tracked: they come straight off the API with names in
+them" and "the ignore rule genuinely matches, proved with git rather than by reading the pattern",
+alongside the existing key and initials scans. `qa/pull_guard.cjs` keeps its independent check from
+the other side, so neither suite is the only thing standing between a raw feed and a commit. The
+leak was removed from the branch as well as from the tree: the commit that introduced it was
+rewritten before it went any further, because a name that has been pushed is not un-shipped by a
+later deletion.

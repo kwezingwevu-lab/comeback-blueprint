@@ -1019,7 +1019,7 @@ function TabPlan(props) {
           })}
           <KV k="Captain, vice" v={nameOf(ctx, fb.captain) + ", " + nameOf(ctx, fb.vice)} />
           <KV k="Written fifteen costs" v={money(fbCost) + " of " + money(ctx.budget)} tone={fbCost <= ctx.budget ? "go" : "out"} />
-          <div className="note">The written plan quotes {money(978)} for that fifteen. Today it is {money(fbCost)} against a selling value of {money(ctx.budget)}: still affordable, but the price moved.</div>
+          <div className="note">The written plan quotes {money(WEEKLY.classic.wildcard15_cost_written)} for that fifteen. Today it is {money(fbCost)} against a selling value of {money(ctx.budget)}: still affordable, but the price moved.</div>
           <div className="dim"><Tier k="T0" /> prices today · written plan from the weekly block</div>
         </div>
         )}

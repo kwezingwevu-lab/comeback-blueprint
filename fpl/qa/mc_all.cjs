@@ -1123,7 +1123,7 @@ inv("I96", "every Spearman ρ is null or inside [-1,1]", 8, function (u) {
   const badm = t.models.filter(function (m) { return m.spearman !== null && !(m.spearman >= -1 && m.spearman <= 1); });
   return badm.length ? bad(badm[0].key + " ρ " + badm[0].spearman) : OK;
 });
-// E-075: `decidable` is the transition-count half of the gate — enough transitions exist for the
+// E-086: `decidable` is the transition-count half of the gate — enough transitions exist for the
 // gate to be DECIDED. `promotable` is the honest reading of the word: at least one model's own
 // gate is open. The two are asserted separately, and a promotable result must name a model.
 inv("I97", "decidable is the transition count, promotable is a model actually passing, and the leader is one of the nine", 8, function (u) {

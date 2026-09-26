@@ -185,6 +185,9 @@ fi
 # ---------------------------------------------------------------- 5-12. the suites
 
 node_suite qa/privacy.cjs         # rival managers' names are never committed (E-085) — cheap, so first
+node_suite qa/no_frozen.cjs       # no check compares a live-sourced field to a literal (E-084)
+node_suite qa/pull_guard.cjs      # pipeline/pull.sh keeps the last good feed (A1)
+node_suite qa/waiver_log.cjs      # the waiver model reproduces the league's own log, 74/74 (B6, E4)
 sh_suite qa/verify.sh
 node_suite data/validate_live.cjs      # the snapshot against CONTRACT §3 (77 checks)
 node_suite qa/unit_engine.cjs

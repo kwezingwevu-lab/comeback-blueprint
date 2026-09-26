@@ -34,6 +34,11 @@ const WEEKLY = {
     // 100% rival-owned across the six winnable leagues, so he is out of the rule-pure solve
     // and is declared here as the one explicit lock — the only exemption the solver takes.
     locks: [411],
+    // The cost of the fifteen above, in tenths, at the moment this block was written:
+    // £98.8m of a £99.5m selling value on the 26 September snapshot. Recorded so the
+    // Plan tab's "the written plan quotes …" line can be read out of the plan instead of
+    // typed into the markup (ERRORS.md E-088).
+    wildcard15_cost_written: 988,
     captain: 124, vice: 94,                             // Groß (BHA), Schade (BRE) — bestXI 3-4-3
     // Without the chip: the C2 weekly protocol, three of his four free transfers, no hit.
     // Four players are forced sells and only three swaps are searched (C2 caps k at 3), so

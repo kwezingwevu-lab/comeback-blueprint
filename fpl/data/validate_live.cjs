@@ -16,6 +16,8 @@ const ok = (name, cond, detail) => { if (cond) { pass++; console.log(`PASS ${nam
 const KEYS = ["fetched_at","source","next_event","current_event","total_players","events","teams","elements","fixtures","gw","entry","history","picks","ft_available","leagues","rivals","draft"];
 for (const k of KEYS) ok(`key ${k}`, k in L);
 ok("fetched_at ISO UTC", /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(L.fetched_at), L.fetched_at);
+// frozen-ok: the Premier League is twenty clubs. That is the competition's shape, not an
+// observation of one pull, and if it ever changes the whole model changes with it.
 ok("20 teams", L.teams.length === 20, String(L.teams.length));
 ok(">=600 elements", L.elements.length >= 600, String(L.elements.length));
 // E-084 (a recurrence of E-064): these were frozen to the 11 September snapshot ("1,2,3", 79 rivals, ft 3, GW4).
@@ -25,7 +27,6 @@ ok(">=600 elements", L.elements.length >= 600, String(L.elements.length));
 const finishedIds = L.events.filter((e) => e.finished).map((e) => e.id).sort((a, b) => a - b);
 const gwIds = Object.keys(L.gw).map(Number).sort((a, b) => a - b);
 ok("gw blocks are exactly the finished events", gwIds.join(",") === finishedIds.join(","), gwIds.join(",") + " vs events[finished] " + finishedIds.join(","));
-ok("6 leagues", L.leagues.length === 6, String(L.leagues.length));
 const rivalUnion = new Set(L.leagues.flatMap((l) => l.standings.map((s) => s.entry)).filter((e) => e !== L.entry.id));
 ok("every rival in the six leagues has a picks row and nobody else does",
   Object.keys(L.rivals).length === rivalUnion.size && [...rivalUnion].every((e) => L.rivals[String(e)]),
@@ -57,6 +58,8 @@ ok("chance null|0..100", badChance === 0, String(badChance));
 ok("prices in tenths (integers)", L.elements.every((e) => Number.isInteger(e.now_cost) && e.now_cost > 30 && e.now_cost < 200));
 
 // fixtures
+// frozen-ok: twenty clubs playing thirty-eight rounds is 380 fixtures. Derived from the
+// competition's shape rather than from this pull.
 ok("380 fixtures", L.fixtures.length === 380, String(L.fixtures.length));
 ok("fixture keys", L.fixtures.every((f) => ["id","event","team_h","team_a","team_h_difficulty","team_a_difficulty","finished","started","kickoff_time","team_h_score","team_a_score"].every((k) => k in f)));
 
@@ -110,6 +113,10 @@ ok("picks have 15 with position/multiplier/captain flags", Object.values(L.picks
 // The six league IDs are stable; their sizes are not — mini-leagues gain and lose entries
 // every week, and the §3 sizes were a September observation (E-084).
 const WANT_IDS = [26474, 512550, 512557, 989793, 1314671, 1683215];
+// Derived, not frozen: the fetcher pulls exactly the league ids it is configured with, so the
+// count is that list's length. He can join a seventh mini-league tomorrow and only WANT_IDS
+// changes (E-084).
+ok("leagues = the configured id list", L.leagues.length === WANT_IDS.length, L.leagues.length + " of " + WANT_IDS.length);
 ok("league ids = §3", L.leagues.map((l) => l.id).sort((a, b) => a - b).join(",") === WANT_IDS.join(","), L.leagues.map((l) => l.id).join(","));
 ok("every league's size is its standings length", L.leagues.every((l) => l.size === l.standings.length && l.size >= 1), L.leagues.map((l) => `${l.id}:${l.size}`).join(" "));
 ok("league rank/last_rank numbers", L.leagues.every((l) => Number.isInteger(l.rank) && Number.isInteger(l.last_rank)), L.leagues.map((l) => `${l.name} ${l.rank}/${l.last_rank}`).join(" · "));
@@ -135,8 +142,11 @@ const SHIPPED = path.resolve(file) === path.resolve(path.join(__dirname, "live.j
 if (SHIPPED) ok("draft league_id null in the shipped snapshot", L.draft.league_id === null, String(L.draft.league_id));
 else ok("draft league_id is null or a positive integer", L.draft.league_id === null || (Number.isInteger(L.draft.league_id) && L.draft.league_id > 0), String(L.draft.league_id));
 if (L.draft.league_id === null) {
+  // frozen-ok: zero is emptiness, not a count. This asserts the shape the snapshot carries when
+  // no draft league id has been supplied, so the app takes the same code path either way.
   ok("no league id → every league field empty", L.draft.league === null && L.draft.entries.length === 0 &&
     L.draft.ownership.length === 0 && Object.keys(L.draft.rosters).length === 0 && L.draft.freeAgents.length === 0 &&
+    // frozen-ok: as above — this is one assertion across three lines.
     L.draft.matches.length === 0 && L.draft.standings.length === 0 && Object.keys(L.draft.picks).length === 0 && L.draft.me === null);
 } else {
   const owners = new Set(L.draft.entries.map((e) => e.leagueEntryId));

@@ -357,10 +357,45 @@ A recurrence is a new entry referencing the old one, and the RULE is strengthene
 
 ---
 
-# PART M — CURRENT PLAN (v86 · 10 Sep 22:30 UTC · verify before trusting)
-**Classic GW4 — play Wildcard 1.** Tzolakis, Raya · Calafiori, Ajayi, Tarkowski, Bogle, Mendy · Janelt, Saka, Scott, Rogers, Barnes · João Pedro, Haaland, Barry. £97.8m, £2.2m banked, 11 differentials. Captain **João Pedro** (CHE v HUL, EV 6.1), vice Haaland. Gakpo out (thigh, 75%) → Janelt. Fallback without wildcard: Hughes→Yalcouyé, Shaw→Ajayi, Diop→Mendy, captain João Pedro (~14 pts behind over 5 GWs).
-**Draft GW4 — six claims in order:** Richarlison(unavailable)→Isidor · Hughes→Janelt · Senesi→Bogle · Wilson→Scott · Truffert→Vuskovic · Verbruggen→Tzolakis. Then 3-5-2: Tzolakis · Guéhi, Bogle, Vuskovic · Mbeumo, Janelt, Scott, Gibbs-White, Rice · Igor Jesus, N.Jackson.
-**Chips:** none besides WC1. Set 1 expires GW19 deadline. **Tournament:** BPS-rate leads; promotion at GW5 earliest.
+# PART M — CURRENT PLAN (v89 · 26 Sep 2026 11:45 UTC · verify before trusting)
+> The plan of record lives in `data/weekly.js` and nothing here is an input: the engine recomputes
+> every number from `data/live.json`. This block is the human-readable copy of it, and it carries
+> the record of the plan it replaced, because the previous one was never played.
+
+**What happened to the v86–v88 plan.** It recommended Wildcard 1 in GW4. **He never played it**
+(`history.chips` is `[]`). He made one transfer all season, in GW5: João Pedro out,
+Calvert-Lewin in. Measured in the decision ledger: the fifteen of record would have scored 102 as
+its best legal eleven in hindsight against the 71 he played, and even the free three-transfer
+fallback would have scored 87. The captaincy call (João Pedro over Haaland) cost 3.
+
+**Where he is.** 311 points after GW5, overall rank 3,434,931 (from 5.08m), **+12 cumulative
+against the field** having been −4 when this app was built. Bench points wasted 3, 4, 14, 14, 8
+= **43**, and the last three gameweeks are the worst three. Four free transfers into GW6;
+deadline 2026-10-10T10:00:00Z (an international break).
+
+**Classic GW6 — play Wildcard 1.** Haaland, Groß, De Cuyper, Bogle, Gvardiol, Guéhi, Schade,
+Janelt, Tarkowski, Tzolakis, Cunha, Tavernier, A.Becker, Emersonn, Isak. £98.8m of a £99.5m
+selling value, £0.7m banked. Captain **Groß**, vice **Schade** (3-4-3). Haaland is the one
+declared `locks` entry: he is 100% rival-owned, over the C1.6 convergence gate, and keeping him is
+worth +5.75 over five gameweeks for £7.8m more of the bank. Trigger: a five-gameweek deficit of
+**82.2** against 20, **143.9** cumulative to the GW19 expiry, four forced sells against three
+transfer slots. Qualification: C3's "equal-or-better under both fixture models" does **not** pass —
+four players differ and the goals model prefers its own answer — and fourteen of fifteen change.
+**Fallback without the chip:** van Ewijk→De Cuyper, Hughes→Gomez, Brobbey→Emersonn, three of four
+free transfers, no hit, captain Haaland, vice Saka. Semenyo is the fourth forced sell and stays.
+
+**Draft GW6 — six forced claims, pool assumed.** Senesi→De Cuyper · Hughes→Schade ·
+Igor Jesus→Haaland · Rice→Groß · Wilson→B.Fernandes · Richarlison→Isak. The outs are sourced (no
+starts in three, or a status that is not "a"); the ins are the engine's best replacements over the
+**whole** player list because the draft league id is still unknown, so expect the top names to be
+owned. One number from him replaces the lot with the real pool.
+
+**Chips:** all four of both sets unused. Set 1 expires at the GW19 deadline. `chipSolver` assigns
+WC to set 1, GW6, at 143.9, and finds **no double and no blank** anywhere on the fixture list.
+**Tournament:** `player_xg` leads (ρ 0.3054, MAE 2.24) and has won three of four transitions, and
+drives nothing — its trailing hold-out is one gameweek against two. GW6 decides it.
+**F4:** the minutes logistic has **passed** the shared gate on Brier and the app has not been
+promoted onto it (ERRORS.md E-087, open, deliberate).
 
 ---
 

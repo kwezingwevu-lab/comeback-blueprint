@@ -1,4 +1,4 @@
-# CONTRACT.md — build conventions for FPL Mission Control (v88)
+# CONTRACT.md — build conventions for FPL Mission Control (v89)
 
 Every agent building a part of this app reads `CLAUDE.md` (the master prompt) first, then this file. The master prompt says *what*; this file fixes the *names, shapes and markers* so parts written in parallel fit together. Change this file only with a note in `ERRORS.md` if the change was forced by a defect.
 
@@ -109,24 +109,47 @@ Winnable league ids (T0, entry/3546875 on 11 Sep 2026): 1314671 Forecast to Glor
 One statement: `const WEEKLY = {…};` — decisions only, never model outputs (the engine recomputes numbers live). Element ids for classic, `code`s for draft.
 ```
 const WEEKLY = {
-  version: 87, gw: 4, written: "2026-09-11", source: "CLAUDE.md Part M + live check 11 Sep 2026",
+  version: 89, gw: 6, written: "2026-09-26", source: "src/engine.js on data/live.json fetched <ISO>",
+  // v89: a plan that is replaced records what it replaced. `superseded` carries the previous
+  // version, gameweek, plan and what actually happened, so an unplayed recommendation is not
+  // quietly deleted from the record.
+  superseded: { version, gw, plan, what, outcome, measured, evidence },
   classic: {
     plan: "wildcard",                                   // "wildcard" | "transfers" | "hold"
-    wildcard15: [572,1,8,279,229,330,586,98,12,69,40,453,165,411,249],
-    captain: 165, vice: 411,
-    fallback: { moves: [{out:212,in:605},{out:423,in:279},{out:259,in:586}], captain: 165, vice: 411 },
-    chip: "wildcard", notes: ["Gakpo out (thigh, 75%) → Janelt"]
+    wildcard15: [411,124,115,330,391,388,94,98,229,572,428,68,350,316,379],
+    locks: [411],                                       // v89: the convergent players (rivalOwn ≥ 0.60)
+                                                        // the written fifteen keeps on purpose. The ONLY
+                                                        // exemption rule C1.6 takes; smoke_wk reads it.
+    captain: 124, vice: 94,                             // of the WILDCARD fifteen's eleven
+    fallback: { moves: [{out:175,in:115},{out:212,in:127},{out:552,in:316}], captain: 411, vice: 12 },
+                                                        // fallback.captain is the captain of the FALLBACK
+                                                        // eleven and may differ from classic.captain (E-083)
+    chip: "wildcard", notes: [...],
+    why: [...]                                          // v89: one line per number that drives the plan,
+                                                        // each reproducible from a named engine function
   },
   draft: {
-    claims: [ {out:<code Richarlison>, in:<code Isidor>, why:"unavailable"}, … six in order … ],
+    pool: "assumed" | "api",                            // v89: where the `in` side came from. With no
+    pool_note: "…",                                     // league id the pool cannot be seen, so the ins
+                                                        // are the engine's best replacements over the
+                                                        // whole list and say so in both fields.
+    claims: [ {out:<code>, in:<code>, why:"…"}, … in claim order … ],
     xi: { formation: "3-5-2", gk: <code>, def: [...], mid: [...], fwd: [...] },
     watchlist: [ …codes with three starts… ]
   },
-  chips: { set1_expires_gw: 19, planned: [] },
-  tournament: { leader: "bps_rate", transitions: 2, promote_at_gw: 5 },
-  timing: { now_vs_later: { by_gw19: 21, by_gw38: 45, breakeven_double_gw17: 45 } }   // from the master prompt C4; recomputed by the engine when data allows
+  chips: { set1_expires_gw: 19, planned: [{set,chip,gw}], note: "…" },
+  tournament: { leader: "player_xg", transitions: 4, promote_at_gw: 6 },
+  timing: { now_vs_later: { by_gw19, by_gw38, breakeven_double_gw17, breakeven_later_value } }
+  // timing is a note recomputed by the engine every render. `breakeven_double_gw17` is null when
+  // the fixture list carries no double gameweek to price; `breakeven_later_value` (v89) is what a
+  // later window would have to be worth for waiting to break even.
 };
 ```
+Nothing in this block is asserted as an invariant by a suite: the numbers in the comments are dated
+observations and the suites recompute them (E-084). What IS asserted: every id resolves, the written
+fifteen is `legal15` inside the selling value and carries no flagged player, every buy is unflagged
+and under the convergence gate unless it is in `locks`, and each path's own captain and vice are in
+that path's eleven.
 
 ## 5. Engine API (src/engine.js) — required names
 Top-level `function` declarations only (mc_full extracts every top-level function). No React, no DOM, no `Date.now()` inside pure functions (pass `now` in). Deterministic RNG for Monte Carlo (`mulberry32(seed)`). Last lines:
@@ -142,7 +165,7 @@ Required functions (signatures in the file header comment; these names are asser
 - Draft league (C5 · F2): `draftLeagueInput(text)` → `{ok, kind:"league"|"entry"|"unknown", id, note}`; `draftOwnership(ctx)`; `draftPool(ctx, opts?)` (free agents only, ranked by EV, `eligible` = the three-start rule); `draftRosterOf(leagueEntryId, ctx)`; `draftRivalRosters(ctx)`; `waiverOrder(ctx)`; `h2hOpponent(ctx, gw)`; `draftRoster(state, ctx)`; `draftXIBase(codes, ctx, valueOf?)`; `playerSpread(el, ctx, iters, seed)`; `distStats(list)`; `mcDraftXI(ids, bench, ctx, iters, seed)` (no captain, draft scoring); `mcH2H(myIds, myBench, oppIds, oppBench, ctx, iters, seed)` (both elevens over shared fixture draws); `h2hProjection(ctx, opts?)`.
 - Squad/state: `sanitiseState(raw)` (cap 15, dedupe on id, never throws); `detectSquadChange(stateSquadIds, picks)` → `{changed:boolean, added[], removed[], block:boolean}`; `ftAvailable(history, currentEvent)`; `sellPrice(now, purchase)`; `bankAfter(state, moves, els)` (tenths, raw).
 - MC (E4): `simPlayer(el, ctx, rng)` (may be negative); `mcSquad(ids, capId, ctx, iters, seed)` → `{mean, sd, q10, q50, q90}`; `mcLeague(…)` → direction + rank band, never a raw P(win) when data < 8 GWs; `chipRegret(…)` → `{regretUse, …}`.
-- Tournament (E5): `tournament(live)` → `{models:[{key,name,spearman,mae,maeRaw,perTransition[],transitions,wins,holdout,gate,promotable}], leader, promotable:boolean, transitions, transitionWinners[]}` with the **nine** named models — the eight of E5 plus `player_xg` (F5, added v88). `promotable` on the result is the transition-count half of the gate; each model's own `gate` is `promotionGate(…)`.
+- Tournament (E5): `tournament(live)` → `{models:[{key,name,spearman,mae,maeRaw,perTransition[],transitions,wins,holdout,gate,promotable}], leader, decidable:boolean, promotable:boolean, transitions, transitionWinners[], note}` with the **nine** named models — the eight of E5 plus `player_xg` (F5, added v88). **`decidable`** is the transition-count half of the gate: enough transitions exist for the gate to be DECIDED (`transitions >= TOURNAMENT_PROMOTE_AT`). It says nothing about any model passing. **`promotable`** means what the word reads as: at least one model's own gate is open (`models.some(m => m.promotable)`). Until v88 the second name carried the first meaning and the Lab panel printed "Promotable: yes" over a table in which nothing was promotable (E-086). Each model's own `gate` is `promotionGate(…)` and its `promotable` is that gate's verdict.
 - Promotion gate (CLAUDE.md J): `promotionGate({transitions, wins, holdout, challenger, incumbent})` → `{promotable, transitions, wins, holdout, need, needHoldout, transitionsOk, winsOk, holdoutOk, reasons[], note}`. `TOURNAMENT_PROMOTE_AT` is 3 and `PROMOTION_HOLDOUT_WEEKS` is 2. **One function, used by the model tournament and by the minutes walk-forward** — a challenger may never be promoted through a second door.
 - Calibration (F4): `logistic(z)` → [0,1] (NaN answers 0.5); `solveLinear(A,b)` → vector or null; `fitLogistic(X, y, opts?)` → `{ok, beta[], n, k, iters, converged, ridge, logLik, baseRate, note}` (ridge IRLS, the design matrix carries its own intercept); `brier(pred, out)` → `{brier, n, baseRate, baseBrier, skill, ok}`; `reliability(pred, out, bins?)` → `{bins:[{lo,hi,n,meanPred,meanOutcome,gap}], n, baseRate, maxGap, ok}`.
 - Minutes model (F4, a challenger — it drives nothing): `minutesPanel(live)`; `minutesFeatureVector(hist, gw, deadlines)` → the `MINUTES_FEATURES` vector `[1, starts_last3, minutes_trend3, minutes_rate, days_since_last_start]`, every term bounded; `minutesRowsFor(live, gw, panel?)` → `{X, y, ids, seenFlag, n, seen, baseRate, note}` built from gameweeks **strictly before** `gw`; `minutesFit(live, uptoGw, opts?)` → `{ok, beta[], rows, gws[], terms[], …}`; `ctxMinutesFit(ctx, opts?)`; `minutesModel(el, ctx, opts?)` → `{p, pModel, pIncumbent, flagFactor, fitted, driving:false, driver:"pStart", features, terms[], fit, note}`; `truncateLive(live, uptoGw)`; `minutesWalkForward(live, opts?)` → `{folds[], comparable, wins, holdout, incumbent, challengerScore, gate, note}`. `terms` always declares `flag` (applied, not fitted — the snapshot has one status per player, not one per gameweek) and `european_load` (`available:false` — the fixture list is the Premier League list).
@@ -153,15 +176,50 @@ Required functions (signatures in the file header comment; these names are asser
 
 ## 6. state/kwezi.json (exported app state; `sanitiseState` accepts exactly this)
 ```
-{ "version": 87, "exported_at": ISO, "entry": 3546875,
-  "squad": [ {"id": 109, "purchase": 45} … 15 ], "bank": 0, "ft": 3, "value": 1000,
-  "confirmed_gw": 3,                                     // last GW whose picks the manager confirmed (D3 block clears when equal to live)
+{ "version": 89, "exported_at": ISO, "entry": 3546875,
+  "squad": [ {"id": 496, "purchase": 45} … 15 ], "bank": 16, "ft": 4, "value": 999,
+  "confirmed_gw": 5,                                     // last GW whose picks the manager confirmed (D3 block clears when equal to live)
   "leagues": [1314671,1683215,26474,512557,989793,512550],
   "draft": { "league_id": null, "entry_id": null, "league_input": "…"?, "roster": [codes…], "watchlist": [codes…] },
   "ui": { "mode": "simple", "tab": "command", "open": {}, "reveals": {} },
   "ledger": [ {gw, type, pick, alt, xp_pick, xp_alt, outcome, regret} ],
-  "refresh": { "pair": "sonnet46", "last": null } }
+  "refresh": { "pair": "sonnet46", "last": null },
+  "notes": { … }                                         // v89, NOT imported: see below
+}
 ```
+`sanitiseState` keeps exactly the fields above and drops everything else, so a field this file
+carries and that list does not never reaches the app.
+
+**`squad[].purchase`** is the price paid, in tenths. For a player held since GW1 it is
+`now_cost − cost_change_start`, which is exact. For one bought later the public API will not
+itemise the price without a login, so it is derived from the constraint the history does give:
+with one transfer and no hit, `bank_after − bank_before === sell(out) − buy(in)` exactly. A derived
+price is stated as derived, with its working, and is never presented as read.
+
+**`notes`** (v89) is a record carried by the file and **not imported**: the derivation of every
+number above, written so a human can check it against the snapshot. It exists because the state
+file is the state of record in git and a number without its working is not checkable. Nothing reads
+it at runtime, and `notes.read_by_the_app` is `false` to say so in the file itself.
+
+**`ledger`** (roadmap F6) is the decision ledger, eight fields fixed by `sanitiseState`:
+- `gw` — the gameweek the decision was made for; it must be a gameweek `history.current` has played.
+- `type` — `"chip" | "transfer" | "captain" | "xi"`.
+- `pick` — what the app recommended (an element id, or a label of up to 40 characters).
+- `alt` — what the manager actually did.
+- `xp_pick` / `xp_alt` — the **ex-ante** expectation, and only where one was recorded at the time.
+  `0` means "no ex-ante figure was recorded", not "an expectation of zero". They are never
+  rebuilt from a later snapshot: one price, one status and one cumulative stat line per player
+  means any such rebuild reads the gameweek it is predicting (E-069).
+- `outcome` — the realised squad points of that gameweek as played (T0, `history.current[].points`).
+- `regret` — the **marginal** squad points the recommendation would have ADDED. Positive means
+  ignoring the app cost that many points; negative means the manager's own call was better; `null`
+  means the app had no recommendation of record. Counterfactual squads were never played and so
+  have no played eleven: they are scored on the hindsight-optimal legal eleven with the recommended
+  captain doubled, which makes a squad-level `regret` an **upper bound**, and the `xi` row for the
+  same gameweek isolates the eleven-and-bench part on the same basis so the two net.
+Every `regret` is recomputed from the snapshot's own `gw[<n>]` rows by
+`qa/unit_engine.cjs` "LIVE-LEDGER-the-captain-and-xi-regrets-recompute-from-the-event-live-rows",
+so a typed number cannot survive in this file.
 
 ## 7. UI contract (src/ui.jsx)
 - Root `<div className="mc-root">` carries exactly 21 colour tokens as CSS custom properties: `--bg --bg2 --bg3 --line --text --dim --mute --grn --grn2 --pnk --pnk2 --amb --cyn --blu --pur --wht --shadow --focus --ok --warn --err`. Markup uses `var(--…)` only; **0 hex literals** in any `style`/`className` markup (hex may appear only inside the token definitions in the one `<style>` block).

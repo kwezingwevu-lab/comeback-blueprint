@@ -22,7 +22,7 @@ const LIVE = require(path.join(ROOT, "data", "live.json"));
 // prints against what the engine computes, rather than against a number typed into the test.
 const ENG = require(path.join(ROOT, "src", "engine.js"));
 
-// E-076: these were "2026-09-11T08:00:00Z" and "2026-09-12T15:00:00Z" — the Friday and the
+// E-084: these were "2026-09-11T08:00:00Z" and "2026-09-12T15:00:00Z" — the Friday and the
 // Saturday of GW4. The snapshot moved on to GW6 and every clock-relative check in this suite
 // went red on an app that was correct. Both are derived from the snapshot's own is_next event
 // now, so a refresh moves them with it (E-011).
@@ -71,7 +71,7 @@ function withFlag(id, on) {
 /* The subject of the flag pair, chosen from the snapshot rather than named: the highest
    five-week xP flagged player who walks into the engine's recommended fifteen the moment his
    flag is lifted. Hard-coding Gakpo meant the pair stopped testing anything the week his form
-   dropped out of the solve (E-076). */
+   dropped out of the solve (E-084). */
 function flagSubject() {
   const base = ENG.buildCtx(LIVE, null, NOW);
   const cands = base.elList
@@ -685,7 +685,7 @@ async function main() {
     // 13:00Z on the Saturday is inside the live window, so the landing shows live points and
     // only the header prints a countdown; 09:00Z on the Tuesday is past the last kick-off, so
     // the landing is back and prints one too. Both times are walked, on all seven tabs.
-    // Derived from the snapshot (E-076): just after the next deadline, which is inside the live
+    // Derived from the snapshot (E-084): just after the next deadline, which is inside the live
     // window, and then past the last kick-off of that gameweek, where the landing comes back.
     const POST_DEADLINE = [isoAt(NEXT_DL + 3 * 3600000), isoAt(NEXT_LAST_KO + 14 * 3600000)];
     const brokenCopy = [];
@@ -830,7 +830,7 @@ async function main() {
       "panel shows Laplace " + (lastFit ? lastFit.incumbent.brier.toFixed(4) : "—") + " and logistic " +
         (lastFit ? lastFit.challenger.brier.toFixed(4) : "—") + " for GW" + (lastFit ? lastFit.from + "→" + lastFit.to : "?") +
         "; first 160 chars: " + minPanel.slice(0, 160).replace(/\n/g, " | "));
-    // E-076: the last clause was /the gate needs 3/, which is what the engine's note says while
+    // E-084: the last clause was /the gate needs 3/, which is what the engine's note says while
     // the gate is SHUT. Five finished gameweeks opened it, and the panel correctly stopped
     // saying that. The panel must state the gate's own verdict, whichever way it has gone.
     const gateOpen = mwfLive.gate.promotable === true;

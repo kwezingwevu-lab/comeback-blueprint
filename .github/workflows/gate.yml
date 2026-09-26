@@ -57,6 +57,15 @@ jobs:
       - name: privacy (rival managers' names are never committed)
         run: node qa/privacy.cjs 2>&1 | tee -a "$GATE_LOG"
 
+      - name: no_frozen (no live-sourced field asserted against a literal)
+        run: node qa/no_frozen.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      - name: pull_guard (the pull keeps the last good feed)
+        run: node qa/pull_guard.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      - name: waiver_log (the waiver model reproduces the league's own log)
+        run: node qa/waiver_log.cjs 2>&1 | tee -a "$GATE_LOG"
+
       - name: verify.sh (live reconciliation + invariants)
         run: bash qa/verify.sh 2>&1 | tee -a "$GATE_LOG"
 

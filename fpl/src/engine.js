@@ -201,7 +201,7 @@
  *                                      DECIDED (transitions >= TOURNAMENT_PROMOTE_AT); it says
  *                                      nothing about any model passing. promotable = at least one
  *                                      model's own gate is open, which is what the word reads as
- *                                      (E-075). Per model, `promotable` is that model's gate.
+ *                                      (E-086). Per model, `promotable` is that model's gate.
  *   calibrateToPoints(pred, actual) → {scale, calibrated, pred[]}
  *   spearman(a, b) / mae(a, b)      → numbers
  *
@@ -1952,6 +1952,106 @@ function waiverOrder(ctx) {
   return res;
 }
 
+/* How this league actually settles waivers, inferred from its own transaction log and then
+   proved against it (v110 §4 Draft, §5 B6; qa/waiver_log.cjs replays 74 of 74).
+
+   The game documents none of this, so every rule below is one the log forced:
+
+     1. Claims settle in ROUNDS, not in one pass. Each round visits managers in waiver order,
+        and a manager keeps trying their own claims, in the order they lodged them, until one
+        LANDS. So your first success beats everyone behind you, and your k-th success comes
+        after everyone ahead of you has had k and everyone behind you k−1.
+     2. "Already claimed" is checked BEFORE "drop already gone". Both can be true of the same
+        claim, and the game reports the first. Checking them the other way round scores 72 of
+        74 on this log, which is how the order was established (ERRORS.md E-089).
+     3. Nobody moves to the bottom after a success. A league that rotated priority would settle
+        the same claims in a different order, and the log says it does not.
+     4. A failed claim is consumed. It is not retried in a later round.
+
+   Pure and context-free on purpose: it takes the claim lists and the order, so the suite can
+   drive it straight off a recorded log, and so a claims sheet can be simulated under several
+   orderings without a context at all.
+
+   `claimsByOwner`  { ownerKey: [{add, drop}, …] } in lodged order. ownerKey is whatever the
+                    caller keys by — a league-entry id, an entry id, anything comparable.
+   `order`          [ownerKey] in processing order.
+   `opts.maxRounds` a safety bound, default 12: no manager in an 8-team league can land more
+                    than a roster's worth, and an unbounded loop in a renderer is a hang.
+   `opts.denyOrder` / `rotate` / `stopOnFail` / `reverseOrder` exist ONLY so the suite can break
+                    one rule at a time and show the fit gets worse. Production never passes them.
+*/
+function waiverSim(claimsByOwner, order, opts) {
+  var res = { ok: false, log: [], taken: [], rounds: 0, note: "" };
+  try {
+    var o = isObj(opts) ? opts : {};
+    var maxRounds = intOf(o.maxRounds, 0) || 12;
+    var seq = arr(order).slice();
+    if (o.reverseOrder) seq.reverse();
+    var lists = {};
+    seq.forEach(function (k) {
+      lists[k] = arr(isObj(claimsByOwner) ? claimsByOwner[k] : null)
+        .filter(isObj)
+        .map(function (c) { return { add: c.add, drop: c.drop }; });
+    });
+    if (!seq.length) { res.note = "no claim order"; res.ok = true; return res; }
+
+    var at = {}, dropped = {}, taken = {};
+    seq.forEach(function (k) { at[k] = 0; dropped[k] = {}; });
+
+    for (var round = 1; round <= maxRounds; round++) {
+      var landed = false;
+      res.rounds = round;
+      for (var i = 0; i < seq.length; i++) {
+        var who = seq[i], L = lists[who] || [];
+        while (at[who] < L.length) {
+          var c = L[at[who]++];
+          if (!c) continue;
+          var gone = Object.prototype.hasOwnProperty.call(taken, String(c.add));
+          var lost = Object.prototype.hasOwnProperty.call(dropped[who], String(c.drop));
+          // Rule 2. The mutation swaps which of the two the game is told to report.
+          var first = o.denyOrder === "dropFirst"
+            ? (lost ? "drop already gone" : (gone ? "already claimed" : ""))
+            : (gone ? "already claimed" : (lost ? "drop already gone" : ""));
+          if (first) {
+            res.log.push({ round: round, who: who, add: c.add, drop: c.drop, ok: false, why: first });
+            if (o.stopOnFail) break;          // mutation: one attempt per manager per round
+            continue;
+          }
+          taken[String(c.add)] = true;
+          dropped[who][String(c.drop)] = true;
+          res.log.push({ round: round, who: who, add: c.add, drop: c.drop, ok: true, why: "" });
+          landed = true;
+          break;
+        }
+      }
+      // Rule 3. The mutation is a league that sends a successful claimant to the back.
+      if (o.rotate && landed) seq.push(seq.shift());
+      if (!landed) break;
+    }
+
+    res.taken = Object.keys(taken).map(function (k) { return num(k, k); });
+    res.ok = true;
+    res.note = res.log.length + " claim(s) settled over " + res.rounds + " round(s)";
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+/* Every claim in the log that the model did NOT get to attempt would be invisible, so the suite
+   asserts the counts agree. This helper says how many claims one owner landed, which the claims
+   sheet uses to label a line "lands", "taken first" or "not reached". */
+function waiverOutcomeFor(sim, ownerKey) {
+  var out = { landed: [], denied: [], note: "" };
+  try {
+    arr(isObj(sim) ? sim.log : null).forEach(function (x) {
+      if (!isObj(x) || String(x.who) !== String(ownerKey)) return;
+      if (x.ok) out.landed.push({ add: x.add, drop: x.drop, round: x.round });
+      else out.denied.push({ add: x.add, drop: x.drop, round: x.round, why: x.why });
+    });
+    out.note = out.landed.length + " of " + (out.landed.length + out.denied.length) + " landed";
+  } catch (e) { out.note = "engine error: " + errMsg(e); }
+  return out;
+}
+
 /* The head-to-head fixture for a gameweek, from the league's own matches array. */
 function h2hOpponent(ctx, gw) {
   var res = { ok: false, gw: 0, opponent: null, mine: null, myPoints: null, oppPoints: null, finished: false, started: false, note: "" };
@@ -2691,7 +2791,7 @@ function tournament(live) {
     res.transitions = Math.max.apply(null, [0].concat(res.models.map(function (m) { return m.transitions; })));
     var ranked = res.models.filter(function (m) { return m.spearman !== null; }).sort(function (a, b) { return b.spearman - a.spearman || a.mae - b.mae; });
     res.leader = ranked.length ? ranked[0].key : null;
-    // E-075: this flag used to be called `promotable`, which read as "something can be
+    // E-086: this flag used to be called `promotable`, which read as "something can be
     // promoted" while every model's own gate was shut. It is the transition-count half of the
     // gate and nothing else, so it is `decidable`: enough transitions exist for the gate to be
     // decided. `promotable` below is the honest reading of the word.
@@ -2718,7 +2818,7 @@ function tournament(live) {
       m.gate = promotionGate({ transitions: m.transitions, wins: wins, holdout: trail, challenger: m.name, incumbent: "E1 xP in production" });
       m.promotable = m.gate.promotable;
     });
-    // E-075: the top-level word now means what it says — at least one model's own gate is open.
+    // E-086: the top-level word now means what it says — at least one model's own gate is open.
     res.promotable = res.models.some(function (m) { return m.promotable === true; });
     res.note = res.transitions
       ? (res.transitions + " walk-forward transition" + (res.transitions === 1 ? "" : "s") + "; promotion needs " + TOURNAMENT_PROMOTE_AT +
@@ -3127,6 +3227,142 @@ function ctxMinutesFit(ctx, opts) {
   return ctx._minutesFit;
 }
 
+/* Whether the minutes logistic may drive production P(start) (ERRORS.md E-087, closed here).
+
+   E-087 recorded the defect: `driving` was the literal `false`, written in v88 when the gate was
+   shut, and five finished gameweeks later the gate is open while the engine still reported that
+   nothing was being driven. A flag that answers a question the engine can compute is computed.
+
+   THREE THINGS THIS DECIDES, AND THEY ARE NOT THE SAME THING
+     eligible  the challenger has earned promotion: the shared gate is open AND the tail condition
+               below holds.
+     routed    production actually asks it. It does not yet — see MINUTES_PRODUCTION_ROUTED.
+     driving   eligible AND routed. This is what the app reports, and it is true only when the
+               model really is behind the numbers on screen. Reporting `driving` for a model that
+               nothing calls would be E-087 inverted, which is no better than E-087.
+
+   THE GATE, MEASURED
+     Brier over each fold: logistic 0.0874 / 0.0768 / 0.0764 against the Laplace rate's
+     0.0954 / 0.0953 / 0.0968. It wins every fold it can be fitted on, with a three-gameweek
+     hold-out against a gate wanting two, so `promotionGate` opens.
+
+   THE TAIL CONDITION, AND WHY A MEAN SCORE NEEDS ONE
+     The gate is a mean over every scored row, and a mean cannot see a handful of rows where the
+     challenger has almost no evidence. Those rows are the ones that move a transfer
+     recommendation: a model that gives a good chance of starting to a player the incumbent can
+     see has not been starting will put him in a squad. So promotion also requires that, for every
+     player whose incumbent probability is at the floor, the challenger stays below an even chance.
+
+     Measured like for like on the 26 September snapshot — both probabilities flag-adjusted, which
+     matters: comparing the model's raw `pModel` against the flag-adjusted incumbent invents
+     disagreements out of nothing, and the first version of this note did exactly that and claimed
+     a 0.000 to 0.627 jump for a flagged player that was the flag and not the model. Corrected:
+     over 421 players the two disagree by a mean of 0.104, median 0.035, p90 0.304, max 0.598. Of
+     138 players at the incumbent floor the challenger's highest is 0.305, against the 0.50 limit.
+     So the tail condition HOLDS and the challenger is eligible.
+
+   WHY IT IS STILL NOT ROUTED
+     v110 §5 B3 replaces this minutes model outright — recent starts weighted, flags, parsed
+     return dates and dated overrides — and the tournament re-scores against that. Routing
+     production through a model that is about to be replaced would spend a round's worth of
+     before-and-after on the shipped plan twice. So the decision is recorded, not taken, and the
+     code says which of the three words is false rather than implying all three.
+*/
+var MINUTES_TAIL_LIMIT = 0.50;
+
+/* Production P(start) is the Laplace rate. Flip this to true only together with routing the xp
+   path through minutesModel, and only with the before-and-after on the shipped plan in the
+   retest — every recommendation in the app moves with it. */
+var MINUTES_PRODUCTION_ROUTED = false;
+
+
+function minutesPromotion(live, opts) {
+  var res = {
+    ok: false, eligible: false, routed: MINUTES_PRODUCTION_ROUTED, driving: false, driver: "pStart", gate: null,
+    tail: { ok: false, thin: 0, checked: 0, max: 0, limit: MINUTES_TAIL_LIMIT, worst: null },
+    note: ""
+  };
+  try {
+    var wf = minutesWalkForward(live, opts);
+    res.gate = wf.gate || null;
+    var gateOpen = !!(res.gate && res.gate.promotable);
+
+    /* A "thin" row is one where the INCUMBENT has hard evidence of not starting: the Laplace
+       rate over its own recent window is at the floor. That is the comparison that matters,
+       because the incumbent is what production uses, and the two models look at different
+       windows — Fatawu has starts earlier in the season and none recently, so the Laplace rate
+       reads 0.000 while the logistic, fitted over the whole panel, reads 0.627. Measuring the
+       tail against the fitted window instead found no thin rows at all and would have passed
+       this condition without testing anything. */
+    var panel = minutesPanel(live);
+    var fit = minutesFit(live, 0, opts);
+    var gwStats = elementGwStats(live);
+    var THIN_INCUMBENT = 0.10;
+
+    var els = arr(isObj(live) ? live.elements : null);
+    var worst = null, maxP = 0, maxAdj = 0, thin = 0, checked = 0;
+    if (fit.ok) {
+      els.forEach(function (el) {
+        if (!isObj(el)) return;
+        if (intOf(el.minutes, 0) <= 0) return;            // never on the pitch: no features to speak of
+        if (pStart(el, gwStats) > THIN_INCUMBENT) return; // the incumbent has evidence either way
+        thin++;
+        var hist = [];
+        arr(panel.gws).forEach(function (g) {
+          var rows = panel.rows[g] || {}, tg = panel.teamGames[g] || {};
+          var clubN = intOf(tg[num(el.team, -1)], 0), row = rows[el.id];
+          if (!clubN && !Array.isArray(row)) return;
+          hist.push({ gw: g, games: Math.max(clubN, Array.isArray(row) ? num(row[1], 0) : 0, Array.isArray(row) ? 1 : 0),
+            min: Array.isArray(row) ? num(row[0], 0) : 0, starts: Array.isArray(row) ? num(row[1], 0) : 0 });
+        });
+        var x = minutesFeatureVector(hist, intOf(panel.nextEvent, 0) || 0, panel.deadlines);
+        var z = 0;
+        for (var i = 0; i < x.length && i < fit.beta.length; i++) z += num(fit.beta[i], 0) * x[i];
+        /* The RAW model probability binds the condition, not the flag-adjusted one. A flag is
+           today's news and it lifts; the model's own claim about a player the incumbent has not
+           seen starting is the thing being judged, and it must not move with the news. Both are
+           reported, because the raw figure is what a promotion would inherit. */
+        var pm = clamp(logistic(z), 0, 1);
+        var pmAdj = clamp(pm * clamp(flagInfo(el).factor, 0, 1), 0, 1);
+        checked++;
+        if (pmAdj > maxAdj) maxAdj = pmAdj;
+        if (pm > maxP) { maxP = pm; worst = { id: el.id, name: String(el.web_name || el.id), p: pm, pAdjusted: pmAdj }; }
+      });
+    }
+    res.tail.thin = thin;
+    res.tail.checked = checked;
+    res.tail.max = maxP;
+    res.tail.maxAdjusted = maxAdj;
+    res.tail.margin = MINUTES_TAIL_LIMIT - maxP;
+    res.tail.worst = worst;
+    res.tail.ok = fit.ok && checked > 0 && maxP <= MINUTES_TAIL_LIMIT;
+
+    res.eligible = gateOpen && res.tail.ok;
+    res.driving = res.eligible && MINUTES_PRODUCTION_ROUTED;
+    res.ok = res.eligible;                       // "ok" answers eligibility, which is what the gate decides
+    res.driver = res.driving ? "minutesLogistic" : "pStart";
+    if (!gateOpen) {
+      res.note = "the gate is shut: " + ((res.gate && res.gate.reasons ? res.gate.reasons : []).join("; ") || "not enough transitions won");
+    } else if (!res.tail.ok) {
+      res.note = "the gate is open (" + (res.gate ? res.gate.note : "") + ") but the tail condition is not met: " +
+        (worst ? worst.name + " has no recent start the incumbent can see and the model gives " + Math.round(maxP * 1000) / 1000 : "no thin row could be scored") +
+        ", against a limit of " + MINUTES_TAIL_LIMIT + ". P(start) in production stays the Laplace rate.";
+    } else if (!MINUTES_PRODUCTION_ROUTED) {
+      res.note = "the gate is open and the tail condition holds (worst row at the incumbent floor: " +
+        (worst ? worst.name + " at " + Math.round(maxP * 1000) / 1000 : "none") + " \u2264 " + MINUTES_TAIL_LIMIT +
+        ", by " + Math.round((MINUTES_TAIL_LIMIT - maxP) * 1000) / 1000 +
+        " \u2014 close, and said so rather than rounded away; flag-adjusted the same row is " + Math.round(maxAdj * 1000) / 1000 +
+        "), so the minutes logistic is ELIGIBLE. It is not routed: production P(start) is still the " +
+        "Laplace rate, because v110 B3 replaces this minutes model and the tournament re-scores against that.";
+    } else {
+      res.note = "the gate is open, the tail condition holds (worst row at the incumbent floor: " +
+        (worst ? worst.name + " at " + Math.round(maxP * 1000) / 1000 : "none") + " \u2264 " + MINUTES_TAIL_LIMIT +
+        ") and production is routed through it: the minutes logistic drives P(start).";
+    }
+  } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
 // F4's challenger for P(start). It does NOT drive anything: `driving` is false until the shared
 // promotion gate says otherwise, and the note says which model is driving today.
 function minutesModel(el, ctx, opts) {
@@ -3157,6 +3393,8 @@ function minutesModel(el, ctx, opts) {
     res.features = { starts_last3: x[1], minutes_trend3: x[2], minutes_rate: x[3], days_since_last_start: x[4] };
     if (!fit.ok) {
       res.p = res.pIncumbent;
+      res.driving = false;
+      res.driver = "pStart";
       res.note = "the minutes model could not be fitted on this snapshot (" + fit.note + "), so this is the Laplace rate the app ships.";
       return res;
     }
@@ -3165,7 +3403,16 @@ function minutesModel(el, ctx, opts) {
     res.fitted = true;
     res.pModel = clamp(logistic(z), 0, 1);
     res.p = clamp(res.pModel * res.flagFactor, 0, 1);
-    res.note = "challenger only: P(start) in production is still the Laplace rate. This figure drives nothing until the shared promotion gate opens.";
+    // E-087: computed, not typed. Cached on the context because the decision needs a
+    // walk-forward and every player would otherwise pay for it again.
+    var promo = ctx._minutesPromotion || (ctx._minutesPromotion = minutesPromotion(ctx.live, opts));
+    res.driving = !!promo.driving;
+    res.driver = promo.driver;
+    res.promotion = { eligible: !!promo.eligible, routed: !!promo.routed, driving: !!promo.driving,
+      gateOpen: !!(promo.gate && promo.gate.promotable), tail: promo.tail, note: promo.note };
+    res.note = promo.driving
+      ? "the minutes logistic drives P(start): " + promo.note
+      : "challenger only \u2014 " + promo.note;
   } catch (e) { res.note = "engine error: " + errMsg(e); }
   return res;
 }
@@ -3537,7 +3784,7 @@ if (typeof module !== "undefined" && module.exports) {
     wildcardSolver: wildcardSolver, elName: elName, writtenFifteen: writtenFifteen, wildcardOptions: wildcardOptions, wildcardTiming: wildcardTiming, chipWindows: chipWindows, chipRegret: chipRegret,
     draftEl: draftEl, draftEV: draftEV, draftWaivers: draftWaivers, watchlistAudit: watchlistAudit, draftXIBase: draftXIBase, draftXI: draftXI,
     draftLeagueInput: draftLeagueInput, draftOwnership: draftOwnership, draftPool: draftPool, draftRosterOf: draftRosterOf, draftRivalRosters: draftRivalRosters,
-    waiverOrder: waiverOrder, h2hOpponent: h2hOpponent, draftRoster: draftRoster, playerSpread: playerSpread,
+    waiverOrder: waiverOrder, waiverSim: waiverSim, waiverOutcomeFor: waiverOutcomeFor, h2hOpponent: h2hOpponent, draftRoster: draftRoster, playerSpread: playerSpread,
     distStats: distStats, mcDraftXI: mcDraftXI, mcH2H: mcH2H, h2hProjection: h2hProjection,
     sanitiseState: sanitiseState, detectSquadChange: detectSquadChange, ftAvailable: ftAvailable, sellPrice: sellPrice, bankAfter: bankAfter,
     openClosers: openClosers, salvageJson: salvageJson, stripFences: stripFences, parseJson: parseJson, blocksOf: blocksOf, pickText: pickText, blockTypes: blockTypes, refreshRequest: refreshRequest, applyRefresh: applyRefresh,
@@ -3547,6 +3794,7 @@ if (typeof module !== "undefined" && module.exports) {
     logistic: logistic, solveLinear: solveLinear, fitLogistic: fitLogistic, brier: brier, reliability: reliability, promotionGate: promotionGate,
     minutesTerms: minutesTerms, minutesPanel: minutesPanel, minutesFeatureVector: minutesFeatureVector, minutesRowsFor: minutesRowsFor,
     minutesFit: minutesFit, ctxMinutesFit: ctxMinutesFit, minutesModel: minutesModel, truncateLive: truncateLive, minutesWalkForward: minutesWalkForward,
+    minutesPromotion: minutesPromotion, MINUTES_TAIL_LIMIT: MINUTES_TAIL_LIMIT, MINUTES_PRODUCTION_ROUTED: MINUTES_PRODUCTION_ROUTED,
     playerXg: playerXg, eventMult: eventMult, xpEvent: xpEvent, bestElevenForEvent: bestElevenForEvent, chipValue: chipValue, chipSolver: chipSolver,
     MINUTES_FEATURES: MINUTES_FEATURES, CHIP_SETS: CHIP_SETS, CHIP_NAMES: CHIP_NAMES, PROMOTION_HOLDOUT_WEEKS: PROMOTION_HOLDOUT_WEEKS
   };

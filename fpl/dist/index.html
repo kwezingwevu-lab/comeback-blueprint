@@ -27989,6 +27989,59 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
     }
     return res;
   }
+  function waiverSim(claimsByOwner, order, opts) {
+    var res = { ok: !1, log: [], taken: [], rounds: 0, note: "" };
+    try {
+      var o = isObj(opts) ? opts : {}, maxRounds = intOf(o.maxRounds, 0) || 12, seq = arr(order).slice();
+      o.reverseOrder && seq.reverse();
+      var lists = {};
+      if (seq.forEach(function(k) {
+        lists[k] = arr(isObj(claimsByOwner) ? claimsByOwner[k] : null).filter(isObj).map(function(c2) {
+          return { add: c2.add, drop: c2.drop };
+        });
+      }), !seq.length)
+        return res.note = "no claim order", res.ok = !0, res;
+      var at = {}, dropped = {}, taken = {};
+      seq.forEach(function(k) {
+        at[k] = 0, dropped[k] = {};
+      });
+      for (var round2 = 1; round2 <= maxRounds; round2++) {
+        var landed = !1;
+        res.rounds = round2;
+        for (var i = 0; i < seq.length; i++)
+          for (var who = seq[i], L = lists[who] || []; at[who] < L.length; ) {
+            var c = L[at[who]++];
+            if (c) {
+              var gone = Object.prototype.hasOwnProperty.call(taken, String(c.add)), lost = Object.prototype.hasOwnProperty.call(dropped[who], String(c.drop)), first = o.denyOrder === "dropFirst" ? lost ? "drop already gone" : gone ? "already claimed" : "" : gone ? "already claimed" : lost ? "drop already gone" : "";
+              if (first) {
+                if (res.log.push({ round: round2, who, add: c.add, drop: c.drop, ok: !1, why: first }), o.stopOnFail) break;
+                continue;
+              }
+              taken[String(c.add)] = !0, dropped[who][String(c.drop)] = !0, res.log.push({ round: round2, who, add: c.add, drop: c.drop, ok: !0, why: "" }), landed = !0;
+              break;
+            }
+          }
+        if (o.rotate && landed && seq.push(seq.shift()), !landed) break;
+      }
+      res.taken = Object.keys(taken).map(function(k) {
+        return num(k, k);
+      }), res.ok = !0, res.note = res.log.length + " claim(s) settled over " + res.rounds + " round(s)";
+    } catch (e) {
+      res.note = "engine error: " + errMsg(e);
+    }
+    return res;
+  }
+  function waiverOutcomeFor(sim, ownerKey) {
+    var out = { landed: [], denied: [], note: "" };
+    try {
+      arr(isObj(sim) ? sim.log : null).forEach(function(x) {
+        !isObj(x) || String(x.who) !== String(ownerKey) || (x.ok ? out.landed.push({ add: x.add, drop: x.drop, round: x.round }) : out.denied.push({ add: x.add, drop: x.drop, round: x.round, why: x.why }));
+      }), out.note = out.landed.length + " of " + (out.landed.length + out.denied.length) + " landed";
+    } catch (e) {
+      out.note = "engine error: " + errMsg(e);
+    }
+    return out;
+  }
   function h2hOpponent(ctx, gw) {
     var res = { ok: !1, gw: 0, opponent: null, mine: null, myPoints: null, oppPoints: null, finished: !1, started: !1, note: "" };
     try {
@@ -29229,6 +29282,45 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
   function ctxMinutesFit(ctx, opts) {
     return okCtx(ctx) ? (ctx._minutesFit || (ctx._minutesFit = minutesFit(ctx.live, 0, opts)), ctx._minutesFit) : minutesFit(null, 0, opts);
   }
+  var MINUTES_TAIL_LIMIT = 0.5, MINUTES_PRODUCTION_ROUTED = !1;
+  function minutesPromotion(live, opts) {
+    var res = {
+      ok: !1,
+      eligible: !1,
+      routed: MINUTES_PRODUCTION_ROUTED,
+      driving: !1,
+      driver: "pStart",
+      gate: null,
+      tail: { ok: !1, thin: 0, checked: 0, max: 0, limit: MINUTES_TAIL_LIMIT, worst: null },
+      note: ""
+    };
+    try {
+      var wf = minutesWalkForward(live, opts);
+      res.gate = wf.gate || null;
+      var gateOpen = !!(res.gate && res.gate.promotable), panel = minutesPanel(live), fit = minutesFit(live, 0, opts), gwStats = elementGwStats(live), THIN_INCUMBENT = 0.1, els = arr(isObj(live) ? live.elements : null), worst = null, maxP = 0, maxAdj = 0, thin = 0, checked = 0;
+      fit.ok && els.forEach(function(el2) {
+        if (isObj(el2) && !(intOf(el2.minutes, 0) <= 0) && !(pStart(el2, gwStats) > THIN_INCUMBENT)) {
+          thin++;
+          var hist = [];
+          arr(panel.gws).forEach(function(g) {
+            var rows = panel.rows[g] || {}, tg = panel.teamGames[g] || {}, clubN = intOf(tg[num(el2.team, -1)], 0), row = rows[el2.id];
+            !clubN && !Array.isArray(row) || hist.push({
+              gw: g,
+              games: Math.max(clubN, Array.isArray(row) ? num(row[1], 0) : 0, Array.isArray(row) ? 1 : 0),
+              min: Array.isArray(row) ? num(row[0], 0) : 0,
+              starts: Array.isArray(row) ? num(row[1], 0) : 0
+            });
+          });
+          for (var x = minutesFeatureVector(hist, intOf(panel.nextEvent, 0) || 0, panel.deadlines), z = 0, i = 0; i < x.length && i < fit.beta.length; i++) z += num(fit.beta[i], 0) * x[i];
+          var pm = clamp(logistic(z), 0, 1), pmAdj = clamp(pm * clamp(flagInfo(el2).factor, 0, 1), 0, 1);
+          checked++, pmAdj > maxAdj && (maxAdj = pmAdj), pm > maxP && (maxP = pm, worst = { id: el2.id, name: String(el2.web_name || el2.id), p: pm, pAdjusted: pmAdj });
+        }
+      }), res.tail.thin = thin, res.tail.checked = checked, res.tail.max = maxP, res.tail.maxAdjusted = maxAdj, res.tail.margin = MINUTES_TAIL_LIMIT - maxP, res.tail.worst = worst, res.tail.ok = fit.ok && checked > 0 && maxP <= MINUTES_TAIL_LIMIT, res.eligible = gateOpen && res.tail.ok, res.driving = res.eligible && MINUTES_PRODUCTION_ROUTED, res.ok = res.eligible, res.driver = res.driving ? "minutesLogistic" : "pStart", gateOpen ? res.tail.ok ? MINUTES_PRODUCTION_ROUTED ? res.note = "the gate is open, the tail condition holds (worst row at the incumbent floor: " + (worst ? worst.name + " at " + Math.round(maxP * 1e3) / 1e3 : "none") + " \u2264 " + MINUTES_TAIL_LIMIT + ") and production is routed through it: the minutes logistic drives P(start)." : res.note = "the gate is open and the tail condition holds (worst row at the incumbent floor: " + (worst ? worst.name + " at " + Math.round(maxP * 1e3) / 1e3 : "none") + " \u2264 " + MINUTES_TAIL_LIMIT + ", by " + Math.round((MINUTES_TAIL_LIMIT - maxP) * 1e3) / 1e3 + " \u2014 close, and said so rather than rounded away; flag-adjusted the same row is " + Math.round(maxAdj * 1e3) / 1e3 + "), so the minutes logistic is ELIGIBLE. It is not routed: production P(start) is still the Laplace rate, because v110 B3 replaces this minutes model and the tournament re-scores against that." : res.note = "the gate is open (" + (res.gate ? res.gate.note : "") + ") but the tail condition is not met: " + (worst ? worst.name + " has no recent start the incumbent can see and the model gives " + Math.round(maxP * 1e3) / 1e3 : "no thin row could be scored") + ", against a limit of " + MINUTES_TAIL_LIMIT + ". P(start) in production stays the Laplace rate." : res.note = "the gate is shut: " + ((res.gate && res.gate.reasons ? res.gate.reasons : []).join("; ") || "not enough transitions won");
+    } catch (e) {
+      res.note = "engine error: " + errMsg(e);
+    }
+    return res;
+  }
   function minutesModel(el2, ctx, opts) {
     var res = {
       p: 0,
@@ -29261,9 +29353,18 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
       });
       var x = minutesFeatureVector(hist, ctx.nextEvent, P.deadlines);
       if (res.x = x.slice(), res.features = { starts_last3: x[1], minutes_trend3: x[2], minutes_rate: x[3], days_since_last_start: x[4] }, !fit.ok)
-        return res.p = res.pIncumbent, res.note = "the minutes model could not be fitted on this snapshot (" + fit.note + "), so this is the Laplace rate the app ships.", res;
+        return res.p = res.pIncumbent, res.driving = !1, res.driver = "pStart", res.note = "the minutes model could not be fitted on this snapshot (" + fit.note + "), so this is the Laplace rate the app ships.", res;
       for (var z = 0, i = 0; i < x.length && i < fit.beta.length; i++) z += num(fit.beta[i], 0) * x[i];
-      res.fitted = !0, res.pModel = clamp(logistic(z), 0, 1), res.p = clamp(res.pModel * res.flagFactor, 0, 1), res.note = "challenger only: P(start) in production is still the Laplace rate. This figure drives nothing until the shared promotion gate opens.";
+      res.fitted = !0, res.pModel = clamp(logistic(z), 0, 1), res.p = clamp(res.pModel * res.flagFactor, 0, 1);
+      var promo = ctx._minutesPromotion || (ctx._minutesPromotion = minutesPromotion(ctx.live, opts));
+      res.driving = !!promo.driving, res.driver = promo.driver, res.promotion = {
+        eligible: !!promo.eligible,
+        routed: !!promo.routed,
+        driving: !!promo.driving,
+        gateOpen: !!(promo.gate && promo.gate.promotable),
+        tail: promo.tail,
+        note: promo.note
+      }, res.note = promo.driving ? "the minutes logistic drives P(start): " + promo.note : "challenger only \u2014 " + promo.note;
     } catch (e) {
       res.note = "engine error: " + errMsg(e);
     }
@@ -29688,6 +29789,8 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
     draftRosterOf,
     draftRivalRosters,
     waiverOrder,
+    waiverSim,
+    waiverOutcomeFor,
     h2hOpponent,
     draftRoster,
     playerSpread,
@@ -29746,6 +29849,9 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
     minutesModel,
     truncateLive,
     minutesWalkForward,
+    minutesPromotion,
+    MINUTES_TAIL_LIMIT,
+    MINUTES_PRODUCTION_ROUTED,
     playerXg,
     eventMult,
     xpEvent,
@@ -29789,6 +29895,11 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
       // 100% rival-owned across the six winnable leagues, so he is out of the rule-pure solve
       // and is declared here as the one explicit lock — the only exemption the solver takes.
       locks: [411],
+      // The cost of the fifteen above, in tenths, at the moment this block was written:
+      // £98.8m of a £99.5m selling value on the 26 September snapshot. Recorded so the
+      // Plan tab's "the written plan quotes …" line can be read out of the plan instead of
+      // typed into the markup (ERRORS.md E-088).
+      wildcard15_cost_written: 988,
       captain: 124,
       vice: 94,
       // Groß (BHA), Schade (BRE) — bestXI 3-4-3
@@ -31048,7 +31159,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KV, { k: "Written fifteen costs", v: money(fbCost) + " of " + money(ctx.budget), tone: fbCost <= ctx.budget ? "go" : "out" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "note", children: [
           "The written plan quotes ",
-          money(978),
+          money(WEEKLY.classic.wildcard15_cost_written),
           " for that fifteen. Today it is ",
           money(fbCost),
           " against a selling value of ",

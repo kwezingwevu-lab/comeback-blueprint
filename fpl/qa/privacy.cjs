@@ -54,6 +54,13 @@ const OWN_ENTRY_FEEDS = new Set([
 const SKIP_DIRS = new Set(["node_modules", ".git"]);
 const SKIP_FILES = new Set(["reference/v110/UPDATE_PROMPT.md"]);
 
+/* THE SCOPE IS WHAT GIT TRACKS, not what is on disk.
+   The first version walked the working tree, and that let a real leak through: 53 raw feeds were
+   committed under pipeline/feeds/ carrying 489 personal-name fields, because the ignore rule was
+   written as `pipeline/feeds/` INSIDE pipeline/.gitignore — where patterns are relative to that
+   directory, so it meant pipeline/pipeline/feeds/ and matched nothing. A working-tree walk cannot
+   see that class of defect at all: the files look like untracked scratch either way. "Committed"
+   means tracked, so that is what is scanned (ERRORS.md E-091). */
 function walk(dir, out) {
   for (const name of fs.readdirSync(dir)) {
     if (SKIP_DIRS.has(name)) continue;
@@ -66,6 +73,15 @@ function walk(dir, out) {
     out.push(rel);
   }
   return out;
+}
+
+/* Every path git tracks under fpl/, relative to fpl/. */
+function trackedFiles() {
+  let out = "";
+  try {
+    out = require("child_process").execFileSync("git", ["-C", ROOT, "ls-files"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  } catch (e) { return null; }
+  return out.split("\n").map((x) => x.trim()).filter(Boolean).filter((rel) => !SKIP_FILES.has(rel));
 }
 
 /* Scan scope: data, state, built artefacts, fixtures, and the reference feeds. */
@@ -85,8 +101,34 @@ function hits(rel) {
   return { n: m ? m.length : 0, bytes: Buffer.byteLength(text) };
 }
 
-const all = walk(ROOT, []);
-const scanned = all.filter(inScope);
+const tracked = trackedFiles();
+ok("git could be asked what it tracks", Array.isArray(tracked) && tracked.length > 20,
+  tracked === null ? "git ls-files failed" : String(tracked && tracked.length));
+
+/* Tracked first, then anything on disk that is in scope and NOT tracked — so a file about to be
+   committed is checked before it is, and a tracked file is checked whether or not it is on disk. */
+const onDisk = walk(ROOT, []);
+const seen = new Set();
+const scanned = [];
+for (const rel of (tracked || []).concat(onDisk)) {
+  if (seen.has(rel)) continue;
+  seen.add(rel);
+  if (inScope(rel)) scanned.push(rel);
+}
+
+/* The specific leak that got through, asserted directly rather than left to the scan. */
+{
+  const feedsTracked = (tracked || []).filter((rel) => /^pipeline\/feeds\//.test(rel));
+  ok("no raw feed is tracked: they come straight off the API with names in them (E-091)",
+    feedsTracked.length === 0, feedsTracked.length + " tracked: " + feedsTracked.slice(0, 4).join(", "));
+  let ignored = false, why = "";
+  try {
+    require("child_process").execFileSync("git", ["-C", ROOT, "check-ignore", "--no-index", "-q", "pipeline/feeds/entry.json"], { stdio: "ignore" });
+    ignored = true;
+  } catch (e) { ignored = false; why = "git check-ignore says pipeline/feeds/entry.json is NOT ignored"; }
+  ok("and the ignore rule genuinely matches, proved with git rather than by reading the pattern",
+    ignored, why);
+}
 
 /* A scan that looked at nothing would pass every assertion below. */
 ok("the scan reached the files it is meant to check",

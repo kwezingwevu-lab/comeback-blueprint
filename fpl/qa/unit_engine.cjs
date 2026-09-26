@@ -1892,6 +1892,8 @@ check("F4-truncateLive-hides-every-later-gameweek-and-puts-later-fixtures-back-t
   const earlyIntact = t.fixtures.filter(function (f) { return f.event <= 2 && f.finished; }).length;
   const original = SYN.fixtures.filter(function (f) { return f.event === 3 && f.finished; }).length;
   return { ok: keys.join(",") === "1,2" && laterPlayed.length === 0 && earlyIntact === 6 && original === 3 &&
+      // frozen-ok: SYN is the synthetic snapshot this suite builds itself. These are its own
+      // inputs read back through the engine, not an observation of the live API.
       t.current_event === 2 && t.next_event === 3 && SYN.gw["3"] !== undefined,
     detail: "gameweeks kept [" + keys.join(",") + "], " + laterPlayed.length + " later fixtures still marked played, " +
       earlyIntact + " earlier fixtures intact; the original snapshot still carries GW3 (" + (SYN.gw["3"] !== undefined) + ")" };
@@ -2362,7 +2364,7 @@ if (!LIVE) {
       if (LCTX.els[d.code]) bad.push(d.code + ": a code is also a live element id — the control is unsound");
     });
     const ex = collisions[0];
-    // E-076: this asserted "59" — the figure on 11 September 2026. The game adds players, so
+    // E-084: this asserted "59" — the figure on 11 September 2026. The game adds players, so
     // the count is a live observation and never an invariant. What is invariant: every shifted
     // code resolves to the same footballer on both sides, and at least one of them would land
     // on a different footballer under an id join.
@@ -2403,7 +2405,7 @@ if (!LIVE) {
     const xgaPg = hull.g ? hull.xga / hull.g : 0;
     console.log("Hull: " + hull.g + " games · xGA " + r2(hull.xga) + " (" + r2(xgaPg) + " per game) · goals conceded " + hull.ga +
       " · tagAgainst " + String(hull.tagAgainst) + " · TS def " + r4(LCTX.TS[hull.teamId].def) + " (E-011: the goals model rated them the best defence; xG rates them average)");
-    // E-076: the second clause was "xGA per game above 1.5", which was September's number and
+    // E-084: the second clause was "xGA per game above 1.5", which was September's number and
     // fell to 1.48 by the end of GW5 on a snapshot that was entirely correct. The E-011 property
     // is the one asserted now: they conceded fewer goals than their xGA, and the GOALS model
     // therefore rates their defence better than the xG model does — which is the inversion that
@@ -2420,7 +2422,7 @@ if (!LIVE) {
   if (ars) {
     console.log("Arsenal: " + ars.g + " games · xGA " + r2(ars.xga) + " (" + r2(ars.xga / ars.g) + " per game) · TS def " + r4(LCTX.TS[ars.teamId].def) + " (lower is a better defence)");
     check("LIVE-Arsenal-is-the-best-defence-on-xG", function () {
-      // E-076: the frozen 0.73 was the 11 September figure and is 0.79 after five gameweeks.
+      // E-084: the frozen 0.73 was the 11 September figure and is 0.79 after five gameweeks.
       // The claim worth asserting is the ranking and the direction, not the decimal.
       const ranked = Object.keys(LCTX.TS).map(function (t) { return { t: Number(t), def: LCTX.TS[t].def }; }).sort(function (a, b) { return a.def - b.def; });
       const best = ranked[0], median = ranked[Math.floor(ranked.length / 2)];
@@ -2575,7 +2577,7 @@ if (!LIVE) {
     return { ok: bps.maeRaw / bps.mae > 3 && bps.maeScale < 0.5 && Math.abs(bps.mae - cxp.mae) < 1 && cxp.maeRaw / cxp.mae < 1.5,
       detail: "bps_rate MAE " + r2(bps.maeRaw) + " raw → " + r2(bps.mae) + " in points (scale " + r4(bps.maeScale) + "); component_xp " + r2(cxp.maeRaw) + " → " + r2(cxp.mae) + " (scale " + r4(cxp.maeScale) + ")" };
   });
-  // E-075 · E-076: this pinned "2 transitions" and read the old top-level `promotable`, which
+  // E-086 · E-084: this pinned "2 transitions" and read the old top-level `promotable`, which
   // meant "enough transitions exist for the gate to be decidable" and read as "something can be
   // promoted". The transition count is now derived from the snapshot's own finished gameweeks,
   // `decidable` carries the transition-count half, and `promotable` means at least one model's
@@ -2611,6 +2613,159 @@ if (!LIVE) {
       (written === ltour.leader ? " — they agree today, and the computed one is still what the engine reports" : " — they disagree, and the computed one is what the engine reports") +
       "; decidable " + ltour.decidable + " at " + ltour.transitions + " transitions, promotable " + ltour.promotable };
   });
+  // ================================================================ ground truth (v89)
+  //
+  // state/kwezi.json is the state of record. These checks prove it against the snapshot rather
+  // than against a typed list, so a refresh that moves the squad on moves them with it.
+
+  check("LIVE-STATE-the-saved-fifteen-is-the-entry's-own-latest-picks", function () {
+    const mine = (LSTATE.squad || []).map(function (s) { return Number(s.id); }).sort(function (a, b) { return a - b; });
+    const api = LIVE.picks[String(LIVE.current_event)].picks.map(function (p) { return Number(p.element); }).sort(function (a, b) { return a - b; });
+    const blk = E.detectSquadChange(mine, LIVE.picks[String(LIVE.current_event)]);
+    return { ok: mine.length === 15 && mine.join(",") === api.join(",") && blk.block === false &&
+        Number(LSTATE.confirmed_gw) === Number(LIVE.current_event) && Number(LSTATE.ft) === Number(LIVE.ft_available) &&
+        Number(LSTATE.version) >= 89,
+      detail: "saved fifteen " + mine.length + " ids, identical to picks[GW" + LIVE.current_event + "] = " + (mine.join(",") === api.join(",")) +
+        "; D3 block " + blk.block + "; confirmed_gw " + LSTATE.confirmed_gw + " against current_event " + LIVE.current_event +
+        "; ft " + LSTATE.ft + " against snapshot " + LIVE.ft_available + "; version " + LSTATE.version };
+  });
+
+  // The purchase prices: exact for the fourteen held since GW1, derived for the one bought in a
+  // gameweek the public API will not itemise. The bank delta is the constraint that pins it.
+  check("LIVE-STATE-purchase-prices-derive-from-the-snapshot-and-the-bank-delta-pins-the-one-transfer", function () {
+    const byId = {}; LIVE.elements.forEach(function (e) { byId[e.id] = e; });
+    const pur = {}; (LSTATE.squad || []).forEach(function (r) { pur[Number(r.id)] = Number(r.purchase); });
+    const hist = LIVE.history.current;
+    const txWeeks = hist.filter(function (h) { return Number(h.event_transfers) > 0; });
+    const bad = [];
+    // Every id that was in the GW1 fifteen and is still here must be priced at its season start.
+    const gw1 = new Set(LIVE.picks["1"].picks.map(function (p) { return Number(p.element); }));
+    let held = 0;
+    Object.keys(pur).forEach(function (k) {
+      const id = Number(k), el = byId[id];
+      if (!gw1.has(id)) return;
+      held++;
+      const want = Number(el.now_cost) - Number(el.cost_change_start);
+      if (pur[id] !== want) bad.push(el.web_name + " priced " + pur[id] + ", season start is " + want);
+    });
+    // The one transfer: bank_after - bank_before === sell(out) - buy(in), exactly, with no hit.
+    let pinned = "no single-transfer week to pin";
+    if (txWeeks.length === 1 && Number(txWeeks[0].event_transfers) === 1 && Number(txWeeks[0].event_transfers_cost) === 0) {
+      const ev = Number(txWeeks[0].event);
+      const before = hist.filter(function (h) { return Number(h.event) === ev - 1; })[0];
+      const outId = LIVE.picks[String(ev - 1)].picks.map(function (p) { return Number(p.element); }).filter(function (id) { return !pur[id]; })[0];
+      const inId = LIVE.picks[String(ev)].picks.map(function (p) { return Number(p.element); }).filter(function (id) { return !LIVE.picks[String(ev - 1)].picks.some(function (q) { return Number(q.element) === id; }); })[0];
+      if (before && outId && inId) {
+        const delta = Number(txWeeks[0].bank) - Number(before.bank);
+        const outPur = Number(byId[outId].now_cost) - Number(byId[outId].cost_change_start);
+        const sell = E.sellPrice(Number(byId[outId].now_cost), outPur);
+        if (sell - pur[inId] !== delta) bad.push("the bank delta does not pin the buy: sell(" + byId[outId].web_name + ") " + sell + " - buy " + pur[inId] + " = " + (sell - pur[inId]) + ", bank moved " + delta);
+        pinned = "GW" + ev + ": bank " + before.bank + "→" + txWeeks[0].bank + " (" + delta + "), sell " + byId[outId].web_name + " at " + sell + " → buy " + byId[inId].web_name + " at " + pur[inId];
+      }
+    }
+    // And the reconciliation against the recorded value is signed and bounded by price movement,
+    // never asserted to the tenth: history value is selling value + bank at THAT deadline, and the
+    // snapshot carries one price per player rather than a price history.
+    const purSum = Object.keys(pur).reduce(function (a, k) { return a + pur[k]; }, 0);
+    const last = hist[hist.length - 1];
+    const gap = purSum + Number(last.bank) - Number(last.value);
+    const move = Object.keys(pur).reduce(function (a, k) { return a + Math.abs(Number(byId[k].now_cost) - pur[k]); }, 0);
+    if (Math.abs(gap) > move) bad.push("the reconciliation gap " + gap + " exceeds the total price movement " + move + " — a price is wrong, not merely stale");
+    return { ok: !bad.length && held >= 1 && Object.keys(pur).length === 15,
+      detail: bad.slice(0, 3).join("; ") || held + " of 15 held since GW1 priced at now_cost - cost_change_start; " + pinned +
+        "; purchase sum " + purSum + " + bank " + last.bank + " = " + (purSum + Number(last.bank)) + " against the GW" + last.event +
+        " value of " + last.value + ", a gap of " + gap + " tenths inside a total price movement of " + move };
+  });
+
+  // The decision ledger (roadmap F6). Its counterfactuals are realised points out of the
+  // event/{gw}/live rows in the snapshot, so they are recomputed here rather than trusted.
+  check("LIVE-LEDGER-every-row-names-a-played-gameweek-and-carries-that-gameweek's-own-points", function () {
+    const rows = E.sanitiseState(LSTATE).ledger;
+    const bad = [];
+    const TYPES = ["chip", "transfer", "captain", "xi"];
+    rows.forEach(function (r, i) {
+      const h = LIVE.history.current.filter(function (x) { return Number(x.event) === Number(r.gw); })[0];
+      if (!h) { bad.push("row " + i + " names GW" + r.gw + ", which has not been played"); return; }
+      if (Number(r.outcome) !== Number(h.points)) bad.push("row " + i + " (GW" + r.gw + " " + r.type + ") outcome " + r.outcome + " against the history's " + h.points);
+      if (TYPES.indexOf(r.type) < 0) bad.push("row " + i + " type " + r.type + " is not one of " + TYPES.join("/"));
+      if (!String(r.pick).length || !String(r.alt).length) bad.push("row " + i + " does not say what was recommended and what was done");
+      if (r.regret !== null && !isFinite(r.regret)) bad.push("row " + i + " regret " + r.regret + " is not a number");
+    });
+    const scored = rows.filter(function (r) { return r.regret !== null; });
+    return { ok: rows.length >= 4 && !bad.length && scored.length >= 3,
+      detail: bad.slice(0, 3).join("; ") || rows.length + " rows over GW" + rows[0].gw + "–GW" + rows[rows.length - 1].gw +
+        ", " + scored.length + " with a measured regret: " + rows.map(function (r) { return "GW" + r.gw + " " + r.type + " " + (r.regret === null ? "—" : r.regret); }).join(" · ") };
+  });
+
+  check("LIVE-LEDGER-the-captain-and-xi-regrets-recompute-from-the-event-live-rows", function () {
+    const rows = E.sanitiseState(LSTATE).ledger;
+    const byId = {}; LIVE.elements.forEach(function (e) { byId[e.id] = e; });
+    const pts = function (gw, id) { const g = LIVE.gw[String(gw)]; const r = g && g.elements[String(id)]; return r ? Number(r[2]) : 0; };
+    // The best legal eleven of a fifteen, scored on what actually happened, with one captain doubled.
+    const best = function (ids, gw, capId) {
+      const by = { 1: [], 2: [], 3: [], 4: [] };
+      ids.forEach(function (id) { const e = byId[id]; if (e) by[e.element_type].push({ id: id, p: pts(gw, id) }); });
+      [1, 2, 3, 4].forEach(function (t) { by[t].sort(function (a, b) { return b.p - a.p; }); });
+      let top = null;
+      E.FORMATIONS.forEach(function (f) {
+        if (by[1].length < 1 || by[2].length < f[0] || by[3].length < f[1] || by[4].length < f[2]) return;
+        let sel = [by[1][0]].concat(by[2].slice(0, f[0]), by[3].slice(0, f[1]), by[4].slice(0, f[2]));
+        if (capId && !sel.some(function (x) { return x.id === capId; })) {
+          const ct = byId[capId].element_type;
+          const inPos = sel.filter(function (x) { return byId[x.id].element_type === ct; });
+          if (!inPos.length) return;
+          const worst = inPos[inPos.length - 1];
+          sel = sel.filter(function (x) { return x.id !== worst.id; }).concat([{ id: capId, p: pts(gw, capId) }]);
+        }
+        let tot = sel.reduce(function (a, x) { return a + x.p; }, 0);
+        if (capId && sel.some(function (x) { return x.id === capId; })) tot += pts(gw, capId);
+        if (top === null || tot > top) top = tot;
+      });
+      return top;
+    };
+    const bad = [];
+    let checked = 0;
+    rows.filter(function (r) { return r.type === "xi" && r.regret !== null; }).forEach(function (r) {
+      const picks = LIVE.picks[String(r.gw)];
+      if (!picks) { bad.push("GW" + r.gw + " has no picks row"); return; }
+      const ids = picks.picks.map(function (p) { return Number(p.element); });
+      const cap = (picks.picks.filter(function (p) { return p.is_captain; })[0] || {}).element;
+      const want = best(ids, r.gw, Number(cap)) - Number(r.outcome);
+      if (want !== Number(r.regret)) bad.push("GW" + r.gw + " xi regret " + r.regret + ", recomputed " + want);
+      checked++;
+    });
+    rows.filter(function (r) { return r.type === "captain" && r.regret !== null; }).forEach(function (r) {
+      // The armband doubles, so swapping it between two players already in the eleven is worth
+      // exactly the difference in their realised points.
+      const picks = LIVE.picks[String(r.gw)];
+      const cap = Number((picks.picks.filter(function (p) { return p.is_captain; })[0] || {}).element);
+      const named = LIVE.elements.filter(function (e) { return e.web_name === String(r.pick); })[0];
+      if (!named) { bad.push("GW" + r.gw + " captain row names " + r.pick + ", who is not in the snapshot"); return; }
+      const want = pts(r.gw, named.id) - pts(r.gw, cap);
+      if (want !== Number(r.regret)) bad.push("GW" + r.gw + " captain regret " + r.regret + ", recomputed " + want + " (" + r.pick + " " + pts(r.gw, named.id) + " against " + byId[cap].web_name + " " + pts(r.gw, cap) + ")");
+      checked++;
+    });
+    return { ok: checked >= 2 && !bad.length,
+      detail: bad.slice(0, 3).join("; ") || checked + " ledger rows recomputed from the snapshot's own event-live rows and every one matched" };
+  });
+
+  // E-088 · open · the Plan tab's fallback panel quotes a cost as a literal in the markup.
+  check("LIVE-the-fallback-panel-quotes-the-written-fifteen's-own-recorded-cost", function () {
+    let ui = "", wk = "";
+    try { ui = fs.readFileSync(path.join(ROOT, "src", "ui.jsx"), "utf8"); } catch (e) { ui = ""; }
+    try { wk = fs.readFileSync(path.join(ROOT, "data", "weekly.js"), "utf8"); } catch (e) { wk = ""; }
+    const quoted = /The written plan quotes \{money\((\d+)\)\}/.exec(ui);
+    const recorded = /wildcard15_cost_written:\s*(\d+)/.exec(wk);
+    const reads = /The written plan quotes \{money\((?!\d)/.test(ui);      // reads it from the block
+    let logged = false;
+    try { logged = /^### E-088\b/m.test(fs.readFileSync(path.join(ROOT, "ERRORS.md"), "utf8")); } catch (e) { logged = false; }
+    const agrees = !!quoted && !!recorded && Number(quoted[1]) === Number(recorded[1]);
+    return { ok: reads || agrees || logged,
+      detail: "src/ui.jsx quotes " + (quoted ? quoted[1] : "nothing") + " tenths, data/weekly.js records " +
+        (recorded ? recorded[1] : "nothing") + (reads ? " — the panel reads the block" : agrees ? " — they agree" :
+        " — they disagree, and E-088 " + (logged ? "records it" : "IS MISSING from ERRORS.md")) };
+  });
+
   check("LIVE-deadline-is-read-from-is_next-never-hard-coded", function () {
     const nextEv = LIVE.events.filter(function (e) { return e.is_next; })[0];
     return { ok: !!nextEv && LCTX.deadline === nextEv.deadline_time && LCTX.nextEvent === nextEv.id, detail: "events[is_next] GW" + (nextEv ? nextEv.id : "?") + " " + (nextEv ? nextEv.deadline_time : "?") + " · ctx " + LCTX.nextEvent + " " + LCTX.deadline };
@@ -2896,7 +3051,7 @@ if (!LIVE) {
     let checked = 0;
     shifted.forEach(function (d) {
       const rawRow = rawByElement[d.id];
-      // E-076: qa/fixtures/draft was captured on 11 September 2026. The game has added players
+      // E-084: qa/fixtures/draft was captured on 11 September 2026. The game has added players
       // since, and a player the recorded element-status never saw is not a join failure — it is
       // the fixture's date. Counted and reported, never silently skipped.
       if (!rawRow) { addedSinceCapture.push(d.web_name + " (draft id " + d.id + ")"); return; }
@@ -2949,7 +3104,7 @@ if (!LIVE) {
   });
   console.log("  gate: " + LWF.gate.note);
 
-  // E-076: this pinned "2 folds, 1 fittable, gate shut" — the 11 September arithmetic. Five
+  // E-084: this pinned "2 folds, 1 fittable, gate shut" — the 11 September arithmetic. Five
   // finished gameweeks give four folds, three of them fittable, three of them won and a
   // three-gameweek trailing run, so the gate is OPEN. What is asserted now is the arithmetic
   // itself, which holds at any gameweek, plus the fact that a fit needs a gameweek of history
@@ -2966,19 +3121,49 @@ if (!LIVE) {
       " won, trailing hold-out " + LWF.holdout + " → gate " + (LWF.gate.promotable ? "OPEN" : "shut") + "; driver " + LWF.driver +
       "; " + (LWF.gate.reasons.join("; ") || LWF.gate.note) };
   });
-  // The minutes logistic has now passed the shared promotion gate on Brier, and `minutesModel`
-  // still returns driving:false because that flag is a literal rather than a read of the gate.
-  // That is ERRORS.md E-077, open, and owned by whoever owns src/engine.js. This check pins the
-  // contradiction to its ledger entry: the moment the code is fixed, or the entry is deleted
-  // without fixing it, this goes red and somebody has to look.
-  check("LIVE-F4-an-open-gate-that-the-model-does-not-act-on-is-recorded-in-the-ledger", function () {
+  // E-087 is closed. The promotion decision is now three separate questions, and the code answers
+  // each rather than typing a verdict: `eligible` is the shared gate AND the tail condition;
+  // `routed` is whether production actually asks the model; `driving` is the conjunction. Reporting
+  // driving:true for a model nothing calls would be E-087 inverted, and no better than E-087.
+  check("LIVE-F4-driving-is-computed-from-eligibility-and-routing-not-typed", function () {
     const mm = E.minutesModel(LCTX.els[LCTX.squadIds[0]] || LCTX.elList[0], LCTX, {});
-    const consistent = mm.driving === LWF.gate.promotable;
+    const pr = E.minutesPromotion(LIVE, {});
+    const ok = pr.eligible === (LWF.gate.promotable && pr.tail.ok) &&
+      pr.driving === (pr.eligible && pr.routed) &&
+      mm.driving === pr.driving &&
+      mm.driver === (pr.driving ? "minutesLogistic" : "pStart") &&
+      pr.routed === E.MINUTES_PRODUCTION_ROUTED;
+    return { ok: ok, detail: "gate " + (LWF.gate.promotable ? "open" : "shut") + " · tail " + (pr.tail.ok ? "holds" : "fails") +
+      " → eligible " + pr.eligible + " · routed " + pr.routed + " → driving " + pr.driving + " · driver " + mm.driver };
+  });
+  // The tail condition is the part a mean-score gate cannot see: a model that gives a good chance
+  // of starting to a player the incumbent has not seen starting will put him in a squad. It binds
+  // on the RAW model probability, because a flag is today's news and it lifts.
+  check("LIVE-F4-the-tail-condition-binds-on-the-raw-probability-of-a-thin-row", function () {
+    const pr = E.minutesPromotion(LIVE, {});
+    const t = pr.tail;
+    const ok = t.thin > 0 && t.checked === t.thin && t.limit === E.MINUTES_TAIL_LIMIT &&
+      t.ok === (t.max <= t.limit) && t.max >= t.maxAdjusted &&
+      Math.abs(t.margin - (t.limit - t.max)) < 1e-9 &&
+      (!t.worst || (t.worst.p === t.max && t.worst.pAdjusted <= t.worst.p));
+    return { ok: ok, detail: t.thin + " players at the incumbent floor · worst raw " +
+      (t.worst ? t.worst.name + " " + r4(t.worst.p) : "none") + " against a limit of " + t.limit +
+      " (margin " + r4(t.margin) + ") · flag-adjusted maximum " + r4(t.maxAdjusted) +
+      " → the condition " + (t.ok ? "holds" : "fails") };
+  });
+  // An eligible model that is not routed is a decision, and a decision that is not written down is
+  // a thing somebody re-discovers. This keeps it tied to its ledger entry the way E-087 was.
+  check("LIVE-F4-an-eligible-model-that-production-does-not-use-is-recorded-in-the-ledger", function () {
+    const pr = E.minutesPromotion(LIVE, {});
+    const pending = pr.eligible && !pr.routed;
     let logged = false;
-    try { logged = /E-077/.test(fs.readFileSync(path.join(ROOT, "ERRORS.md"), "utf8")); } catch (e) { logged = false; }
-    return { ok: consistent || logged,
-      detail: "gate " + (LWF.gate.promotable ? "open" : "shut") + ", minutesModel.driving " + mm.driving + ", driver " + mm.driver +
-        (consistent ? " — they agree" : " — they disagree, and E-077 " + (logged ? "records it" : "IS MISSING from ERRORS.md")) };
+    // The heading, not the string: the entries' bodies name E-087 several times, so a substring
+    // search could never fail (E-066). Mutation-proven by removing the heading.
+    try { logged = /^### E-087\b/m.test(fs.readFileSync(path.join(ROOT, "ERRORS.md"), "utf8")); } catch (e) { logged = false; }
+    return { ok: !pending || logged,
+      detail: pending
+        ? "eligible but not routed, and E-087 " + (logged ? "records the decision with its numbers" : "IS MISSING from ERRORS.md")
+        : "nothing pending: eligible " + pr.eligible + ", routed " + pr.routed };
   });
 
   const LPXEL = LCTX.els[LCTX.squadIds[0]] || LCTX.elList[0];
@@ -2994,7 +3179,7 @@ if (!LIVE) {
   console.log("  worked example: " + (LPXEL ? LPXEL.web_name : "no player") +
     " xG90 " + r4(LPX.xg90) + " x att " + r4(LPX.att) + " x def " + r4(LPX.def) + " → lambda " + r4(LPX.lambda) + ", xP " + r2(LPX.xp));
 
-  // E-076: this pinned `gate.transitionsOk === false`, which was true at two transitions and is
+  // E-084: this pinned `gate.transitionsOk === false`, which was true at two transitions and is
   // false at four — the half that is short today is the trailing hold-out, not the count. The
   // gate is asserted as arithmetic over its own three conditions, so it holds at any gameweek,
   // and a shut gate must say which condition shut it.

@@ -33,7 +33,12 @@ const SHOTS = path.join(__dirname, "shots");
 const DIST = path.join(ROOT, "dist", "index.html");
 const LIVE = require(path.join(ROOT, "data", "live.json"));
 
-const NOW = "2026-09-11T08:00:00Z";                  // Friday before the GW4 deadline
+// E-084 again: this was frozen at "2026-09-11T08:00:00Z" — the Friday before the GW4
+// deadline — and the screenshots this suite writes were still counting down to a deadline
+// fifteen days in the past ("29d to deadline" on a GW6 snapshot). Derived from the
+// snapshot's own is_next event, like the clocks in qa/smoke.cjs.
+const NEXT_EV = LIVE.events.filter(function (e) { return e.is_next; })[0] || LIVE.events[LIVE.events.length - 1];
+const NOW = new Date(Date.parse(NEXT_EV.deadline_time) - 26 * 3600000).toISOString().replace(/\.\d{3}Z$/, "Z");   // the day before the next deadline
 const TABS = ["command", "plan", "squad", "rivals", "draft", "chips", "lab"];
 const FLOORS = { ".btn": 38, ".btn-sm": 32, ".tabi": 52, ".sec-h": 48, ".menu-i": 44, ".inp": 40, ".row": 38 };
 const GAKPO = 367;
