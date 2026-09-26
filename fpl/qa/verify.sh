@@ -689,7 +689,16 @@ if(/api\.anthropic\.com/.test(code)) bad.push("sw.js code names api.anthropic.co
 const h=crypto.createHash("sha256");
 h.update(fs.readFileSync(path.join(D,"index.html")));
 h.update(fs.readFileSync(path.join(D,"manifest.webmanifest")));
-["icon-192.png","icon-512.png","icon-maskable-512.png","icon.svg"].sort().forEach(function(k){ h.update(k); h.update(fs.readFileSync(path.join(D,k))); });
+/* E-095: this was a hard-coded four-icon list. build.cjs hashes EVERY icon it writes, so the
+   day the icon set grew from four files to eleven the two derivations disagreed and a correct
+   build read red. That is the E-084 class: a frozen list in a suite standing in for what the
+   build actually produces. The list is now read off dist/ itself, every icon file there sorted,
+   which is exactly what build.cjs walks. A file added to the set is hashed by both sides or by
+   neither. NOTE: no apostrophe may appear anywhere in this node -e block, because the whole
+   block is inside a single-quoted shell string and an apostrophe ends it. */
+const iconFiles=fs.readdirSync(D).filter(function(f){ return /^icon.*[.](png|svg)$/.test(f); }).sort();
+if(!iconFiles.length) bad.push("dist/ holds no icon file, so the cache name cannot be derived");
+iconFiles.forEach(function(k){ h.update(k); h.update(fs.readFileSync(path.join(D,k))); });
 const want="fpl-mc-"+ver+"-"+h.digest("hex").slice(0,12);
 if(cm[1]!==want) bad.push("cache name "+cm[1]+" is not the one this build derives ("+want+") — dist/ is a mix of two builds, or the name stopped being derived");
 if(bad.length){ console.log(bad.join("; ")); process.exit(1); }

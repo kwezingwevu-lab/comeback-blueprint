@@ -6,7 +6,9 @@
  *                                window.storage shim over localStorage.
  *   dist/manifest.webmanifest    installable-app metadata; its colours ARE the --bg token
  *   dist/sw.js                   service worker, cache name carrying this build's hash
- *   dist/icon.svg + three PNGs   the icon set, drawn here from the colour tokens (no deps)
+ *   dist/icon.svg + PNG icon set the icons, drawn here from the colour tokens (no deps), at
+ *                                every size a 2026 install asks for, each one parsed back before
+ *                                it is written
  *
  * Marker text is exact and each marker appears once, in order; verify.sh asserts it.
  */
@@ -154,8 +156,18 @@ function bundle() {
  * build.cjs writes the PNGs itself.
  */
 
+/* One snapshot of src/ui.jsx per build. The tokens are read at build time on purpose — they
+   are the UI's own, and a second hand-written copy of a colour is the drift this generator
+   exists to prevent — but they are read ONCE, so eleven icons cannot be rastered from two
+   different revisions of the file if it changes underneath a running build. */
+var _uiSrc = null;
+function uiSource() {
+  if (_uiSrc === null) _uiSrc = read("src/ui.jsx");
+  return _uiSrc;
+}
+
 function tokenColour(name) {
-  const src = read("src/ui.jsx");
+  const src = uiSource();
   const m = src.match(new RegExp("--" + name + "\\s*:\\s*(#[0-9a-fA-F]{3,8})\\s*;"));
   if (!m) {
     throw new Error("build: the --" + name + " colour token is not defined in src/ui.jsx — the manifest, " +
@@ -217,6 +229,66 @@ function png(size, rgba) {
   ]);
 }
 
+/* ---- PNG reader: every file this build emits is parsed back before it is written ----
+
+   A PNG that node's zlib wrote is not automatically a PNG a browser accepts, and the failure
+   mode is the worst kind: the manifest names the file, every existence check passes, and the
+   installed app shows a blank tile. So the bytes are decoded again here — signature, every
+   chunk's CRC recomputed, IHDR read back field by field, the IDAT stream inflated and the
+   scanline filter bytes checked — and the build throws rather than write a file it cannot
+   read. `size` is what the caller asked for, so a size that disagrees with the IHDR (which is
+   what the manifest's `sizes` is written from) cannot ship either. */
+
+function verifyPng(buf, size, name) {
+  const fail = function (why) {
+    throw new Error("build: " + name + " is not a PNG a browser will accept \u2014 " + why);
+  };
+  if (!buf || typeof buf.length !== "number") fail("the build produced no bytes for it at all");
+  const SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (buf.length < 8) fail("the file is " + buf.length + " bytes, shorter than the signature");
+  for (let i = 0; i < 8; i++) {
+    if (buf[i] !== SIG[i]) fail("signature byte " + i + " is 0x" + buf[i].toString(16) + ", expected 0x" + SIG[i].toString(16));
+  }
+  let p = 8;
+  const order = [];
+  const idat = [];
+  let ihdr = null;
+  while (p < buf.length) {
+    if (p + 12 > buf.length) fail("a chunk header at byte " + p + " runs past the end of the file");
+    const len = buf.readUInt32BE(p);
+    const type = buf.toString("ascii", p + 4, p + 8);
+    if (p + 12 + len > buf.length) fail("chunk " + type + " declares " + len + " bytes of data and only " + (buf.length - p - 12) + " remain");
+    const body = buf.slice(p + 4, p + 8 + len);                 // type + data, exactly what the CRC covers
+    const want = buf.readUInt32BE(p + 8 + len);
+    const got = crc32(body);
+    if (got !== want) fail("chunk " + type + " at byte " + p + " carries CRC 0x" + want.toString(16) + " and its bytes hash to 0x" + got.toString(16));
+    order.push(type);
+    if (type === "IHDR") ihdr = buf.slice(p + 8, p + 8 + len);
+    if (type === "IDAT") idat.push(buf.slice(p + 8, p + 8 + len));
+    p += 12 + len;
+  }
+  if (order[0] !== "IHDR") fail("the first chunk is " + order[0] + ", not IHDR");
+  if (order[order.length - 1] !== "IEND") fail("the last chunk is " + order[order.length - 1] + ", not IEND");
+  if (!ihdr || ihdr.length !== 13) fail("IHDR carries " + (ihdr ? ihdr.length : 0) + " bytes, not 13");
+  const w = ihdr.readUInt32BE(0), h = ihdr.readUInt32BE(4);
+  if (w !== size || h !== size) fail("IHDR says " + w + "x" + h + " and the build asked for " + size + "x" + size);
+  if (ihdr[8] !== 8) fail("bit depth " + ihdr[8] + ", not 8");
+  if (ihdr[9] !== 6) fail("colour type " + ihdr[9] + ", not 6 (truecolour with alpha)");
+  if (ihdr[10] !== 0) fail("compression method " + ihdr[10] + ", not 0 (deflate)");
+  if (ihdr[11] !== 0) fail("filter method " + ihdr[11] + ", not 0");
+  if (ihdr[12] !== 0) fail("interlace method " + ihdr[12] + " \u2014 this writer emits no Adam7 passes");
+  if (!idat.length) fail("there is no IDAT chunk");
+  let raw = null;
+  try { raw = zlib.inflateSync(Buffer.concat(idat)); }
+  catch (e) { fail("the IDAT stream does not inflate: " + (e && e.message ? e.message : e)); }
+  const stride = w * 4 + 1;
+  if (raw.length !== stride * h) fail("the inflated image is " + raw.length + " bytes and " + w + "x" + h + " RGBA with one filter byte a row is " + (stride * h));
+  for (let y = 0; y < h; y++) {
+    if (raw[y * stride] !== 0) fail("scanline " + y + " declares filter type " + raw[y * stride] + ", not 0 (none)");
+  }
+  return { name: name, bytes: buf.length, w: w, h: h, depth: ihdr[8], colour: ihdr[9], chunks: order.join("+"), raw: raw.length };
+}
+
 /* ---- the mark: one geometry in a unit square, used for the PNGs and the SVG alike, so the
         raster icons and the vector icon cannot disagree. Three ascending bars on a baseline
         and the dot that marks the call. `scale` shrinks the content about the centre for the
@@ -265,24 +337,108 @@ function topShape(shapes, x, y) {
   return -1;
 }
 
+/* A maskable icon is cropped by the platform to a circle, a squircle or a rounded square, and
+   only the middle 80% of the canvas — a circle of radius 0.40 from the centre — is guaranteed
+   to survive. `at()` scales the content about that exact centre, so the farthest point of the
+   content is linear in the scale: the largest scale that fits is arithmetic, not a guess, and
+   the scale is derived from it below rather than typed in. MASK_FILL is how much of the safe
+   radius the mark is allowed to occupy; the remainder is margin the spec does not require and
+   a launcher's own padding is glad of. 0.72 shipped before this, which put the mark at 79.6%
+   of the safe radius and left 41.8 px of the 204.8 unused at 512 — not clipped, over-shrunk. */
+const MASK_SAFE_R = 0.40;
+const MASK_FILL = 0.95;
+
+/* The farthest point of a shape from (cx, cy). A rounded rectangle is the convex hull of its
+   four corner discs, and the farthest point of a hull of discs from an outside point is the
+   farthest of those discs, so this is exact rather than sampled. */
+function shapeMaxRadius(sh, cx, cy) {
+  if (sh.kind === "disc") return Math.sqrt((sh.cx - cx) * (sh.cx - cx) + (sh.cy - cy) * (sh.cy - cy)) + sh.r;
+  const r = Math.min(sh.r, (sh.x1 - sh.x0) / 2, (sh.y1 - sh.y0) / 2);
+  const corners = [[sh.x0 + r, sh.y0 + r], [sh.x1 - r, sh.y0 + r], [sh.x0 + r, sh.y1 - r], [sh.x1 - r, sh.y1 - r]];
+  let best = 0;
+  for (let i = 0; i < corners.length; i++) {
+    const dx = corners[i][0] - cx, dy = corners[i][1] - cy;
+    const d = Math.sqrt(dx * dx + dy * dy) + r;
+    if (d > best) best = d;
+  }
+  return best;
+}
+
+/* shapes[0] is the tile, which is meant to run to the edge and is not content. */
+function contentRadius(scale) {
+  const shapes = iconShapes(scale, 0).slice(1);
+  let worst = 0;
+  for (let i = 0; i < shapes.length; i++) {
+    const r = shapeMaxRadius(shapes[i], 0.5, 0.5);
+    if (r > worst) worst = r;
+  }
+  return worst;
+}
+
+function maskableScale() {
+  const worst1 = contentRadius(1);
+  const scale = (MASK_SAFE_R * MASK_FILL) / worst1;
+  const worst = contentRadius(scale);
+  if (!(worst <= MASK_SAFE_R)) {
+    throw new Error("build: the maskable mark reaches " + worst.toFixed(5) + "u from the centre at scale " +
+      scale.toFixed(4) + ", past the " + MASK_SAFE_R + "u safe radius (" + (worst / MASK_SAFE_R * 100).toFixed(1) +
+      "% of it) \u2014 a launcher would crop the mark. Lower MASK_FILL.");
+  }
+  return { scale: scale, worst: worst, worst1: worst1, pct: worst / MASK_SAFE_R * 100, limit: MASK_SAFE_R / worst1 };
+}
+
+/* Is the pixel square [x0,x1]x[y0,y1] clear of this shape's outline? Returns 1 for wholly
+   inside, 0 for wholly outside and -1 for "the outline crosses it, sample this pixel".
+
+   Both answers are proved, not sampled. Every shape here is convex (a disc, or a rounded
+   rectangle, which is the hull of four discs), so four corners inside a convex set means the
+   whole square is inside it. "Outside" needs the bounding box as well, and that is the half
+   that matters: a feature thinner than a pixel — the baseline is 0.020u, which is 0.64 px at
+   32 — can pass clean between four corners that all read "outside", and a four-corner test
+   alone would then drop it and fill the pixel flat. */
+function pixelVsShape(sh, x0, y0, x1, y1) {
+  let bx0, bx1, by0, by1;
+  if (sh.kind === "disc") { bx0 = sh.cx - sh.r; bx1 = sh.cx + sh.r; by0 = sh.cy - sh.r; by1 = sh.cy + sh.r; }
+  else { bx0 = sh.x0; bx1 = sh.x1; by0 = sh.y0; by1 = sh.y1; }
+  if (bx0 > x1 || bx1 < x0 || by0 > y1 || by1 < y0) return 0;   // bounding boxes do not touch
+  const n = (inShape(sh, x0, y0) ? 1 : 0) + (inShape(sh, x1, y0) ? 1 : 0) +
+            (inShape(sh, x0, y1) ? 1 : 0) + (inShape(sh, x1, y1) ? 1 : 0);
+  if (n === 4) return 1;
+  return -1;
+}
+
+/* The topmost shape covering the whole pixel square, -1 if none covers any of it, and -2 if an
+   outline crosses it and the pixel has to be sampled. */
+function pixelShape(shapes, x0, y0, x1, y1) {
+  let top = -1;
+  for (let i = 0; i < shapes.length; i++) {
+    const v = pixelVsShape(shapes[i], x0, y0, x1, y1);
+    if (v === 1) { top = i; continue; }
+    if (v === -1) return -2;
+  }
+  return top;
+}
+
 function iconRgba(size, scale) {
   const shapes = iconShapes(scale, 0);
   const cols = {};
   ["bg2", "line", "grn"].forEach(function (k) { cols[k] = rgbOf(tokenColour(k)); });
   const buf = Buffer.alloc(size * size * 4);               // transparent outside the tile
-  const S = 4;                                             // 4x4 supersample on the edges only
+  /* 16x16 = 256 samples, so a pixel's coverage lands on one of 256 levels: the full precision
+     an 8-bit channel can carry, and the point at which more samples stop changing the file.
+     Measured against a 32x32 reference the 4x4 grid this replaces was out by up to 23 of 255
+     levels (rms 3.08 at 32 px) and dropped colour on 122 pixels of a 32 px icon; 16x16 is
+     within 6 levels with no pixel out by more than 8. It costs nothing on flat interiors
+     because only the pixels an outline crosses are sampled at all — supersampling every pixel
+     of the 1024 would take 12.7 s against 0.28 s. */
+  const S = 16;
   const px = 1 / size;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const u = (x + 0.5) * px, v = (y + 0.5) * px;
-      const mid = topShape(shapes, u, v);
-      // A pixel whose four corners agree with its centre is interior to one shape: one sample
-      // is exact and the 4x4 supersample would only cost time. Only the edges are sampled.
-      const flat =
-        topShape(shapes, u - px / 2, v - px / 2) === mid && topShape(shapes, u + px / 2, v - px / 2) === mid &&
-        topShape(shapes, u - px / 2, v + px / 2) === mid && topShape(shapes, u + px / 2, v + px / 2) === mid;
       const o = (y * size + x) * 4;
-      if (flat) {
+      const mid = pixelShape(shapes, u - px / 2, v - px / 2, u + px / 2, v + px / 2);
+      if (mid !== -2) {
         if (mid < 0) continue;
         const c = cols[shapes[mid].fill];
         buf[o] = c[0]; buf[o + 1] = c[1]; buf[o + 2] = c[2]; buf[o + 3] = 255;
@@ -325,13 +481,32 @@ function iconSvg() {
 
 /* ---- manifest, service worker, registration ---- */
 
+/* Every size a 2026 install asks for, and no size nothing asks for.
+     32, 48   — the browser tab. A raster fallback matters because the mark's own baseline is
+                0.64 px at 32, and an engine that does not take an SVG rel=icon otherwise has
+                nothing at all to draw.
+     120      — iPhone home screen at @2x.
+     152, 167 — iPad at @2x and iPad Pro at @2x.
+     180      — iPhone home screen at @3x, which is what apple-touch-icon is handed. Resampling
+                the 192 to 180 is not an integer ratio and measured 56 of 255 levels out at
+                worst against a 180 drawn directly (E-076's neighbour: the apple-touch icon was
+                also the one file no manifest-derived check covered).
+     192, 512 — the two sizes an installable manifest is required to carry.
+     1024     — store listings, and a clean source for any downsample a platform does itself.
+   Maskable is drawn at 192 and 512: Android is the only consumer, and those are the two sizes
+   it asks for. All of them are named in the manifest, which is what puts them inside I17, I21
+   and I22 — the E-076 checks — instead of beside them. */
+const ICON_ANY = [32, 48, 120, 152, 167, 180, 192, 512, 1024];
+const ICON_MASKABLE = [192, 512];
+const APPLE_TOUCH = [180, 167, 152, 120];                  // largest first; 180 is the default pick
+const FAVICON_PNG = [48, 32];
+
 const PWA = {
   manifest: "manifest.webmanifest",
   sw: "sw.js",
   svg: "icon.svg",
-  png192: "icon-192.png",
-  png512: "icon-512.png",
-  maskable: "icon-maskable-512.png"
+  png: function (n) { return "icon-" + n + ".png"; },
+  maskablePng: function (n) { return "icon-maskable-" + n + ".png"; }
 };
 
 function manifestObject() {
@@ -347,19 +522,43 @@ function manifestObject() {
     display: "standalone",
     display_override: ["standalone", "minimal-ui", "browser"],
     orientation: "portrait",
+    /* `id` is the installed app's identity. Without it the identity IS start_url, so the day
+       start_url changes the install becomes a second, unrelated app on the device and the
+       first one is orphaned. It is resolved against the origin, not the manifest's path, so a
+       path-independent string keeps the identity stable if dist/ is ever served from a
+       subdirectory. */
+    id: "fpl-mission-control",
+    categories: ["sports", "utilities"],
     background_color: bg,
     theme_color: bg,
-    icons: [
-      { src: PWA.svg, sizes: "any", type: "image/svg+xml", purpose: "any" },
-      { src: PWA.png192, sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: PWA.png512, sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: PWA.maskable, sizes: "512x512", type: "image/png", purpose: "maskable" }
-    ]
+    /* One list, built from ICON_ANY and ICON_MASKABLE, so the manifest declares exactly the
+       files main() writes: a manifest naming a file the repository does not hold is E-076. */
+    icons: [{ src: PWA.svg, sizes: "any", type: "image/svg+xml", purpose: "any" }]
+      .concat(ICON_ANY.map(function (n) {
+        return { src: PWA.png(n), sizes: n + "x" + n, type: "image/png", purpose: "any" };
+      }))
+      .concat(ICON_MASKABLE.map(function (n) {
+        return { src: PWA.maskablePng(n), sizes: n + "x" + n, type: "image/png", purpose: "maskable" };
+      }))
   };
 }
 
-function shellList() {
-  return ["./", "./index.html", "./" + PWA.manifest, "./" + PWA.svg, "./" + PWA.png192, "./" + PWA.png512, "./" + PWA.maskable];
+/* The worker precaches exactly what the manifest names, derived from the manifest itself so a
+   size added to ICON_ANY cannot be installable and offline-missing at the same time.
+
+   "./" is deliberately absent. On every static host it and "./index.html" are the same 2.37 MiB
+   document, so precaching both stored the shell twice — 4.75 MiB of cache quota and two full
+   fetches per install for one file. Nothing is lost: navigateFirst answers every navigation
+   from caches.match("./index.html") whatever URL was asked for, which is the line that makes
+   the app work offline, and it does not consult "./" at all. */
+function shellList(mf) {
+  const out = [];
+  const seen = {};
+  const add = function (u) { if (!seen[u]) { seen[u] = 1; out.push(u); } };
+  add("./index.html");
+  add("./" + PWA.manifest);
+  mf.icons.forEach(function (i) { add("./" + String(i.src).replace(/^\.\//, "")); });
+  return out;
 }
 
 function serviceWorker(cacheName, shell) {
@@ -485,8 +684,19 @@ function page(js) {
        a format that understands var(--bg), so the only safe copy is a derived one. verify.sh
        asserts all three are equal to the token. */
     "<link rel=\"manifest\" href=\"" + PWA.manifest + "\">",
+    /* Tab icons: the raster pair first, so an engine that does not take an SVG rel=icon has a
+       sharp file to draw rather than nothing, then the vector one for engines that prefer it.
+       Home-screen icons: iOS reads these links and not the manifest, and it is handed the size
+       it asks for instead of resampling one — 192 down to 180 is not an integer ratio. Every
+       href below is also a manifest icon, which is what checkPageIcons() asserts and what puts
+       these files inside the manifest-derived E-076 checks. */
+    FAVICON_PNG.map(function (n) {
+      return "<link rel=\"icon\" type=\"image/png\" sizes=\"" + n + "x" + n + "\" href=\"" + PWA.png(n) + "\">";
+    }).join("\n"),
     "<link rel=\"icon\" type=\"image/svg+xml\" href=\"" + PWA.svg + "\">",
-    "<link rel=\"apple-touch-icon\" href=\"" + PWA.png192 + "\">",
+    APPLE_TOUCH.map(function (n) {
+      return "<link rel=\"apple-touch-icon\" sizes=\"" + n + "x" + n + "\" href=\"" + PWA.png(n) + "\">";
+    }).join("\n"),
     "<meta name=\"theme-color\" content=\"" + tokenColour("bg") + "\">",
     "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">",
     "<meta name=\"apple-mobile-web-app-title\" content=\"FPL MC\">",
@@ -510,18 +720,58 @@ function page(js) {
   ].join("\n");
 }
 
+/* Every icon the page links to must be one the manifest names. The apple-touch-icon was the
+   one asset dist/index.html referenced that no manifest-derived check could see, which is how
+   E-076 got its PNGs quietly dropped by an ignore rule: I17, I21 and I22 all build their file
+   lists from manifest.icons. Pointing the page's links at manifest icons puts them inside
+   those checks; this assert is what stops a later link pointing somewhere else again. */
+function checkPageIcons(html, mf) {
+  const named = {};
+  mf.icons.forEach(function (i) { named[String(i.src).replace(/^\.\//, "")] = true; });
+  const hrefs = [];
+  const re = /<link rel="(?:icon|apple-touch-icon)"[^>]*href="([^"]+)"/g;
+  let m;
+  while ((m = re.exec(html)) !== null) hrefs.push(m[1].replace(/^\.\//, ""));
+  if (!hrefs.length) throw new Error("build: dist/index.html links no icon at all");
+  const stray = hrefs.filter(function (h) { return !named[h]; });
+  if (stray.length) {
+    throw new Error("build: the page links " + stray.join(", ") + ", which the manifest does not name \u2014 " +
+      "a file outside manifest.icons is a file verify.sh I17/I21/I22 cannot see, and E-076 is what that costs");
+  }
+  return hrefs;
+}
+
 function main() {
   const jsx = assemble();
   const js = bundle();
   fs.mkdirSync(P("dist"), { recursive: true });
 
+  const mask = maskableScale();
   const html = page(js);
-  const mfText = JSON.stringify(manifestObject(), null, 2) + "\n";
+  const mf = manifestObject();
+  const mfText = JSON.stringify(mf, null, 2) + "\n";
+  const linked = checkPageIcons(html, mf);
+
   const icons = {};
+  const parsed = [];
   icons[PWA.svg] = Buffer.from(iconSvg(), "utf8");
-  icons[PWA.png192] = png(192, iconRgba(192, 1));
-  icons[PWA.png512] = png(512, iconRgba(512, 1));
-  icons[PWA.maskable] = png(512, iconRgba(512, 0.72));
+  ICON_ANY.forEach(function (n) { icons[PWA.png(n)] = png(n, iconRgba(n, 1)); });
+  ICON_MASKABLE.forEach(function (n) { icons[PWA.maskablePng(n)] = png(n, iconRgba(n, mask.scale)); });
+
+  /* The manifest and the files on disk are the same list by construction; this is the assert
+     that says so out loud, because "by construction" is how E-076 read too. */
+  const mfIcons = mf.icons.map(function (i) { return String(i.src).replace(/^\.\//, ""); });
+  const unwritten = mfIcons.filter(function (k) { return !icons[k]; });
+  const unnamed = Object.keys(icons).filter(function (k) { return mfIcons.indexOf(k) < 0; });
+  if (unwritten.length || unnamed.length) {
+    throw new Error("build: the manifest and the icon set disagree \u2014 named and not written: " +
+      (unwritten.join(", ") || "none") + "; written and not named: " + (unnamed.join(", ") || "none"));
+  }
+
+  /* Decoded again before anything is written: see verifyPng. The manifest's `sizes` is written
+     from the same number this checks the IHDR against, so the two cannot disagree either. */
+  ICON_ANY.forEach(function (n) { parsed.push(verifyPng(icons[PWA.png(n)], n, PWA.png(n))); });
+  ICON_MASKABLE.forEach(function (n) { parsed.push(verifyPng(icons[PWA.maskablePng(n)], n, PWA.maskablePng(n))); });
 
   /* The cache name is derived from everything the worker precaches except the worker itself,
      so a build that changes one byte of the page or one icon gets a new cache and the old one
@@ -532,7 +782,7 @@ function main() {
   stamp.update(mfText);
   Object.keys(icons).sort().forEach(function (k) { stamp.update(k); stamp.update(icons[k]); });
   const cacheName = "fpl-mc-" + APP_VERSION + "-" + stamp.digest("hex").slice(0, 12);
-  const swText = serviceWorker(cacheName, shellList());
+  const swText = serviceWorker(cacheName, shellList(mf));
 
   fs.writeFileSync(P("dist/index.html"), html);
   fs.writeFileSync(P("dist/" + PWA.manifest), mfText);
@@ -545,8 +795,17 @@ function main() {
   console.log("dist/index.html              " + kb(html));
   console.log("dist/" + PWA.manifest + "    " + kb(mfText) + "  theme " + tokenColour("bg") + " (= --bg)");
   console.log("dist/" + PWA.sw + "                    " + kb(swText) + "  cache " + cacheName);
-  console.log("dist/ icons                  " + Object.keys(icons).map(function (k) { return k + " " + kbb(icons[k]); }).join(" \u00b7 "));
-  console.log("version " + APP_VERSION + "  markers 6/6  order ok");
+  console.log("dist/icon.svg                " + kbb(icons[PWA.svg]) + "  vector, viewBox 512");
+  parsed.forEach(function (r) {
+    console.log("dist/" + r.name + (r.name.length < 24 ? new Array(24 - r.name.length + 1).join(" ") : "") +
+      " " + String(r.bytes).padStart(6) + " B  IHDR " + r.w + "x" + r.h +
+      "  depth " + r.depth + "  colour " + r.colour + " (RGBA)  " + r.chunks + "  CRCs ok");
+  });
+  console.log("maskable safe zone           content reaches " + mask.worst.toFixed(5) + "u = " +
+    mask.pct.toFixed(1) + "% of the " + MASK_SAFE_R + "u safe radius at scale " + mask.scale.toFixed(4) +
+    " (clips above " + mask.limit.toFixed(4) + ")");
+  console.log("page icon links              " + linked.length + " (" + linked.join(", ") + "), all named by the manifest");
+  console.log("version " + APP_VERSION + "  markers 6/6  order ok  " + parsed.length + " PNGs parsed back");
 }
 
 main();

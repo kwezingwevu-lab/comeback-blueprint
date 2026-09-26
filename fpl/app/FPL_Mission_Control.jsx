@@ -5638,7 +5638,7 @@ const PRIMARY = { command: "cmd-stand", plan: "plan-tx", squad: "sq-fifteen", ri
 const STYLE = `
 .mc-root{
   --bg:#0b0e13; --bg2:#131822; --bg3:#1b2130; --line:#28303e; --text:#e9eef6; --dim:#97a3b6;
-  --mute:#6a7588; --grn:#42dda0; --grn2:#1d7a59; --pnk:#ff5f8d; --pnk2:#7c2542; --amb:#ffb84d;
+  --mute:#7c899f; --grn:#42dda0; --grn2:#1d7a59; --pnk:#ff5f8d; --pnk2:#7c2542; --amb:#ffb84d;
   --cyn:#4fd1e0; --blu:#5d8cf0; --pur:#a98bfb; --wht:#ffffff; --shadow:#00000099; --focus:#7aa2ff;
   --ok:#42dda0; --warn:#ffb84d; --err:#ff5f8d;
   background:var(--bg); color:var(--text); min-height:100vh; padding:0 0 44px;
@@ -5661,8 +5661,10 @@ const STYLE = `
 .refbar i{display:block;height:100%;width:40%;background:var(--cyn);animation:sl 1.1s linear infinite}
 @keyframes sl{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
 
-.tabs{display:flex;gap:4px;padding:6px 8px;background:var(--bg2);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:4}
-.tabi{flex:1 1 0;min-width:0;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+.tabs{display:flex;gap:4px;padding:6px 8px;background:var(--bg2);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:4;
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{width:0;height:0}
+.tabi{flex:1 1 0;min-width:44px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
   background:var(--bg3);border:1px solid var(--line);border-radius:10px;color:var(--dim);font-size:11px;cursor:pointer;padding:4px 2px}
 .tabi svg{width:19px;height:19px}
 .tabi[aria-current="true"]{color:var(--text);border-color:var(--grn2);background:var(--bg)}
@@ -5675,7 +5677,7 @@ const STYLE = `
 .btn-ic{width:38px;min-height:38px;padding:0}
 .btn-ic svg{width:18px;height:18px}
 .btn:disabled,.btn-sm:disabled{opacity:.5}
-.inp{min-height:40px;width:100%;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px}
+.inp{min-height:40px;width:100%;padding:8px 10px;border-radius:9px;border:1px solid var(--mute);background:var(--bg);color:var(--text);font-size:13px}
 textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 
 .card{background:var(--bg2);border:1px solid var(--line);border-radius:14px;margin:12px 0;overflow:hidden}
@@ -5712,16 +5714,20 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 .note-a{border-left-color:var(--pnk)}
 .err{font-size:12px;line-height:1.45;color:var(--text);padding:9px 10px;background:var(--pnk2);border:1px solid var(--pnk);border-radius:9px;word-break:break-word}
 .boundary{margin:12px;padding:14px;border:1px solid var(--pnk);background:var(--pnk2);border-radius:12px;font-size:13px}
+/* C2: --dim was never sized against --pnk2 (3.74 at 11px). On these three surfaces the
+   quiet grey becomes --text (8.19). The token is untouched; its other 12 usages keep it. */
+.block .dim,.err .dim,.boundary .dim{color:var(--text)}
 
 .row{min-height:38px;display:grid;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:12px}
 .row:last-child{border-bottom:0}
 .row-h{min-height:38px;color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.row-h>*{min-width:0;overflow-wrap:anywhere}
 .row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
 .row .rt{text-align:right;font-variant-numeric:tabular-nums}
 .kv{display:flex;align-items:baseline;justify-content:space-between;gap:10px;min-height:38px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}
 .kv:last-child{border-bottom:0}
-.kv .k{color:var(--dim);font-size:12px}
-.kv .v{text-align:right;font-variant-numeric:tabular-nums}
+.kv .k{color:var(--dim);font-size:12px;min-width:0;overflow-wrap:anywhere}
+.kv .v{text-align:right;font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere}
 .tbl{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
 .dim{color:var(--dim);font-size:11px;line-height:1.5}
@@ -5732,11 +5738,12 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 .cynt{color:var(--cyn)}
 .put{color:var(--pur)}
 .blut{color:var(--blu)}
-.tag{display:inline-block;padding:1px 6px;border-radius:6px;font-size:11px;border:1px solid var(--line);background:var(--bg);color:var(--dim)}
+.tag{display:inline-block;max-width:100%;padding:1px 6px;border-radius:6px;font-size:11px;border:1px solid var(--line);background:var(--bg);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row>.tag{text-align:center}
 .tag-e{border-color:var(--grn2);color:var(--grn)}
 .tag-s{border-color:var(--line);color:var(--blu)}
 .tag-d{border-color:var(--pnk2);color:var(--pnk)}
-.meter{height:6px;border-radius:4px;background:var(--bg);overflow:hidden;border:1px solid var(--line)}
+.meter{height:6px;border-radius:4px;background:var(--bg);overflow:hidden;border:1px solid var(--mute)}
 .meter i{display:block;height:100%;background:var(--cyn)}
 .chips-r{display:flex;flex-wrap:wrap;gap:6px}
 
@@ -5752,7 +5759,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 .mc-root button,.mc-root .tabi,.mc-root .sec-h,.mc-root .menu-i,.mc-root .reveal{transition:transform .08s ease,background .12s ease,color .12s ease}
 .mc-root :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 @media (prefers-reduced-motion: reduce){
-  .mc-root *,.mc-root *::before,.mc-root *::after{transition:none !important;animation:none !important;scroll-behavior:auto !important}
+  .mc-root,.mc-root *,.mc-root *::before,.mc-root *::after{transition:none !important;animation:none !important;scroll-behavior:auto !important}
 }
 .mini{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--dim);line-height:1.5;grid-column:1 / -1}
 .mini b{color:var(--text);font-weight:600}
@@ -5760,7 +5767,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 .reveal-w{margin-top:2px}
 .sec-b p{margin:0 0 8px}
 .sec-b p:last-child{margin-bottom:0}
-@media (max-width:380px){ .tabi{font-size:11px} .wrap{padding:0 10px} }
+@media (max-width:380px){ .tabi{min-width:37px;font-size:10px;padding:4px 0} .wrap{padding:0 10px} }
 `;
 
 /* ------------------------------------------------------------------ storage adapter
@@ -6757,7 +6764,7 @@ function TabRivals(props) {
           const r = rivalOwnMax(id, ctx), cls = classify(ctx.els[id], ctx);
           const tagc = cls === "EDGE" ? "tag-e" : cls === "DEAD" ? "tag-d" : cls === "SHARED" ? "tag-s" : "";
           return (
-            <Row key={id} cols="minmax(0,1fr) 48px 52px">
+            <Row key={id} cols="minmax(0,1fr) 48px 72px">
               <span className="nm">{nameOf(ctx, id)}</span>
               <span className="rt">{pc(r.max)}</span>
               <span className={"rt tag " + tagc}>{cls}</span>
@@ -7169,7 +7176,7 @@ function TabLab(props) {
     const d = Math.max.apply(null, vals) - Math.min.apply(null, vals);
     return d > mx ? d : mx;
   }, 0) : 0;
-  const transCols = "minmax(0,1fr) repeat(" + Math.max(1, trans.length) + ", 56px)";
+  const transCols = "minmax(76px,1fr) repeat(" + Math.max(1, trans.length) + ", 52px)";
   const leadRow = tour ? scored.filter(function (m) { return m.key === tour.leader; })[0] || scored[0] || null : null;
   const gateNeed = leadRow && leadRow.gate ? leadRow.gate.need : 3;
   const gateHold = leadRow && leadRow.gate ? leadRow.gate.needHoldout : 2;
@@ -7282,12 +7289,12 @@ function TabLab(props) {
             <Reveal id="lab-min-rel" label="Reliability curve" open={!!ui.reveals["lab-min-rel"]} onToggle={on.rev}>
               {mfold && mfold.challenger ? (
                 <div className="tbl">
-                  <Row head cols="88px 34px 50px minmax(0,1fr)">
+                  <Row head cols="88px 30px 44px minmax(68px,1fr)">
                     <span>Forecast</span><span className="rt">n</span><span className="rt">Said</span><span className="rt">Happened</span>
                   </Row>
                   {mfold.challenger.reliability.bins.map(function (b) {
                     return (
-                      <Row key={"rb-" + b.lo} cols="88px 34px 50px minmax(0,1fr)">
+                      <Row key={"rb-" + b.lo} cols="88px 30px 44px minmax(68px,1fr)">
                         <span className="nm">{pc(b.lo)} to {pc(b.hi)}</span>
                         <span className="rt">{b.n}</span>
                         <span className="rt">{b.n ? pc(b.meanPred) : "—"}</span>
@@ -7301,12 +7308,12 @@ function TabLab(props) {
             </Reveal>
             <Reveal id="lab-min-terms" label="What is in the model" open={!!ui.reveals["lab-min-terms"]} onToggle={on.rev}>
               <div className="tbl">
-                <Row head cols="minmax(0,1fr) 62px 62px">
+                <Row head cols="minmax(0,1fr) 84px 62px">
                   <span>Term</span><span className="rt">Coefficient</span><span className="rt">Fitted</span>
                 </Row>
                 {mterms.map(function (t) {
                   return (
-                    <Row key={"mt-" + t.name} cols="minmax(0,1fr) 62px 62px">
+                    <Row key={"mt-" + t.name} cols="minmax(0,1fr) 84px 62px">
                       <span className="nm">{t.name.replace(/_/g, " ")}</span>
                       <span className="rt">{t.coef === null ? "—" : two(t.coef)}</span>
                       <span className={"rt " + (t.fitted ? "" : "dim")}>{t.fitted ? "yes" : "no"}</span>
