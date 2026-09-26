@@ -1,0 +1,22 @@
+{
+  "name": "The Comeback Blueprint",
+  "short_name": "Comeback",
+  "id": "./ComebackBlueprint.html",
+  "start_url": "./ComebackBlueprint.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0D14",
+  "theme_color": "#0A0D14",
+  "description": "Pure-muscle training, fuel and progress tracking for one lifter.",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Today's session", "short_name": "Lift", "url": "./ComebackBlueprint.html#lift" },
+    { "name": "Log weight", "short_name": "Track", "url": "./ComebackBlueprint.html#track" },
+    { "name": "Weekly review", "short_name": "Home", "url": "./ComebackBlueprint.html#home" }
+  ]
+}

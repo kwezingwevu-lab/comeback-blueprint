@@ -1,0 +1,39 @@
+# The Comeback Blueprint — QA gate for the fitness app at the repo root (fpl/ has its own gate.yml).
+# Every push or PR that touches the app: syntax check -> rebuild -> committed dist/ must match the build ->
+# Chromium functional suite -> PWA/offline suite -> WebKit (Safari engine) acceptance. Any failure blocks.
+name: app-gate
+
+on:
+  push:
+    paths: ["src/**", "qa/**", "dist/**", "build.py", "package.json", "package-lock.json", ".github/workflows/app-gate.yml"]
+  pull_request:
+    paths: ["src/**", "qa/**", "dist/**", "build.py", "package.json", "package-lock.json", ".github/workflows/app-gate.yml"]
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install (npm ci; puppeteer fetches its own Chrome)
+        run: npm ci
+      - name: Build and check the committed dist/ is current
+        run: |
+          node --check src/app_full.js
+          python3 build.py
+          git diff --exit-code -- dist/ || { echo "dist/ is stale: run python3 build.py and commit the result"; exit 1; }
+      - name: Chromium functional suite
+        run: bash qa/run.sh | tee qa-chromium.log && grep -q "^ALL PASS" qa-chromium.log
+      - name: PWA / offline suite
+        run: node qa/pwa.js
+      - name: Install WebKit
+        run: npx playwright install --with-deps webkit
+      - name: WebKit acceptance
+        run: node qa/webkit.js
