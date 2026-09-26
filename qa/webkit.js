@@ -5,7 +5,7 @@ const {webkit}=require('playwright');const path=require('path');const fs=require
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const R=[];const T=(n,ok,d)=>R.push({name:n,ok:!!ok,detail:d});
 (async()=>{const iso=process.argv[2]||'2026-09-12';
-const b=await webkit.launch();const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2});
+const b=await webkit.launch();const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
 await ctx.route(u=>!(u.protocol==='file:'||u.protocol==='data:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
 await ctx.addInitScript(iso=>{const R=Date;const fixed=new R(iso+'T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;
   const store={};window.__cs=store;window.storage={async get(k){if(!(k in store))throw new Error('nf');return{key:k,value:store[k]};},async set(k,v){store[k]=String(v);return{key:k,value:v};},async delete(k){delete store[k];return{key:k}},async list(){return{keys:Object.keys(store)}}};},iso);

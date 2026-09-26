@@ -4,7 +4,8 @@ const STORAGE=()=>{const store={};window.__cs=store;window.storage={async get(k)
 const R=[];const T=(name,ok,detail)=>{R.push({name,ok:!!ok,detail});};
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const OFFLINE=async p=>{await p.setRequestInterception(true);p.on('request',r=>{const u=r.url();if(u.startsWith('file:')||u.startsWith('data:'))r.continue();else r.respond({status:200,contentType:'text/css',body:''});});};
-async function page(b,iso,extra){const p=await b.newPage();await OFFLINE(p);p.__errs=[];p.on('pageerror',e=>p.__errs.push(e.message));p.on('console',m=>{if(m.type()==='error')p.__errs.push(m.text());});
+// The user lives in Johannesburg (UTC+2): run every page in that timezone so date bugs that hide in UTC show up here.
+async function page(b,iso,extra){const p=await b.newPage();await p.emulateTimezone('Africa/Johannesburg');await OFFLINE(p);p.__errs=[];p.on('pageerror',e=>p.__errs.push(e.message));p.on('console',m=>{if(m.type()==='error')p.__errs.push(m.text());});
   await p.evaluateOnNewDocument(MOCK,iso);await p.evaluateOnNewDocument(STORAGE);if(extra)await p.evaluateOnNewDocument(extra);
   await p.goto('file://'+path.resolve('ComebackBlueprint.html'),{waitUntil:'networkidle0'});await p.setViewport({width:390,height:844,deviceScaleFactor:1});await wait(900);return p;}
 (async()=>{const b=await puppeteer.launch({headless:'new',args:['--no-sandbox','--disable-setuid-sandbox']});
@@ -192,7 +193,7 @@ const d5=await tt('2027-01-05');T('time: Jan = Posterior specialization block',/
  const before=await q.evaluate(()=>({bf:DB.profile.bf,chip:document.getElementById('cdDays').textContent,lean:+compute().leanNow.toFixed(1),btn:!!document.querySelector('button[onclick="applyTapeBF()"]')}));
  await q.evaluate(()=>applyTapeBF());await wait(300);
  const after=await q.evaluate(()=>({bf:DB.profile.bf,chip:document.getElementById('cdDays').textContent,lean:+compute().leanNow.toFixed(1),sync:document.body.innerText.includes('In sync')}));
- T('bf: apply button present when estimate differs',before.btn);T('bf: applying updates profile, lean mass and header chip',+after.bf===e.bf&&after.lean>before.lean&&after.chip!==before.chip&&after.sync,JSON.stringify({before,after}));
+ T('bf: apply button present when estimate differs',before.btn);T('bf: a waist+neck reading anchors lean mass automatically (≈88.4×(1−15.8%) before Apply is tapped)',Math.abs(before.lean-74.4)<0.3,JSON.stringify(before));T('bf: applying writes the tape % to the profile and the header chip matches the lean anchor',+after.bf===e.bf&&after.lean===before.lean&&after.chip===('+'+(77.7-after.lean).toFixed(1))&&after.sync,JSON.stringify({before,after}));
  T('R: no errors',q.__errs.length===0,q.__errs.join('|'));await q.close();}
 
 // ===== S. Legs & Back focus =====
