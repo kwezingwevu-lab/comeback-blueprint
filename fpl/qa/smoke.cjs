@@ -16,6 +16,7 @@ const path = require("path");
 const H = require(path.join(__dirname, "harness.cjs"));
 
 const ROOT = path.resolve(__dirname, "..");
+const DIST = path.join(ROOT, "dist", "index.html");
 const LIVE = require(path.join(ROOT, "data", "live.json"));
 // The engine is required here for ONE reason: the panel checks below compare what the screen
 // prints against what the engine computes, rather than against a number typed into the test.
@@ -834,6 +835,60 @@ async function main() {
       /Set one[\s\S]{0,40}GW19/.test(chipPanel) && /Set two[\s\S]{0,40}GW20 to GW38/.test(chipPanel) &&
       /upper bound/i.test(chipPanel) && /never two chips in one gameweek/i.test(chipPanel),
       "set one to the GW19 deadline, set two GW20 to GW38, the Free Hit labelled an upper bound and the one-chip-a-gameweek rule stated");
+
+    // ---------------------------------------------------------- v89 the PWA must not cost the file:// mode
+
+    /* dist/index.html gained a manifest link and a service-worker registration in v89, and the
+       way this app is actually opened today is from a file:// URL — where a registration
+       rejects, and on some engines throws synchronously. The protocol guard is what keeps that
+       mode alive, so this check boots the SHIPPED file exactly as the manager does, with a spy
+       over navigator.serviceWorker.register, and reads what the guard decided. The same boot is
+       re-measured under WebKit in qa/webkit.js, because Safari is the target device. */
+    {
+      const pc = await browser.newContext({ viewport: { width: 390, height: 844 } });
+      const pp = await pc.newPage();
+      const pwaErrs = [];
+      pp.on("pageerror", function (e) { pwaErrs.push(String(e && e.message ? e.message : e)); });
+      pp.on("console", function (m) {
+        if (m.type() !== "error") return;
+        const t = m.text();
+        if (/Failed to load resource/i.test(t) || /net::ERR_/.test(t) || /[Mm]anifest/.test(t)) return;
+        pwaErrs.push("console: " + t);
+      });
+      await pp.addInitScript(H.SW_SPY);
+      await pp.goto("file://" + DIST, { waitUntil: "load" });
+      await pp.waitForSelector(".mc-root", { timeout: 25000 });
+      const pwa = await pp.evaluate(function () {
+        const r = document.querySelector(".mc-root");
+        const meta = document.querySelector('meta[name="theme-color"]');
+        let store = false;
+        try { localStorage.setItem("mc_probe", "1"); store = localStorage.getItem("mc_probe") === "1"; localStorage.removeItem("mc_probe"); } catch (e) { store = false; }
+        return {
+          state: window.__PWA__ ? String(window.__PWA__.sw) : "no __PWA__ on the page",
+          protocol: window.__PWA__ ? String(window.__PWA__.protocol) : "",
+          calls: (window.__SWCALLS__ || []).slice(),
+          spyErr: window.__SWSPY_ERR__ || "",
+          manifest: !!document.querySelector('link[rel="manifest"]'),
+          appleIcon: !!document.querySelector('link[rel="apple-touch-icon"]'),
+          theme: meta ? String(meta.getAttribute("content")) : "",
+          landing: !!r.querySelector(".landing"),
+          boundary: r.querySelectorAll(".boundary").length,
+          store: store
+        };
+      });
+      await pc.close();
+      H.assert("PWA-the-shipped-file-still-boots-from-a-file-url-with-no-service-worker-exception",
+        pwa.landing && pwa.boundary === 0 && pwa.state === "skipped-not-http" && pwa.calls.length === 0 &&
+          pwaErrs.length === 0 && pwa.store,
+        "file://" + DIST + " → landing " + pwa.landing + ", boundaries " + pwa.boundary + ", protocol " +
+          pwa.protocol + ", __PWA__.sw " + pwa.state + ", register() calls " + JSON.stringify(pwa.calls) +
+          ", localStorage writable " + pwa.store + ", page errors " +
+          (pwaErrs.length ? pwaErrs.slice(0, 2).join(" | ") : "none"));
+      H.assert("PWA-the-shipped-page-links-the-manifest-the-apple-icon-and-the-theme-colour",
+        pwa.manifest && pwa.appleIcon && /^#[0-9a-fA-F]{6}$/.test(pwa.theme),
+        "manifest link " + pwa.manifest + ", apple-touch-icon " + pwa.appleIcon + ", theme-color " +
+          (pwa.theme || "absent"));
+    }
 
     // ---------------------------------------------------------- close
 

@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
-# qa/verify.sh — the reconciliation gate (CLAUDE.md H1 "verify" row, bar 23/23).
+# qa/verify.sh — the reconciliation gate (CLAUDE.md H1 "verify" row).
 #
 #   11 live reconciliations  — the shipped snapshot and the app's own numbers against
 #                              a fresh pull of the public API. Skipped, loudly, when the
 #                              network is unreachable; the SUITE line says so.
-#   11 static invariants     — things that must hold whether or not the network is up.
-#    1 esbuild syntax gate
+#   20 static invariants     — things that must hold whether or not the network is up,
+#                              I1..I20 below, one of which is the esbuild syntax gate.
 #   ---
-#   23 checks
+#   31 checks
 #
-# The arithmetic, spelled out so nobody has to guess how 23 was reached: the master
-# prompt lists nine invariant sentences, two of which name two artefacts each (banned
-# fields in the assembled app AND in data/live.json; account-touching URLs in src AND
-# in the shipped app), and one of which is the tdz scan. Those two are counted as the
-# two checks they are, which is 11 static invariants, and esbuild is the twelfth
-# static check: 11 + 11 + 1 = 23.
+# The arithmetic, spelled out so nobody has to guess: the master prompt lists nine
+# invariant sentences, two of which name two artefacts each (banned fields in the
+# assembled app AND in data/live.json; account-touching URLs in src AND in the shipped
+# app), and one of which is the tdz scan — 11 checks. esbuild is the twelfth. v88 added
+# I13..I16 (imports survive the assembler; the shell style block carries no hex; the
+# draft-league block; the recorded draft fixtures) for 16, and the header still said 23
+# until v89 corrected it. v89 adds I17..I20 for the PWA: 11 + 20 = 31.
 #
 # Every check prints "PASS <name> — <detail>" or "FAIL <name> — <detail>", and the last
 # line is "SUITE verify <pass>/<total>". Exit 1 on any FAIL.
@@ -23,7 +24,7 @@
 
 set -uo pipefail
 
-cd "$(dirname "$0")/.." || { echo "FAIL verify — cannot reach the fpl/ directory"; echo "SUITE verify 0/23"; exit 1; }
+cd "$(dirname "$0")/.." || { echo "FAIL verify — cannot reach the fpl/ directory"; echo "SUITE verify 0/31"; exit 1; }
 ROOT="$PWD"
 
 ENTRY=3546875
@@ -453,6 +454,149 @@ console.log(files.length+" recorded responses, every one from draft.premierleagu
   if [ $? -eq 0 ]; then ok "draft-fixtures-recorded-with-a-manifest" "$fx_out"
   else bad "draft-fixtures-recorded-with-a-manifest" "$fx_out"; fi
 fi
+
+# ---------------------------------------------------------------- the PWA (v89)
+# dist/ is also an installable, offline-capable app. The four checks below are the ones that
+# can actually regress: the files are generated, so "they exist and parse" is worth asserting
+# after a build; the colours are derived from the --bg token, so "they still equal it" is the
+# whole point of deriving them; and the registration guard is what keeps the file:// mode
+# alive, so it is EXECUTED here against a stubbed location rather than grepped for.
+
+# I17 · the manifest, the worker and every icon the manifest names are on disk and parse
+pwa_out="$(MC_ROOT="$ROOT" node -e '
+const fs=require("fs"), path=require("path");
+const R=process.env.MC_ROOT, D=path.join(R,"dist");
+const need=["index.html","manifest.webmanifest","sw.js"];
+const missing=need.filter(f=>!fs.existsSync(path.join(D,f)));
+if (missing.length) { console.log("missing from dist/: "+missing.join(", ")+" — run node build.cjs"); process.exit(1); }
+let m; try { m=JSON.parse(fs.readFileSync(path.join(D,"manifest.webmanifest"),"utf8")); }
+catch(e){ console.log("manifest.webmanifest is not valid JSON: "+e.message); process.exit(1); }
+const req=["name","short_name","start_url","scope","display","background_color","theme_color","icons"];
+const gone=req.filter(k=>!(k in m));
+if (gone.length) { console.log("manifest is missing "+gone.join(", ")); process.exit(1); }
+if (m.display!=="standalone") { console.log("manifest display is "+m.display+", not standalone"); process.exit(1); }
+if (m.short_name!=="FPL MC") { console.log("manifest short_name is "+JSON.stringify(m.short_name)+", not \"FPL MC\""); process.exit(1); }
+if (!Array.isArray(m.icons)||!m.icons.length) { console.log("manifest lists no icons"); process.exit(1); }
+const badIcon=m.icons.filter(i=>!i.src||!fs.existsSync(path.join(D,i.src)));
+if (badIcon.length) { console.log("icon(s) named by the manifest but not on disk: "+badIcon.map(i=>i.src).join(", ")); process.exit(1); }
+const maskable=m.icons.filter(i=>String(i.purpose||"").split(/\s+/).indexOf("maskable")>=0);
+if (!maskable.length) { console.log("no maskable icon in the manifest"); process.exit(1); }
+const png=m.icons.filter(i=>/\.png$/.test(i.src));
+for (const i of png) {
+  const b=fs.readFileSync(path.join(D,i.src));
+  if (b.length<8 || b[0]!==0x89 || b.toString("ascii",1,4)!=="PNG") { console.log(i.src+" is not a PNG"); process.exit(1); }
+  const w=b.readUInt32BE(16), h=b.readUInt32BE(20);
+  const want=Number(String(i.sizes).split("x")[0]);
+  if (w!==want||h!==want) { console.log(i.src+" declares "+i.sizes+" but the IHDR says "+w+"x"+h); process.exit(1); }
+}
+console.log(m.icons.length+" icons ("+png.length+" PNG, "+maskable.length+" maskable), display "+m.display+", scope "+m.scope+", start_url "+m.start_url);
+' 2>&1)"
+if [ $? -eq 0 ]; then ok "pwa-manifest-worker-and-icons-exist-and-parse" "$pwa_out"
+else bad "pwa-manifest-worker-and-icons-exist-and-parse" "$pwa_out"; fi
+
+# I18 · the manifest colours and the theme-color meta ARE the --bg token
+# A manifest cannot say var(--bg), so the only safe copy is one derived at build time. This is
+# the check that makes "derived" mean something: change the token and forget to rebuild, or
+# hand-edit either copy, and it goes red.
+theme_out="$(MC_ROOT="$ROOT" node -e '
+const fs=require("fs"), path=require("path");
+const R=process.env.MC_ROOT;
+const ui=fs.readFileSync(path.join(R,"src","ui.jsx"),"utf8");
+const t=ui.match(/--bg\s*:\s*(#[0-9a-fA-F]{3,8})\s*;/);
+if(!t){ console.log("no --bg token definition in src/ui.jsx"); process.exit(1); }
+const bg=t[1].toLowerCase();
+const m=JSON.parse(fs.readFileSync(path.join(R,"dist","manifest.webmanifest"),"utf8"));
+const html=fs.readFileSync(path.join(R,"dist","index.html"),"utf8");
+const meta=html.match(/<meta name="theme-color" content="(#[0-9a-fA-F]{3,8})">/);
+const bad=[];
+if(String(m.theme_color).toLowerCase()!==bg) bad.push("manifest theme_color "+m.theme_color);
+if(String(m.background_color).toLowerCase()!==bg) bad.push("manifest background_color "+m.background_color);
+if(!meta) bad.push("no theme-color meta in dist/index.html");
+else if(meta[1].toLowerCase()!==bg) bad.push("theme-color meta "+meta[1]);
+if(bad.length){ console.log("--bg is "+bg+" but: "+bad.join("; ")); process.exit(1); }
+console.log("--bg "+bg+" = manifest theme_color = manifest background_color = the theme-color meta");
+' 2>&1)"
+if [ $? -eq 0 ]; then ok "pwa-colours-are-the-bg-token-and-cannot-drift" "$theme_out"
+else bad "pwa-colours-are-the-bg-token-and-cannot-drift" "$theme_out"; fi
+
+# I19 · the shipped page registers the worker ONLY over http(s) — executed, not grepped
+# dist/index.html is opened from a file:// URL today. A service-worker registration from one
+# rejects, and on some engines throws; either way it would be a regression in the mode the app
+# is actually used in. The registration is bracketed in the page so this check can lift it out
+# and RUN it twice, against a stubbed file: location and a stubbed https: one.
+guard_out="$(MC_ROOT="$ROOT" node -e '
+const fs=require("fs"), path=require("path");
+const html=fs.readFileSync(path.join(process.env.MC_ROOT,"dist","index.html"),"utf8");
+const A="/* PWA — START */", B="/* PWA — END */";
+const a=html.indexOf(A), b=html.indexOf(B);
+if(a<0||b<0||b<a){ console.log("the bracketed PWA registration block is not in dist/index.html"); process.exit(1); }
+if(html.split(A).length-1!==1||html.split(B).length-1!==1){ console.log("the PWA markers do not appear exactly once each"); process.exit(1); }
+const src=html.slice(a+A.length,b);
+if(!/serviceWorker/.test(src)){ console.log("the bracketed block does not mention serviceWorker"); process.exit(1); }
+function run(proto){
+  const calls=[]; const listeners=[];
+  const win={ addEventListener:function(t,f){ listeners.push(t); } };
+  const nav={ serviceWorker:{ register:function(u,o){ calls.push(String(u)); return { then:function(ok){ try{ok({scope:"/"});}catch(e){} return { then:function(){} }; } }; } } };
+  const loc={ protocol: proto };
+  const doc={ readyState:"complete" };
+  let err=null;
+  try { new Function("window","navigator","location","document",src)(win,nav,loc,doc); }
+  catch(e){ err = e && e.message ? e.message : String(e); }
+  return { st: win.__PWA__, calls: calls, listeners: listeners, err: err };
+}
+const f=run("file:"), h=run("https:"), t=run("http:");
+const bad=[];
+if(f.err) bad.push("file: threw "+f.err);
+if(!f.st||f.st.sw!=="skipped-not-http") bad.push("file: __PWA__.sw is "+(f.st?f.st.sw:"undefined")+", expected skipped-not-http");
+if(f.calls.length) bad.push("file: called register("+f.calls.join(",")+")");
+if(f.listeners.length) bad.push("file: added a "+f.listeners.join(",")+" listener");
+if(h.err) bad.push("https: threw "+h.err);
+if(h.calls.length!==1||h.calls[0]!=="sw.js") bad.push("https: register calls "+JSON.stringify(h.calls));
+if(t.calls.length!==1) bad.push("http: register calls "+JSON.stringify(t.calls));
+if(bad.length){ console.log(bad.join("; ")); process.exit(1); }
+console.log("executed the shipped block: file: → "+f.st.sw+", no register, no listener; https: → register(\"sw.js\") once; http: → once");
+' 2>&1)"
+if [ $? -eq 0 ]; then ok "pwa-service-worker-registers-only-over-http-s" "$guard_out"
+else bad "pwa-service-worker-registers-only-over-http-s" "$guard_out"; fi
+
+# I20 · the worker parses, precaches this build and never caches what it must not
+# The cache name is recomputed here from the same inputs build.cjs hashes. The duplication is
+# deliberate: it is what turns "derived from the build" into something a test can fail on. Stop
+# deriving it, or ship a worker from a previous build, and this goes red.
+sw_out="$(MC_ROOT="$ROOT" node -e '
+const fs=require("fs"), path=require("path"), crypto=require("crypto");
+const R=process.env.MC_ROOT, D=path.join(R,"dist");
+const sw=fs.readFileSync(path.join(D,"sw.js"),"utf8");
+try { new Function(sw); } catch(e){ console.log("sw.js does not parse: "+e.message); process.exit(1); }
+/* The checks below are about what the worker DOES, so they read the code with the comments
+   taken out. A scan that cannot tell a comment from a statement is how E-013 happened: the
+   first version of this check went red on the header comment that explains why the refresh
+   path is never cached — the comment was right and the check was wrong (E-075). */
+const code=sw.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+const cm=sw.match(/var CACHE = "([^"]+)";/);
+const sm=sw.match(/var SHELL = (\[[^\]]*\]);/);
+if(!cm||!sm){ console.log("sw.js does not declare CACHE and SHELL as literals"); process.exit(1); }
+const shell=JSON.parse(sm[1]);
+const pkg=JSON.parse(fs.readFileSync(path.join(R,"package.json"),"utf8"));
+const ver="v"+String(pkg.version).split(".")[0];
+const bad=[];
+if(shell.indexOf("./index.html")<0) bad.push("SHELL does not precache ./index.html");
+if(shell.indexOf("./manifest.webmanifest")<0) bad.push("SHELL does not precache the manifest");
+shell.filter(u=>u!=="./").forEach(function(u){ if(!fs.existsSync(path.join(D,u.replace(/^\.\//,"")))) bad.push("SHELL names "+u+", which is not in dist/"); });
+if(!/req\.method !== .GET./.test(code)) bad.push("sw.js does not skip non-GET requests (the D4 refresh path is a POST)");
+if(!/url\.origin !== self\.location\.origin/.test(code)) bad.push("sw.js does not skip cross-origin requests");
+if(/api\.anthropic\.com/.test(code)) bad.push("sw.js code names api.anthropic.com — the refresh path is a cross-origin POST and is skipped by the two rules above, not by naming it");
+const h=crypto.createHash("sha256");
+h.update(fs.readFileSync(path.join(D,"index.html")));
+h.update(fs.readFileSync(path.join(D,"manifest.webmanifest")));
+["icon-192.png","icon-512.png","icon-maskable-512.png","icon.svg"].sort().forEach(function(k){ h.update(k); h.update(fs.readFileSync(path.join(D,k))); });
+const want="fpl-mc-"+ver+"-"+h.digest("hex").slice(0,12);
+if(cm[1]!==want) bad.push("cache name "+cm[1]+" is not the one this build derives ("+want+") — dist/ is a mix of two builds, or the name stopped being derived");
+if(bad.length){ console.log(bad.join("; ")); process.exit(1); }
+console.log("sw.js parses ("+code.split("\n").filter(l=>l.trim()).length+" code lines after comments are stripped), cache "+cm[1]+" recomputed from the shipped page+manifest+icons, "+shell.length+" shell entries, non-GET and cross-origin skipped");
+' 2>&1)"
+if [ $? -eq 0 ]; then ok "pwa-service-worker-precaches-this-build-only" "$sw_out"
+else bad "pwa-service-worker-precaches-this-build-only" "$sw_out"; fi
 
 # ---------------------------------------------------------------- verdict
 

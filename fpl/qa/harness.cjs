@@ -176,6 +176,25 @@ function buildPage(opts) {
   ].join("\n");
 }
 
+/* An init script that records every navigator.serviceWorker.register() call on
+   window.__SWCALLS__ and resolves it locally, so a suite can prove whether the shipped page
+   TRIED to register a worker without one actually being installed (and without depending on
+   an engine's service-worker support in a test browser). Shared by smoke.cjs (Chromium) and
+   webkit.js (Safari engine) so the two measure exactly the same thing. */
+function SW_SPY() {
+  try {
+    window.__SWCALLS__ = [];
+    if (navigator.serviceWorker && typeof navigator.serviceWorker.register === "function") {
+      navigator.serviceWorker.register = function (url) {
+        window.__SWCALLS__.push(String(url));
+        return Promise.resolve({ scope: String(location.href) });
+      };
+    }
+  } catch (e) {
+    window.__SWSPY_ERR__ = String(e && e.message ? e.message : e);
+  }
+}
+
 // ---------------------------------------------------------------- browser
 
 function launch(options) {
@@ -313,5 +332,6 @@ module.exports = {
   visibleText: visibleText,
   assert: assert,
   done: done,
-  counts: counts
+  counts: counts,
+  SW_SPY: SW_SPY
 };

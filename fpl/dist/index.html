@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>FPL Mission Control v88</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#0b0e13">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="FPL MC">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
 <style>html,body{margin:0;padding:0}#root{min-height:100vh}</style>
 </head>
 <body>
@@ -32125,5 +32133,26 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
   (0, import_client.createRoot)(el).render(import_react53.default.createElement(App));
 })();
 </script>
+<script>/* PWA — START */
+(function(){
+  var st = { protocol: '', sw: 'pending', cache: null, error: null };
+  try {
+    window.__PWA__ = st;
+    st.protocol = (location && location.protocol) || '';
+    if (st.protocol !== 'http:' && st.protocol !== 'https:') { st.sw = 'skipped-not-http'; return; }
+    if (!('serviceWorker' in navigator)) { st.sw = 'unsupported'; return; }
+    var go = function(){
+      try {
+        navigator.serviceWorker.register('sw.js', { scope: './' }).then(function(reg){
+          st.sw = 'registered'; st.cache = reg && reg.scope ? String(reg.scope) : '';
+        }, function(err){
+          st.sw = 'failed'; st.error = String(err && err.message ? err.message : err).slice(0, 140);
+        });
+      } catch (e) { st.sw = 'failed'; st.error = String(e && e.message ? e.message : e).slice(0, 140); }
+    };
+    if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
+  } catch (e) { st.sw = 'failed'; st.error = String(e && e.message ? e.message : e).slice(0, 140); }
+})();
+/* PWA — END */</script>
 </body>
 </html>

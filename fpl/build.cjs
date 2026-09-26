@@ -4,6 +4,9 @@
  *   app/FPL_Mission_Control.jsx  imports · APP_VERSION · engine · weekly · live · ui
  *   dist/index.html              esbuild IIFE bundle of that file, inlined, with a
  *                                window.storage shim over localStorage.
+ *   dist/manifest.webmanifest    installable-app metadata; its colours ARE the --bg token
+ *   dist/sw.js                   service worker, cache name carrying this build's hash
+ *   dist/icon.svg + three PNGs   the icon set, drawn here from the colour tokens (no deps)
  *
  * Marker text is exact and each marker appears once, in order; verify.sh asserts it.
  */
@@ -12,6 +15,8 @@
 const fs = require("fs");
 const path = require("path");
 const esbuild = require("esbuild");
+const zlib = require("zlib");
+const crypto = require("crypto");
 
 const ROOT = __dirname;
 const P = function (...parts) { return path.join(ROOT, ...parts); };
@@ -131,6 +136,332 @@ function bundle() {
   return res.outputFiles[0].text;
 }
 
+/* ------------------------------------------------------------------ PWA (v89)
+ *
+ * dist/ is also a progressive web app: a manifest, an icon set and a service worker that
+ * precaches the shell. All three are GENERATED here rather than written by hand, for one
+ * reason — the manifest's theme and background colours are the app's own `--bg` token, read
+ * out of src/ui.jsx at build time, so a second hand-written copy of a colour cannot drift
+ * from the tokens (the same argument the shell's <style> block already makes above).
+ *
+ * The single-file mode is a hard constraint: dist/index.html is opened from a file:// URL
+ * today, and a service worker cannot be registered from one — the call rejects, and on some
+ * engines throws a SecurityError synchronously. So the registration sits behind a protocol
+ * guard and records what it decided on `window.__PWA__` for the suites to read. Nothing else
+ * about the page changes: same shim, same bundle, same single <style> block.
+ *
+ * No dependency is added. zlib and crypto are in node, and the icons are flat colour, so
+ * build.cjs writes the PNGs itself.
+ */
+
+function tokenColour(name) {
+  const src = read("src/ui.jsx");
+  const m = src.match(new RegExp("--" + name + "\\s*:\\s*(#[0-9a-fA-F]{3,8})\\s*;"));
+  if (!m) {
+    throw new Error("build: the --" + name + " colour token is not defined in src/ui.jsx — the manifest, " +
+      "the theme-color meta and the icons are all taken from the tokens so they cannot drift from the UI");
+  }
+  return m[1].toLowerCase();
+}
+
+function rgbOf(hex) {
+  let h = String(hex).replace("#", "");
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+/* ---- PNG writer (signature + IHDR + IDAT + IEND, filter 0, 8-bit RGBA) ---- */
+
+const CRC_TABLE = (function () {
+  const t = new Int32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c;
+  }
+  return t;
+})();
+
+function crc32(buf) {
+  let c = -1;
+  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ -1) >>> 0;
+}
+
+function pngChunk(type, data) {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length, 0);
+  const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body), 0);
+  return Buffer.concat([len, body, crc]);
+}
+
+function png(size, rgba) {
+  const stride = size * 4 + 1;
+  const raw = Buffer.alloc(stride * size);
+  for (let y = 0; y < size; y++) {
+    raw[y * stride] = 0;                                   // filter type 0 (none)
+    rgba.copy(raw, y * stride + 1, y * size * 4, (y + 1) * size * 4);
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
+  ihdr[8] = 8;                                             // bit depth
+  ihdr[9] = 6;                                             // colour type 6 = RGBA
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", ihdr),
+    pngChunk("IDAT", zlib.deflateSync(raw, { level: 9 })),
+    pngChunk("IEND", Buffer.alloc(0))
+  ]);
+}
+
+/* ---- the mark: one geometry in a unit square, used for the PNGs and the SVG alike, so the
+        raster icons and the vector icon cannot disagree. Three ascending bars on a baseline
+        and the dot that marks the call. `scale` shrinks the content about the centre for the
+        maskable variant, whose safe zone is the middle 80%.
+
+        `tileR` is the tile's corner radius, and the PNGs pass 0 on purpose. A rounded tile
+        leaves the corner pixels transparent, and every platform that consumes these files
+        applies its own mask: iOS rounds the apple-touch icon itself and composites what is
+        underneath through the transparent corners, and a maskable icon is cropped to a circle
+        or a squircle. So the raster icons are full-bleed opaque squares and only the SVG —
+        which is the browser-tab icon, drawn as it is — keeps the radius. ---- */
+
+function iconShapes(scale, tileR) {
+  const s = typeof scale === "number" ? scale : 1;
+  const tr = typeof tileR === "number" ? tileR : 0.22;
+  const at = function (v) { return 0.5 + (v - 0.5) * s; };
+  const bar = function (x, top) {
+    return { kind: "rect", x0: at(x), x1: at(x + 0.13), y0: at(top), y1: at(0.77), r: 0.022 * s, fill: "grn" };
+  };
+  return [
+    { kind: "rect", x0: 0, x1: 1, y0: 0, y1: 1, r: tr, fill: "bg2" },
+    { kind: "rect", x0: at(0.20), x1: at(0.80), y0: at(0.785), y1: at(0.805), r: 0.010 * s, fill: "line" },
+    bar(0.230, 0.500),
+    bar(0.435, 0.380),
+    bar(0.640, 0.255),
+    { kind: "disc", cx: at(0.705), cy: at(0.175), r: 0.058 * s, fill: "grn" }
+  ];
+}
+
+function inShape(sh, x, y) {
+  if (sh.kind === "disc") {
+    const dx = x - sh.cx, dy = y - sh.cy;
+    return dx * dx + dy * dy <= sh.r * sh.r;
+  }
+  if (x < sh.x0 || x > sh.x1 || y < sh.y0 || y > sh.y1) return false;
+  const r = Math.min(sh.r, (sh.x1 - sh.x0) / 2, (sh.y1 - sh.y0) / 2);
+  if (r <= 0) return true;
+  const cx = x < sh.x0 + r ? sh.x0 + r : (x > sh.x1 - r ? sh.x1 - r : x);
+  const cy = y < sh.y0 + r ? sh.y0 + r : (y > sh.y1 - r ? sh.y1 - r : y);
+  const dx = x - cx, dy = y - cy;
+  return dx * dx + dy * dy <= r * r;
+}
+
+function topShape(shapes, x, y) {
+  for (let i = shapes.length - 1; i >= 0; i--) if (inShape(shapes[i], x, y)) return i;
+  return -1;
+}
+
+function iconRgba(size, scale) {
+  const shapes = iconShapes(scale, 0);
+  const cols = {};
+  ["bg2", "line", "grn"].forEach(function (k) { cols[k] = rgbOf(tokenColour(k)); });
+  const buf = Buffer.alloc(size * size * 4);               // transparent outside the tile
+  const S = 4;                                             // 4x4 supersample on the edges only
+  const px = 1 / size;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = (x + 0.5) * px, v = (y + 0.5) * px;
+      const mid = topShape(shapes, u, v);
+      // A pixel whose four corners agree with its centre is interior to one shape: one sample
+      // is exact and the 4x4 supersample would only cost time. Only the edges are sampled.
+      const flat =
+        topShape(shapes, u - px / 2, v - px / 2) === mid && topShape(shapes, u + px / 2, v - px / 2) === mid &&
+        topShape(shapes, u - px / 2, v + px / 2) === mid && topShape(shapes, u + px / 2, v + px / 2) === mid;
+      const o = (y * size + x) * 4;
+      if (flat) {
+        if (mid < 0) continue;
+        const c = cols[shapes[mid].fill];
+        buf[o] = c[0]; buf[o + 1] = c[1]; buf[o + 2] = c[2]; buf[o + 3] = 255;
+        continue;
+      }
+      let r = 0, g = 0, b = 0, hit = 0;
+      for (let sy = 0; sy < S; sy++) {
+        for (let sx = 0; sx < S; sx++) {
+          const uu = (x + (sx + 0.5) / S) * px, vv = (y + (sy + 0.5) / S) * px;
+          const t = topShape(shapes, uu, vv);
+          if (t < 0) continue;
+          const c = cols[shapes[t].fill];
+          r += c[0]; g += c[1]; b += c[2]; hit++;
+        }
+      }
+      if (!hit) continue;
+      buf[o] = Math.round(r / hit);
+      buf[o + 1] = Math.round(g / hit);
+      buf[o + 2] = Math.round(b / hit);
+      buf[o + 3] = Math.round((hit / (S * S)) * 255);
+    }
+  }
+  return buf;
+}
+
+function iconSvg() {
+  const cols = { bg2: tokenColour("bg2"), line: tokenColour("line"), grn: tokenColour("grn") };
+  const V = 512;
+  const p = function (v) { return Math.round(v * V * 100) / 100; };
+  const parts = iconShapes(1, 0.22).map(function (sh) {
+    if (sh.kind === "disc") {
+      return '<circle cx="' + p(sh.cx) + '" cy="' + p(sh.cy) + '" r="' + p(sh.r) + '" fill="' + cols[sh.fill] + '"/>';
+    }
+    return '<rect x="' + p(sh.x0) + '" y="' + p(sh.y0) + '" width="' + p(sh.x1 - sh.x0) +
+      '" height="' + p(sh.y1 - sh.y0) + '" rx="' + p(sh.r) + '" fill="' + cols[sh.fill] + '"/>';
+  });
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + V + " " + V + '" width="' + V + '" height="' + V +
+    '" role="img" aria-label="FPL Mission Control">' + parts.join("") + "</svg>\n";
+}
+
+/* ---- manifest, service worker, registration ---- */
+
+const PWA = {
+  manifest: "manifest.webmanifest",
+  sw: "sw.js",
+  svg: "icon.svg",
+  png192: "icon-192.png",
+  png512: "icon-512.png",
+  maskable: "icon-maskable-512.png"
+};
+
+function manifestObject() {
+  const bg = tokenColour("bg");
+  return {
+    name: "FPL Mission Control",
+    short_name: "FPL MC",
+    description: "One screen that says what to do this gameweek, sourced.",
+    lang: "en-ZA",
+    dir: "ltr",
+    start_url: "./index.html",
+    scope: "./",
+    display: "standalone",
+    display_override: ["standalone", "minimal-ui", "browser"],
+    orientation: "portrait",
+    background_color: bg,
+    theme_color: bg,
+    icons: [
+      { src: PWA.svg, sizes: "any", type: "image/svg+xml", purpose: "any" },
+      { src: PWA.png192, sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: PWA.png512, sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: PWA.maskable, sizes: "512x512", type: "image/png", purpose: "maskable" }
+    ]
+  };
+}
+
+function shellList() {
+  return ["./", "./index.html", "./" + PWA.manifest, "./" + PWA.svg, "./" + PWA.png192, "./" + PWA.png512, "./" + PWA.maskable];
+}
+
+function serviceWorker(cacheName, shell) {
+  return [
+    "/* sw.js — generated by build.cjs; do not edit. Precaches the shell so the app opens with",
+    " * no network. The cache name carries the build hash, so a new build lands in a new cache",
+    " * and every older fpl-mc- cache is deleted on activate: a stale shell cannot survive a",
+    " * deploy. Nothing cross-origin and nothing that is not a GET is ever cached — the D4",
+    " * refresh path is a POST to api.anthropic.com and must always hit the network. */",
+    '"use strict";',
+    "var CACHE = " + JSON.stringify(cacheName) + ";",
+    "var SHELL = " + JSON.stringify(shell) + ";",
+    "",
+    "self.addEventListener('install', function (e) {",
+    "  e.waitUntil((async function () {",
+    "    var c = await caches.open(CACHE);",
+    "    for (var i = 0; i < SHELL.length; i++) {",
+    "      try {",
+    "        var r = await fetch(new Request(SHELL[i], { cache: 'reload' }));",
+    "        if (r && r.ok) await c.put(SHELL[i], r.clone());",
+    "      } catch (err) { /* one missing file must not fail the install; fetch() falls through */ }",
+    "    }",
+    "    await self.skipWaiting();",
+    "  })());",
+    "});",
+    "",
+    "self.addEventListener('activate', function (e) {",
+    "  e.waitUntil((async function () {",
+    "    var names = await caches.keys();",
+    "    for (var i = 0; i < names.length; i++) {",
+    "      if (names[i] !== CACHE && names[i].indexOf('fpl-mc-') === 0) await caches.delete(names[i]);",
+    "    }",
+    "    await self.clients.claim();",
+    "  })());",
+    "});",
+    "",
+    "self.addEventListener('fetch', function (e) {",
+    "  var req = e.request;",
+    "  if (req.method !== 'GET') return;",
+    "  var url = null;",
+    "  try { url = new URL(req.url); } catch (err) { return; }",
+    "  if (url.origin !== self.location.origin) return;",
+    "  if (req.mode === 'navigate') { e.respondWith(navigateFirst(req)); return; }",
+    "  e.respondWith(cacheFirst(req));",
+    "});",
+    "",
+    "/* A navigation goes to the network first, so a fresh deploy is picked up on the next open;",
+    "   the cached shell is the fallback, which is what makes the app work offline. */",
+    "async function navigateFirst(req) {",
+    "  try {",
+    "    var fresh = await fetch(req);",
+    "    if (fresh && fresh.ok) { var c = await caches.open(CACHE); await c.put('./index.html', fresh.clone()); return fresh; }",
+    "    if (fresh) return fresh;",
+    "  } catch (err) { /* offline */ }",
+    "  var hit = await caches.match('./index.html', { cacheName: CACHE });",
+    "  if (hit) return hit;",
+    "  return new Response('FPL Mission Control is offline and the shell is not in the cache yet.',",
+    "    { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });",
+    "}",
+    "",
+    "async function cacheFirst(req) {",
+    "  var hit = await caches.match(req, { cacheName: CACHE });",
+    "  if (hit) return hit;",
+    "  var fresh = await fetch(req);",
+    "  if (fresh && fresh.ok && fresh.type !== 'opaque') { var c = await caches.open(CACHE); await c.put(req, fresh.clone()); }",
+    "  return fresh;",
+    "}",
+    ""
+  ].join("\n");
+}
+
+/* The registration, bracketed so qa/verify.sh can lift it out of the shipped page and RUN it
+   against a stubbed file: location — a grep for the word "protocol" would not prove the guard
+   works, and this is the line that keeps the single-file mode alive. */
+const PWA_MARK = { start: "/* PWA — START */", end: "/* PWA — END */" };
+
+function registerScript() {
+  return [
+    PWA_MARK.start,
+    "(function(){",
+    "  var st = { protocol: '', sw: 'pending', cache: null, error: null };",
+    "  try {",
+    "    window.__PWA__ = st;",
+    "    st.protocol = (location && location.protocol) || '';",
+    "    if (st.protocol !== 'http:' && st.protocol !== 'https:') { st.sw = 'skipped-not-http'; return; }",
+    "    if (!('serviceWorker' in navigator)) { st.sw = 'unsupported'; return; }",
+    "    var go = function(){",
+    "      try {",
+    "        navigator.serviceWorker.register('sw.js', { scope: './' }).then(function(reg){",
+    "          st.sw = 'registered'; st.cache = reg && reg.scope ? String(reg.scope) : '';",
+    "        }, function(err){",
+    "          st.sw = 'failed'; st.error = String(err && err.message ? err.message : err).slice(0, 140);",
+    "        });",
+    "      } catch (e) { st.sw = 'failed'; st.error = String(e && e.message ? e.message : e).slice(0, 140); }",
+    "    };",
+    "    if (document.readyState === 'complete') go(); else window.addEventListener('load', go);",
+    "  } catch (e) { st.sw = 'failed'; st.error = String(e && e.message ? e.message : e).slice(0, 140); }",
+    "})();",
+    PWA_MARK.end
+  ].join("\n");
+}
+
 function page(js) {
   const shim = [
     "(function(){",
@@ -149,6 +480,18 @@ function page(js) {
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">",
     "<meta name=\"color-scheme\" content=\"dark\">",
     "<title>FPL Mission Control " + APP_VERSION + "</title>",
+    /* The installable half. theme_color, background_color and this meta are all the app's own
+       --bg token, read out of src/ui.jsx at build time: the manifest cannot carry a colour in
+       a format that understands var(--bg), so the only safe copy is a derived one. verify.sh
+       asserts all three are equal to the token. */
+    "<link rel=\"manifest\" href=\"" + PWA.manifest + "\">",
+    "<link rel=\"icon\" type=\"image/svg+xml\" href=\"" + PWA.svg + "\">",
+    "<link rel=\"apple-touch-icon\" href=\"" + PWA.png192 + "\">",
+    "<meta name=\"theme-color\" content=\"" + tokenColour("bg") + "\">",
+    "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">",
+    "<meta name=\"apple-mobile-web-app-title\" content=\"FPL MC\">",
+    "<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black-translucent\">",
+    "<meta name=\"mobile-web-app-capable\" content=\"yes\">",
     /* CONTRACT §7 allows hex only inside the token definitions, which live in the app's own
        single <style> block. This shell block therefore carries no colour at all: it would be a
        second, unwatched copy of --bg and --text, free to drift from the tokens. The dark canvas
@@ -160,6 +503,7 @@ function page(js) {
     "<div id=\"root\"></div>",
     "<script>" + shim + "</script>",
     "<script>" + js.replace(/<\/script/gi, "<\\/script") + "</script>",
+    "<script>" + registerScript() + "</script>",
     "</body>",
     "</html>",
     ""
@@ -170,11 +514,38 @@ function main() {
   const jsx = assemble();
   const js = bundle();
   fs.mkdirSync(P("dist"), { recursive: true });
+
   const html = page(js);
+  const mfText = JSON.stringify(manifestObject(), null, 2) + "\n";
+  const icons = {};
+  icons[PWA.svg] = Buffer.from(iconSvg(), "utf8");
+  icons[PWA.png192] = png(192, iconRgba(192, 1));
+  icons[PWA.png512] = png(512, iconRgba(512, 1));
+  icons[PWA.maskable] = png(512, iconRgba(512, 0.72));
+
+  /* The cache name is derived from everything the worker precaches except the worker itself,
+     so a build that changes one byte of the page or one icon gets a new cache and the old one
+     is deleted on activate. Hashing the worker into its own name is the cycle that has to be
+     avoided; nothing in the page references the worker's contents, only its filename. */
+  const stamp = crypto.createHash("sha256");
+  stamp.update(html);
+  stamp.update(mfText);
+  Object.keys(icons).sort().forEach(function (k) { stamp.update(k); stamp.update(icons[k]); });
+  const cacheName = "fpl-mc-" + APP_VERSION + "-" + stamp.digest("hex").slice(0, 12);
+  const swText = serviceWorker(cacheName, shellList());
+
   fs.writeFileSync(P("dist/index.html"), html);
+  fs.writeFileSync(P("dist/" + PWA.manifest), mfText);
+  fs.writeFileSync(P("dist/" + PWA.sw), swText);
+  Object.keys(icons).forEach(function (k) { fs.writeFileSync(P("dist/" + k), icons[k]); });
+
   const kb = function (s) { return (Buffer.byteLength(s, "utf8") / 1024).toFixed(0) + " kB"; };
+  const kbb = function (b) { return (b.length / 1024).toFixed(1) + " kB"; };
   console.log("app/FPL_Mission_Control.jsx  " + kb(jsx));
   console.log("dist/index.html              " + kb(html));
+  console.log("dist/" + PWA.manifest + "    " + kb(mfText) + "  theme " + tokenColour("bg") + " (= --bg)");
+  console.log("dist/" + PWA.sw + "                    " + kb(swText) + "  cache " + cacheName);
+  console.log("dist/ icons                  " + Object.keys(icons).map(function (k) { return k + " " + kbb(icons[k]); }).join(" \u00b7 "));
   console.log("version " + APP_VERSION + "  markers 6/6  order ok");
 }
 
