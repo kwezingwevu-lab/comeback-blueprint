@@ -23,5 +23,6 @@
     "league_100_details.json": "https://draft.premierleague.com/api/league/100/details",
     "league_100_status.json": "https://draft.premierleague.com/api/league/100/element-status"
   },
-  "current_event": 3
+  "current_event": 3,
+  "scrubbed": "player_first_name, player_last_name, player_name and league-entry short_name were removed at capture by data/scrub.cjs. These are other people's public leagues; their managers' names and initials are never committed (v110 s1.5, ERRORS.md E-085). Entry ids, league-entry ids, team names and waiver picks are kept, and those are what the suites assert on."
 }

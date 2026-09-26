@@ -1686,7 +1686,7 @@ check("TOURNAMENT-spearman-values-are-inside-minus-1-and-1", function () {
   return { ok: bad.length === 0, detail: TOUR.models.map(function (m) { return m.key + "=" + (m.spearman === null ? "n/a" : r4(m.spearman)); }).join(" ") };
 });
 check("TOURNAMENT-promotion-needs-three-transitions", function () {
-  return { ok: TOUR.transitions === 2 && TOUR.promotable === false, detail: TOUR.transitions + " transitions from 3 finished gameweeks; promotable=" + TOUR.promotable + " (gate is 3)" };
+  return { ok: TOUR.decidable === false && TOUR.transitions === 2, detail: TOUR.transitions + " transitions from 3 finished gameweeks; promotable=" + TOUR.promotable + " (gate is 3)" };
 });
 check("TOURNAMENT-leader-is-one-of-the-nine", function () {
   const keys = TOUR.models.map(function (m) { return m.key; });
@@ -2362,7 +2362,11 @@ if (!LIVE) {
       if (LCTX.els[d.code]) bad.push(d.code + ": a code is also a live element id — the control is unsound");
     });
     const ex = collisions[0];
-    return { ok: bad.length === 0 && L_SHIFTED.length === 59 && collisions.length >= 1,
+    // E-076: this asserted "59" — the figure on 11 September 2026. The game adds players, so
+    // the count is a live observation and never an invariant. What is invariant: every shifted
+    // code resolves to the same footballer on both sides, and at least one of them would land
+    // on a different footballer under an id join.
+    return { ok: bad.length === 0 && L_SHIFTED.length >= 1 && collisions.length === L_SHIFTED.length,
       detail: bad.length ? bad.slice(0, 3).join("; ") :
         L_SHIFTED.length + " shifted codes all resolve to the same player in both systems; " + collisions.length +
         " of them would land on a DIFFERENT player under an id join — e.g. " + ex.name + " (code " + ex.code + ", draft id " + ex.draftId +
@@ -2399,8 +2403,16 @@ if (!LIVE) {
     const xgaPg = hull.g ? hull.xga / hull.g : 0;
     console.log("Hull: " + hull.g + " games · xGA " + r2(hull.xga) + " (" + r2(xgaPg) + " per game) · goals conceded " + hull.ga +
       " · tagAgainst " + String(hull.tagAgainst) + " · TS def " + r4(LCTX.TS[hull.teamId].def) + " (E-011: the goals model rated them the best defence; xG rates them average)");
-    check("LIVE-Hull-conceded-fewer-goals-than-xGA-so-the-tag-is-UNDER", function () {
-      return { ok: hull.tagAgainst === "UNDER" && xgaPg > 1.5, detail: "xGA/game " + r2(xgaPg) + " · goals conceded " + hull.ga + " · tagAgainst " + hull.tagAgainst };
+    // E-076: the second clause was "xGA per game above 1.5", which was September's number and
+    // fell to 1.48 by the end of GW5 on a snapshot that was entirely correct. The E-011 property
+    // is the one asserted now: they conceded fewer goals than their xGA, and the GOALS model
+    // therefore rates their defence better than the xG model does — which is the inversion that
+    // cost a captaincy in v74. Lower def is a better defence.
+    check("LIVE-Hull-conceded-fewer-goals-than-xGA-and-the-goals-model-overrates-them", function () {
+      const dXg = LCTX.TS[hull.teamId].def, dG = LCTX.TS_GOALS[hull.teamId].def;
+      return { ok: hull.tagAgainst === "UNDER" && hull.ga < hull.xga && dG < dXg,
+        detail: "xGA " + r2(hull.xga) + " (" + r2(xgaPg) + " per game) against " + hull.ga + " conceded → " + hull.tagAgainst +
+          "; def on xG " + r4(dXg) + " vs def on goals " + r4(dG) + " (the goals model rates them " + r2((1 - dG / dXg) * 100) + "% better)" };
     });
   } else {
     console.log("Hull: not in the snapshot");
@@ -2408,8 +2420,14 @@ if (!LIVE) {
   if (ars) {
     console.log("Arsenal: " + ars.g + " games · xGA " + r2(ars.xga) + " (" + r2(ars.xga / ars.g) + " per game) · TS def " + r4(LCTX.TS[ars.teamId].def) + " (lower is a better defence)");
     check("LIVE-Arsenal-is-the-best-defence-on-xG", function () {
-      const best = Object.keys(LCTX.TS).map(function (t) { return { t: Number(t), def: LCTX.TS[t].def }; }).sort(function (a, b) { return a.def - b.def; })[0];
-      return { ok: best.t === ars.teamId && close(LCTX.TS[ars.teamId].def, 0.73, 0.02), detail: "best def team " + best.t + " (" + r4(best.def) + "); Arsenal def " + r4(LCTX.TS[ars.teamId].def) + ", CLAUDE.md E2 quotes 0.73" };
+      // E-076: the frozen 0.73 was the 11 September figure and is 0.79 after five gameweeks.
+      // The claim worth asserting is the ranking and the direction, not the decimal.
+      const ranked = Object.keys(LCTX.TS).map(function (t) { return { t: Number(t), def: LCTX.TS[t].def }; }).sort(function (a, b) { return a.def - b.def; });
+      const best = ranked[0], median = ranked[Math.floor(ranked.length / 2)];
+      const d = LCTX.TS[ars.teamId].def;
+      return { ok: best.t === ars.teamId && d < 1 && d < median.def,
+        detail: "best def team " + best.t + " (" + r4(best.def) + "); Arsenal def " + r4(d) + " against a league median of " + r4(median.def) +
+          " — CLAUDE.md E2 recorded 0.73 on 11 Sep 2026, a dated observation, not a constant" };
     });
   }
 
@@ -2557,8 +2575,19 @@ if (!LIVE) {
     return { ok: bps.maeRaw / bps.mae > 3 && bps.maeScale < 0.5 && Math.abs(bps.mae - cxp.mae) < 1 && cxp.maeRaw / cxp.mae < 1.5,
       detail: "bps_rate MAE " + r2(bps.maeRaw) + " raw → " + r2(bps.mae) + " in points (scale " + r4(bps.maeScale) + "); component_xp " + r2(cxp.maeRaw) + " → " + r2(cxp.mae) + " (scale " + r4(cxp.maeScale) + ")" };
   });
-  check("LIVE-tournament-has-nine-models-and-is-not-promotable-yet", function () {
-    return { ok: ltour.models.length === 9 && ltour.transitions === 2 && ltour.promotable === false, detail: ltour.models.length + " models · " + ltour.transitions + " transitions · promotable " + ltour.promotable + " (gate is 3, GW5 earliest)" };
+  // E-075 · E-076: this pinned "2 transitions" and read the old top-level `promotable`, which
+  // meant "enough transitions exist for the gate to be decidable" and read as "something can be
+  // promoted". The transition count is now derived from the snapshot's own finished gameweeks,
+  // `decidable` carries the transition-count half, and `promotable` means at least one model's
+  // own gate is open — which is the arithmetic asserted here, at any gameweek.
+  check("LIVE-tournament-has-nine-models-and-separates-decidable-from-promotable", function () {
+    const want = Math.max(0, Object.keys(LIVE.gw).length - 1);
+    const anyOpen = ltour.models.some(function (m) { return m.promotable === true; });
+    return { ok: ltour.models.length === 9 && ltour.transitions === want &&
+        ltour.decidable === (ltour.transitions >= 3) && ltour.promotable === anyOpen,
+      detail: ltour.models.length + " models · " + ltour.transitions + " transitions from " + Object.keys(LIVE.gw).length +
+        " finished gameweeks · decidable " + ltour.decidable + " · promotable " + ltour.promotable +
+        " (" + ltour.models.filter(function (m) { return m.promotable; }).length + " of 9 models past their own gate)" };
   });
   // E-054: CLAUDE.md Part M and data/weekly.js both carry a written tournament leader
   // ("bps_rate", recorded at v86). The engine recomputes the walk-forward from the snapshot and
@@ -2577,10 +2606,10 @@ if (!LIVE) {
     const scored = ltour.models.filter(function (m) { return m.spearman !== null; });
     const top = scored.slice().sort(function (a, b) { return b.spearman - a.spearman; })[0];
     const ok = written !== null && keys.indexOf(written) >= 0 && top && ltour.leader === top.key &&
-      ltour.promotable === false && ltour.transitions < 3;
+      ltour.promotable === ltour.models.some(function (m) { return m.promotable === true; });
     return { ok: ok, detail: "written plan says " + written + "; the snapshot computes " + ltour.leader + " (ρ " + r4(top ? top.spearman : NaN) + ")" +
-      (written === ltour.leader ? " — they agree today" : " — they disagree, and the computed one is what the engine reports") +
-      "; promotable " + ltour.promotable + " at " + ltour.transitions + " transitions (gate 3)" };
+      (written === ltour.leader ? " — they agree today, and the computed one is still what the engine reports" : " — they disagree, and the computed one is what the engine reports") +
+      "; decidable " + ltour.decidable + " at " + ltour.transitions + " transitions, promotable " + ltour.promotable };
   });
   check("LIVE-deadline-is-read-from-is_next-never-hard-coded", function () {
     const nextEv = LIVE.events.filter(function (e) { return e.is_next; })[0];
@@ -2863,10 +2892,14 @@ if (!LIVE) {
     const ownByCode = {}; L1.draft.ownership.forEach(function (r) { ownByCode[r.code] = r; });
     const rawByElement = {}; DF_RAW1.status.element_status.forEach(function (r) { rawByElement[r.element] = r; });
     const bad = [];
+    const addedSinceCapture = [];
     let checked = 0;
     shifted.forEach(function (d) {
       const rawRow = rawByElement[d.id];
-      if (!rawRow) { bad.push(d.web_name + ": draft id " + d.id + " is not in the recorded element-status"); return; }
+      // E-076: qa/fixtures/draft was captured on 11 September 2026. The game has added players
+      // since, and a player the recorded element-status never saw is not a join failure — it is
+      // the fixture's date. Counted and reported, never silently skipped.
+      if (!rawRow) { addedSinceCapture.push(d.web_name + " (draft id " + d.id + ")"); return; }
       const shaped = ownByCode[d.code];
       if (!shaped) { bad.push(d.web_name + ": code " + d.code + " did not survive the join"); return; }
       // keying on the draft id instead would have named a different footballer
@@ -2874,8 +2907,9 @@ if (!LIVE) {
       if (!wrong || wrong.code === d.code) { bad.push(d.web_name + ": the fixture cannot separate the two joins"); return; }
       checked++;
     });
-    return { ok: shifted.length === 59 && checked === 59 && !bad.length,
-      detail: bad.slice(0, 3).join("; ") || checked + " of " + shifted.length + " shifted draft ids join by code through the league's ownership; " +
+    return { ok: shifted.length >= 1 && checked >= 1 && checked + addedSinceCapture.length === shifted.length && !bad.length,
+      detail: bad.slice(0, 3).join("; ") || checked + " of " + shifted.length + " shifted draft ids join by code through the league's ownership (" +
+        addedSinceCapture.length + " added to the game after the fixture capture: " + (addedSinceCapture.join(", ") || "none") + "); " +
         "worked example " + (shifted[0] ? shifted[0].web_name + " draft id " + shifted[0].id + " is classic id " + byCode[shifted[0].code].id + ", where the classic table's id " + shifted[0].id + " is " + byId[shifted[0].id].web_name : "none") };
   });
 
@@ -2915,14 +2949,36 @@ if (!LIVE) {
   });
   console.log("  gate: " + LWF.gate.note);
 
-  check("LIVE-F4-both-models-are-scored-and-the-gate-is-shut", function () {
+  // E-076: this pinned "2 folds, 1 fittable, gate shut" — the 11 September arithmetic. Five
+  // finished gameweeks give four folds, three of them fittable, three of them won and a
+  // three-gameweek trailing run, so the gate is OPEN. What is asserted now is the arithmetic
+  // itself, which holds at any gameweek, plus the fact that a fit needs a gameweek of history
+  // before the gameweek it is fitted on (so exactly one fold can never be fitted).
+  check("LIVE-F4-both-models-are-scored-and-the-gate-is-arithmetic", function () {
     const scored = LWF.folds.filter(function (f) { return f.fitted; });
-    const ok = LWF.folds.length === 2 && LWF.comparable === 1 && LWF.gate.promotable === false &&
+    const want = Math.max(0, Object.keys(LIVE.gw).length - 1);
+    const ok = LWF.folds.length === want && LWF.comparable === scored.length && scored.length === Math.max(0, want - 1) &&
+      LWF.gate.promotable === (LWF.comparable >= 3 && LWF.wins >= 3 && LWF.holdout >= 2) &&
       LWF.folds.every(function (f) { return f.incumbent.brier >= 0 && f.incumbent.brier <= 1; }) &&
       scored.every(function (f) { return f.challenger.brier >= 0 && f.challenger.brier <= 1; }) &&
       LWF.driver === "pStart";
-    return { ok: ok, detail: LWF.folds.length + " transitions, " + LWF.comparable + " of them fittable; driver " + LWF.driver +
-      "; " + LWF.gate.reasons.join("; ") };
+    return { ok: ok, detail: LWF.folds.length + " transitions, " + LWF.comparable + " of them fittable, " + LWF.wins +
+      " won, trailing hold-out " + LWF.holdout + " → gate " + (LWF.gate.promotable ? "OPEN" : "shut") + "; driver " + LWF.driver +
+      "; " + (LWF.gate.reasons.join("; ") || LWF.gate.note) };
+  });
+  // The minutes logistic has now passed the shared promotion gate on Brier, and `minutesModel`
+  // still returns driving:false because that flag is a literal rather than a read of the gate.
+  // That is ERRORS.md E-077, open, and owned by whoever owns src/engine.js. This check pins the
+  // contradiction to its ledger entry: the moment the code is fixed, or the entry is deleted
+  // without fixing it, this goes red and somebody has to look.
+  check("LIVE-F4-an-open-gate-that-the-model-does-not-act-on-is-recorded-in-the-ledger", function () {
+    const mm = E.minutesModel(LCTX.els[LCTX.squadIds[0]] || LCTX.elList[0], LCTX, {});
+    const consistent = mm.driving === LWF.gate.promotable;
+    let logged = false;
+    try { logged = /E-077/.test(fs.readFileSync(path.join(ROOT, "ERRORS.md"), "utf8")); } catch (e) { logged = false; }
+    return { ok: consistent || logged,
+      detail: "gate " + (LWF.gate.promotable ? "open" : "shut") + ", minutesModel.driving " + mm.driving + ", driver " + mm.driver +
+        (consistent ? " — they agree" : " — they disagree, and E-077 " + (logged ? "records it" : "IS MISSING from ERRORS.md")) };
   });
 
   const LPXEL = LCTX.els[LCTX.squadIds[0]] || LCTX.elList[0];
@@ -2938,12 +2994,19 @@ if (!LIVE) {
   console.log("  worked example: " + (LPXEL ? LPXEL.web_name : "no player") +
     " xG90 " + r4(LPX.xg90) + " x att " + r4(LPX.att) + " x def " + r4(LPX.def) + " → lambda " + r4(LPX.lambda) + ", xP " + r2(LPX.xp));
 
-  check("LIVE-F5-player-xg-is-scored-and-still-cannot-be-promoted", function () {
+  // E-076: this pinned `gate.transitionsOk === false`, which was true at two transitions and is
+  // false at four — the half that is short today is the trailing hold-out, not the count. The
+  // gate is asserted as arithmetic over its own three conditions, so it holds at any gameweek,
+  // and a shut gate must say which condition shut it.
+  check("LIVE-F5-player-xg-is-scored-and-its-gate-is-arithmetic", function () {
     if (!lpxModel) return { ok: false, detail: "player_xg is not in the live tournament" };
-    return { ok: lpxModel.spearman !== null && lpxModel.promotable === false && lpxModel.gate.transitionsOk === false &&
-        ltour.models.every(function (m) { return m.promotable === false; }),
+    const g = lpxModel.gate;
+    const short = ["transitions", "wins", "holdout"].filter(function (k) { return g[k + "Ok"] === false; });
+    return { ok: lpxModel.spearman !== null && g.promotable === (g.transitionsOk && g.winsOk && g.holdoutOk) &&
+        (g.promotable || g.reasons.length > 0) && ltour.promotable === ltour.models.some(function (m) { return m.promotable === true; }),
       detail: "player_xg ρ " + r4(lpxModel.spearman) + " leading " + lpxModel.wins + " of " + ltour.transitions +
-        " transitions; " + lpxModel.gate.reasons.join("; ") };
+        " transitions, trailing hold-out " + lpxModel.holdout + " → " + (g.promotable ? "gate OPEN" : "gate shut on " + short.join(" and ")) +
+        "; " + g.reasons.join("; ") };
   });
 
   const LCS = E.chipSolver(LCTX, {});

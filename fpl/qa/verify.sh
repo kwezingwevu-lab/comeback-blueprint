@@ -4,10 +4,10 @@
 #   11 live reconciliations  — the shipped snapshot and the app's own numbers against
 #                              a fresh pull of the public API. Skipped, loudly, when the
 #                              network is unreachable; the SUITE line says so.
-#   20 static invariants     — things that must hold whether or not the network is up,
-#                              I1..I20 below, one of which is the esbuild syntax gate.
+#   22 static invariants     — things that must hold whether or not the network is up,
+#                              I1..I22 below, one of which is the esbuild syntax gate.
 #   ---
-#   31 checks
+#   33 checks
 #
 # The arithmetic, spelled out so nobody has to guess: the master prompt lists nine
 # invariant sentences, two of which name two artefacts each (banned fields in the
@@ -15,7 +15,11 @@
 # app), and one of which is the tdz scan — 11 checks. esbuild is the twelfth. v88 added
 # I13..I16 (imports survive the assembler; the shell style block carries no hex; the
 # draft-league block; the recorded draft fixtures) for 16, and the header still said 23
-# until v89 corrected it. v89 adds I17..I20 for the PWA: 11 + 20 = 31.
+# until v89 corrected it. v89 adds I17..I22 for the PWA — the manifest, worker and icons
+# exist and parse; the colours are the --bg token; the registration guard is executed
+# rather than grepped; the worker precaches this build only; every manifest-named file is
+# in the worker SHELL; and nothing the app ships is excluded by a gitignore rule
+# (E-076): 11 + 22 = 33.
 #
 # Every check prints "PASS <name> — <detail>" or "FAIL <name> — <detail>", and the last
 # line is "SUITE verify <pass>/<total>". Exit 1 on any FAIL.
@@ -576,7 +580,9 @@ const code=sw.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
 const cm=sw.match(/var CACHE = "([^"]+)";/);
 const sm=sw.match(/var SHELL = (\[[^\]]*\]);/);
 if(!cm||!sm){ console.log("sw.js does not declare CACHE and SHELL as literals"); process.exit(1); }
-const shell=JSON.parse(sm[1]);
+let shell;
+try { shell=JSON.parse(sm[1]); }
+catch(e){ console.log("the SHELL literal in sw.js is not valid JSON ("+e.message+"): "+sm[1].slice(0,160)); process.exit(1); }
 const pkg=JSON.parse(fs.readFileSync(path.join(R,"package.json"),"utf8"));
 const ver="v"+String(pkg.version).split(".")[0];
 const bad=[];
@@ -597,6 +603,70 @@ console.log("sw.js parses ("+code.split("\n").filter(l=>l.trim()).length+" code 
 ' 2>&1)"
 if [ $? -eq 0 ]; then ok "pwa-service-worker-precaches-this-build-only" "$sw_out"
 else bad "pwa-service-worker-precaches-this-build-only" "$sw_out"; fi
+
+# I21 · every file the manifest names is also precached by the worker
+# I17 proves the manifest's icons are on disk and I20 proves the worker's SHELL entries are on
+# disk, and between them they leave a gap wide enough to walk through: an icon added to the
+# manifest and not to shellList() is a file the installed app fetches from the network and does
+# not have offline. Today the two lists agree; they agree by hand, which is the kind of agreement
+# that holds until the fifth icon.
+shell_out="$(MC_ROOT="$ROOT" node -e '
+const fs=require("fs"), path=require("path");
+const D=path.join(process.env.MC_ROOT,"dist");
+const m=JSON.parse(fs.readFileSync(path.join(D,"manifest.webmanifest"),"utf8"));
+const sw=fs.readFileSync(path.join(D,"sw.js"),"utf8");
+const sm=sw.match(/var SHELL = (\[[^\]]*\]);/);
+if(!sm){ console.log("sw.js does not declare SHELL as a literal array"); process.exit(1); }
+let shell;
+try { shell=JSON.parse(sm[1]).map(u=>u.replace(/^\.\//,"")); }
+catch(e){ console.log("the SHELL literal in sw.js is not valid JSON ("+e.message+"): "+sm[1].slice(0,160)); process.exit(1); }
+const named=[m.start_url].concat(m.icons.map(i=>i.src)).map(u=>String(u).replace(/^\.\//,""));
+const gap=named.filter(u=>shell.indexOf(u)<0 && !(u==="" && shell.indexOf("")>=0));
+if(gap.length){ console.log("named by the manifest and NOT precached by the worker: "+gap.join(", ")+" (SHELL is "+shell.join(", ")+")"); process.exit(1); }
+if(shell.indexOf("manifest.webmanifest")<0){ console.log("the worker does not precache the manifest itself"); process.exit(1); }
+console.log(named.length+" manifest-named files (start_url + "+m.icons.length+" icons) all appear in the worker SHELL of "+shell.length);
+' 2>&1)"
+if [ $? -eq 0 ]; then ok "pwa-every-manifest-named-file-is-precached" "$shell_out"
+else bad "pwa-every-manifest-named-file-is-precached" "$shell_out"; fi
+
+# I22 · nothing the app ships is excluded from the repository by a gitignore rule
+# The defect this was written for (E-076): the repository root ignores *.png for the sibling
+# project's screenshots, so the three PWA icons build.cjs generates were never committed. The
+# manifest named them, the worker precached them, every other check passed — and a host serving
+# the committed dist/ would have answered 404 three times, with the iPhone install falling back
+# to a screenshot of the page for its icon.
+# The assertion is "not excluded", not "already tracked": a file generated a second ago is
+# legitimately untracked until somebody commits it, but a file an ignore rule has quietly
+# removed from the repository is a defect at any moment. Untracked files are named in the detail
+# so they are visible rather than silent.
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  bad "pwa-no-shipped-file-is-gitignored" "qa/verify.sh is not running inside a git work tree, so the exclusion rules cannot be read"
+else
+  pwa_files="dist/index.html dist/manifest.webmanifest dist/sw.js"
+  for ic in $(MC_ROOT="$ROOT" node -e '
+const fs=require("fs"), path=require("path");
+const m=JSON.parse(fs.readFileSync(path.join(process.env.MC_ROOT,"dist","manifest.webmanifest"),"utf8"));
+process.stdout.write(m.icons.map(i=>"dist/"+String(i.src).replace(/^\.\//,"")).join(" "));' 2>/dev/null); do
+    pwa_files="$pwa_files $ic"
+  done
+  excluded=""
+  untracked=""
+  counted=0
+  for f in $pwa_files; do
+    counted=$((counted + 1))
+    if [ ! -f "$f" ]; then excluded="$excluded $f(absent)"; continue; fi
+    if git check-ignore -q "$f"; then
+      excluded="$excluded $f($(git check-ignore -v "$f" | awk '{print $1}'))"
+    elif ! git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+      untracked="$untracked $f"
+    fi
+  done
+  if [ -z "$excluded" ]; then
+    ok "pwa-no-shipped-file-is-gitignored" "$counted shipped PWA files, none excluded by a gitignore rule${untracked:+; not yet committed:$untracked}"
+  else
+    bad "pwa-no-shipped-file-is-gitignored" "excluded from the repository:$excluded — the manifest names files the repository does not carry"
+  fi
+fi
 
 # ---------------------------------------------------------------- verdict
 

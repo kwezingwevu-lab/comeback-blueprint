@@ -464,3 +464,224 @@ CAUGHT: v88, by `mc_full` at the **25000 release count**, first run of `bash qa/
 RULE: a total function guards every element of every array it is handed, not just the ones the happy path reaches. Fixed one level up rather than one call site at a time: the history is filtered to objects once, at the top of the function (`var h = arr(hist).filter(isObj);`), so a null row is treated as no row at all — which is what it is — and every reader below can assume an object. A null row is not a gameweek of zero minutes.
 STATUS: **fixed**, same round, by the agent that owns `src/engine.js`, from the repro handed over above. Both repro calls now return the five bounded terms; nine junk histories (null-only, null-last, mixed, string, empty, non-array) were checked by hand before the suite was touched.
 TEST: `qa/mc_full.cjs` group P01 at the release count, which is what found it; and unit_engine "F4-minutesFeatureVector-is-bounded-on-any-history-and-starts-with-the-intercept", whose case list now carries six null-row and junk-row histories among its twelve, so the defect is caught deterministically at every count rather than only when the fuzzer happens to draw that junk kind. The real lesson is the count: this is the third defect the release count found that the dev count could not (E-035, E-036), and a tag is cut only after `bash qa/run.sh --release`.
+
+### E-075 · v89 · a new invariant went red on the comment that explains it (recurrence of E-013)
+CAUSE: the first version of `qa/verify.sh` I20, the service-worker invariant, asserted that `dist/sw.js` never names `api.anthropic.com` — the D4 refresh path must never be served from a cache. It tested the whole file, comments included, and the generated worker opens with a header comment that says in plain words why that origin is never cached. The comment was correct and the check was wrong: `SUITE verify 30/31 — red: pwa-service-worker-precaches-this-build-only`, on a worker that behaves exactly as intended. This is E-013 again in a different file: a scan that cannot tell a comment from a statement.
+CAUGHT: v89, on the first run of the new invariant, before anything shipped.
+RULE: a check on what code DOES reads the code with the comments stripped. I20 now builds `code` by removing block and line comments from `sw.js` and runs all three behavioural greps (non-GET skipped, cross-origin skipped, the refresh origin not named) against that, and prints how many code lines it scanned so the stripping is visible rather than assumed. The wider rule from E-013 stands and now has a second test behind it: never assert on source text without deciding first whether comments are part of what you are asserting.
+TEST: `qa/verify.sh` I20 "pwa-service-worker-precaches-this-build-only", which prints "sw.js parses (51 code lines after comments are stripped)". Mutation-proof of the stripping itself: putting `api.anthropic.com` back into the worker's header comment leaves the check green, and putting it into a statement turns it red.
+
+> Numbering note (v89): two sessions appended to this file in the same round. When the entries
+> below were drafted, `qa/verify.sh` I20 already carried a comment citing **E-075** and that entry
+> had not yet been written, so these were numbered from E-076 rather than claim a number another
+> agent was holding. E-075 landed while they were being written, which is the outcome the choice
+> was made for: the numbering held and nothing was overwritten. Append-only means the number you
+> take is the number nobody else can be taking.
+
+### E-076 · v89 · the app shipped a manifest naming three icons the repository did not carry
+CAUSE: `build.cjs` generates four PWA icons into `dist/`, and the repository root `.gitignore`
+carries `*.png` on line 4 for the sibling fitness project's screenshots. That rule swallowed
+`icon-192.png`, `icon-512.png` and `icon-maskable-512.png`, so the commit that added the PWA
+carried `dist/manifest.webmanifest` naming all four icons, `dist/sw.js` precaching all four, and
+`dist/icon.svg` — and none of the three PNGs. A host serving the committed `dist/` would have
+answered 404 three times: `apple-touch-icon` gone, so an iPhone "Add to Home Screen" falls back to
+a screenshot of the page, which is the exact device this feature was built for; two of the four
+manifest icons gone; and the service worker skipping them at install through the `catch` that is
+there so one missing file cannot abort the precache — silently, by design, for the wrong reason.
+CAUGHT: v89, by `git ls-files fpl/dist` printing four paths where seven files exist on disk, and
+then `git check-ignore -v` naming `.gitignore:4:*.png`. No suite could see it: every PWA check ran
+against the working tree, where `node build.cjs` had just written the files.
+RULE: a generated file the app names is a file the repository must carry, and "it exists on disk
+after a build" is not that. `fpl/.gitignore` re-includes `dist/*.png` (`!dist/*.png`, which is
+scoped so `qa/shots/*.png` stays ignored), and verify.sh asserts the property rather than the
+patch: for every file the manifest names, `git check-ignore -q` must say it is not excluded. The
+assertion is "not excluded", not "already tracked" — a file generated a second ago is legitimately
+uncommitted, while a file an ignore rule has quietly removed from the repository is wrong at any
+moment — and uncommitted files are named in the detail so they are visible rather than silent.
+TEST: `qa/verify.sh` I22 "pwa-no-shipped-file-is-gitignored", which reads the icon list out of the
+shipped manifest rather than a typed list, so a fifth icon is covered the day it is added.
+Mutation-proven: with `fpl/.gitignore` moved aside the suite goes 33/33 → 32/33 with
+"excluded from the repository: dist/icon-192.png(.gitignore:4:*.png) dist/icon-512.png(…)
+dist/icon-maskable-512.png(…)", and restoring it returns 33/33.
+
+### E-077 · v89 · a deadline that had just passed made the scheduled refresh decline for the wrong reason
+CAUSE: `.github/workflows/refresh.yml` reads the hours to the next deadline in node, hands the
+number back to bash, and the first version let bash hand it to a second `node -e` for the
+"is it inside 36 hours" comparison. The FPL API can still report a gameweek whose deadline has
+just passed as `is_next`, so that argument can be `-0.2`, and node reads a leading dash as a
+command-line option: `node: bad option: -0.2`. The comparison then produced an empty string, the
+`= "true"` test failed, and the run declined with the message "outside the 36-hour window" for a
+deadline twelve minutes in the past — a wrong answer wearing a plausible explanation, in the one
+window the second daily run exists for.
+CAUGHT: v89, before the workflow ran anywhere, by testing the gate at seven deadline positions
+(+334.8 h, +36.0, +35.9, +20, +0.5, −0.2, −4.0 and no `is_next` at all). The two negative cases
+printed `node: bad option`; the five others were correct, which is why reading the code was not
+going to find it.
+RULE: a number crosses the shell boundary once, or not at all. The window decision now lives in
+`gate.cjs` beside the arithmetic that produces the number, which emits `inside_window=1|0` and the
+window itself as text; bash reads the flag and never re-derives it. The window is stated as 36
+hours ahead to 3 hours behind, and the trailing edge is deliberate: it keeps the run going through
+the minutes after a deadline locks.
+TEST: the gate helper was run against the live API (GW6, deadline 2026-10-10T10:00:00Z, 334.8 h,
+`inside_window=0`) and against four synthetic bootstraps — deadline 12 minutes past → `hours=-0.2
+inside_window=1`; 4 hours past → `-4.0`, `0`; 20 hours ahead → `1`; no `is_next` → empty hours,
+`0`. The workflow is validated with `python3 -c "import yaml; yaml.safe_load(...)"` and both
+embedded helpers are extracted and `node --check`ed.
+
+### E-078 · v89 · two agents edited build.cjs and it declared serviceWorker twice
+CAUSE: two sessions were given the PWA half of v89 at the same time. One had already written the
+manifest, worker and icon generator into `build.cjs`; the other had read `build.cjs` before that
+landed, built its edit as an atomic batch against the bytes it had read, and applied it. Every
+`assert count == 1` in the batch passed, because the anchors it matched were still there — the
+other agent's code had been added around them, not over them. The result compiled, `node --check`
+passed, and the file declared `function serviceWorker` twice, at lines 372 and 709. Function
+declarations hoist, the later one wins, so every call resolved to the version that took one
+argument and the `shell` array the call site passed was dropped on the floor.
+CAUGHT: v89, by review, from the duplicate `const zlib = require("zlib")` that the same batch
+produced one line below an identical declaration — that one is a `SyntaxError` and stopped
+`node --check` immediately, which is the only reason the silent duplicate beside it was looked for.
+A duplicate `function` declaration is legal JavaScript and no gate in this project can see it.
+RULE: recon is not a step you do once. An atomic batch is only atomic against a file nobody else
+is writing, so the last thing before applying one is re-reading the target — and `assert
+count == 1` on an anchor proves the anchor is unique, never that the file is the one you read.
+When a collision is found the other agent's work is restored first and the merge is deliberate;
+the resolution here was to keep their implementation whole and drop the duplicate wholesale.
+`grep -o '^function [A-Za-z0-9_]*' build.cjs | sort | uniq -c | awk '$1>1'` prints nothing on a
+clean file and is the check that would have caught it in one line.
+TEST: no suite assertion — this one is a working-practice rule, and pretending otherwise would be
+worse than saying so. What is verified is the end state: `build.cjs` declares each of its 24
+top-level functions exactly once, and `verify.sh` I20 recomputes the worker's cache name from the
+shipped page, manifest and icons, so a worker built by the wrong code path cannot match it.
+
+### E-079 · v89 · a red check that could not say what was wrong
+CAUSE: `verify.sh` I20 and I21 both read the worker's `SHELL` array with `JSON.parse` on a regex
+capture. When that literal is malformed the exception escapes the `node -e`, bash captures a stack
+trace and keeps its first line, and the suite prints `FAIL pwa-service-worker-precaches-this-
+build-only — <anonymous_script>:1`. The check was right to go red and told the reader nothing.
+It matters more than it looks: `.github/workflows/refresh.yml` copies these `FAIL` lines straight
+into a GitHub issue, and an unreadable weekly failure is how a scheduled job gets muted.
+CAUGHT: v89, by an invalid first attempt at mutation-proving I21 — the mutation removed an array
+element and left a trailing comma, so both checks failed on the parse instead of the logic. The
+bad mutation was the useful one.
+RULE: a check reports what it found, not that it fell over. Both parses are wrapped and print the
+JSON error and the first 160 characters of the offending literal. A mutation that turns a check red
+for a different reason than the one being proven has not proven it; re-mutate.
+TEST: the trailing-comma mutation now yields "the SHELL literal in sw.js is not valid JSON
+(Unexpected token ']' …): [\"./\",\"./index.html\",…,]" on both checks, and the clean mutation —
+one element removed, list still valid JSON — turns I21 red alone (33/33 → 32/33, "named by the
+manifest and NOT precached by the worker: icon-maskable-512.png") while I20 stays green, which is
+the proof that I21 covers a gap I20 could not see.
+
+### E-080 · v89 · the refresh job sourced API-derived text as shell (recurrence of E-077's class)
+CAUSE: `gate.cjs` prints `key=value` lines and the workflow read them back with `. "$LOGS/gate.env"`.
+Two things are wrong with that and the second is the serious one. First, one of the values is a
+sentence — `window=36h ahead to 3h behind` — and sourcing it runs `ahead`, `to`, `3h` and `behind`
+as commands, leaving `window` set to `36h` and four "command not found" lines in the log of a job
+whose whole job is to be readable. Second, every value in that file was derived from a public HTTP
+response. `deadline` is a string the FPL API chose. Sourcing API-derived text is a shell-injection
+path, and it does not need a hostile API to go wrong — it needs one unexpected character.
+CAUGHT: v89, by reading the shipped text after fixing E-077, looking for other values crossing the
+same boundary. It had not run anywhere yet.
+RULE: read, never source. A `key=value` file produced for a shell is parsed with
+`sed -n "s/^key=//p"` into a variable, which evaluates nothing, tolerates spaces, and cannot run a
+command whatever the API returns. Nothing that came off the network is ever `.`-sourced, `eval`-ed
+or interpolated into a position where the shell would evaluate it.
+TEST: the gate step's shipped text is extracted from the YAML with only the `curl` line swapped for
+a fixture, and executed for six scenarios against real and synthetic bootstraps — morning far from
+a deadline (`proceed=1`), afternoon far (`proceed=0`, "334.7h away, outside the 36h ahead to 3h
+behind window", which is the sentence-valued variable surviving the read), afternoon 19.9h ahead
+(`1`), afternoon 0.3h past (`1`), afternoon 4.1h past (`0`), and no `is_next` at all (`0`, "the
+afternoon run needs a next deadline and the API reports none").
+
+### E-081 · v89 · a green run would have failed on the red it inherited
+CAUSE: the refresh job runs `validate_live` twice — once on the committed snapshot before fetching,
+to tell "this fetch broke something" apart from "this assertion is frozen to a past gameweek", and
+once afterwards as a gate. Both logs went into `$LOGS`, and a later step sweeps `$LOGS` for `^FAIL `
+and fails the job on a hit. So the baseline measurement, whose entire purpose is to record failures
+that are *not* this run's fault, would have failed the run for them — and it would have done it on
+every single run, because today the committed snapshot carries eleven of them. A diagnostic that
+fails the thing it is diagnosing is worse than no diagnostic.
+CAUGHT: v89, before the workflow ran anywhere, while working out what it would do against the real
+tree: `data/validate_live.cjs` is 76/87 on the 26 Sep snapshot with all eleven failures frozen to
+12 September, so the sweep would have hit eleven `FAIL` lines on a job whose own suites were green.
+RULE: measurements and results do not share a directory. `$LOGS` holds only what this run produced
+and is what the sweep and the failure issue read; `$HELPERS` holds inputs and evidence about the
+previous state. The rule generalises past this workflow: any "no FAIL anywhere" sweep has to be
+told exactly what "anywhere" means, or it will eventually be handed a log of expected failures.
+TEST: the step's shipped text is extracted and run against the real 76/87 snapshot twice. With the
+true baseline it reports "0 check(s) NEWLY broken by this fetch, 11 already failing on the committed
+snapshot", prints every one as a `before:`/`after:` pair, exits 1 and commits nothing. With one
+check removed from the baseline it reports "1 newly broken, 10 pre-existing", lists
+`FAIL next_event 4 — 6` under "the snapshot this job just wrote is the suspect", and annotates the
+run with both counts.
+
+### E-082 · v89 · a protocol check allowed two of the three reasons the rules give for a sell
+CAUSE: `qa/smoke_wk.cjs` asserted that every sell `transferProtocol` proposes either has no starts
+in three or gains more than the hit plus a margin — C1 rule 1 — and ignored `m.forced`. C2 step 1
+is explicit that a sell is also justified when the player is unavailable ("status != 'a'"), and a
+75% doubt is a status that is not "a". The check encoded two of the three justifications, so it was
+bound to go red the first week the engine did something it was entitled to do.
+CAUGHT: v89, the first week the protocol forced out a player who was starting — Brobbey, status d,
+three starts of three, a gain of only 2.44. The recommendation was right and the check could not
+express it.
+RULE: a check on a rule reproduces every branch of that rule, or it is a check on a different rule.
+Selling a starter on a doubt is the aggressive end of the protocol, so the third justification is
+allowed only when the reason is on screen with the player's name against it.
+TEST: `qa/smoke_wk.cjs` step 3 accepts a forced sell only when the landing copy names the player
+and the reason, and still requires the margin on an unforced one.
+
+### E-083 · v89 · a check named "on the fallback path" read the wildcard captain
+CAUSE: `qa/smoke_wk.cjs` step 14 asserts the captain is in the eleven on the fallback path, where
+no chip is played, and read `WEEKLY.classic.captain` — the captain of the WILDCARD fifteen. It
+passed through v87 and v88 only because the same player captained both paths.
+CAUGHT: v89, the moment the two paths differed: the wildcard fifteen captains Groß, who is not in
+the fallback fifteen at all, so a correct plan turned the check red.
+RULE: a check reads the field belonging to the path it is named for. Where one plan carries two
+paths, each path's captain and vice are asserted separately.
+TEST: step 14 reads `fallback.captain` and `fallback.vice` and asserts both are in the fallback
+eleven and differ; the wildcard captain is asserted in its own check above it.
+
+### E-084 · v89 · eleven snapshot assertions frozen to a past gameweek (a recurrence of E-064)
+CAUSE: `data/validate_live.cjs` asserted the 11 September observation as an invariant — three
+finished gameweeks ("1,2,3"), 79 rivals, `ft_available === 3`, `next_event 4`, `current_event 3`,
+the literal deadline `2026-09-12T12:30:00Z`, the GW4 draft waiver time, and the six mini-league
+sizes. Refreshing the snapshot to GW5 turned eleven of them red on data that was entirely correct.
+E-064 recorded this exact class in v88 and the rule did not reach this file, which is the part that
+matters: a ledger entry that does not get applied everywhere the class lives is a note, not a rule.
+CAUGHT: v110 preflight. The baseline gate came back `RED: 5 of 15 steps` with `validate_live 76/87`,
+`unit_engine 246/255`, `smoke 51/60`, `smoke_wk 26/36` and `components 128/133`, and every failure
+inspected was the same class: an expectation frozen to 12 September against a snapshot whose next
+deadline is 10 October.
+RULE: derive, never freeze. What is invariant is the snapshot's internal consistency with its own
+events, history and picks — the gameweek keys are exactly the finished events, `ft_available` is
+the replayed ledger, the deadline is the `is_next` event's own — not the values any one pull
+happened to carry. A dated observation is reported in the detail string, never asserted.
+TEST: `data/validate_live.cjs` 86/86 on the GW5 snapshot with every check derived from the file
+under test; `qa/verify.sh` reconciles the same fields against the live API. A future refresh moves
+the numbers in the detail strings and changes no assertion.
+
+### E-085 · v110 · rival managers' personal names were committed, and a suite held them in place
+CAUSE: `data/fetch_live.cjs` mapped `player_name` straight from the Classic league standings into
+`data/live.json`, and `data/draft_league.cjs` built a `manager` field from `player_first_name` and
+`player_last_name`. 115 name fields holding 84 distinct real people went into the snapshot and
+from there into `app/FPL_Mission_Control.jsx` and `dist/index.html` — 345 occurrences in the
+shipped tree — plus 50 more and 24 league-entry `short_name` values, which are managers'
+initials, in the recorded fixtures under `qa/fixtures/draft/`. Nothing rendered them, which is why
+nobody saw them; the rule is about committing, not rendering. Worse, `data/validate_live.cjs`
+asserted that `player_name` was PRESENT, so the suite was holding the violation in place and
+reporting green.
+CAUGHT: v110 preflight, reading the snapshot's shape against the privacy clause. Not by any suite,
+and not by the interface, because neither was looking.
+RULE: scrub at the write, not at the display — a display filter leaves the names on disk, in the
+built page and in git history. `data/scrub.cjs` drops the three name keys everywhere and
+`short_name` only from an object that identifies a league entry, because a Classic team's
+`short_name` is a club ("ARS") and a Draft entry's is a person ("KN"). The whole payload goes
+through it at the write, so a field added to a feed tomorrow cannot leak a name in by default.
+TEST: `qa/privacy.cjs`, first among the suites in `qa/run.sh` and `.github/workflows/gate.yml`:
+22/22 over 92 files and 12,650,291 bytes, 0 name keys and 0 league-entry initials where there were
+345 and 24. It matches quoted, single-quoted and BARE key positions — the first version insisted on
+double quotes and read `dist/index.html` as clean while that file carried 115 names, because the
+build inlines its data as a JavaScript object literal. It plants a violation in each encoding and
+asserts the scanner finds it, and asserts it does not fire on the key name used in prose, so a
+scanner that stops looking cannot pass (E-070's lesson). `data/validate_live.cjs` now requires the
+standings row's keys to be exactly {entry, entry_name, total, rank}.

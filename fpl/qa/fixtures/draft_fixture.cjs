@@ -1,11 +1,15 @@
 /*
  * qa/fixtures/draft_fixture.cjs — recorded draft-league responses, replayed offline.
  *
- * The files in qa/fixtures/draft/ are verbatim public responses captured on
- * 11 September 2026 (MANIFEST.json lists every URL and the capture time). No suite
- * ever calls the draft API: it calls the same shaping function data/fetch_live.cjs
- * calls, on these bytes, so a suite cannot pass against a copy of the shaping code
- * that the fetcher does not run.
+ * The files in qa/fixtures/draft/ are public responses captured on 11 September 2026
+ * (MANIFEST.json lists every URL and the capture time), with one change: the managers'
+ * personal names and initials were removed by data/scrub.cjs before they were committed.
+ * These are other people's leagues and the privacy rule is not limited to Kwezi's
+ * (v110 s1.5, ERRORS.md E-085). Everything the suites assert on -- entry ids,
+ * league-entry ids, team names, waiver picks, rosters -- is untouched.
+ *   No suite ever calls the draft API: it calls the same shaping function
+ * data/fetch_live.cjs calls, on these bytes, so a suite cannot pass against a copy of
+ * the shaping code that the fetcher does not run.
  *
  * League 1  "Garth Crooks Fan Club Draft" — 14 teams, 15 each, and three teams whose
  *           league-entry id differs from their entry id (the E-063 trap).

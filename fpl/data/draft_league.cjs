@@ -90,8 +90,9 @@ function shapeDraftLeague(opts) {
       leagueEntryId,
       entryId: intOrNull(e.entry_id),
       name: str(e.entry_name),
-      manager: (str(e.player_first_name) + " " + str(e.player_last_name)).trim(),
-      shortName: str(e.short_name),
+      // No manager and no shortName. player_first_name/player_last_name are personal names
+      // and short_name is the manager's initials; both are named in the privacy rule
+      // (v110 §1.5, ERRORS.md E-085). The team name and the entry id identify a rival.
       waiverPick: intOrNull(e.waiver_pick),
     });
   }
@@ -193,20 +194,15 @@ function shapeDraftLeague(opts) {
     };
   }
 
-  // Which of these fourteen teams is his. The entry id is exact; the name is a fallback
-  // and is only accepted when exactly one team matches it.
+  // Which of these teams is his, by entry id.
   const meEntryId = intOrNull(o.meEntryId);
   if (meEntryId) {
     const hit = out.entries.filter((e) => e.entryId === meEntryId)[0];
     if (hit) out.me = { leagueEntryId: hit.leagueEntryId, entryId: hit.entryId, via: "entry id" };
   }
-  if (!out.me && o.meName && typeof o.meName === "object") {
-    const want = (str(o.meName.first) + " " + str(o.meName.last)).trim().toLowerCase();
-    if (want) {
-      const hits = out.entries.filter((e) => e.manager.toLowerCase() === want);
-      if (hits.length === 1) out.me = { leagueEntryId: hits[0].leagueEntryId, entryId: hits[0].entryId, via: "manager name" };
-    }
-  }
+  // The name fallback is gone with the names. Matching "which of these teams is mine" against a
+  // manager's name needed the names stored, and the entry id is exact anyway: 279275 for this
+  // league (v110 §3), read from state or passed with --draft-entry.
   return out;
 }
 

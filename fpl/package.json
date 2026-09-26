@@ -1,7 +1,7 @@
 {
   "name": "fpl-mission-control",
   "private": true,
-  "version": "88.0.0",
+  "version": "89.0.0",
   "description": "FPL Mission Control — single-file React app for Kwezi's FPL season. Factory + QA suites.",
   "scripts": {
     "fetch": "node data/fetch_live.cjs",

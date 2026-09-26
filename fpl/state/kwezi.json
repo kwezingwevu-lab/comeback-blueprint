@@ -1,10 +1,10 @@
 {
-  "version": 88,
-  "exported_at": "2026-09-11T06:21:29Z",
+  "version": 89,
+  "exported_at": "2026-09-26T11:20:00Z",
   "entry": 3546875,
   "squad": [
     {
-      "id": 109,
+      "id": 496,
       "purchase": 45
     },
     {
@@ -12,12 +12,12 @@
       "purchase": 80
     },
     {
-      "id": 423,
-      "purchase": 45
-    },
-    {
       "id": 259,
       "purchase": 40
+    },
+    {
+      "id": 31,
+      "purchase": 45
     },
     {
       "id": 397,
@@ -40,15 +40,19 @@
       "purchase": 60
     },
     {
-      "id": 165,
-      "purchase": 75
-    },
-    {
       "id": 411,
       "purchase": 155
     },
     {
-      "id": 496,
+      "id": 346,
+      "purchase": 60
+    },
+    {
+      "id": 109,
+      "purchase": 45
+    },
+    {
+      "id": 212,
       "purchase": 45
     },
     {
@@ -56,18 +60,14 @@
       "purchase": 40
     },
     {
-      "id": 31,
-      "purchase": 45
-    },
-    {
-      "id": 212,
+      "id": 423,
       "purchase": 45
     }
   ],
-  "bank": 0,
-  "ft": 3,
-  "value": 1000,
-  "confirmed_gw": 3,
+  "bank": 16,
+  "ft": 4,
+  "value": 999,
+  "confirmed_gw": 5,
   "leagues": [
     1314671,
     1683215,
@@ -95,7 +95,7 @@
     ],
     "watchlist": [],
     "roster_complete": false,
-    "roster_note": "12 of 15 known (Gu\u00e9hi, Mbeumo, Gibbs-White, Rice, Igor Jesus, N.Jackson, Richarlison, Hughes, Senesi, Wilson, Truffert, Verbruggen). Three bench slots are unknown: the second goalkeeper, one defender and one further outfield player (by squad shape 2-5-5-3: 1 GKP, 2 DEF/MID/FWD short). Wilson is assumed to be the Leeds midfielder (code 153682); Brentford and Coventry also have a Wilson. Supply the draft league URL and the roster is read from the API."
+    "roster_note": "12 of 15 known (Guéhi, Mbeumo, Gibbs-White, Rice, Igor Jesus, N.Jackson, Richarlison, Hughes, Senesi, Wilson, Truffert, Verbruggen). Three bench slots are unknown: the second goalkeeper, one defender and one further outfield player (by squad shape 2-5-5-3: 1 GKP, 2 DEF/MID/FWD short). Wilson is assumed to be the Leeds midfielder (code 153682); Brentford and Coventry also have a Wilson. Supply the draft league URL and the roster is read from the API."
   },
   "ui": {
     "mode": "simple",
@@ -103,9 +103,117 @@
     "open": {},
     "reveals": {}
   },
-  "ledger": [],
+  "ledger": [
+    {
+      "gw": 4,
+      "type": "chip",
+      "pick": "Wildcard 1, the fifteen of record",
+      "alt": "No chip, no transfer",
+      "xp_pick": 0,
+      "xp_alt": 0,
+      "outcome": 71,
+      "regret": 31
+    },
+    {
+      "gw": 4,
+      "type": "transfer",
+      "pick": "The written fallback, three free",
+      "alt": "No transfer",
+      "xp_pick": 0,
+      "xp_alt": 0,
+      "outcome": 71,
+      "regret": 16
+    },
+    {
+      "gw": 4,
+      "type": "captain",
+      "pick": "João Pedro",
+      "alt": "Haaland",
+      "xp_pick": 6.1,
+      "xp_alt": 0,
+      "outcome": 71,
+      "regret": 3
+    },
+    {
+      "gw": 4,
+      "type": "xi",
+      "pick": "The best XI of the fifteen he held",
+      "alt": "The XI he played",
+      "xp_pick": 0,
+      "xp_alt": 0,
+      "outcome": 71,
+      "regret": 6
+    },
+    {
+      "gw": 5,
+      "type": "transfer",
+      "pick": "Nothing: the GW4 wildcard, unplayed",
+      "alt": "João Pedro out, Calvert-Lewin in",
+      "xp_pick": 0,
+      "xp_alt": 0,
+      "outcome": 62,
+      "regret": -2
+    },
+    {
+      "gw": 5,
+      "type": "captain",
+      "pick": "Nothing of record for GW5",
+      "alt": "Haaland",
+      "xp_pick": 0,
+      "xp_alt": 0,
+      "outcome": 62,
+      "regret": null
+    },
+    {
+      "gw": 5,
+      "type": "xi",
+      "pick": "The best XI of the fifteen he held",
+      "alt": "The XI he played",
+      "xp_pick": 0,
+      "xp_alt": 0,
+      "outcome": 62,
+      "regret": 5
+    }
+  ],
   "refresh": {
     "pair": "sonnet46",
     "last": null
+  },
+  "notes": {
+    "read_by_the_app": false,
+    "what_this_is": "A record carried by the file and NOT imported: sanitiseState keeps only the fields CONTRACT §6 lists, so nothing below reaches the app. It is here so the derivation of every number above can be checked by a human against the snapshot.",
+    "squad": "The GW5 fifteen, by element id, in the order entry/3546875/event/5/picks/ returns them (starters 1-11, bench 12-15). Source data/live.json picks[\"5\"], fetched 2026-09-26T10:49:45Z.",
+    "purchase_prices": "Fourteen players have been held since GW1 (history.current event_transfers is 0,0,0,0,1), so their purchase price is now_cost - cost_change_start. Exact, T0.",
+    "calvert_lewin_purchase": {
+      "value": 60,
+      "estimated": true,
+      "derivation": "Bought in GW5 (the only transfer of the season). The transfers endpoint needs a login, so the price is derived, not read. bank went 0 -> 16 tenths across GW4->GW5 with event_transfers_cost 0, so sell(João Pedro) - buy(Calvert-Lewin) = 16 exactly. João Pedro: now_cost 77, cost_change_start 2 -> purchase 75, sell price 76. Hence buy = 76 - 16 = 60, which is also Calvert-Lewin's start price (now_cost 60, cost_change_start 0).",
+      "what_would_change_it": "The pair (sell 75, buy 59) also satisfies the bank delta. It needs João Pedro to have been 76 or less at the GW5 deadline and Calvert-Lewin to have fallen to 59 by 18 September and recovered to 60 by 26 September. The snapshot carries one price per player, not a price history, so neither is excluded from the data alone. The figure is marked estimated for that reason."
+    },
+    "reconciliation": {
+      "purchase_sum": 985,
+      "bank": 16,
+      "purchase_sum_plus_bank": 1001,
+      "gw5_value": 999,
+      "gap": 2,
+      "reading": "purchase sum + bank = 1001 against the GW5 value of 999: a gap of 2 tenths (£0.2m). history.current[].value is selling value + bank measured at that gameweek's deadline, and a player whose price has fallen sells at his current price, so the gap is the net of the falls and the halved rises as at 18 September. It is not a missing or invented price. Selling value computed on today's prices is 979 (+ bank 16 = 995), four tenths lower again, because Semenyo, Brobbey, Hughes and Shaw have fallen further since that deadline.",
+      "not_asserted_exact": "The identity value = sell + bank cannot be asserted to the tenth from this snapshot, because the snapshot has no per-deadline prices. What is asserted: the bank delta pins sell(out) - buy(in) exactly, and the gap above is signed and explained."
+    },
+    "ft": "ft 4 for GW6: live.json ft_available, and E.ftAvailable(history, 5) independently derives 4. One transfer used in GW5, none before, cap 5.",
+    "chips": "history.chips is [] on 26 September 2026. No chip has been played. The v87/v88 plan of record recommended Wildcard 1 in GW4; it was never played. All four chips of set 1 (expiring at the GW19 deadline) and all four of set 2 remain.",
+    "ledger": {
+      "basis": "Every row is a decision that was on the table, what the app recommended, what he did, what the gameweek actually scored, and the marginal regret. CONTRACT §6 fixes the eight fields; the semantics are: pick = the app's recommendation, alt = what he actually did, outcome = the realised squad points of the gameweek as played (T0, history.current[].points), regret = the marginal squad points the recommendation would have ADDED, so a positive regret means ignoring the app cost him that many and a negative regret means his own call was better. null regret means the app had no recommendation of record for that decision.",
+      "counterfactual": "Realised, not modelled. Every player's gameweek points come from data/live.json gw[\"4\"] and gw[\"5\"], which are the event/{gw}/live/ rows (T0). A recommended fifteen was never played, so it has no played eleven: its counterfactual is scored on the HINDSIGHT-OPTIMAL legal eleven with the recommended captain doubled, which makes the squad-level regret an UPPER BOUND. The xi rows isolate his own eleven-and-bench leak on exactly the same hindsight-optimal basis, so the two net: of the 31 on the GW4 chip row, 25 is the squad and 6 is the eleven he picked out of the fifteen he had.",
+      "xp_fields": "xp_pick and xp_alt carry the EX-ANTE expectation only where this project recorded one at the time. The only such figure in the memory files is EV_cap 6.1 for João Pedro's GW4 captaincy (CLAUDE.md Part M). Everywhere else they are 0, which means \"no ex-ante figure was recorded\", not \"an expectation of zero\". They are not recomputed from today's snapshot: the snapshot carries one price, one status and one cumulative stat line per player, so any ex-ante number rebuilt from it would read the gameweek it is predicting (ERRORS.md E-069).",
+      "workings": {
+        "gw4_wildcard": "The fifteen of record (data/weekly.js v88 classic.wildcard15) scored 96 across all fifteen; its best legal eleven in hindsight, 3-4-3 with João Pedro captained, is Raya, Bogle, Tarkowski, Calafiori, Saka, Rogers, Janelt, Scott, João Pedro, Haaland, Barry = 102. He scored 71.",
+        "gw4_fallback": "The written fallback (Hughes→Yalcouyé, Shaw→Ajayi, Diop→Mendy, three free transfers, no hit) gives a best hindsight eleven of 87 in 3-5-2. He scored 71.",
+        "gw4_captain": "João Pedro scored 12, Haaland 9. Both were in the eleven, so the armband swap is worth exactly 12 - 9 = 3 squad points.",
+        "gw4_xi": "The best legal eleven of the fifteen he actually held, Haaland captained, is 77 against the 71 he played: 14 points sat on the bench and 6 of them were recoverable.",
+        "gw5_transfer": "João Pedro scored 0 in GW5 and Calvert-Lewin scored 2, both as single-count starters, so the transfer he made GAINED 2 and the regret is -2. On the hindsight-best-eleven basis the same comparison reads 66 against 67, a gain of 1.",
+        "gw5_xi": "The best legal eleven of his GW5 fifteen is 67 against the 62 he played: 8 on the bench, 5 recoverable, mostly Verbruggen 6 benched behind Kinsky 2."
+      },
+      "bench_leak": "points_on_bench by gameweek: 3, 4, 14, 14, 8 = 43 over five gameweeks, and the last three are the worst three. The recoverable part, measured as the best legal eleven against the eleven played, is 6 in GW4 and 5 in GW5."
+    }
   }
 }

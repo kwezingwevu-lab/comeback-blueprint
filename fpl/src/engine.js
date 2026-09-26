@@ -193,9 +193,15 @@
  *
  * Tournament (E5)
  *   tournament(live)                → {models:[{key,name,spearman,mae,maeRaw,maeScale,
- *                                      maeCalibrated,transitions}], leader, promotable,
- *                                      transitions, maeUnits:"points", maeNote} — MAE is rescaled
- *                                      into points before it is compared across models (E-047)
+ *                                      maeCalibrated,transitions,wins,holdout,gate,promotable}],
+ *                                      leader, decidable, promotable, transitions,
+ *                                      maeUnits:"points", maeNote} — MAE is rescaled into points
+ *                                      before it is compared across models (E-047).
+ *                                      decidable = enough transitions exist for the gate to be
+ *                                      DECIDED (transitions >= TOURNAMENT_PROMOTE_AT); it says
+ *                                      nothing about any model passing. promotable = at least one
+ *                                      model's own gate is open, which is what the word reads as
+ *                                      (E-075). Per model, `promotable` is that model's gate.
  *   calibrateToPoints(pred, actual) → {scale, calibrated, pred[]}
  *   spearman(a, b) / mae(a, b)      → numbers
  *
@@ -876,7 +882,7 @@ function buildCtx(live, state, now) {
       var row = {
         leagueEntryId: lid,
         entryId: e.entryId === null || e.entryId === undefined ? null : (intOf(e.entryId, 0) || null),
-        name: String(e.name || ""), manager: String(e.manager || ""), shortName: String(e.shortName || ""),
+        name: String(e.name || ""),
         waiverPick: e.waiverPick === null || e.waiverPick === undefined ? null : (intOf(e.waiverPick, 0) || null)
       };
       ctx.draft.entries.push(row); ctx.draft.entryById[lid] = row;
@@ -1913,8 +1919,8 @@ function draftRivalRosters(ctx) {
       var ids = [];
       codes.forEach(function (c) { var r = draftEl(c, ctx); if (r && r.classic) ids.push(r.classic.id); });
       out.push({
-        leagueEntryId: e.leagueEntryId, entryId: e.entryId, name: e.name, manager: e.manager,
-        shortName: e.shortName, waiverPick: e.waiverPick, codes: codes, ids: ids
+        leagueEntryId: e.leagueEntryId, entryId: e.entryId, name: e.name,
+        waiverPick: e.waiverPick, codes: codes, ids: ids
       });
     });
   } catch (e) { /* total */ }
@@ -1931,7 +1937,7 @@ function waiverOrder(ctx) {
     if (!entries.length) { res.note = ctx.draft.note || "no draft league"; return res; }
     var meId = ctx.draft.me ? ctx.draft.me.leagueEntryId : null;
     var rows = entries.map(function (e) {
-      return { leagueEntryId: e.leagueEntryId, name: e.name, manager: e.manager, waiverPick: e.waiverPick, mine: !!meId && e.leagueEntryId === meId, position: 0 };
+      return { leagueEntryId: e.leagueEntryId, name: e.name, waiverPick: e.waiverPick, mine: !!meId && e.leagueEntryId === meId, position: 0 };
     });
     rows.sort(function (a, b) {
       var pa = a.waiverPick === null ? Infinity : a.waiverPick, pb = b.waiverPick === null ? Infinity : b.waiverPick;
@@ -1964,8 +1970,8 @@ function h2hOpponent(ctx, gw) {
     res.ok = true; res.finished = !!m.finished; res.started = !!m.started;
     res.myPoints = m.entry1 === me ? m.points1 : m.points2;
     res.oppPoints = m.entry1 === me ? m.points2 : m.points1;
-    res.mine = { leagueEntryId: me, name: mineRow ? mineRow.name : "", manager: mineRow ? mineRow.manager : "" };
-    res.opponent = { leagueEntryId: oppId, name: oppRow ? oppRow.name : "", manager: oppRow ? oppRow.manager : "" };
+    res.mine = { leagueEntryId: me, name: mineRow ? mineRow.name : "" };
+    res.opponent = { leagueEntryId: oppId, name: oppRow ? oppRow.name : "" };
     res.note = "GW" + ev + ": " + res.mine.name + " against " + res.opponent.name;
   } catch (e) { res.note = "engine error: " + errMsg(e); }
   return res;
@@ -2607,7 +2613,7 @@ function calibrateToPoints(pred, actual) {
   return res;
 }
 function tournament(live) {
-  var res = { models: TOURNAMENT_MODELS.map(function (m) { return { key: m.key, name: m.name, spearman: null, mae: null, maeRaw: null, maeScale: null, maeCalibrated: false, transitions: 0, perTransition: [], wins: 0, holdout: 0, gate: null, promotable: false }; }), leader: null, promotable: false, transitions: 0, transitionWinners: [], maeUnits: "points", maeNote: "", note: "" };
+  var res = { models: TOURNAMENT_MODELS.map(function (m) { return { key: m.key, name: m.name, spearman: null, mae: null, maeRaw: null, maeScale: null, maeCalibrated: false, transitions: 0, perTransition: [], wins: 0, holdout: 0, gate: null, promotable: false }; }), leader: null, decidable: false, promotable: false, transitions: 0, transitionWinners: [], maeUnits: "points", maeNote: "", note: "" };
   try {
     if (!isObj(live) || !isObj(live.gw)) { res.note = "no finished gameweeks in the snapshot"; return res; }
     var keys = Object.keys(live.gw).map(function (k) { return num(k, NaN); }).filter(isFinite).sort(sortNum);
@@ -2685,7 +2691,11 @@ function tournament(live) {
     res.transitions = Math.max.apply(null, [0].concat(res.models.map(function (m) { return m.transitions; })));
     var ranked = res.models.filter(function (m) { return m.spearman !== null; }).sort(function (a, b) { return b.spearman - a.spearman || a.mae - b.mae; });
     res.leader = ranked.length ? ranked[0].key : null;
-    res.promotable = res.transitions >= TOURNAMENT_PROMOTE_AT;      // the transition-count half of the gate
+    // E-075: this flag used to be called `promotable`, which read as "something can be
+    // promoted" while every model's own gate was shut. It is the transition-count half of the
+    // gate and nothing else, so it is `decidable`: enough transitions exist for the gate to be
+    // decided. `promotable` below is the honest reading of the word.
+    res.decidable = res.transitions >= TOURNAMENT_PROMOTE_AT;
     // Which model led each transition, and then the SHARED promotion gate (CLAUDE.md J) per
     // model: three scored transitions, three of them led, and a two-gameweek trailing run.
     // promotionGate is the one door; F4's minutes walk-forward goes through the same function.
@@ -2708,7 +2718,14 @@ function tournament(live) {
       m.gate = promotionGate({ transitions: m.transitions, wins: wins, holdout: trail, challenger: m.name, incumbent: "E1 xP in production" });
       m.promotable = m.gate.promotable;
     });
-    res.note = res.transitions ? (res.transitions + " walk-forward transition" + (res.transitions === 1 ? "" : "s") + "; promotion needs " + TOURNAMENT_PROMOTE_AT) : "fewer than two finished gameweeks: no transition to score";
+    // E-075: the top-level word now means what it says — at least one model's own gate is open.
+    res.promotable = res.models.some(function (m) { return m.promotable === true; });
+    res.note = res.transitions
+      ? (res.transitions + " walk-forward transition" + (res.transitions === 1 ? "" : "s") + "; promotion needs " + TOURNAMENT_PROMOTE_AT +
+         " with a " + PROMOTION_HOLDOUT_WEEKS + "-gameweek trailing hold-out. The gate is " +
+         (res.decidable ? "decidable" : "not decidable yet") + " and " +
+         (res.promotable ? "one or more models have passed it" : "no model has passed it") + ".")
+      : "fewer than two finished gameweeks: no transition to score";
   } catch (e) { res.note = "engine error: " + errMsg(e); }
   return res;
 }

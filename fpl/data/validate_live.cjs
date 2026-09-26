@@ -18,15 +18,32 @@ for (const k of KEYS) ok(`key ${k}`, k in L);
 ok("fetched_at ISO UTC", /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(L.fetched_at), L.fetched_at);
 ok("20 teams", L.teams.length === 20, String(L.teams.length));
 ok(">=600 elements", L.elements.length >= 600, String(L.elements.length));
-ok("3 finished GWs in gw", Object.keys(L.gw).join(",") === "1,2,3", Object.keys(L.gw).join(","));
+// E-084 (a recurrence of E-064): these were frozen to the 11 September snapshot ("1,2,3", 79 rivals, ft 3, GW4).
+// A refreshed snapshot that was entirely correct turned eleven of them red. What is invariant
+// is the snapshot's internal consistency with its own events, history and picks; the gameweek
+// numbers are not. verify.sh reconciles the same fields against the live API.
+const finishedIds = L.events.filter((e) => e.finished).map((e) => e.id).sort((a, b) => a - b);
+const gwIds = Object.keys(L.gw).map(Number).sort((a, b) => a - b);
+ok("gw blocks are exactly the finished events", gwIds.join(",") === finishedIds.join(","), gwIds.join(",") + " vs events[finished] " + finishedIds.join(","));
 ok("6 leagues", L.leagues.length === 6, String(L.leagues.length));
-ok("79 rivals", Object.keys(L.rivals).length === 79, String(Object.keys(L.rivals).length));
+const rivalUnion = new Set(L.leagues.flatMap((l) => l.standings.map((s) => s.entry)).filter((e) => e !== L.entry.id));
+ok("every rival in the six leagues has a picks row and nobody else does",
+  Object.keys(L.rivals).length === rivalUnion.size && [...rivalUnion].every((e) => L.rivals[String(e)]),
+  Object.keys(L.rivals).length + " rival rows against a standings union of " + rivalUnion.size);
 ok('no "ep_" substring', !text.includes("ep_"));
-ok("ft_available === 3", L.ft_available === 3, String(L.ft_available));
-ok("next_event 4", L.next_event === 4, String(L.next_event));
+ok("ft_available is an integer within the cap of 5", Number.isInteger(L.ft_available) && L.ft_available >= 0 && L.ft_available <= 5, String(L.ft_available));
 const nextEv = L.events.find((e) => e.is_next);
-ok("deadline 2026-09-12T12:30:00Z", nextEv && nextEv.deadline_time === "2026-09-12T12:30:00Z", nextEv && nextEv.deadline_time);
-ok("current_event 3", L.current_event === 3, String(L.current_event));
+const curEv = L.events.find((e) => e.is_current);
+ok("next_event is events[is_next] and one past current_event",
+  !!nextEv && L.next_event === nextEv.id && L.next_event === L.current_event + 1,
+  "next_event " + L.next_event + ", events[is_next] " + (nextEv ? nextEv.id : "none") + ", current_event " + L.current_event);
+ok("the next deadline is ISO UTC, unfinished, and later than every finished deadline",
+  !!nextEv && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(nextEv.deadline_time) && nextEv.finished === false &&
+  L.events.filter((e) => e.finished).every((e) => Date.parse(e.deadline_time) < Date.parse(nextEv.deadline_time)),
+  nextEv ? nextEv.deadline_time : "no is_next event");
+ok("current_event is events[is_current] and is finished",
+  !!curEv && L.current_event === curEv.id && curEv.finished === true,
+  "current_event " + L.current_event + ", events[is_current] " + (curEv ? curEv.id + (curEv.finished ? " finished" : " NOT finished") : "none"));
 ok("total_players number", typeof L.total_players === "number" && L.total_players > 1e7, String(L.total_players));
 
 // element shape and numeric types
@@ -60,25 +77,50 @@ for (const g of Object.keys(L.gw)) {
 // entry / history / picks
 ok("entry id 3546875", L.entry.id === 3546875);
 ok("entry keys", ["id","name","summary_overall_points","summary_overall_rank","summary_event_points","current_event","last_deadline_bank","last_deadline_value","last_deadline_total_transfers"].every((k) => k in L.entry));
-ok("history 3 rows", L.history.current.length === 3, String(L.history.current.length));
+ok("history carries one row per played gameweek, in order",
+  L.history.current.length === L.current_event && L.history.current.every((h, i) => h.event === i + 1),
+  L.history.current.length + " rows for current_event " + L.current_event);
 ok("history keys", L.history.current.every((h) => ["event","points","total_points","rank","overall_rank","bank","value","event_transfers","event_transfers_cost","points_on_bench"].every((k) => k in h)));
 ok("chips array", Array.isArray(L.history.chips));
-ok("picks GW1..3", Object.keys(L.picks).join(",") === "1,2,3", Object.keys(L.picks).join(","));
-const pickIds = (g) => L.picks[g].picks.map((p) => p.element).sort((a, b) => a - b).join(",");
-ok("picks GW1=GW2=GW3", pickIds("1") === pickIds("2") && pickIds("2") === pickIds("3"));
-ok("GW3 picks = §9 ids", pickIds("3") === "4,12,31,40,109,165,175,212,259,368,397,411,423,496,552", pickIds("3"));
+const pickKeys = Object.keys(L.picks).map(Number).sort((a, b) => a - b);
+ok("picks cover GW1 to current_event", pickKeys.join(",") === Array.from({ length: L.current_event }, (_, i) => i + 1).join(","), pickKeys.join(","));
+const pickSet = (g) => new Set(L.picks[String(g)].picks.map((p) => p.element));
+// A fifteen changes only where the history says a transfer was made, or a wildcard or free hit
+// was played. This ties picks to history instead of freezing one week's ids.
+const chipWeeks = new Set(L.history.chips.filter((c) => c.name === "wildcard" || c.name === "freehit").map((c) => c.event));
+const churn = [];
+for (let g = 2; g <= L.current_event; g++) {
+  const a = pickSet(g - 1), b = pickSet(g);
+  const moved = [...b].filter((x) => !a.has(x)).length;
+  const row = L.history.current.find((h) => h.event === g) || { event_transfers: 0 };
+  if (!chipWeeks.has(g) && moved !== row.event_transfers) churn.push("GW" + g + ": " + moved + " players in against event_transfers " + row.event_transfers);
+}
+ok("every change of fifteen is a transfer the history records", churn.length === 0, churn.join("; ") || "GW1–GW" + L.current_event + " reconcile");
+const lastPicks = L.picks[String(L.current_event)].picks;
+const posOf = new Map(L.elements.map((e) => [e.id, e.element_type]));
+const shape = [0, 0, 0, 0, 0];
+lastPicks.forEach((p) => { shape[posOf.get(p.element)]++; });
+ok("the latest fifteen is 2-5-5-3 with one captain and one vice",
+  shape.slice(1).join("-") === "2-5-5-3" && lastPicks.filter((p) => p.is_captain).length === 1 &&
+  lastPicks.filter((p) => p.is_vice_captain).length === 1 && lastPicks.filter((p) => p.multiplier >= 1).length === 11,
+  "shape " + shape.slice(1).join("-") + ", " + lastPicks.filter((p) => p.multiplier >= 1).length + " starters");
 ok("picks have 15 with position/multiplier/captain flags", Object.values(L.picks).every((p) => p.picks.length === 15 && p.picks.every((x) => "position" in x && "multiplier" in x && typeof x.is_captain === "boolean" && typeof x.is_vice_captain === "boolean") && "active_chip" in p));
 
 // leagues / rivals
-const want = { 1314671: 8, 1683215: 11, 26474: 17, 512557: 23, 989793: 24, 512550: 28 };
-ok("league ids = §3", L.leagues.map((l) => l.id).join(",") === Object.keys(want).map(Number).sort((a, b) => a - b).join(",") || L.leagues.every((l) => want[l.id]), L.leagues.map((l) => l.id).join(","));
-ok("league sizes = §3", L.leagues.every((l) => l.size === want[l.id] && l.standings.length === l.size), L.leagues.map((l) => `${l.id}:${l.size}`).join(" "));
+// The six league IDs are stable; their sizes are not — mini-leagues gain and lose entries
+// every week, and the §3 sizes were a September observation (E-084).
+const WANT_IDS = [26474, 512550, 512557, 989793, 1314671, 1683215];
+ok("league ids = §3", L.leagues.map((l) => l.id).sort((a, b) => a - b).join(",") === WANT_IDS.join(","), L.leagues.map((l) => l.id).join(","));
+ok("every league's size is its standings length", L.leagues.every((l) => l.size === l.standings.length && l.size >= 1), L.leagues.map((l) => `${l.id}:${l.size}`).join(" "));
 ok("league rank/last_rank numbers", L.leagues.every((l) => Number.isInteger(l.rank) && Number.isInteger(l.last_rank)), L.leagues.map((l) => `${l.name} ${l.rank}/${l.last_rank}`).join(" · "));
-ok("standings keys", L.leagues.every((l) => l.standings.every((s) => ["entry","player_name","entry_name","total","rank"].every((k) => k in s))));
+// The standings row is {entry, entry_name, total, rank} and nothing else. player_name used to be
+// asserted PRESENT here, which is how 84 rival managers' names came to be committed with a green
+// suite (ERRORS.md E-085). qa/privacy.cjs is the belt; this is the braces.
+const STANDINGS_KEYS = ["entry","entry_name","total","rank"];
+ok("standings keys exact", L.leagues.every((l) => l.standings.every((s) =>
+  STANDINGS_KEYS.every((k) => k in s) && Object.keys(s).length === STANDINGS_KEYS.length)));
 ok("Kwezi not a rival", !("3546875" in L.rivals));
-const allRivals = new Set(L.leagues.flatMap((l) => l.standings.map((s) => s.entry)).filter((e) => e !== 3546875));
-ok("rivals = union of standings minus Kwezi", [...allRivals].every((e) => L.rivals[String(e)]) && Object.keys(L.rivals).length === allRivals.size);
-ok("rival picks 15 for event 3", Object.values(L.rivals).every((r) => r.event === 3 && r.picks.length === 15 && r.picks.every((p) => ["element","is_captain","multiplier","position"].every((k) => k in p))));
+ok("rival picks are fifteen for the current event", Object.values(L.rivals).every((r) => r.event === L.current_event && r.picks.length === 15 && r.picks.every((p) => ["element","is_captain","multiplier","position"].every((k) => k in p))), "event " + [...new Set(Object.values(L.rivals).map((r) => r.event))].join(","));
 
 // draft
 ok("draft keys", ["game","events","scoring","squad","elements","league_id"].every((k) => k in L.draft));
@@ -103,9 +145,12 @@ if (L.draft.league_id === null) {
   ok("free agents are unowned and available",
     L.draft.freeAgents.every((c) => { const r = L.draft.ownership.find((x) => x.code === c); return r && r.owner === null && r.status === "a"; }));
 }
-ok("draft game next_event 4", L.draft.game.next_event === 4 && "waivers_processed" in L.draft.game);
-const dEv4 = L.draft.events.find((e) => e.id === 4);
-ok("draft GW4 waivers 2026-09-11T12:30:00Z", dEv4 && dEv4.waivers_time === "2026-09-11T12:30:00Z", dEv4 && dEv4.waivers_time);
+ok("the draft game is on the same next event as the classic game", L.draft.game.next_event === L.next_event && "waivers_processed" in L.draft.game, "draft " + L.draft.game.next_event + " vs classic " + L.next_event);
+const dNext = L.draft.events.find((e) => e.id === L.next_event);
+const waiverLead = dNext && nextEv ? (Date.parse(nextEv.deadline_time) - Date.parse(dNext.waivers_time)) / 3600000 : null;
+ok("draft waivers process between 0 and 48 hours before the classic deadline",
+  !!dNext && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(dNext.waivers_time) && waiverLead > 0 && waiverLead <= 48,
+  dNext ? dNext.waivers_time + ", " + (waiverLead === null ? "?" : waiverLead.toFixed(1)) + "h before " + nextEv.deadline_time : "no draft event " + L.next_event);
 ok("draft scoring GKP goal 10, bonus applied", L.draft.scoring.goals_scored_GKP === 10 && L.draft.scoring.bonus === 1);
 ok("draft elements carry code", L.draft.elements.every((e) => Number.isInteger(e.code) && ["id","code","web_name","team","element_type","status","chance","news","starts","minutes","total_points"].every((k) => k in e)));
 const classicByCode = new Map(L.elements.map((e) => [e.code, e]));

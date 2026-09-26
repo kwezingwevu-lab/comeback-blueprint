@@ -30,6 +30,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { scrubNames } = require("./scrub.cjs");
 const ENGINE = require("../src/engine.js");                 // draftLeagueInput: one parser, not two
 const { shapeDraftLeague, emptyDraftLeague } = require("./draft_league.cjs");
 
@@ -61,7 +62,6 @@ function savedDraft() {
 const SAVED = savedDraft();
 const DRAFT_INPUT = argOf("--draft-league") || SAVED.input || (SAVED.league_id ? String(SAVED.league_id) : null);
 const DRAFT_ENTRY_ARG = argOf("--draft-entry") || (SAVED.entry_id ? String(SAVED.entry_id) : null);
-const MANAGER_NAME = { first: "Kwezi", last: "Ngwevu" };
 
 // ---------------------------------------------------------------- transport
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -302,7 +302,9 @@ async function main() {
     leagues.push({
       id, name, size: results.length,
       rank: me ? me.rank : null, last_rank: me ? me.last_rank : null,
-      standings: results.map((r) => ({ entry: r.entry, player_name: r.player_name, entry_name: r.entry_name, total: r.total, rank: r.rank })),
+      // No player_name. Rival managers' personal names are never committed (v110 §1.5,
+      // ERRORS.md E-085); the entry id and the team name are what the app needs.
+      standings: results.map((r) => ({ entry: r.entry, entry_name: r.entry_name, total: r.total, rank: r.rank })),
     });
     for (const r of results) if (r.entry !== ENTRY) rivalIds.add(r.entry);
   }
@@ -388,7 +390,7 @@ async function main() {
         entryIds.forEach((eid, i) => { if (picksRaw[i]) picks[String(eid)] = picksRaw[i]; });
         const block = shapeDraftLeague({
           details, status, picks, elements: draft.elements, leagueId,
-          meEntryId, meName: MANAGER_NAME, event: draftGw,
+          meEntryId, event: draftGw,
         });
         Object.assign(draft, block);
         draft.league_id = leagueId;
@@ -425,7 +427,10 @@ async function main() {
     leagues, rivals, draft,
   };
 
-  const text = JSON.stringify(out);
+  // Belt and braces over the field-by-field mapping above: the whole payload goes through the
+  // scrubber on its way out, so a field added to a feed tomorrow cannot carry a personal name
+  // into the snapshot just because nobody thought to strip it (ERRORS.md E-085).
+  const text = JSON.stringify(scrubNames(out));
   if (text.includes("ep_")) {
     // Banned-field invariant: refuse to write rather than ship a file that fails verify.sh.
     const at = text.indexOf("ep_");

@@ -1123,9 +1123,15 @@ inv("I96", "every Spearman ρ is null or inside [-1,1]", 8, function (u) {
   const badm = t.models.filter(function (m) { return m.spearman !== null && !(m.spearman >= -1 && m.spearman <= 1); });
   return badm.length ? bad(badm[0].key + " ρ " + badm[0].spearman) : OK;
 });
-inv("I97", "promotion needs three transitions and the leader is one of the nine", 8, function (u) {
+// E-075: `decidable` is the transition-count half of the gate — enough transitions exist for the
+// gate to be DECIDED. `promotable` is the honest reading of the word: at least one model's own
+// gate is open. The two are asserted separately, and a promotable result must name a model.
+inv("I97", "decidable is the transition count, promotable is a model actually passing, and the leader is one of the nine", 8, function (u) {
   const t = E.tournament(u.snap);
-  if (t.promotable !== (t.transitions >= 3)) return bad("promotable " + t.promotable + " at " + t.transitions + " transitions");
+  if (t.decidable !== (t.transitions >= 3)) return bad("decidable " + t.decidable + " at " + t.transitions + " transitions");
+  const anyOpen = t.models.some(function (m) { return m.promotable === true; });
+  if (t.promotable !== anyOpen) return bad("promotable " + t.promotable + " while " + t.models.filter(function (m) { return m.promotable; }).length + " models are past their gate");
+  if (t.promotable && !t.decidable) return bad("a model passed a gate that is not even decidable at " + t.transitions + " transitions");
   if (t.leader === null) return OK;
   return t.models.map(function (m) { return m.key; }).indexOf(t.leader) >= 0 ? OK : bad("leader " + t.leader);
 });

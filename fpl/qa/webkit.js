@@ -38,6 +38,10 @@ const TABS = ["command", "plan", "squad", "rivals", "draft", "chips", "lab"];
 const FLOORS = { ".btn": 38, ".btn-sm": 32, ".tabi": 52, ".sec-h": 48, ".menu-i": 44, ".inp": 40, ".row": 38 };
 const GAKPO = 367;
 const PAGE_URL = H.PAGE_URL;
+/* A service worker needs a secure context, so the registration half of the PWA guard is
+   measured on an https origin. Both requests are fulfilled by a Playwright route; nothing
+   leaves the machine and no certificate is involved. */
+const SECURE_URL = "https://mc.test/";
 const VIEW = { width: 390, height: 844 };
 
 /* The same localStorage-backed shim dist/index.html ships. Backed by localStorage and
@@ -223,13 +227,15 @@ async function main() {
       await c.close();
     }
 
-    // 1a-bis. the same shipped file served over http, which is the other half of the guard:
+    // 1a-bis. the same shipped file served over https, which is the other half of the guard:
     // the file:// check above proves the registration is skipped, and this proves it is not
-    // skipped for everyone. The spy stands in for the registration itself, so the check does
-    // not depend on WebKit's service-worker support inside a test browser — what is being
-    // measured is the app's decision, not the engine's.
+    // skipped for everyone. https, not http, because a service worker needs a secure context:
+    // over http://mc.test/ WebKit does not expose navigator.serviceWorker at all and the page
+    // honestly reports "unsupported", which would make this check unable to fail. Measured:
+    // over https both engines expose it and the page registers. The spy stands in for the
+    // registration itself so nothing is actually installed in the test browser.
     {
-      const c = await browser.newContext({ viewport: VIEW });
+      const c = await browser.newContext({ viewport: VIEW, ignoreHTTPSErrors: true });
       const p = await c.newPage();
       const errs = [];
       p.on("pageerror", function (e) { errs.push(String(e && e.message ? e.message : e)); });
@@ -237,16 +243,16 @@ async function main() {
       const distHtml = fs.readFileSync(DIST, "utf8");
       const mfText = fs.readFileSync(path.join(ROOT, "dist", "manifest.webmanifest"), "utf8");
       const swText = fs.readFileSync(path.join(ROOT, "dist", "sw.js"), "utf8");
-      await p.route(PAGE_URL + "**", function (route) {
+      await p.route(SECURE_URL + "**", function (route) {
         route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: distHtml });
       });
-      await p.route(PAGE_URL + "manifest.webmanifest", function (route) {
+      await p.route(SECURE_URL + "manifest.webmanifest", function (route) {
         route.fulfill({ status: 200, contentType: "application/manifest+json", body: mfText });
       });
-      await p.route(PAGE_URL + "sw.js", function (route) {
+      await p.route(SECURE_URL + "sw.js", function (route) {
         route.fulfill({ status: 200, contentType: "text/javascript", body: swText });
       });
-      await p.goto(PAGE_URL, { waitUntil: "load" });
+      await p.goto(SECURE_URL, { waitUntil: "load" });
       await p.waitForSelector(".mc-root", { timeout: 25000 });
       let settled = true;
       try {
@@ -258,17 +264,18 @@ async function main() {
           protocol: window.__PWA__ ? String(window.__PWA__.protocol) : "",
           calls: (window.__SWCALLS__ || []).slice(),
           spyErr: window.__SWSPY_ERR__ || "",
+          secure: !!window.isSecureContext,
           error: window.__PWA__ && window.__PWA__.error ? String(window.__PWA__.error) : ""
         };
       });
-      const supported = !http.spyErr && http.calls.length > 0;
-      H.assert("PWA-over-http-the-guard-lets-the-registration-through-under-webkit",
-        settled && http.protocol === "http:" && http.sw !== "skipped-not-http" &&
-          (supported ? (http.calls.length === 1 && http.calls[0] === "sw.js" && http.sw === "registered") : http.sw === "unsupported"),
-        "protocol " + http.protocol + ", __PWA__.sw " + http.sw + ", register() calls " + JSON.stringify(http.calls) +
-          (http.spyErr ? ", spy could not install (" + http.spyErr + ")" : "") + (http.error ? ", error " + http.error : "") +
-          ", settled " + settled);
-      H.assert("PWA-serving-the-page-over-http-raises-zero-page-errors",
+      H.assert("PWA-over-https-the-guard-lets-the-registration-through-under-webkit",
+        settled && http.protocol === "https:" && http.secure && http.sw === "registered" &&
+          http.calls.length === 1 && http.calls[0] === "sw.js" && !http.spyErr,
+        "protocol " + http.protocol + ", secure context " + http.secure + ", __PWA__.sw " + http.sw +
+          ", register() calls " + JSON.stringify(http.calls) +
+          (http.spyErr ? ", spy could not install (" + http.spyErr + ")" : "") +
+          (http.error ? ", error " + http.error : "") + ", settled " + settled);
+      H.assert("PWA-serving-the-page-over-https-raises-zero-page-errors",
         errs.length === 0, errs.length ? errs.slice(0, 3).join(" | ") : "no uncaught error with the manifest linked and the worker registered");
       await c.close();
     }

@@ -1,0 +1,9 @@
+# The optimiser's Python dependencies (v110 §2, §5 C).
+#
+# scipy>=1.11 is the floor because the mixed-integer path this project uses —
+# scipy.optimize.milp on the HiGHS solver — arrived in 1.11. Measured on this machine:
+# scipy 1.17.1, numpy 2.4.6, Python 3 on Ubuntu, 26 September 2026.
+#
+# Install:  python3 -m pip install -r pipeline/requirements.txt
+scipy>=1.11
+numpy>=1.24

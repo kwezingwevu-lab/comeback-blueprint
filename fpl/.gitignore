@@ -1,0 +1,5 @@
+# The repository root ignores *.png (the fitness app's screenshots, and qa/shots/ here).
+# The PWA icons are build OUTPUT that dist/ has to carry: a manifest that names an icon the
+# repository does not hold is an install that shows a blank tile. They are re-included here.
+# qa/shots/*.png stays ignored — those are screenshots, not artefacts.
+!dist/*.png

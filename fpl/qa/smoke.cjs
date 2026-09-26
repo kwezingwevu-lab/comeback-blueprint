@@ -22,8 +22,18 @@ const LIVE = require(path.join(ROOT, "data", "live.json"));
 // prints against what the engine computes, rather than against a number typed into the test.
 const ENG = require(path.join(ROOT, "src", "engine.js"));
 
-const NOW = "2026-09-11T08:00:00Z";                 // Friday before the GW4 deadline
-const LIVE_NOW = "2026-09-12T15:00:00Z";            // GW4 deadline 12:30Z, last kick-off 14 Sep 19:00Z
+// E-076: these were "2026-09-11T08:00:00Z" and "2026-09-12T15:00:00Z" — the Friday and the
+// Saturday of GW4. The snapshot moved on to GW6 and every clock-relative check in this suite
+// went red on an app that was correct. Both are derived from the snapshot's own is_next event
+// now, so a refresh moves them with it (E-011).
+const isoAt = (ms) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
+const NEXT_EV = LIVE.events.filter(function (e) { return e.is_next; })[0] || LIVE.events[LIVE.events.length - 1];
+const NEXT_DL = Date.parse(NEXT_EV.deadline_time);
+const NEXT_LAST_KO = Math.max.apply(null, [NEXT_DL].concat(
+  LIVE.fixtures.filter(function (f) { return Number(f.event) === Number(LIVE.next_event); })
+    .map(function (f) { return Date.parse(f.kickoff_time); }).filter(isFinite)));
+const NOW = isoAt(NEXT_DL - 26 * 3600000);          // the day before the next deadline
+const LIVE_NOW = isoAt(NEXT_DL + 5 * 3600000);      // inside the live window of the next gameweek
 const TABS = ["command", "plan", "squad", "rivals", "draft", "chips", "lab"];
 const PRIMARY = { command: "cmd-stand", plan: "plan-tx", squad: "sq-fifteen", rivals: "rv-table", draft: "df-waivers", chips: "ch-now", lab: "lab-data" };
 const TOKENS = ["--amb", "--bg", "--bg2", "--bg3", "--blu", "--cyn", "--dim", "--err", "--focus", "--grn", "--grn2", "--line", "--mute", "--ok", "--pnk", "--pnk2", "--pur", "--shadow", "--text", "--warn", "--wht"];
@@ -36,26 +46,44 @@ function words(s) { return String(s || "").trim().split(/\s+/).filter(Boolean).l
 
 function deepCopy(o) { return JSON.parse(JSON.stringify(o)); }
 
-/* The snapshot with Gakpo's flag lifted and nothing else touched: the control half of
-   the "a flag is what excludes him" pair. */
-function unflaggedGakpo() {
+/* The snapshot as it would look with the NEXT gameweek under way: the same data, plus the
+   live rows and picks the API serves once the deadline has passed. Nothing else is changed,
+   so current_event stays where a pre-deadline pull leaves it. */
+function nextGwRunning() {
   const live = deepCopy(LIVE);
-  const el = live.elements.filter(function (e) { return e.id === GAKPO; })[0];
-  el.status = "a"; el.chance = null; el.news = "";
+  const cur = String(LIVE.current_event), nxt = String(LIVE.next_event);
+  const picks = live.picks[cur].picks;
+  const rows = {};
+  picks.forEach(function (p, i) { rows[p.element] = [90, 1, (i % 5) + 2, 0.2, 0.1, 0.8, 9, 20, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; });
+  live.gw[nxt] = { elements: rows, fixture_xg: {} };
+  live.picks[nxt] = { active_chip: null, picks: picks };
   return live;
 }
 
-/* The snapshot as it would look with GW4 under way: the same data, plus the live rows
-   and picks the API serves once the deadline has passed. Nothing else is changed, so
-   current_event stays 3 exactly as a Friday snapshot has it. */
-function gw4Running() {
+/* One element's flag lifted, or added, and nothing else touched. */
+function withFlag(id, on) {
   const live = deepCopy(LIVE);
-  const picks = live.picks["3"].picks;
-  const rows = {};
-  picks.forEach(function (p, i) { rows[p.element] = [90, 1, (i % 5) + 2, 0.2, 0.1, 0.8, 9, 20, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; });
-  live.gw["4"] = { elements: rows, fixture_xg: {} };
-  live.picks["4"] = { active_chip: null, picks: picks };
+  const el = live.elements.filter(function (e) { return Number(e.id) === Number(id); })[0];
+  if (el) { el.status = on ? "d" : "a"; el.chance = on ? 75 : null; el.news = on ? "Knock - 75% chance of playing" : ""; }
   return live;
+}
+
+/* The subject of the flag pair, chosen from the snapshot rather than named: the highest
+   five-week xP flagged player who walks into the engine's recommended fifteen the moment his
+   flag is lifted. Hard-coding Gakpo meant the pair stopped testing anything the week his form
+   dropped out of the solve (E-076). */
+function flagSubject() {
+  const base = ENG.buildCtx(LIVE, null, NOW);
+  const cands = base.elList
+    .filter(function (el) { return el.status !== "a" || (el.chance !== null && el.chance < 100); })
+    .filter(function (el) { const g = base.gwStats[el.id]; return g && g.starts_last3 >= 3; })
+    .sort(function (a, b) { return base.xp[b.id].xp5 - base.xp[a.id].xp5; })
+    .slice(0, 5);
+  for (const el of cands) {
+    const wc = ENG.wildcardSolver(ENG.buildCtx(withFlag(el.id, false), null, NOW), {});
+    if (wc.ok && wc.ids.indexOf(el.id) >= 0) return { id: el.id, name: el.web_name, status: el.status, chance: el.chance };
+  }
+  return null;
 }
 
 async function openAllSections(page) {
@@ -94,8 +122,9 @@ async function main() {
   // looks once GW4 kicks off. buildPage() bakes inlineData into the HTML, so a scenario
   // that needs its own snapshot needs its own page.
   const html = H.buildPage({});
-  const htmlCtrl = H.buildPage({ inlineData: unflaggedGakpo() });
-  const htmlLive = H.buildPage({ inlineData: gw4Running() });
+  const SUBJECT = flagSubject();
+  const htmlCtrl = SUBJECT ? H.buildPage({ inlineData: withFlag(SUBJECT.id, false) }) : null;
+  const htmlLive = H.buildPage({ inlineData: nextGwRunning() });
   const browser = await H.launch();
 
   // E-027: Playwright 1.63 looks for Chromium build 1243 while the sandbox carries 1194, so
@@ -219,19 +248,33 @@ async function main() {
 
     // ---------------------------------------------------------- 3. flagged player (C1 rule 2)
 
-    const ctrlPage = await fresh({ html: htmlCtrl, mode: "simple", now: NOW });
-    const ctrlText = await landingText(ctrlPage);
     const realText = simple ? simple.text : "";
-    const ctrlHas = /Gakpo/.test(ctrlText);
-    const ctrlCaptain = /Captain\s+Gakpo/.test(ctrlText.replace(/\n/g, " "));
-    const realHas = /Gakpo/.test(realText);
+    const oneLine = realText.replace(/\n/g, " ");
+    const rx = (n) => new RegExp(String(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    // Half one: the flag is what keeps the subject out. Control = the same snapshot with his
+    // flag lifted and nothing else changed.
+    let ctrlText = "";
+    if (SUBJECT) { const ctrlPage = await fresh({ html: htmlCtrl, mode: "simple", now: NOW }); ctrlText = await landingText(ctrlPage); }
     H.assert("C1-flagged-player-is-absent-from-the-recommendation",
-      ctrlHas && !realHas,
-      "control snapshot (id 367 status a, chance null, nothing else changed) names him in the fifteen = " + ctrlHas +
-      "; shipped snapshot (status d, chance 75) names him = " + realHas);
+      !!SUBJECT && rx(SUBJECT.name).test(ctrlText) && !rx(SUBJECT.name).test(realText),
+      SUBJECT ? "subject " + SUBJECT.name + " (id " + SUBJECT.id + ", shipped status " + SUBJECT.status + " " + SUBJECT.chance +
+        "%); control with the flag lifted names him = " + rx(SUBJECT.name).test(ctrlText) + "; shipped names him = " + rx(SUBJECT.name).test(realText)
+        : "no flagged player in the snapshot enters the fifteen once unflagged — the control is unsound");
+    // Half two: the other direction, which cannot age at all. Take whoever the shipped plan
+    // actually captains, flag him, and he must leave the armband, the vice slot and the fifteen.
+    const shippedCap = (oneLine.match(/Captain\s+([^,.·]+)/) || [])[1];
+    const capEl = shippedCap ? LIVE.elements.filter(function (e) { return e.web_name === shippedCap.trim(); })[0] : null;
+    let capFlaggedText = "";
+    if (capEl) {
+      const capPage = await fresh({ html: H.buildPage({ inlineData: withFlag(capEl.id, true) }), mode: "simple", now: NOW });
+      capFlaggedText = (await landingText(capPage)).replace(/\n/g, " ");
+    }
     H.assert("C1-flagged-player-is-never-captain-nor-vice",
-      ctrlCaptain && !/Captain\s+Gakpo/.test(realText.replace(/\n/g, " ")) && !/vice\s+Gakpo/.test(realText.replace(/\n/g, " ")),
-      "control captains him = " + ctrlCaptain + "; shipped captain line = " + (realText.replace(/\n/g, " ").match(/Captain [^.]*\./) || ["none"])[0]);
+      !!capEl && new RegExp("Captain\\s+" + shippedCap.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(oneLine) &&
+      !new RegExp("(Captain|vice)\\s+" + shippedCap.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(capFlaggedText) &&
+      !rx(shippedCap.trim()).test(capFlaggedText),
+      capEl ? "the shipped plan captains " + shippedCap.trim() + " (id " + capEl.id + "); with a 75% flag on him and nothing else changed the landing reads «" +
+        capFlaggedText.slice(0, 120) + "»" : "no captain could be read off the shipped landing: «" + oneLine.slice(0, 120) + "»");
 
     // ---------------------------------------------------------- 4. type floor and touch floors
 
@@ -642,7 +685,9 @@ async function main() {
     // 13:00Z on the Saturday is inside the live window, so the landing shows live points and
     // only the header prints a countdown; 09:00Z on the Tuesday is past the last kick-off, so
     // the landing is back and prints one too. Both times are walked, on all seven tabs.
-    const POST_DEADLINE = ["2026-09-12T13:00:00Z", "2026-09-15T09:00:00Z"];
+    // Derived from the snapshot (E-076): just after the next deadline, which is inside the live
+    // window, and then past the last kick-off of that gameweek, where the landing comes back.
+    const POST_DEADLINE = [isoAt(NEXT_DL + 3 * 3600000), isoAt(NEXT_LAST_KO + 14 * 3600000)];
     const brokenCopy = [];
     const headerPost = {};
     let lateLanding = "";
@@ -681,7 +726,7 @@ async function main() {
 
     // ---------------------------------------------------------- 15. D3 block (E-012)
 
-    const squad = LIVE.picks["3"].picks.map(function (p) { return p.element; });
+    const squad = LIVE.picks[String(LIVE.current_event)].picks.map(function (p) { return p.element; });
     const mismatched = squad.slice(0, 14).concat([GAKPO]);
     const d3state = {
       version: 87, exported_at: null, entry: 3546875,
@@ -785,11 +830,17 @@ async function main() {
       "panel shows Laplace " + (lastFit ? lastFit.incumbent.brier.toFixed(4) : "—") + " and logistic " +
         (lastFit ? lastFit.challenger.brier.toFixed(4) : "—") + " for GW" + (lastFit ? lastFit.from + "→" + lastFit.to : "?") +
         "; first 160 chars: " + minPanel.slice(0, 160).replace(/\n/g, " | "));
+    // E-076: the last clause was /the gate needs 3/, which is what the engine's note says while
+    // the gate is SHUT. Five finished gameweeks opened it, and the panel correctly stopped
+    // saying that. The panel must state the gate's own verdict, whichever way it has gone.
+    const gateOpen = mwfLive.gate.promotable === true;
+    const gateWording = gateOpen ? /(gate|promot)/i.test(minPanel) : /the gate needs 3/i.test(minPanel);
     H.assert("F4-the-lab-panel-says-the-flag-and-the-European-load-were-not-fitted",
       /flag/i.test(minPanel) && /european load/i.test(minPanel) &&
-      /not a status per gameweek/i.test(minPanel) && /Premier League/i.test(minPanel) &&
-      /the gate needs 3/i.test(minPanel),
-      "the two declared-but-unfitted terms and the gate are all named in the panel");
+      /not a status per gameweek/i.test(minPanel) && /Premier League/i.test(minPanel) && gateWording,
+      "the two declared-but-unfitted terms are named; the walk-forward gate is " + (gateOpen ? "OPEN" : "shut") +
+      " (" + mwfLive.comparable + " fittable transitions, " + mwfLive.wins + " won, hold-out " + mwfLive.holdout +
+      ") and the panel " + (gateWording ? "states it" : "does NOT state it"));
     H.assert("F4-the-reliability-curve-prints-what-it-said-against-what-happened",
       /said/i.test(minPanel) && /happened/i.test(minPanel) &&
       minPanel.indexOf(Math.round(lastFit.challenger.reliability.bins[0].meanPred * 100) + "%") >= 0,

@@ -142,7 +142,7 @@ function flaggedLive(e) { return !e || e.status !== "a" || (e.chance !== null &&
 // ---------------------------------------------------------------- the UI pass
 
 async function collectUI() {
-  const out = { ok: false, why: "", status: "", landing: "", timing: "", draftRows: [], draftText: "", poolText: "" };
+  const out = { ok: false, why: "", status: "", landing: "", timing: "", txText: "", draftRows: [], draftText: "", poolText: "" };
   let browser = null;
   try {
     browser = await H.launch();
@@ -157,6 +157,7 @@ async function collectUI() {
 
     await page.click('[data-testid="tab-plan"]');
     await page.waitForSelector('[data-section="plan-time"]', { timeout: 15000 });
+    out.txText = await page.evaluate(() => { const e = document.querySelector('[data-section="plan-tx"]'); return e ? e.innerText : ""; });
     await page.click('[data-testid="sec-plan-time"]');
     await page.waitForFunction(() => {
       const s = document.querySelector('[data-section="plan-time"]');
@@ -276,18 +277,36 @@ async function main() {
       ui.ok ? "header \"" + ui.status.replace(/\n/g, " · ") + "\"; landing " + (okDl ? "names " + want : "does not name " + want) : "the page did not render: " + ui.why);
   }
 
-  // ---- 3 · C1 rule 1: a sell has no starts in three, or the gain clears the hit with margin
+  // ---- 3 · C1 rule 1 AND C2 step 1: a sell has no starts in three, or the gain clears the hit
+  // with margin, or the player is unavailable.
+  //
+  // E-082: this check read C1 rule 1 on its own and ignored `m.forced`, so it allowed exactly
+  // two of the three justifications the master prompt gives. C2 step 1 is explicit —
+  // "sells := players with starts_last3==0 or status!='a' (forced)" — and a 75% doubt is a
+  // status that is not "a". It went red the first week the protocol forced out a player who was
+  // starting (Brobbey, status d, three starts of three, a gain of only 2.44), which is a
+  // recommendation the engine is entitled to make and the check could not express. Selling a
+  // starter on a doubt is the aggressive end of the protocol, so the third justification is
+  // allowed only when the reason is ON SCREEN with the player's name against it.
   {
     const bad = [];
+    const statusForced = [];
     tp.moves.forEach((m) => {
       const gs = ctx.gwStats[m.out] || { starts_last3: 0 };
       if (gs.starts_last3 === 0) return;
       if (m.gain > SELL_GAIN_MIN) return;
-      bad.push(nm(m.out) + " has " + gs.starts_last3 + " starts and gains only " + m.gain.toFixed(2));
+      const row = (tp.forced || []).filter((f) => Number(f.id) === Number(m.out))[0];
+      const unavailable = !!row && String(ctx.els[m.out].status) !== "a";
+      if (!unavailable) { bad.push(nm(m.out) + " has " + gs.starts_last3 + " starts, gains only " + m.gain.toFixed(2) + " and is status a"); return; }
+      statusForced.push({ id: m.out, reason: row.reason });
+      const shown = ui.ok && new RegExp(nm(m.out).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\s\\S]{0,80}" + String(ctx.els[m.out].status)).test(ui.txText);
+      if (!shown) bad.push(nm(m.out) + " is sold on a status of " + ctx.els[m.out].status + " and the panel does not say so");
     });
-    assert("sells-have-no-starts-in-three-or-beat-the-hit-by-four",
+    assert("sells-have-no-starts-in-three-or-beat-the-hit-by-four-or-are-unavailable-and-say-so",
       !bad.length,
-      tp.moves.length + " sells: " + tp.moves.map((m) => nm(m.out) + (m.forced ? " (forced, " + (ctx.gwStats[m.out] || {}).starts_last3 + "/3 starts)" : " (+" + m.gain.toFixed(2) + " xp5)")).join("; ") + (bad.length ? " — " + bad.join("; ") : ""));
+      tp.moves.length + " sells: " + tp.moves.map((m) => nm(m.out) + (m.forced ? " (forced, " + (ctx.gwStats[m.out] || {}).starts_last3 + "/3 starts, status " + ctx.els[m.out].status + ")" : " (+" + m.gain.toFixed(2) + " xp5)")).join("; ") +
+      "; sold on a status alone and named on screen: " + (statusForced.length ? statusForced.map((f) => nm(f.id) + " — " + f.reason).join(", ") : "none") +
+      (bad.length ? " — " + bad.join("; ") : ""));
   }
 
   // ---- 4 · E-010: never sell a player who started his club's last match after a spell out
@@ -398,13 +417,36 @@ async function main() {
   }
 
   // ---- 14 · and on the fallback path, where no chip is played
+  // E-083: this check is named "on the fallback path" and read `WEEKLY.classic.captain`, which is
+  // the captain of the WILDCARD fifteen. It passed through v87 and v88 only because the same
+  // player captained both paths. The moment they differed — the wildcard fifteen captains Groß,
+  // who is not in the fallback fifteen at all — it went red on a plan that was correct.
+  // It reads `fallback.captain` now, and the wildcard captain is asserted separately below.
   {
     const engineOk = !!fbXI.capId && fbXI.ids.indexOf(fbXI.capId) >= 0;
-    const writtenCap = Number(WRITTEN.captain);
-    const writtenOk = fbXI.ids.indexOf(writtenCap) >= 0;
+    const fbCap = Number((WRITTEN.fallback || {}).captain);
+    const fbVice = Number((WRITTEN.fallback || {}).vice);
+    const writtenOk = fbXI.ids.indexOf(fbCap) >= 0;
+    const viceOk = fbXI.ids.indexOf(fbVice) >= 0 && fbVice !== fbCap;
     assert("captain-in-the-xi-on-the-fallback-path",
-      engineOk && writtenOk,
-      "fallback XI " + fbXI.formation + " (" + list(fbXI.ids) + "); engine captain " + nm(fbXI.capId) + (engineOk ? " in the eleven" : " NOT in the eleven") + "; written captain " + nm(writtenCap) + (writtenOk ? " in the eleven" : " NOT in the eleven"));
+      engineOk && writtenOk && viceOk,
+      "fallback XI " + fbXI.formation + " (" + list(fbXI.ids) + "); engine captain " + nm(fbXI.capId) + (engineOk ? " in the eleven" : " NOT in the eleven") +
+      "; written fallback captain " + nm(fbCap) + (writtenOk ? " in the eleven" : " NOT in the eleven") +
+      "; written fallback vice " + nm(fbVice) + (viceOk ? " in the eleven and not the captain" : " NOT usable"));
+  }
+
+  // ---- 14b · and the WRITTEN wildcard captain belongs to the WRITTEN wildcard fifteen's eleven
+  {
+    const w15 = (WRITTEN.wildcard15 || []).map(Number);
+    const wxi = w15.length === 15 ? E.bestXI(w15, ctx) : { ids: [], formation: "" };
+    const cap = Number(WRITTEN.captain), vice = Number(WRITTEN.vice);
+    const capOk = w15.indexOf(cap) >= 0 && wxi.ids.indexOf(cap) >= 0;
+    const viceOk = w15.indexOf(vice) >= 0 && wxi.ids.indexOf(vice) >= 0 && vice !== cap;
+    const flaggedCap = (ctx.flags[cap] || {}).flagged || (ctx.flags[vice] || {}).flagged;
+    assert("captain-and-vice-in-the-xi-of-the-written-wildcard-fifteen",
+      w15.length === 15 && capOk && viceOk && !flaggedCap,
+      "written fifteen " + w15.length + " players, eleven " + wxi.formation + "; captain " + nm(cap) + (capOk ? " in it" : " NOT in it") +
+      "; vice " + nm(vice) + (viceOk ? " in it and not the captain" : " NOT usable") + (flaggedCap ? "; one of them is FLAGGED" : "; neither is flagged"));
   }
 
   // ---- 15 · C1 rule 2: a flagged player is never captain, on any path

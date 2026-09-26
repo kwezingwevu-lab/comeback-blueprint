@@ -184,6 +184,7 @@ fi
 
 # ---------------------------------------------------------------- 5-12. the suites
 
+node_suite qa/privacy.cjs         # rival managers' names are never committed (E-085) — cheap, so first
 sh_suite qa/verify.sh
 node_suite data/validate_live.cjs      # the snapshot against CONTRACT §3 (77 checks)
 node_suite qa/unit_engine.cjs

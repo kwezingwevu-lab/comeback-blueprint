@@ -54,6 +54,9 @@ jobs:
       - name: TDZ check (freshly built app)
         run: node qa/tdz_check.cjs app/FPL_Mission_Control.jsx 2>&1 | tee -a "$GATE_LOG"
 
+      - name: privacy (rival managers' names are never committed)
+        run: node qa/privacy.cjs 2>&1 | tee -a "$GATE_LOG"
+
       - name: verify.sh (live reconciliation + invariants)
         run: bash qa/verify.sh 2>&1 | tee -a "$GATE_LOG"
 

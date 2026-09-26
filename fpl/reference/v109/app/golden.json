@@ -1,0 +1,596 @@
+{
+ "snapshot": "2026-09-22T17:32:13.530Z",
+ "note": "Numbers the repo must reproduce on reference/v109 data. Expected points for every player and gameweek 6–20 are in solver_in.json (tolerance 0.01).",
+ "calib": {
+  "ka": 1.5,
+  "kd": 2,
+  "rmse": 0.1687,
+  "anchors": 42,
+  "weeks": [
+   5,
+   6,
+   7
+  ]
+ },
+ "ratings": {
+  "ARS": {
+   "att": 1.2196,
+   "def": 0.5723
+  },
+  "AVL": {
+   "att": 0.8188,
+   "def": 1.2014
+  },
+  "BOU": {
+   "att": 1.0025,
+   "def": 0.9446
+  },
+  "BRE": {
+   "att": 1.121,
+   "def": 0.9478
+  },
+  "BHA": {
+   "att": 1.1719,
+   "def": 1.0465
+  },
+  "CHE": {
+   "att": 1.2077,
+   "def": 1.0536
+  },
+  "COV": {
+   "att": 0.711,
+   "def": 1.2657
+  },
+  "CRY": {
+   "att": 0.8881,
+   "def": 1.1676
+  },
+  "EVE": {
+   "att": 0.9119,
+   "def": 0.8568
+  },
+  "FUL": {
+   "att": 0.8512,
+   "def": 1.1751
+  },
+  "HUL": {
+   "att": 0.7507,
+   "def": 1.1703
+  },
+  "IPS": {
+   "att": 0.9095,
+   "def": 1.3168
+  },
+  "LEE": {
+   "att": 0.9446,
+   "def": 0.9397
+  },
+  "LIV": {
+   "att": 1.2671,
+   "def": 0.8168
+  },
+  "MCI": {
+   "att": 1.5876,
+   "def": 0.8278
+  },
+  "MUN": {
+   "att": 1.3181,
+   "def": 1.0446
+  },
+  "NEW": {
+   "att": 0.932,
+   "def": 1.1037
+  },
+  "NFO": {
+   "att": 0.9475,
+   "def": 0.8194
+  },
+  "TOT": {
+   "att": 0.8216,
+   "def": 1.0425
+  },
+  "SUN": {
+   "att": 1.0352,
+   "def": 1.0269
+  }
+ },
+ "odds": {
+  "6": [
+   {
+    "h": "ARS",
+    "a": "LEE",
+    "lh": 2.14,
+    "la": 0.74,
+    "fair": [
+     0.6966,
+     0.1867,
+     0.1167
+    ]
+   },
+   {
+    "h": "HUL",
+    "a": "EVE",
+    "lh": 0.95,
+    "la": 1.33,
+    "fair": [
+     0.2681,
+     0.2785,
+     0.4534
+    ]
+   },
+   {
+    "h": "AVL",
+    "a": "BRE",
+    "lh": 1.25,
+    "la": 1.26,
+    "fair": [
+     0.3632,
+     0.2693,
+     0.3675
+    ]
+   },
+   {
+    "h": "CHE",
+    "a": "BOU",
+    "lh": 1.82,
+    "la": 1.13,
+    "fair": [
+     0.536,
+     0.2291,
+     0.2349
+    ]
+   },
+   {
+    "h": "SUN",
+    "a": "BHA",
+    "lh": 1.14,
+    "la": 1.22,
+    "fair": [
+     0.3397,
+     0.2793,
+     0.381
+    ]
+   },
+   {
+    "h": "IPS",
+    "a": "FUL",
+    "lh": 1.2,
+    "la": 1.25,
+    "fair": [
+     0.3513,
+     0.2735,
+     0.3752
+    ]
+   },
+   {
+    "h": "MUN",
+    "a": "TOT",
+    "lh": 1.83,
+    "la": 1.03,
+    "fair": [
+     0.5619,
+     0.2275,
+     0.2106
+    ]
+   },
+   {
+    "h": "CRY",
+    "a": "NFO",
+    "lh": 1.1,
+    "la": 1.1,
+    "fair": [
+     0.3549,
+     0.2916,
+     0.3535
+    ]
+   },
+   {
+    "h": "LIV",
+    "a": "MCI",
+    "lh": 1.28,
+    "la": 1.5,
+    "fair": [
+     0.3239,
+     0.2521,
+     0.424
+    ]
+   },
+   {
+    "h": "COV",
+    "a": "NEW",
+    "lh": 1.12,
+    "la": 1.48,
+    "fair": [
+     0.2877,
+     0.2586,
+     0.4537
+    ]
+   }
+  ],
+  "7": [
+   {
+    "h": "EVE",
+    "a": "CHE",
+    "lh": 1.14,
+    "la": 1.43,
+    "fair": [
+     0.3004,
+     0.2623,
+     0.4372
+    ]
+   },
+   {
+    "h": "BRE",
+    "a": "LIV",
+    "lh": 1.41,
+    "la": 1.48,
+    "fair": [
+     0.3603,
+     0.2478,
+     0.3919
+    ]
+   },
+   {
+    "h": "FUL",
+    "a": "HUL",
+    "lh": 1.86,
+    "la": 0.87,
+    "fair": [
+     0.6069,
+     0.2225,
+     0.1706
+    ]
+   }
+  ]
+ },
+ "classic": {
+  "total": 311,
+  "ftNext": 4,
+  "bank": 1.6,
+  "recon": [
+   {
+    "gw": 1,
+    "reported": 58,
+    "rebuilt": 58
+   },
+   {
+    "gw": 2,
+    "reported": 70,
+    "rebuilt": 70
+   },
+   {
+    "gw": 3,
+    "reported": 50,
+    "rebuilt": 50
+   },
+   {
+    "gw": 4,
+    "reported": 71,
+    "rebuilt": 71
+   },
+   {
+    "gw": 5,
+    "reported": 62,
+    "rebuilt": 62
+   }
+  ],
+  "sell": {
+   "Gabriel": {
+    "now": 8,
+    "paid": 8,
+    "sell": 8
+   },
+   "Saka": {
+    "now": 9.5,
+    "paid": 9.5,
+    "sell": 9.5
+   },
+   "Konsa": {
+    "now": 4.6,
+    "paid": 4.5,
+    "sell": 4.5
+   },
+   "Rogers": {
+    "now": 7.7,
+    "paid": 7.5,
+    "sell": 7.6
+   },
+   "Verbruggen": {
+    "now": 4.5,
+    "paid": 4.5,
+    "sell": 4.5
+   },
+   "van Ewijk": {
+    "now": 4,
+    "paid": 4,
+    "sell": 4
+   },
+   "Hughes": {
+    "now": 4.4,
+    "paid": 4.5,
+    "sell": 4.4
+   },
+   "Diop": {
+    "now": 4,
+    "paid": 4,
+    "sell": 4
+   },
+   "Calvert-Lewin": {
+    "now": 6,
+    "paid": 6,
+    "sell": 6
+   },
+   "Szoboszlai": {
+    "now": 7,
+    "paid": 7,
+    "sell": 7
+   },
+   "Semenyo": {
+    "now": 8.4,
+    "paid": 8.5,
+    "sell": 8.4
+   },
+   "Haaland": {
+    "now": 15.6,
+    "paid": 15.5,
+    "sell": 15.5
+   },
+   "Shaw": {
+    "now": 4.3,
+    "paid": 4.5,
+    "sell": 4.3
+   },
+   "Kinsky": {
+    "now": 4.5,
+    "paid": 4.5,
+    "sell": 4.5
+   },
+   "Brobbey": {
+    "now": 5.7,
+    "paid": 6,
+    "sell": 5.7
+   }
+  },
+  "budget": 99.5,
+  "sim6": {
+   "p10": 37,
+   "p50": 52,
+   "p90": 71
+  },
+  "greedyTransfers": {
+   "value": 827.5,
+   "moves": [
+    "van Ewijk -> Silva",
+    "Semenyo -> Mbeumo",
+    "Konsa -> Murillo",
+    "Brobbey -> Barry"
+   ]
+  },
+  "plan": {
+   "total": 878.28,
+   "gap": 0.012967284891281062,
+   "chips": [
+    {
+     "gw": 6,
+     "chip": "wildcard",
+     "captain": "Saka"
+    },
+    {
+     "gw": 7,
+     "chip": "3xc",
+     "captain": "Haaland"
+    },
+    {
+     "gw": 10,
+     "chip": "bboost",
+     "captain": "Saka"
+    }
+   ],
+   "gw6squad": [
+    "Raya",
+    "Saka",
+    "Rogers",
+    "Groß",
+    "Thomas",
+    "Tarkowski",
+    "Barry",
+    "Diop",
+    "Stach",
+    "Haaland",
+    "Mbeumo",
+    "Hall",
+    "Murillo",
+    "Gonzalo",
+    "Tzolakis"
+   ],
+   "timing": {
+    "now": 878.28,
+    "later": 876.8,
+    "laterWildcardGw": 10,
+    "never": 869.4
+   }
+  }
+ },
+ "draft": {
+  "horizonEnd": 20,
+  "waiverOrder": [
+   "Sizobona Phambili FC",
+   "Yoh-Nited",
+   "Unique Stars",
+   "Thabz Appeal",
+   "Isak at this game",
+   "Saka Potatoes",
+   "Penderentials FC",
+   "Muggles & Wizards"
+  ],
+  "h2h6": {
+   "opp": "Isak at this game",
+   "win": 0.519,
+   "draw": 0.031,
+   "me50": 38,
+   "them50": 37
+  },
+  "race": [
+   {
+    "name": "Muggles & Wizards",
+    "first": 0.594,
+    "top3": 0.894
+   },
+   {
+    "name": "Penderentials FC",
+    "first": 0.132,
+    "top3": 0.551
+   },
+   {
+    "name": "Thabz Appeal",
+    "first": 0.117,
+    "top3": 0.512
+   },
+   {
+    "name": "Saka Potatoes",
+    "first": 0.052,
+    "top3": 0.3
+   },
+   {
+    "name": "Unique Stars",
+    "first": 0.049,
+    "top3": 0.304
+   },
+   {
+    "name": "Sizobona Phambili FC",
+    "first": 0.035,
+    "top3": 0.235
+   },
+   {
+    "name": "Yoh-Nited",
+    "first": 0.016,
+    "top3": 0.127
+   },
+   {
+    "name": "Isak at this game",
+    "first": 0.006,
+    "top3": 0.078
+   }
+  ],
+  "solvedRoster": {
+   "value": 645.77,
+   "base": 577.57,
+   "pairs": [
+    "Silva for Dunk",
+    "Mukiele for Davis",
+    "Hill for Bogle",
+    "E.Le Fée for Belloumi",
+    "Cunha for King",
+    "Mainoo for Janelt",
+    "Evanilson for Isidor",
+    "McBurnie for Igor Jesus"
+   ]
+  },
+  "claims": {
+   "strategy": "firsts",
+   "valueNow": 577.6,
+   "valueStress": 619.8,
+   "altValue": 616.8,
+   "valueAll": 645.8,
+   "sheet": [
+    {
+     "kind": "first",
+     "add": "Silva",
+     "drop": "Dunk",
+     "gain": 34.6,
+     "result": "taken"
+    },
+    {
+     "kind": "first",
+     "add": "Evanilson",
+     "drop": "Isidor",
+     "gain": 21.8,
+     "result": "lands"
+    },
+    {
+     "kind": "first",
+     "add": "Mukiele",
+     "drop": "Davis",
+     "gain": 14.8,
+     "result": "taken"
+    },
+    {
+     "kind": "first",
+     "add": "E.Le Fée",
+     "drop": "Belloumi",
+     "gain": 13.8,
+     "result": "taken"
+    },
+    {
+     "kind": "first",
+     "add": "Hill",
+     "drop": "Bogle",
+     "gain": 12.1,
+     "result": "taken"
+    },
+    {
+     "kind": "first",
+     "add": "McBurnie",
+     "drop": "Igor Jesus",
+     "gain": 11.6,
+     "result": "lands"
+    },
+    {
+     "kind": "first",
+     "add": "Cunha",
+     "drop": "King",
+     "gain": 6.4,
+     "result": "taken"
+    },
+    {
+     "kind": "first",
+     "add": "Mainoo",
+     "drop": "Janelt",
+     "gain": 1.6,
+     "result": "lands"
+    },
+    {
+     "kind": "backup",
+     "add": "Schuster",
+     "drop": "Dunk",
+     "gain": 25.1,
+     "result": "lands"
+    },
+    {
+     "kind": "backup",
+     "add": "Fernandez-Pardo",
+     "drop": "Isidor",
+     "gain": 8.8,
+     "result": "not reached"
+    },
+    {
+     "kind": "backup",
+     "add": "Justin",
+     "drop": "Davis",
+     "gain": 10.2,
+     "result": "lands"
+    },
+    {
+     "kind": "backup",
+     "add": "Buendía",
+     "drop": "Belloumi",
+     "gain": 10.1,
+     "result": "lands"
+    },
+    {
+     "kind": "backup",
+     "add": "Thomas",
+     "drop": "Bogle",
+     "gain": 6,
+     "result": "lands"
+    }
+   ]
+  },
+  "waiverLogReplication": "74 of 74 claim results in d_tx.json, gameweeks 2–5"
+ },
+ "qa": {
+  "checks": 189,
+  "inAppSelfTest": "217/217",
+  "propertyCases": 3920
+ }
+}
