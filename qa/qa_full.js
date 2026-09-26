@@ -202,7 +202,7 @@ const d5=await tt('2027-01-05');T('time: Jan = Posterior specialization block',/
  T('focus: calves ≥12 sets/week, hamstrings ≥16, mid back ≥16',r.rs.calves>=12&&r.rs.hamstrings>=16&&r.rs['mid back']>=16,JSON.stringify(r.rs));
  await q.evaluate(()=>switchView('lift'));await wait(300);await q.evaluate(()=>{[...document.querySelectorAll('#dayPills .pill')].find(x=>x.textContent==='Legs A').click();});await wait(300);
  const c=await q.evaluate(()=>({first:document.querySelector('#liftBody .chip')?.textContent.replace(/\s+/g,' '),rows:document.querySelectorAll('input[data-ex="ga1"][data-f="r"]').length,seg:!!document.querySelector('#focusSeg'),rules:/legs & back focus/.test(document.body.innerText)}));
- T('focus: Legs A squat shows 5 sets + focus tag and 5 rows',/^5×/.test(c.first||'')&&/focus/.test(c.first||'')&&c.rows===5,JSON.stringify(c));T('focus: toggle + rules summary',c.seg&&c.rules);
+ T('focus: Legs A squat shows 5 sets + focus tag, and 6 rows (Aggressive +1 set pre-added, matching the +1 chip)',/^5×/.test(c.first||'')&&/focus/.test(c.first||'')&&/\+1/.test(c.first||'')&&c.rows===6,JSON.stringify(c));T('focus: toggle + rules summary',c.seg&&c.rules);
  await q.evaluate(()=>{[...document.querySelectorAll('#dayPills .pill')].find(x=>x.textContent==='Push A').click();});await wait(300);
  const t=await q.evaluate(()=>({fly:[...document.querySelectorAll('#liftBody .ex')].find(x=>x.textContent.includes('Fly'))?.querySelector('.chip')?.textContent.replace(/\s+/g,' ')}));
  T('focus: chest fly trimmed to 2 sets',/^2×/.test(t.fly||'')&&/trim/.test(t.fly||''),t.fly);

@@ -44,5 +44,12 @@ for(const v of views){await p.evaluate(n=>{switchView(n);window.scrollTo(0,0);},
   const H=await p.evaluate(()=>document.documentElement.scrollHeight);const shots=Math.min(+maxShots,Math.ceil(H/760));
   for(let i=0;i<shots;i++){await p.evaluate(y=>window.scrollTo(0,y),i*760);await wait(120);const f=path.join(out,`${v}-${String(i+1).padStart(2,'0')}.png`);await p.screenshot({path:f});index.push(f);}
   index.push(`${v}: pageHeight=${H}px shots=${shots}${Math.ceil(H/760)>shots?' (TRUNCATED at '+maxShots+')':''}`);}
+// Track sub-tabs (Lifts, Volume, Measures) are hidden panes: screenshot each one too
+await p.evaluate(()=>{switchView('track');window.scrollTo(0,0);});await wait(300);
+for(const tp of await p.evaluate(()=>[...document.querySelectorAll('.track-tabs button')].map(b=>b.dataset.tp))){
+  await p.evaluate(t=>{document.querySelector('.track-tabs button[data-tp="'+t+'"]').click();window.scrollTo(0,0);},tp);await wait(250);
+  fs.writeFileSync(path.join(out,'track-'+tp+'.txt'),await p.evaluate(t=>document.getElementById('tp-'+t).innerText,tp));
+  const H=await p.evaluate(()=>document.documentElement.scrollHeight);const n=Math.min(4,Math.ceil(H/760));
+  for(let i=0;i<n;i++){await p.evaluate(y=>window.scrollTo(0,y),i*760);await wait(100);const f=path.join(out,'track-'+tp+'-'+(i+1)+'.png');await p.screenshot({path:f});index.push(f);}}
 fs.writeFileSync(path.join(out,'INDEX.txt'),[`date=${iso} mode=${mode} errors=${errs.length}`,...errs,...index].join('\n'));
 console.log('audit written to',out,'errors:',errs.length);await b.close();})().catch(e=>{console.error('AUDIT CRASH',e);process.exit(2);});

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-ZA">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -9,15 +9,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Comeback">
-<meta name="description" content="Your unified strength + 15K race plan, calculators, logging and a 2-year roadmap.">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230A0D14'/%3E%3Cpath d='M40 138L70 70l22 36 22-50 36 82' fill='none' stroke='%23FFC53D' stroke-width='14' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="description" content="Pure-muscle training, logging, fuel and a two-year roadmap for one lifter — built for FFMI 25.">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230A0D14'/%3E%3Cpath d='M40 138L70 70l22 36 22-50 36 82' fill='none' stroke='%23FFC53D' stroke-width='14' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --ink:#0A0D14;--ink-2:#0E121B;--panel:#141925;--panel-2:#1A2030;--panel-3:#222A3D;
-  --line:#2A3346;--line-2:#374257;--text:#F3F6FC;--text-2:#9FAAC0;--text-3:#6B7894;
+  --line:#2A3346;--line-2:#374257;--text:#F3F6FC;--text-2:#9FAAC0;--text-3:#6B7894;--bad:#FF6B7A;
   --gold:#FFC53D;--gold-2:#FFD970;--gold-deep:#E0A012;          /* STRENGTH pillar */
   --cyan:#3FD8C8;--cyan-2:#6FE9DC;--cyan-deep:#23A99B;          /* ENDURANCE pillar */
   --go:#42D77D;--warn:#F0883E;--danger:#F65B5B;--violet:#9D8CFF;
@@ -238,6 +239,8 @@ nav.tabs .tab{flex:1 0 12.5%}
 .input-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px;margin-bottom:16px}
 .field label{display:block;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-3);font-weight:700;margin-bottom:6px}
 .field input,.field select{width:100%;background:var(--panel-3);border:1px solid var(--line);border-radius:10px;color:var(--text);font-family:var(--f-mono);font-size:16px;font-weight:500;padding:11px 12px}
+select.field{background:var(--panel-3);border:1px solid var(--line);border-radius:10px;color:var(--text);font-family:var(--f-body);min-height:40px}
+select.field:focus{outline:none;border-color:var(--gold)}
 .field input:focus,.field select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,197,61,.14)}
 .field.full{grid-column:1/-1}
 .readout{background:linear-gradient(155deg,var(--panel-2),var(--ink-2));border:1px solid var(--line-2);border-radius:var(--r);padding:18px;margin-top:4px}
@@ -531,6 +534,36 @@ button:active,.pill:active,.tab:active{transform:scale(.97)}
 .hr-s{white-space:normal;overflow-wrap:anywhere}
 .cd-ring{flex:none;margin-left:auto}
 .hr-d{font-size:25px!important;white-space:nowrap}
+/* session tools (2026-09-26) */
+.awake-row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
+.awake-btn{flex:1 1 150px;min-height:44px;background:var(--panel);border:1px solid var(--line);color:var(--text-2);border-radius:10px;font-family:var(--f-body);font-size:12.5px;font-weight:700;padding:8px 10px;cursor:pointer;text-align:center}
+.awake-btn.on{border-color:rgba(255,197,61,.45);color:var(--gold);background:rgba(255,197,61,.07)}
+.awake-btn:disabled{opacity:.6;cursor:default}
+/* auto-progression + session strip (2026-09-26) */
+.prog{display:flex;align-items:center;gap:10px;margin:8px 0 2px;padding:9px 10px;border-radius:10px;background:rgba(63,216,200,.07);border:1px solid rgba(63,216,200,.28);font-size:13px;line-height:1.4}
+.prog-ic{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:rgba(63,216,200,.16);color:var(--cyan)}
+.prog-t{flex:1;min-width:0}.prog-t small{display:block;color:var(--text-3);font-size:11.5px;margin-top:2px}
+.prog-up{background:rgba(66,211,146,.08);border-color:rgba(66,211,146,.35)}.prog-up .prog-ic{background:rgba(66,211,146,.18);color:var(--go)}
+.prog-reset{background:rgba(255,176,32,.08);border-color:rgba(255,176,32,.35)}.prog-reset .prog-ic{background:rgba(255,176,32,.18);color:var(--warn)}
+.prog-use{flex:none;min-width:52px;min-height:44px;border-radius:9px;border:1px solid rgba(255,197,61,.45);background:var(--panel-3);color:var(--gold);font-weight:800;font-size:13px;cursor:pointer;font-family:var(--f-body)}
+.sess-strip{display:flex;gap:8px;justify-content:space-between;margin:14px 0 4px;padding:12px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:12.5px;color:var(--text-2)}
+.sess-strip b{color:var(--text);font-family:var(--f-mono);font-size:14px}.sess-strip .pr b{color:var(--gold)}
+/* track: lift progress, volume, scans (2026-09-26) */
+.ex-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.ex-stats>div{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:8px;min-width:0}
+.ex-stats span{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
+.ex-stats b{display:block;font-family:var(--f-mono);font-size:15px;color:var(--text);margin-top:2px}.ex-stats b.up{color:var(--go)}.ex-stats b.down{color:var(--warn)}
+.ex-stats small{display:block;font-size:11px;color:var(--text-3);margin-top:2px;overflow-wrap:anywhere}
+.vol-row{margin:10px 0}.vol-h{display:flex;justify-content:space-between;gap:8px;font-size:13px}.vol-h span{color:var(--text-3);font-family:var(--f-mono);font-size:12px}
+.vol-bar{height:10px;border-radius:6px;background:var(--panel-3);overflow:hidden;margin-top:5px}.vol-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--go));border-radius:6px}
+details.tested{margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel)}
+details.tested summary{cursor:pointer;font-weight:700;color:var(--text-2);min-height:32px;display:flex;align-items:center}
+/* coach pack (2026-09-26) */
+.coach-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.coach-btns .btn{flex:1 1 100px;width:auto;min-height:44px}
+.coach-pre{white-space:pre-wrap;word-break:break-word;font-family:var(--f-mono);font-size:11.5px;line-height:1.5;color:var(--text-2);margin:8px 0 0;max-height:320px;overflow:auto}
+/* lift fixes (2026-09-26) */
+.ex{scroll-margin-top:104px}
+.chk{position:relative}.chk::before{content:"";position:absolute;inset:-8px}
 </style>
 </head>
 <body>

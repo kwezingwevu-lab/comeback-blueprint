@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-ZA">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -9,15 +9,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Comeback">
-<meta name="description" content="Your unified strength + 15K race plan, calculators, logging and a 2-year roadmap.">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230A0D14'/%3E%3Cpath d='M40 138L70 70l22 36 22-50 36 82' fill='none' stroke='%23FFC53D' stroke-width='14' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="description" content="Pure-muscle training, logging, fuel and a two-year roadmap for one lifter — built for FFMI 25.">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230A0D14'/%3E%3Cpath d='M40 138L70 70l22 36 22-50 36 82' fill='none' stroke='%23FFC53D' stroke-width='14' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --ink:#0A0D14;--ink-2:#0E121B;--panel:#141925;--panel-2:#1A2030;--panel-3:#222A3D;
-  --line:#2A3346;--line-2:#374257;--text:#F3F6FC;--text-2:#9FAAC0;--text-3:#6B7894;
+  --line:#2A3346;--line-2:#374257;--text:#F3F6FC;--text-2:#9FAAC0;--text-3:#6B7894;--bad:#FF6B7A;
   --gold:#FFC53D;--gold-2:#FFD970;--gold-deep:#E0A012;          /* STRENGTH pillar */
   --cyan:#3FD8C8;--cyan-2:#6FE9DC;--cyan-deep:#23A99B;          /* ENDURANCE pillar */
   --go:#42D77D;--warn:#F0883E;--danger:#F65B5B;--violet:#9D8CFF;
@@ -238,6 +239,8 @@ nav.tabs .tab{flex:1 0 12.5%}
 .input-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px;margin-bottom:16px}
 .field label{display:block;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-3);font-weight:700;margin-bottom:6px}
 .field input,.field select{width:100%;background:var(--panel-3);border:1px solid var(--line);border-radius:10px;color:var(--text);font-family:var(--f-mono);font-size:16px;font-weight:500;padding:11px 12px}
+select.field{background:var(--panel-3);border:1px solid var(--line);border-radius:10px;color:var(--text);font-family:var(--f-body);min-height:40px}
+select.field:focus{outline:none;border-color:var(--gold)}
 .field input:focus,.field select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,197,61,.14)}
 .field.full{grid-column:1/-1}
 .readout{background:linear-gradient(155deg,var(--panel-2),var(--ink-2));border:1px solid var(--line-2);border-radius:var(--r);padding:18px;margin-top:4px}
@@ -531,6 +534,36 @@ button:active,.pill:active,.tab:active{transform:scale(.97)}
 .hr-s{white-space:normal;overflow-wrap:anywhere}
 .cd-ring{flex:none;margin-left:auto}
 .hr-d{font-size:25px!important;white-space:nowrap}
+/* session tools (2026-09-26) */
+.awake-row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
+.awake-btn{flex:1 1 150px;min-height:44px;background:var(--panel);border:1px solid var(--line);color:var(--text-2);border-radius:10px;font-family:var(--f-body);font-size:12.5px;font-weight:700;padding:8px 10px;cursor:pointer;text-align:center}
+.awake-btn.on{border-color:rgba(255,197,61,.45);color:var(--gold);background:rgba(255,197,61,.07)}
+.awake-btn:disabled{opacity:.6;cursor:default}
+/* auto-progression + session strip (2026-09-26) */
+.prog{display:flex;align-items:center;gap:10px;margin:8px 0 2px;padding:9px 10px;border-radius:10px;background:rgba(63,216,200,.07);border:1px solid rgba(63,216,200,.28);font-size:13px;line-height:1.4}
+.prog-ic{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:rgba(63,216,200,.16);color:var(--cyan)}
+.prog-t{flex:1;min-width:0}.prog-t small{display:block;color:var(--text-3);font-size:11.5px;margin-top:2px}
+.prog-up{background:rgba(66,211,146,.08);border-color:rgba(66,211,146,.35)}.prog-up .prog-ic{background:rgba(66,211,146,.18);color:var(--go)}
+.prog-reset{background:rgba(255,176,32,.08);border-color:rgba(255,176,32,.35)}.prog-reset .prog-ic{background:rgba(255,176,32,.18);color:var(--warn)}
+.prog-use{flex:none;min-width:52px;min-height:44px;border-radius:9px;border:1px solid rgba(255,197,61,.45);background:var(--panel-3);color:var(--gold);font-weight:800;font-size:13px;cursor:pointer;font-family:var(--f-body)}
+.sess-strip{display:flex;gap:8px;justify-content:space-between;margin:14px 0 4px;padding:12px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:12.5px;color:var(--text-2)}
+.sess-strip b{color:var(--text);font-family:var(--f-mono);font-size:14px}.sess-strip .pr b{color:var(--gold)}
+/* track: lift progress, volume, scans (2026-09-26) */
+.ex-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.ex-stats>div{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:8px;min-width:0}
+.ex-stats span{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
+.ex-stats b{display:block;font-family:var(--f-mono);font-size:15px;color:var(--text);margin-top:2px}.ex-stats b.up{color:var(--go)}.ex-stats b.down{color:var(--warn)}
+.ex-stats small{display:block;font-size:11px;color:var(--text-3);margin-top:2px;overflow-wrap:anywhere}
+.vol-row{margin:10px 0}.vol-h{display:flex;justify-content:space-between;gap:8px;font-size:13px}.vol-h span{color:var(--text-3);font-family:var(--f-mono);font-size:12px}
+.vol-bar{height:10px;border-radius:6px;background:var(--panel-3);overflow:hidden;margin-top:5px}.vol-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--go));border-radius:6px}
+details.tested{margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel)}
+details.tested summary{cursor:pointer;font-weight:700;color:var(--text-2);min-height:32px;display:flex;align-items:center}
+/* coach pack (2026-09-26) */
+.coach-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.coach-btns .btn{flex:1 1 100px;width:auto;min-height:44px}
+.coach-pre{white-space:pre-wrap;word-break:break-word;font-family:var(--f-mono);font-size:11.5px;line-height:1.5;color:var(--text-2);margin:8px 0 0;max-height:320px;overflow:auto}
+/* lift fixes (2026-09-26) */
+.ex{scroll-margin-top:104px}
+.chk{position:relative}.chk::before{content:"";position:absolute;inset:-8px}
 </style>
 </head>
 <body>
@@ -582,9 +615,9 @@ function persist(k,v){try{if(!STORAGE_OK){mem[k]=v;return;}localStorage.setItem(
 const DB={
   profile:load("cb2_profile",{weight:88,height:177,age:38,bf:18,goal:102.3,goalBf:24,act:1.55,goal10k:"55:00",phase:"hyper"}),
   sessions:load("cb2_sessions",[]),runs:load("cb2_runs",[]),weight:load("cb2_weight",[]),measure:load("cb2_measure",[]),lifts:load("cb2_lifts",[]),
-  save(){persist("cb2_profile",this.profile);persist("cb2_sessions",this.sessions);persist("cb2_runs",this.runs);persist("cb2_weight",this.weight);persist("cb2_measure",this.measure);persist("cb2_lifts",this.lifts);persist("cb2_sleep",this.sleep||[]);persist("cb2_rhr",this.rhr||[]);persist("cb2_steps",this.steps||[]);persist("cb2_ts",Date.now());cloudQueue();}
+  save(){persist("cb2_profile",this.profile);persist("cb2_sessions",this.sessions);persist("cb2_runs",this.runs);persist("cb2_weight",this.weight);persist("cb2_measure",this.measure);persist("cb2_lifts",this.lifts);persist("cb2_sleep",this.sleep||[]);persist("cb2_rhr",this.rhr||[]);persist("cb2_steps",this.steps||[]);persist("cb2_dexa",this.dexa||[]);persist("cb2_ts",Date.now());cloudQueue();}
 };
-DB.sleep=load("cb2_sleep",[]);DB.rhr=load("cb2_rhr",[]);DB.steps=load("cb2_steps",[]);
+DB.sleep=load("cb2_sleep",[]);DB.rhr=load("cb2_rhr",[]);DB.steps=load("cb2_steps",[]);DB.dexa=load("cb2_dexa",[]);
 if(!load("cb2_pure",false)){DB.profile.phase="hyper";DB.save();persist("cb2_pure",true);}
 function todayISO(){return new Date().toISOString().slice(0,10);}
 function fmtShort(iso){const d=new Date(iso+"T00:00:00");return d.toLocaleDateString(undefined,{day:'2-digit',month:'2-digit'});}
@@ -606,7 +639,12 @@ function firstSessionDow(){return DOW[new Date(START_ISO+"T00:00:00").getDay()];
 function parseRest(str){if(!str)return 90;str=String(str).toLowerCase();const m=str.match(/([\d.]+)(?:\s*-\s*([\d.]+))?\s*min/);if(m){const a=parseFloat(m[1]),b=m[2]?parseFloat(m[2]):a;return Math.round((a+b)/2*60);}const s=str.match(/([\d.]+)\s*s/);if(s)return Math.round(parseFloat(s[1]));return 90;}
 function computePlates(target,bar){bar=parseFloat(bar)||20;target=parseFloat(target)||0;const sizes=[25,20,15,10,5,2.5,1.25];let per=(target-bar)/2;if(per<0)return null;const out=[];sizes.forEach(p=>{let n=Math.floor(per/p+1e-9);if(n>0){out.push({p,n});per=+(per-n*p).toFixed(4);}});return {perSide:out,leftover:+per.toFixed(2),bar};}
 function warmupSets(working){working=parseFloat(working);if(!working||working<=0)return[];const pcts=[0.4,0.6,0.8],reps=[8,5,3];return pcts.map((pc,i)=>({pct:Math.round(pc*100),weight:Math.max(20,Math.round(working*pc/2.5)*2.5),reps:reps[i]}));}
-function sessionsThisWeek(){const wk=planWeek(),s=weekStartISO(wk),e=dateAdd(s,7);const lifts=DB.sessions.filter(x=>x.dateISO>=s&&x.dateISO<e&&Object.values(x.entries||{}).some(arr=>arr&&arr.some(st=>st&&st.r&&st.w))).length;const runs=DB.runs.filter(x=>x.date>=s&&x.date<e).length;return {lifts,runs};}
+/* set-done rule, home rests, default row counts (2026-09-26) */
+function isBWEx(exId){const e=exObj(exId);if(!e)return false;if(/AMRAP/i.test(String(e.reps))||/Bodyweight/i.test(String(e.tag)))return true;if(LOC==="home"&&HOME_SUB[exId]&&/bodyweight/.test(homeRx(e,HOME_SUB[exId]).load))return true;return false;}
+function setDone(exId,st){return !!(st&&+st.r>0&&(+st.w>0||isBWEx(exId)));}
+function homeRest(exId){const hs=HOME_SUB[exId];if(!hs)return 90;return /Calf|Curl|Raise|Fly|Extension|Y-T-W|Y-Raise|Pullover|Kickback|21s|Shrug|Rollout|Dead-Bug|Crunch/i.test(hs.n)?60:90;}
+function defaultRows(e,day){let n=(LOC==="home"&&HOME_SUB[e.id])?Math.max(2,homeRx(e,HOME_SUB[e.id]).sets+fxDelta(e)):fxSets(e);if(bulkMode==="aggr"&&!isDeloadWeek()&&LOC!=="home"&&day&&dayType(curDay)!=="extras"&&e===day.ex[0]&&e.cmp)n++;return n;}
+function sessionsThisWeek(){const wk=planWeek(),s=weekStartISO(wk),e=dateAdd(s,7);const lifts=DB.sessions.filter(x=>x.dateISO>=s&&x.dateISO<e&&Object.entries(x.entries||{}).some(([ex,arr])=>arr&&arr.some(st=>setDone(ex,st)))).length;const runs=DB.runs.filter(x=>x.date>=s&&x.date<e).length;return {lifts,runs};}
 function e1rm(w,r){w=parseFloat(w);r=parseFloat(r);if(!w||!r||w<=0||r<=0)return 0;return w*(1+r/30);}
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function parseTime(s){if(!s)return 0;const p=String(s).split(":").map(Number);if(p.length===2)return p[0]*60+p[1];if(p.length===3)return p[0]*3600+p[1]*60+p[2];return parseFloat(s)||0;}
@@ -692,16 +730,16 @@ const GYM={
     {id:"ua7",n:"U7",name:"Rope Triceps Pushdown",tag:"Isolation · Cable",cmp:0,sets:3,reps:"12-15",tempo:"2/0/1/1",rest:"60s",rir:"0-1",how:"Face a high cable with a rope, elbows pinned to your sides. Push down and spread the rope apart at the bottom, return slowly.",why:"Triceps are most of your arm size. This direct work, twice a week with your pressing, fills out the back of the arm fast."}
   ]},
   extras:{name:"Extras",sub:"Active Recovery Pump · Fridays · RIR 2, no failure",ex:[
-    {id:"x1",post:1,n:"X1",name:"Face Pull (rope, high cable)",tag:"Isolation · Cable",cmp:0,sets:3,reps:"15-20",tempo:"2/1/1/1",rest:"60s",rir:"0-1",how:"Set a rope at upper-chest height. Pull it towards your face, elbows high and wide, and finish by squeezing your shoulder blades together and rotating your knuckles back. Light weight, big squeeze.",why:"Builds the rear delts and upper back that pressing days under-hit — better posture, healthier shoulders, and a thicker look from behind. Almost zero recovery cost, perfect for a rest day."},
-    {id:"x2",n:"X2",name:"Dumbbell Lateral Raise",tag:"Isolation · Dumbbell",cmp:0,sets:3,reps:"15-20",tempo:"2/0/1/1",rest:"60s",rir:"0-1",how:"Light dumbbells at your sides, slight forward lean. Raise out to shoulder height leading with the elbows, lower slowly. No swinging — if you're swinging, it's too heavy.",why:"Side delts are what make shoulders look wide, and they recover fast — an extra weekly hit here is nearly free growth."},
-    {id:"x3",n:"X3",name:"Incline Dumbbell Curl",tag:"Isolation · Dumbbell · Stretch",cmp:0,stretch:1,sets:3,reps:"10-12",tempo:"3/0/1/1",rest:"75s",rir:"0-1",how:"Lie back on a 45-60° incline bench, arms hanging straight down so the biceps start in a deep stretch. Curl up without letting your elbows drift forward, lower slowly all the way down.",why:"The stretched starting position is the strongest growth trigger for the biceps — this is the highest-value curl you can add on a spare day."},
-    {id:"x4",n:"X4",name:"Overhead Rope Triceps Extension",tag:"Isolation · Cable · Stretch",cmp:0,stretch:1,sets:3,reps:"12-15",tempo:"3/0/1/1",rest:"75s",rir:"0-1",how:"Face away from a low cable, rope behind your head, elbows pointing forward. Extend to lockout, then lower until you feel a deep stretch behind the arms.",why:"Works the triceps' long head in its stretched position — the part that adds most to arm size and gets least from pressing."},
-    {id:"x5",n:"X5",name:"Standing Calf Raise",tag:"Isolation · Machine/DB",cmp:0,sets:3,reps:"12-15",tempo:"2/2/1/1",rest:"60s",rir:"0-1",how:"Ball of the foot on a step or platform. Lower slowly into a full stretch at the bottom, pause two seconds, then drive up onto your toes and squeeze at the top.",why:"Calves grow from full range and frequency — this costs your recovery nothing tomorrow and quietly fixes the classic lagging muscle."},
+    {id:"x1",post:1,n:"X1",name:"Face Pull (rope, high cable)",tag:"Isolation · Cable",cmp:0,sets:3,reps:"15-20",tempo:"2/1/1/1",rest:"60s",rir:"2",how:"Set a rope at upper-chest height. Pull it towards your face, elbows high and wide, and finish by squeezing your shoulder blades together and rotating your knuckles back. Light weight, big squeeze.",why:"Builds the rear delts and upper back that pressing days under-hit — better posture, healthier shoulders, and a thicker look from behind. Almost zero recovery cost, perfect for a rest day."},
+    {id:"x2",n:"X2",name:"Dumbbell Lateral Raise",tag:"Isolation · Dumbbell",cmp:0,sets:3,reps:"15-20",tempo:"2/0/1/1",rest:"60s",rir:"2",how:"Light dumbbells at your sides, slight forward lean. Raise out to shoulder height leading with the elbows, lower slowly. No swinging — if you're swinging, it's too heavy.",why:"Side delts are what make shoulders look wide, and they recover fast — an extra weekly hit here is nearly free growth."},
+    {id:"x3",n:"X3",name:"Incline Dumbbell Curl",tag:"Isolation · Dumbbell · Stretch",cmp:0,stretch:1,sets:3,reps:"10-12",tempo:"3/0/1/1",rest:"75s",rir:"2",how:"Lie back on a 45-60° incline bench, arms hanging straight down so the biceps start in a deep stretch. Curl up without letting your elbows drift forward, lower slowly all the way down.",why:"The stretched starting position is the strongest growth trigger for the biceps — this is the highest-value curl you can add on a spare day."},
+    {id:"x4",n:"X4",name:"Overhead Rope Triceps Extension",tag:"Isolation · Cable · Stretch",cmp:0,stretch:1,sets:3,reps:"12-15",tempo:"3/0/1/1",rest:"75s",rir:"2",how:"Face away from a low cable, rope behind your head, elbows pointing forward. Extend to lockout, then lower until you feel a deep stretch behind the arms.",why:"Works the triceps' long head in its stretched position — the part that adds most to arm size and gets least from pressing."},
+    {id:"x5",n:"X5",name:"Standing Calf Raise",tag:"Isolation · Machine/DB",cmp:0,sets:3,reps:"12-15",tempo:"2/2/1/1",rest:"60s",rir:"3",how:"Ball of the foot on a step or platform. Lower slowly into a full stretch at the bottom, pause two seconds, then drive up onto your toes and squeeze at the top.",why:"Calves grow from full range and frequency — this costs your recovery nothing tomorrow and quietly fixes the classic lagging muscle."},
     {id:"x6",n:"X6",name:"Hanging Knee Raise / Cable Crunch",tag:"Core · Bodyweight/Cable",cmp:0,sets:3,reps:"10-15",tempo:"2/1/2/0",rest:"60s",rir:"1-2",how:"Hang from a bar and raise your knees towards your chest under control — no swinging. Or kneel at a cable with a rope behind your head and crunch ribs to hips.",why:"Loaded ab work builds a thicker, more visible six-pack as you grow. Finishing a light day with core keeps the session short and complete."}
   ]}
 };
 const GYM_ORDER=["legsA","pushA","pullA","legsB","pushB","pullB"];
-const EXMAP={};GYM_ORDER.forEach(k=>GYM[k].ex.forEach(e=>EXMAP[e.id]={name:e.name,day:k}));
+const EXMAP={};GYM_ORDER.concat(Object.keys(GYM).filter(k=>!GYM_ORDER.includes(k))).forEach(k=>((GYM[k]&&GYM[k].ex)||[]).forEach(e=>{if(!EXMAP[e.id])EXMAP[e.id]={name:e.name,day:k};}));
 const DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 function weekTemplate(){return [
   {day:"Mon",kind:"lift",label:"Pull A",detail:"Strength — heavy rows and pullovers. Back width is a twice-a-week project now."},
@@ -709,7 +747,7 @@ function weekTemplate(){return [
   {day:"Wed",kind:"lift",label:"Push B",detail:"Volume — chest, shoulders, triceps from new angles. The second weekly hit is what drives growth."},
   {day:"Thu",kind:"lift",label:"Pull B",detail:"Volume — back thickness and biceps. Rows lead today."},
   {day:"Fri",kind:"rest",label:"Active Recovery",detail:"Minimal rest by design: a 30–40 minute low-stress pump (rear delts, arms, calves, core) at RIR 2, nothing that touches tomorrow's Legs A. Full rest only in deload weeks or when the Weekly Review says so."},
-  {day:"Sat",kind:"lift",label:"Legs A",detail:"Strength — squat-led lower body opens the week, fresh off the rest day. Legs twice a week is where mass lives."},
+  {day:"Sat",kind:"lift",label:"Legs A",detail:"Strength \u2014 squat-led lower body opens the week, fresh off Friday\u2019s easy pump. Legs twice a week is where mass lives."},
   {day:"Sun",kind:"lift",label:"Push A",detail:"Strength — heavy pressing. Bench and overhead press while the legs recover."}
 ];}
 function dayType(key){return key.indexOf("push")===0?"push":key.indexOf("pull")===0?"pull":key.indexOf("upper")===0?"upper":key.indexOf("extras")===0?"extras":"legs";}
@@ -856,6 +894,7 @@ function switchView(n){
   tabs.forEach(t=>t.classList.toggle("active",t.dataset.view===n));
   const R={home:renderHome,lift:renderLift,run:renderRun,roadmap:renderRoadmap,fuel:renderFuel,numbers:renderNumbers,track:renderTrack,guide:renderGuide};
   if(R[n])R[n]();window.scrollTo({top:0});
+  try{onViewChange(n);}catch(e){}
   const at=document.querySelector('.tab[data-view="'+n+'"]');if(at&&at.scrollIntoView)at.scrollIntoView({inline:"center",block:"nearest"});
 }
 tabs.forEach(t=>t.addEventListener("click",()=>switchView(t.dataset.view)));
@@ -943,7 +982,7 @@ function marchSelectorHTML(){const cur=marchTarget();const rows=["band","edge","
   return `<div style="margin-top:12px"><div class="calc-note" style="margin-bottom:8px"><b>March target \u2014 choose the route, see the price:</b></div>
   <div class="seg" id="marchSeg">${rows.map(r=>`<button data-mk="${r.k}"${r.k===marchKey?" class=on":""}>${r.k==="mass"?"110 kg":"~"+r.kg.toFixed(0)+" kg"}</button>`).join("")}</div>
   <div style="margin-top:10px;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap"><thead><tr style="color:var(--text-3);font-family:var(--f-mono);font-size:10px;text-align:right"><th style="text-align:left;padding:4px 2px">route</th><th style="padding:4px 3px">kg</th><th style="padding:4px 3px">fat%</th><th style="padding:4px 3px">+musc</th><th style="padding:4px 3px">+fat</th><th style="padding:4px 3px">waist</th><th style="padding:4px 3px">kcal</th><th style="padding:4px 3px">cut</th></tr></thead><tbody>
-  ${rows.map(r=>`<tr style="text-align:right;color:${r.k===marchKey?"var(--text)":"var(--text-3)"};font-family:var(--f-mono)"><td style="text-align:left;padding:6px 2px;font-weight:${r.k===marchKey?700:400};white-space:normal;max-width:96px">${r.label}</td><td style="padding:6px 3px">${r.kg.toFixed(1)}</td><td style="color:${r.bfM<=24.5?"var(--go)":r.bfM<=27?"var(--gold)":"var(--bad)"}">${r.bfM.toFixed(0)}%</td><td>+${r.leanGain.toFixed(1)}</td><td>+${r.fatGain.toFixed(1)}</td><td style="padding:6px 3px">+${r.waistEst.toFixed(0)}cm</td><td style="padding:6px 3px">${r.surplus}</td><td style="padding:6px 3px">${r.cutWeeks}wk</td></tr>`).join("")}
+  ${rows.map(r=>`<tr style="text-align:right;color:${r.k===marchKey?"var(--text)":"var(--text-3)"};font-family:var(--f-mono)"><td style="text-align:left;padding:6px 2px;font-weight:${r.k===marchKey?700:400};white-space:normal;max-width:96px">${r.label}</td><td style="padding:6px 3px">${r.kg.toFixed(1)}</td><td style="padding:6px 3px;color:${r.bfM<=24.5?"var(--go)":r.bfM<=27?"var(--gold)":"var(--bad)"}">${r.bfM.toFixed(0)}%</td><td style="padding:6px 3px">+${r.leanGain.toFixed(1)}</td><td style="padding:6px 3px">+${r.fatGain.toFixed(1)}</td><td style="padding:6px 3px">+${r.waistEst.toFixed(0)}cm</td><td style="padding:6px 3px">${r.surplus}</td><td style="padding:6px 3px">${r.cutWeeks}wk</td></tr>`).join("")}
   </tbody></table></div>
   <div class="verdict ${cur.k==="band"?"ok":"warn"}" style="margin-top:10px"><b>${cur.label}:</b> ${cur.note}. Engine now targets <b>+${cur.rate.toFixed(2)} kg/week</b> (${cur.pct.toFixed(2)}% of bodyweight, ~${cur.surplus} kcal surplus); waist brake ${cur.k==="mass"?"<b>off</b> \u2014 a health guard only":"+"+cur.limit+" cm"}.${cur.k==="mass"?" Muscle by March is the same ~"+cur.leanGain.toFixed(1)+" kg on every route \u2014 the extra "+(cur.fatGain-marchTarget("band").fatGain).toFixed(0)+" kg is fat, and the "+cur.cutWeeks+"-week cut afterwards is "+cur.cutWeeks+" weeks of no building.":""}</div></div>`;}
 function fastTrackModel(){const c=compute();const pts=[];let crossWeek=null,contractileWeek=null;
@@ -974,8 +1013,8 @@ function importHealthText(txt){txt=String(txt||"").trim();if(!txt)return {n:0,ki
 function doHealthImport(){const ta=document.getElementById("healthTa");const r=importHealthText(ta&&ta.value);if(!r.n){toast("Nothing recognised \u2014 check the format below");return;}toast("Imported "+r.n+" readings ("+Object.entries(r.kinds).map(([k,v])=>v+" "+k).join(", ")+") \u2713",true);if(ta)ta.value="";renderHome();updateHeader();}
 function healthFromFile(inp){const f=inp.files&&inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const res=importHealthText(String(r.result));toast(res.n?"Imported "+res.n+" readings \u2713":"No readings recognised in that file",!!res.n);renderHome();updateHeader();};r.readAsText(f);}
 function recoveryHTML(){const last=arr=>[...arr].sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];const sl=last(DB.sleep),hr=last(DB.rhr),st=last(DB.steps);if(!sl&&!hr&&!st)return "";
-  const wk=DB.sleep.filter(x=>x.date>=dateAdd(todayISO(),-7));const avg=wk.length?wk.reduce((a,x)=>a+x.h,0)/wk.length:null;
-  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;font-family:var(--f-mono);font-size:12px">${sl?`<span style="padding:5px 9px;border-radius:8px;background:var(--panel-3);color:${sl.h>=7?"var(--go)":"var(--bad)"}">\ud83d\udecc ${sl.h.toFixed(1)} h${avg!=null?" \u00b7 wk ${avg.toFixed(1)}":""}</span>`:""}${hr?`<span style="padding:5px 9px;border-radius:8px;background:var(--panel-3);color:var(--text-2)">\u2764 ${hr.bpm} bpm</span>`:""}${st?`<span style="padding:5px 9px;border-radius:8px;background:var(--panel-3);color:var(--text-2)">\ud83d\udc63 ${st.n.toLocaleString()}</span>`:""}</div>`;}
+  const wk=DB.sleep.filter(x=>x.date>dateAdd(todayISO(),-7));const avg=wk.length?wk.reduce((a,x)=>a+x.h,0)/wk.length:null;
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;font-family:var(--f-mono);font-size:12px">${sl?`<span style="padding:5px 9px;border-radius:8px;background:var(--panel-3);color:${sl.h>=7?"var(--go)":"var(--bad)"}">\ud83d\udecc ${sl.h.toFixed(1)} h${avg!=null?" \u00b7 7-night avg "+avg.toFixed(1)+" h":""}</span>`:""}${hr?`<span style="padding:5px 9px;border-radius:8px;background:var(--panel-3);color:var(--text-2)">\u2764 ${hr.bpm} bpm</span>`:""}${st?`<span style="padding:5px 9px;border-radius:8px;background:var(--panel-3);color:var(--text-2)">\ud83d\udc63 ${st.n.toLocaleString()}</span>`:""}</div>`;}
 function quickLogWeight(){const el=document.getElementById("qW");const v=parseFloat(el&&el.value);if(!v||v<40||v>250){toast("Enter a weight in kg");return;}const date=todayISO();DB.weight=DB.weight.filter(x=>x.date!==date);DB.weight.push({date,v});DB.profile.weight=v;DB.save();toast("Weight logged \u2014 "+v+" kg \u2713",true);renderHome();updateHeader();}
 function quickLogWaist(){const el=document.getElementById("qWa");const v=parseFloat(el&&el.value);if(!v||v<50||v>200){toast("Enter waist in cm");return;}const date=todayISO();const ex=DB.measure.find(x=>x.date===date)||{date};ex.waist=v;DB.measure=DB.measure.filter(x=>x.date!==date);DB.measure.push(ex);DB.save();toast("Waist logged \u2014 "+v+" cm \u2713",true);renderHome();}
 function quickLogHTML(){const date=todayISO();const tw=DB.weight.find(x=>x.date===date),tm=DB.measure.find(x=>x.date===date&&x.waist!=null);const lastW=[...DB.weight].sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];const lastWa=[...DB.measure].filter(x=>x.waist!=null).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];
@@ -985,14 +1024,14 @@ function quickLogHTML(){const date=todayISO();const tw=DB.weight.find(x=>x.date=
   <div style="margin-top:6px">${row("qW","Weight","kg",tw?tw.v:null,lastW,"quickLogWeight",lastW?"last "+lastW.v+" kg":"kg")}${row("qWa","Waist","cm",tm?tm.waist:null,lastWa,"quickLogWaist",lastWa?"last "+lastWa.waist+" cm":"cm, at the navel")}</div>${recoveryHTML()}</div>`;}
 function milestoneCardHTML(){const m=milestoneProjection();
   return `<div class="card" style="border-color:rgba(255,197,61,.4)"><div class="card-t" style="color:var(--gold)"><span class="ic">${ICON.check}</span>\ud83c\udfaf Soft milestone \u2014 5\u20137 March 2027</div>
-  <div class="card-st">${m.passed?"The check weekend has passed \u2014 compare the targets below to what you logged.":m.weeks+" weeks away. Aggressive settings hold until this weekend; then Mini-Cut I and a step down to Maximum, automatically."}</div>
+  <div class="card-st">${m.passed?"The check weekend has passed \u2014 compare the targets below to what you logged.":m.weeks+" weeks away. Aggressive settings hold until that weekend; then the engine steps down to Maximum on its own, and the Weekly Review tells you when to flip Numbers to Cut for Mini-Cut I."}</div>
   <div style="height:8px;border-radius:4px;background:var(--panel-3);margin-top:10px;overflow:hidden"><div style="height:100%;width:${m.pct}%;background:linear-gradient(90deg,var(--gold-deep),var(--gold))"></div></div>
   <div style="display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:11px;color:var(--text-3);margin-top:4px"><span>Day 1 \u00b7 ${fmtDM(START_ISO)}</span><span>${m.pct}% of the run-up</span><span>5\u20137 Mar</span></div>
   <div class="dose-grid" style="margin-top:12px"><div class="dose"><div class="dn">Lean mass target</div><div class="dv">${m.lean.toFixed(1)}<small>kg \u00b7 banked \u2248 ${(()=>{const r=weeklyReview();return r.estLean==null?"\u2014":(r.estLean>=0?"+":"")+r.estLean.toFixed(1);})()}</small></div></div><div class="dose"><div class="dn">Scale target</div><div class="dv">${marchTarget().kg.toFixed(1)}<small>kg \u00b7 ${marchKey==="mass"?"outside the band":marchKey==="edge"?"band edge (~26%)":"top of the band"}</small></div></div><div class="dose"><div class="dn">Waist rule</div><div class="dv">${marchKey==="mass"?"off":"\u2264 +"+marchTarget().limit}<small>${marchKey==="mass"?"health guard only":"cm from baseline"}</small></div></div></div>
   ${marchSelectorHTML()}
   ${fastTrackHTML()}
   ${baselineRowHTML()}
-  <div class="calc-note" style="margin-top:10px"><b>What \u201con track\u201d looks like that weekend:</b> ${m.total*6} sessions logged (six a week), ${m.total*3} weigh-ins, lean mass within ~0.5 kg of the target, waist inside the +5 cm band. Miss the lean target but hit the attendance and the brake, and the plan is still working \u2014 the ceiling taper and one bad month look identical on a scale; the log is what separates them.</div></div>${(()=>{const d=dayDiff(todayISO(),MILESTONE_ISO);return d>=0&&d<=7?peakWeekHTML(true):"";})()}`;}
+  <div class="calc-note" style="margin-top:10px"><b>What \u201con track\u201d looks like that weekend:</b> ${m.total*6} sessions logged (six a week), ${m.total*3} weigh-ins, lean mass within ~0.5 kg of the target, waist inside the +${marchTarget().limit} cm brake. Miss the lean target but hit the attendance and the brake, and the plan is still working \u2014 the ceiling taper and one bad month look identical on a scale; the log is what separates them.</div></div>${(()=>{const d=dayDiff(todayISO(),MILESTONE_ISO);return d>=0&&d<=7?peakWeekHTML(true):"";})()}`;}
 function etaCardHTML(){
   const cur=etaModel(bulkMode),best=etaModel("aggr"),act=etaActual(),c=compute();
   const modeName={aggr:"Aggressive",max:"Maximum",balanced:"Balanced",lean:"Lean"}[bulkMode]||"Maximum";
@@ -1082,10 +1121,10 @@ function drawRoadmapChart(weeks,now){
 /* ===== REST TIMER ===== */
 let _restLeft=0,_restInt=null,_restWired=false;
 function renderRest(){const lab=document.getElementById("restTime");if(lab)lab.textContent=_restLeft>0?fmtPace(_restLeft):"Go!";}
-function startRest(sec){const bar=document.getElementById("restTimer");if(!bar)return;_restLeft=sec;bar.classList.add("show");renderRest();clearInterval(_restInt);_restInt=setInterval(()=>{_restLeft--;if(_restLeft<=0){clearInterval(_restInt);renderRest();if(navigator.vibrate)try{navigator.vibrate([120,60,120]);}catch(e){}setTimeout(()=>{const b=document.getElementById("restTimer");if(b&&_restLeft<=0)b.classList.remove("show");},2200);}else renderRest();},1000);}
-function wireRest(){if(_restWired)return;_restWired=true;const end=document.getElementById("restEnd"),plus=document.getElementById("restPlus");if(end)end.addEventListener("click",()=>{clearInterval(_restInt);_restLeft=0;document.getElementById("restTimer").classList.remove("show");});if(plus)plus.addEventListener("click",()=>{_restLeft+=15;renderRest();});}
+function startRest(sec){const bar=document.getElementById("restTimer");if(!bar)return;_restEnd=nowMs()+sec*1000;_restLeft=sec;bar.classList.add("show");renderRest();clearInterval(_restInt);_restInt=setInterval(restTick,250);}
+function wireRest(){if(_restWired)return;_restWired=true;const end=document.getElementById("restEnd"),plus=document.getElementById("restPlus");if(end)end.addEventListener("click",()=>{clearInterval(_restInt);_restInt=null;_restLeft=0;document.getElementById("restTimer").classList.remove("show");});if(plus)plus.addEventListener("click",()=>{if(_restInt){_restEnd+=15000;restTick();}else startRest(15);});}
 /* ===== HOME ===== */
-function backupJSON(){const keys=["cb2_profile","cb2_sessions","cb2_runs","cb2_weight","cb2_measure","cb2_lifts","cb2_bulk","cb2_ceilbf","cb2_pure","cb2_ts","cb2_march","cb2_focuslb","cb2_radius","cb2_sleep","cb2_rhr","cb2_steps"];const o={};keys.forEach(k=>{const v=load(k,null);if(v!=null)o[k]=v;});return JSON.stringify(o);}
+function backupJSON(){const keys=["cb2_profile","cb2_sessions","cb2_runs","cb2_weight","cb2_measure","cb2_lifts","cb2_bulk","cb2_ceilbf","cb2_pure","cb2_ts","cb2_march","cb2_focuslb","cb2_radius","cb2_sleep","cb2_rhr","cb2_steps","cb2_dexa","cb2_fuelq","cb2_loc","cb2_incr","cb2_awake","cb2_beep","cb2_curex","cb2_lastbackup"];const o={};keys.forEach(k=>{const v=load(k,null);if(v!=null)o[k]=v;});return JSON.stringify(o);}
 function showDataBox(val,forRestore){const box=document.getElementById("dataBox"),ta=document.getElementById("dataTa"),ap=document.getElementById("dataApply");box.style.display="block";ta.value=val||"";ta.placeholder=forRestore?"Paste your backup here, then tap Apply":"";ap.style.display=forRestore?"block":"none";ta.focus();if(!forRestore)ta.select();}
 function doBackup(){persist("cb2_lastbackup",Date.now());const j=backupJSON();if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(j).then(()=>toast("Backup copied \u2014 paste into Notes, and into any new version via Restore",true)).catch(()=>showDataBox(j,false));}else showDataBox(j,false);}
 function doRestore(){showDataBox("",true);}
@@ -1102,7 +1141,7 @@ function cloudSaveNow(){if(!cloudOK()||!_cloudReady)return;clearTimeout(_ct);try
 function idbOpen(){return new Promise((res,rej)=>{try{const q=indexedDB.open("cb2",1);q.onupgradeneeded=()=>{q.result.createObjectStore("kv");};q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);}catch(e){rej(e);}});}
 function idbSave(){try{idbOpen().then(db=>{const tx=db.transaction("kv","readwrite");tx.objectStore("kv").put(cloudPayload(),"cb2_all");}).catch(()=>{});}catch(e){}}
 function idbLoad(){return idbOpen().then(db=>new Promise(res=>{const q=db.transaction("kv","readonly").objectStore("kv").get("cb2_all");q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null);})).catch(()=>null);}
-async function idbBoot(){try{const empty=DB.sessions.length===0&&DB.weight.length===0&&DB.measure.length===0;if(!empty)return;const raw=await idbLoad();if(!raw)return;const o=JSON.parse(raw);const data=o.data||o;let n=0;Object.keys(data).forEach(k=>{if(data[k]!=null){persist(k,data[k]);n++;}});if(n){reloadDB();rerenderAll();toast("Restored from the device vault \u2713",true);}}catch(e){}}
+async function idbBoot(){try{const empty=DB.sessions.length===0&&DB.weight.length===0&&DB.measure.length===0;if(!empty)return;const raw=await idbLoad();if(!raw)return;const o=JSON.parse(raw);const data=o.data||o;if(!hasLogsIn(data))return;let n=0;Object.keys(data).forEach(k=>{if(data[k]!=null){persist(k,data[k]);n++;}});if(n){reloadDB();rerenderAll();toast("Restored from the device vault \u2713",true);}}catch(e){}}
 function cloudQueue(){idbSave();if(!cloudOK()||!_cloudReady)return;clearTimeout(_ct);_ct=setTimeout(cloudSaveNow,250);}
 async function cloudBoot(){if(!cloudOK())return;
   let cloud=null;try{const res=await window.storage.get("cb2_all");if(res&&res.value)cloud=JSON.parse(res.value);}catch(e){}
@@ -1110,12 +1149,12 @@ async function cloudBoot(){if(!cloudOK())return;
   if(cloud){if(cloud.data){cts=cloud.ts||0;cdata=cloud.data;}else{cdata=cloud;cts=0;}}
   const lts=load("cb2_ts",0);
   const empty=DB.sessions.length===0&&DB.runs.length===0&&DB.weight.length===0;
-  if(cdata&&(empty||cts>lts)){
+  if(cdata&&((empty&&hasLogsIn(cdata))||(!empty&&cts>lts))){
     let n=0;Object.keys(cdata).forEach(k=>{if(cdata[k]!=null){persist(k,cdata[k]);n++;}});
     if(n){reloadDB();rerenderAll();toast("Cloud data loaded \u2713",true);}
   }
   _cloudReady=true;cloudSaveNow();}
-function reloadDB(){DB.profile=load("cb2_profile",DB.profile);DB.sessions=load("cb2_sessions",[]);DB.runs=load("cb2_runs",[]);DB.weight=load("cb2_weight",[]);DB.measure=load("cb2_measure",[]);DB.lifts=load("cb2_lifts",{});DB.sleep=load("cb2_sleep",[]);DB.rhr=load("cb2_rhr",[]);DB.steps=load("cb2_steps",[]);ceilBf=load("cb2_ceilbf",18);LOC=load("cb2_loc","gym");}
+function reloadDB(){DB.profile=load("cb2_profile",DB.profile);DB.sessions=load("cb2_sessions",[]);DB.runs=load("cb2_runs",[]);DB.weight=load("cb2_weight",[]);DB.measure=load("cb2_measure",[]);DB.lifts=load("cb2_lifts",[]);DB.sleep=load("cb2_sleep",[]);DB.rhr=load("cb2_rhr",[]);DB.steps=load("cb2_steps",[]);DB.dexa=load("cb2_dexa",[]);ceilBf=load("cb2_ceilbf",18);LOC=load("cb2_loc","gym");}
 function rerenderAll(){try{const act=[...document.querySelectorAll('[id^="view-"]')].find(el=>el.offsetParent!==null);renderHome();updateHeader();if(act&&act.id!=="view-home")switchView(act.id.replace("view-",""));}catch(e){}}
 function dataCardHTML(){const empty=DB.sessions.length===0&&DB.runs.length===0&&DB.weight.length===0;
   return `<div class="card" style="border-color:rgba(255,197,61,.3)"><div class="card-t" style="color:var(--gold)"><span class="ic">${ICON.check}</span>Your Data \u2014 Keep It Safe</div>
@@ -1137,21 +1176,20 @@ function coachBriefHTML(){
     return `<div class="card" style="border-color:rgba(63,216,200,.35)"><div class="card-t cyan"><span class="ic">${ICON.check}</span>Coach\u2019s Brief \u00b7 Day 1 Tomorrow</div><div class="prose" style="margin-top:6px">
       <p><b>Tomorrow opens with Legs A</b> \u2014 squat, Romanian deadlift, split squats, calves, the 45\u00b0 back extension. The Legs & Back focus starts on Day 1. Start at ~50\u201360% of your old weights and let the tendons catch up; the extra focus set is the last set of each lift, taken honestly.</p>
       <p><b>Tonight:</b> pack the gym bag \u00b7 shop the meal plan (Fuel tab) \u00b7 sleep 7-9 h \u2014 it\u2019s the #1 recovery drug.</p>
-      <p><b>Sunday:</b> Push A \u2014 bench and overhead press while the legs recover. Two days in, two sessions logged: that is the whole first weekend.</p><p><b>Today, before Day 1:</b> start the creatine load \u2014 20 g split across four meals, five to seven days \u2014 so the muscle is saturating by the first session. And log a baseline weigh-in and waist in Quick log: Day 1 should start with a number.</p></div></div>`;
+      <p><b>Sunday:</b> Push A \u2014 bench and overhead press while the legs recover. Two days in, two sessions logged: that is the whole first weekend.</p><p><b>Today, before Day 1:</b> start the creatine load \u2014 20 g a day, 10 g at 04:30 and 10 g at 20:00, for seven days \u2014 so the muscle is saturating by the first session. And log a baseline weigh-in and waist in Quick log: Day 1 should start with a number.</p></div></div>`;
   }
   const dow=DOW[new Date().getDay()],tmpl=weekTemplate(),ti=tmpl.find(x=>x.day===dow);
-  const rp=RUN_PLAN[Math.min(planWeek(),PLAN_WEEKS)-1]||RUN_PLAN[RUN_PLAN.length-1];
-  const run=rp&&rp.runs.find(x=>x.d===dow);
-  let sess=ti?ti.label:"Rest";if(run)sess=run.title;
-  const supp=(ti&&ti.kind==="lift")||run?"04:30: caffeine + \u00bd beta-alanine (citrulline only if training before ~07:00) \u00b7 20:00: creatine, \u00bd beta-alanine, omega-3, D3, ashwagandha":"Rest day \u2014 skip 04:30 entirely \u00b7 20:00: creatine, \u00bd beta-alanine, omega-3, D3, ashwagandha";
+  const isLift=!!(ti&&ti.kind==="lift"),restFull=!isLift&&isDeloadWeek();
+  const sess=isLift?(peakLegsSkip()?"Peak week \u2014 upper-body pump (legs rest)":ti.label):(restFull?"Full rest (deload week)":"Active recovery \u2014 Extras pump");
+  const supp=suppLine(isLift?"lift":(restFull?"rest":"pump"));
   const act=actualGainRate(),wr=actualWaistRate();
-  let nudges=[];if(planStarted()&&planWeek()<=2)nudges.push({c:"ok",t:"Creatine fast track: 20 g today split across four meals (loading days 1\u20137), then 5 g daily. Lean mass on the scale within a week."});if(isDeloadWeek())nudges.push({c:"ok",t:"Deload week: lighter loads, same movements, 3+ reps in reserve. Recovery is the stimulus this week."});
+  let nudges=[];{const dd=dayDiff(START_ISO,todayISO());if(planStarted()&&dd>=0&&dd<7)nudges.push({c:"ok",t:"Creatine fast track \u2014 loading day "+(dd+1)+" of 7: 20 g today \u2014 10 g at 04:30 and 10 g at 20:00 \u2014 then 5 g every day at 20:00 from day 8."});}if(isDeloadWeek())nudges.push({c:"ok",t:"Deload week: lighter loads, same movements, 3+ reps in reserve. Recovery is the stimulus this week."});
   if(!act)nudges.push({c:"warn",t:"Log your bodyweight in Track \u2014 the Lean Gain engine is idling without it."});
   else if(!wr)nudges.push({c:"warn",t:"Add a waist measurement in Track \u2014 it\u2019s what proves the gain is lean."});
-  if(nudges.length===0)nudges.push({c:"ok",t:"All engines fed \u2014 weight, waist and runs are flowing. Just execute today."});
+  if(nudges.length===0)nudges.push({c:"ok",t:"All engines fed \u2014 weight, waist and sessions are flowing. Just execute today."});
   return `<div class="card" style="border-color:rgba(63,216,200,.35)"><div class="card-t cyan"><span class="ic">${ICON.check}</span>Coach\u2019s Brief</div><div class="prose" style="margin-top:6px">
-    <p><b>Today:</b> ${sess}${ti&&!run?` \u2014 ${ti.detail.split(". ")[0]}.`:""}</p>
-    <p><b>Fuel:</b> ${m.cal} kcal \u00b7 ${m.pro} g protein \u00b7 target +${g.rateKgWk.toFixed(2)} kg/wk (${g.mode})</p>
+    <p><b>Today:</b> ${sess}${ti&&!restFull&&!peakLegsSkip()?` \u2014 ${ti.detail.split(". ")[0]}.`:""}</p>
+    <p><b>Fuel:</b> ${m.cal} kcal \u00b7 ${m.pro} g protein \u00b7 target +${g.rateKgWk.toFixed(2)} kg/wk (${MODE_LABEL[g.mode]||g.mode})</p>
     <p><b>Supps:</b> ${supp}</p></div>
     ${nudges.map(n=>`<div class="verdict ${n.c}" style="margin-top:8px">${n.t}</div>`).join("")}</div>`;
 }
@@ -1160,13 +1198,8 @@ function renderHome(){
   const started=planStarted(),wk=planWeek(),dleft=daysToRace(),frac=clamp((PLAN_WEEKS-(dleft/7))/PLAN_WEEKS,0,1);
   const rp=RUN_PLAN[Math.min(wk,RUN_PLAN.length)-1]||RUN_PLAN[0],tmpl=weekTemplate(),todayDow=DOW[new Date().getDay()];
   const todayItem=started?tmpl.find(t=>t.day===todayDow):null;
-  let tClass="rest",tIc=ICON.rest,tTitle=(isDeloadWeek()?"Rest Day — Deload Week":"Active Recovery — Minimal Rest by Design"),tBody=(isDeloadWeek()?`<b>Deload week: this is the one full rest day the plan keeps.</b> Walk, eat to target, sleep long. The muscle from the last five weeks is consolidated here, not on the floor.`:`<b>Minimal rest days, as you asked — but rest is a training variable, not a day off.</b> A 30–40 minute <b>Extras pump</b> (rear delts, arms, calves, core) at RIR 2, no failure, builds more than a couch does and steals nothing from tomorrow’s Legs A. Skip it and rest fully only if the Weekly Review flags stalls or sleep under 7 h.`)+`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn btn-gold" style="flex:1;min-width:120px" onclick="goToExtras()">${ICON.lift}Extras Pump</button><button class="btn" style="flex:1;min-width:120px;background:var(--panel-3);color:var(--text);border:1px solid var(--line)" onclick="switchView('lift')">Main day instead</button></div>`;
-  if(todayItem){
-    const todayRun=rp.runs.find(x=>x.d===todayDow),isRaceToday=todayRun&&todayRun.t==="race";
-    if(todayItem.kind==="lift"&&!isRaceToday){tClass="lift";tIc=ICON.lift;tTitle=todayItem.label+" — Strength";tBody="<b>"+todayItem.detail+"</b> Open the Lift tab to load the session and log your sets.";}
-    else if(todayRun){tClass="run";tIc=ICON.run;tTitle=todayRun.title;tBody="<b>"+todayRun.det+"</b>"+(isRaceToday?"":" Log it in the Run tab when you're done.");}
-    else if(todayItem.kind==="run"){tClass="run";tIc=ICON.run;tTitle=todayItem.label;tBody="<b>"+todayItem.detail+"</b> Log it in the Run tab when you're done.";}
-  }
+  let tClass="rest",tIc=ICON.rest,tTitle=(isDeloadWeek()?"Rest Day — Deload Week":"Active Recovery — Minimal Rest by Design"),tBody=(isDeloadWeek()?`<b>Deload week: this is the one full rest day the plan keeps.</b> Walk, eat to target, sleep long. The muscle from the last five weeks is consolidated here, not on the floor.`:`<b>Minimal rest days, as you asked — but rest is a training variable, not a day off.</b> A 30–40 minute <b>Extras pump</b> (rear delts, arms, calves, core) at RIR 2, no failure, builds more than a couch does and steals nothing from tomorrow’s Legs A. Skip it and rest fully only if the Weekly Review flags stalls or sleep under 7 h.`)+(isDeloadWeek()?"":`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn btn-gold" style="flex:1;min-width:120px" onclick="goToExtras()">${ICON.lift}Extras Pump</button><button class="btn" style="flex:1;min-width:120px;background:var(--panel-3);color:var(--text);border:1px solid var(--line)" onclick="goToCatchUp()">${firstMissedDay()?"Catch up: "+GYM[firstMissedDay()].name:"Main day instead"}</button></div>`);
+  if(todayItem&&todayItem.kind==="lift"){tClass="lift";tIc=ICON.lift;if(peakLegsSkip()){tTitle="Peak week \u2014 legs rest";tBody="<b>Legs look fullest loaded, not sore.</b> Swap today\u2019s "+todayItem.label+" for a 30-minute upper-body pump; full leg sessions return after the check weekend.";}else{tTitle=todayItem.label+" \u2014 Strength";tBody="<b>"+todayItem.detail+"</b> Open the Lift tab to load the session and log your sets.";}}
   // pre-start: preview the actual first session on START_ISO's weekday
   const fsDow=firstSessionDow(),fsItem=tmpl.find(t=>t.day===fsDow);
   let fsClass="rest",fsIc=ICON.rest,fsTitle="Rest",fsBody="Full rest or gentle mobility before Week 1 ramps up.";
@@ -1189,11 +1222,13 @@ function renderHome(){
   </div></div>
   ${(()=>{const dow=DOW[new Date().getDay()],t=weekTemplate().find(x=>x.day===dow);
       if(!planStarted())return `<button class="btn btn-gold cta" onclick="switchView('lift')">Day 1 is ${fmtLong(START_ISO)} \u2014 preview the first session</button>`;
+      if(dayDiff(todayISO(),checkISO())===0)return `<button class="btn btn-gold cta" onclick="switchView('track')">\u25b6 Check day \u2014 weigh in, five tapes, photos</button>`;
+      if(t&&t.kind==="lift"&&peakLegsSkip())return `<button class="btn btn-gold cta" onclick="goToExtras()">\u25b6 Peak week \u2014 upper-body pump, legs rest</button>`;
       if(t&&t.kind==="lift")return `<button class="btn btn-gold cta" onclick="goToLift()">\u25b6 Start today\u2019s session \u2014 ${t.label}${LOC==="home"?" \u00b7 home":""}</button>`;
-      return isDeloadWeek()?`<button class="btn cta" style="background:var(--panel-3);color:var(--text);border:1px solid var(--line)" onclick="switchView('guide')">Deload week rest day \u2014 walk, eat, sleep</button>`:`<button class="btn btn-gold cta" onclick="goToExtras()">\u25b6 Active recovery \u2014 Extras pump, 30 min</button>`;})()}
+      return isDeloadWeek()?`<button class="btn cta" style="background:var(--panel-3);color:var(--text);border:1px solid var(--line)" onclick="switchView('guide')">Deload week rest day \u2014 walk, eat, sleep</button>`:`<button class="btn btn-gold cta" onclick="goToExtras()">\u25b6 Active recovery \u2014 Extras pump, 30\u201340 min</button>`;})()}
     <div class="pillars">
-    <div class="pillar str"><div class="pi">${ICON.lift}<span>Strength</span></div><div class="pv" id="pillarStr">—</div><div class="pl">Current bodyweight</div><div class="pmeta" id="pillarStrMeta">goal ${DB.profile.goal} kg</div></div>
-    <div class="pillar end"><div class="pi">${ICON.run}<span>Focus</span></div><div class="pv">Week ${started?wk:"0"}</div><div class="pl">${currentBlock().name}</div><div class="pmeta">wk ${currentBlock().i}/${currentBlock().n} · ${currentBlock().span}</div></div>
+    <div class="pillar str"><div class="pi">${ICON.lift}<span>Bodyweight</span></div><div class="pv" id="pillarStr">\u2014</div><div class="pl">latest weigh-in</div><div class="pmeta" id="pillarStrMeta">goal ${DB.profile.goal} kg</div></div>
+    <div class="pillar end"><div class="pi">${ICON.check}<span>Focus</span></div><div class="pv">Week ${started?wk:"0"}</div><div class="pl">${currentBlock().name}</div><div class="pmeta">wk ${currentBlock().i}/${currentBlock().n} · ${currentBlock().span}</div></div>
   </div>
   ${started?`<div class="compbar"><div class="compcard lift"><div class="cc-top"><span class="cc-l">Lifts this week</span><span class="cc-v">${comp.lifts}/6</span></div><div class="dots">${liftDots}</div></div><div class="compcard run"><div class="cc-top"><span class="cc-l">Weigh-ins this week</span><span class="cc-v">${wiCount}/3</span></div><div class="dots">${runDots}</div></div></div>`:""}
   
@@ -1202,49 +1237,53 @@ function renderHome(){
   <div class="eyebrow">${started?"Today — "+todayDow:"First Session — "+fsDow+" "+fmtDM(START_ISO)}</div>
   <div class="today"><div class="today-band ${started?tClass:fsClass}"><div class="tb-ic">${started?tIc:fsIc}</div><div class="tb-txt"><div class="tb-day">${started?fmtLong(todayISO()):fmtLong(START_ISO)}</div><div class="tb-title">${started?tTitle:fsTitle}</div></div></div><div class="today-body">${started?tBody:fsBody}</div></div>
   <div class="eyebrow cyan">This Week — ${started?"Week "+wk+" · Pure muscle block":"Week 1 preview"} <span style="color:var(--text-3);font-weight:600">(${weekRangeLabel(started?wk:1)})</span></div>
-  <div class="weekstrip">${stripDays.map(t=>{const isT=started&&t.day===todayDow;const ic=t.kind==="lift"?ICON.lift:t.kind==="run"?ICON.run:ICON.rest;let lbl;if(t.kind==="lift")lbl=t.label.split(" ")[0];else if(t.kind==="run"){const rr=(started?rp:RUN_PLAN[0]).runs.find(x=>x.d===t.day);const ty=rr?rr.t:"easy";lbl=ty==="long"?"Long":ty==="quality"?"Quality":ty==="race"?"Race":"Easy";}else lbl="Rest";return `<div class="wd${isT?" today":""}"><div class="wdn">${t.day}</div><div class="wdi ${t.kind}">${ic}</div><div class="wdl">${lbl}</div></div>`;}).join("")}</div>
-  <div class="note cyan" style="margin-top:8px"><b>How the week works:</b> 6 lifting days + 1 full rest (Fri). Every muscle trains twice a week — Push/Pull/Legs, then again. Rest-day itch? The Extras pump is one tap away. Cardio is optional now and lives in its own tab. The why lives in the Guide.</div>
-  ${coachBriefHTML()}${weeklyReviewHTML()}${winTeaserHTML()}${dataCardHTML()}
+  <div class="weekstrip">${stripDays.map(t=>{const isT=started&&t.day===todayDow;const ic=t.kind==="lift"?ICON.lift:t.kind==="run"?ICON.run:ICON.rest;let lbl;if(t.kind==="lift")lbl=t.label.split(" ")[0];else if(t.kind==="run"){const rr=(started?rp:RUN_PLAN[0]).runs.find(x=>x.d===t.day);const ty=rr?rr.t:"easy";lbl=ty==="long"?"Long":ty==="quality"?"Quality":ty==="race"?"Race":"Easy";}else lbl=isDeloadWeek()?"Rest":"Pump";return `<div class="wd${isT?" today":""}"><div class="wdn">${t.day}</div><div class="wdi ${t.kind}">${ic}</div><div class="wdl">${lbl}</div></div>`;}).join("")}</div>
+  <div class="note cyan" style="margin-top:8px"><b>How the week works:</b> ${isDeloadWeek()?"6 lifting days + Friday full rest (deload week).":"6 lifting days + Friday active recovery \u2014 a 30\u201340 min Extras pump at RIR 2."} Full rest otherwise only in deload weeks or when the Weekly Review flags it. Every muscle trains twice a week \u2014 Legs, Push, Pull, then again. Cardio is optional and lives in Events. The why lives in the Guide.</div>
+  ${coachBriefHTML()}${weeklyReviewHTML()}${coachPackHTML()}${winTeaserHTML()}${dataCardHTML()}
   
   ${nextM?`<div class="card" style="margin-top:4px;cursor:pointer" onclick="switchView('roadmap')"><div class="card-t"><span class="ic">${ICON.check}</span>Next Milestone</div><div class="prose" style="margin-top:2px"><p style="margin:0"><b>Week ${nextM.wk} · ${fmtDM(nextM.start)}</b> — ${nextM.milestone}</p></div><p style="font-size:12px;color:var(--text-3);margin-top:8px">Tap to open your 2-year roadmap →</p></div>`:""}
   <div class="card" style="margin-top:4px"><div class="card-t"><span class="ic">${ICON.check}</span>Jump In</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-gold" style="flex:1;min-width:130px" onclick="goToLift()">${ICON.lift}${(started&&todayItem&&todayItem.kind==="lift")?"Start "+todayItem.label.split(" ")[0]:"Today's Lift"}</button><button class="btn btn-cyan" style="flex:1;min-width:130px" onclick="switchView('run')">${ICON.run}Run Plan</button></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-gold" style="flex:1;min-width:130px" onclick="goToLift()">${ICON.lift}${(started&&todayItem&&todayItem.kind==="lift")?"Start "+todayItem.label.split(" ")[0]:"Today's Lift"}</button><button class="btn btn-cyan" style="flex:1;min-width:130px" onclick="switchView('run')">Events &amp; cardio</button></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px"><button class="btn btn-ghost" style="flex:1;min-width:130px" onclick="switchView('roadmap')">2-Year Roadmap</button><button class="btn btn-ghost" style="flex:1;min-width:130px" onclick="switchView('track')">Log Progress</button></div>
   </div>`;
   const lw=DB.weight.length?[...DB.weight].sort((a,b)=>b.date.localeCompare(a.date))[0].v:DB.profile.weight;
   document.getElementById("pillarStr").textContent=lw+" kg";
-  document.getElementById("pillarStrMeta").textContent="natural peak ~"+Math.round(compute().ceilBW)+" kg";
+  document.getElementById("pillarStrMeta").textContent="ceiling "+compute().ceilLean.toFixed(1)+" kg lean";
 }
 /* ===== LIFT ===== */
-function goToExtras(){curDay="extras";switchView('lift');}
-function goToLift(){const dow=DOW[new Date().getDay()],map={Sat:"legsA",Sun:"pushA",Mon:"pullA",Tue:"legsB",Wed:"pushB",Thu:"pullB"};if(planStarted()&&map[dow]&&GYM[map[dow]]){liftPhase="hyper";curDay=map[dow];}switchView("lift");}
+function goToExtras(){curDay="extras";curDayPicked=todayISO();switchView('lift');}
+function todayLiftKey(){return ({Sat:"legsA",Sun:"pushA",Mon:"pullA",Tue:"legsB",Wed:"pushB",Thu:"pullB",Fri:"extras"})[DOW[new Date().getDay()]]||null;}
+var curDayPicked=null;
+function goToLift(){const k=todayLiftKey();if(planStarted()&&k&&GYM[k]){if(k!=="extras")liftPhase="hyper";curDay=k;}curDayPicked=todayISO();switchView("lift");}
 let liftPhase=DB.profile.phase==="hyper"?"hyper":"build";
 let curDay=(DB.profile.phase==="hyper"?GYM_ORDER:["pushA","pullA","legsA","upperA"])[0];
 function liftDayOrder(){return liftPhase==="build"?["pushA","pullA","legsA","upperA","extras"]:GYM_ORDER.concat(["extras"]);}
 function renderLift(){
   const el=document.getElementById("view-lift"),order=liftDayOrder();
+  if(planStarted()&&curDayPicked!==todayISO()){const k=todayLiftKey();if(k&&order.includes(k))curDay=k;}
   if(!order.includes(curDay))curDay=order[0];
   el.innerHTML=`<div class="eyebrow">Strength Program · Muscle Priority</div><h2 class="view-title">Lift</h2>
-    <p class="view-sub">Maximum lean muscle gain is the priority, trained aggressively. Compound-led, plain-English, only the highest-impact builders — 4 lifting days a week, chest/back/shoulders hit twice. Open <b>Aggressive growth techniques</b> below to train each set harder. Pick your phase, choose the day, log every set.</p>
-    <div class="seg" id="liftPhaseSeg"><button data-ph="build"${liftPhase==="build"?" class=on":""}>Foundation (4-day)</button><button data-ph="hyper"${liftPhase==="hyper"?" class=on":""}>Pure Muscle (6-day)</button></div>
+    <p class="view-sub">Maximum lean muscle gain is the priority, trained aggressively. Compound-led, plain-English, only the highest-impact builders — six lifting days a week, legs first, every muscle hit twice, and an active-recovery pump on Friday. Open <b>Aggressive growth techniques</b> below to train each set harder. The tab opens on today’s session; log every set and the <b>Next</b> line on each card tells you what to beat.</p>
+    <div class="seg" id="liftPhaseSeg"><button data-ph="build"${liftPhase==="build"?" class=on":""}>Short week (4-day)</button><button data-ph="hyper"${liftPhase==="hyper"?" class=on":""}>Pure Muscle (6-day)</button></div>
     <div class="note ${liftPhase==="build"?"cyan":"gold"}" id="liftPhaseNote"></div>
     <div class="seg" id="locSeg" style="margin-top:10px"><button data-loc="gym"${LOC==="gym"?" class=on":""}>Commercial Gym</button><button data-loc="home"${LOC==="home"?" class=on":""}>\ud83c\udfe0 Home Gym</button></div>
     <div class="seg" id="focusSeg" style="margin-top:8px"><button data-fx="on"${focusLB?" class=on":""}>Legs & Back focus ON</button><button data-fx="off"${!focusLB?" class=on":""}>Even split</button></div>
-    <div class="pills" id="dayPills"></div><div id="liftBody"></div>`;
+    <div class="awake-row" id="awakeRow" role="group" aria-label="Session tools"></div><div class="pills" id="dayPills"></div><div id="liftBody"></div>`;
   document.getElementById("liftPhaseNote").innerHTML=liftPhase==="build"
-    ?"<b>Muscle priority (now):</b> 4 hard, compound-led sessions a week — Push, Pull, Legs, then a second Upper day. Chest, back and shoulders get hit twice weekly, which is what actually drives growth. Running is trimmed to 2 easy/long runs so it doesn't steal your recovery. Legs are heavy once here, with running topping them up."
-    :"<b>Post-race growth (after 24 Sep):</b> the full 6-day Push/Pull/Legs run twice through, every muscle trained 2× a week — your maximal muscle-building block \u2014 running is gone, so every unit of recovery goes to the bar.";
-  document.querySelectorAll("#liftPhaseSeg button").forEach(b=>b.addEventListener("click",()=>{liftPhase=b.dataset.ph;DB.profile.phase=liftPhase;DB.save();curDay=liftDayOrder()[0];renderLift();}));
+    ?"<b>Short week (4 days):</b> Push, Pull, Legs, Upper \u2014 for a week when six sessions won\u2019t fit. Chest, back and shoulders still get two hits; legs get one. Back to the six-day week as soon as life allows."
+    :"<b>Pure Muscle \u2014 the six-day week:</b> Legs A \u2192 Push A \u2192 Pull A \u2192 Legs B \u2192 Push B \u2192 Pull B, every muscle trained twice, Friday an active-recovery pump. Running is retired, so every unit of recovery goes to the bar.";
+  document.querySelectorAll("#liftPhaseSeg button").forEach(b=>b.addEventListener("click",()=>{liftPhase=b.dataset.ph;DB.profile.phase=liftPhase;DB.save();curDay=liftDayOrder()[0];curDayPicked=todayISO();renderLift();}));
   renderDayPills();renderLiftDay();
 }
 function renderDayPills(){
   const wrap=document.getElementById("dayPills");
   wrap.innerHTML=liftDayOrder().map(d=>`<button class="pill${d===curDay?" on":""}" data-d="${d}">${GYM[d].name}</button>`).join("");
-  wrap.querySelectorAll(".pill").forEach(b=>b.addEventListener("click",()=>{curDay=b.dataset.d;renderDayPills();renderLiftDay();}));
+  wrap.querySelectorAll(".pill").forEach(b=>b.addEventListener("click",()=>{curDay=b.dataset.d;curDayPicked=todayISO();renderDayPills();renderLiftDay();}));
 }
-function findLiftSession(day){const iso=todayISO();return DB.sessions.find(s=>s.dateISO===iso&&s.day===day);}
-function ensureLiftSession(day){let s=findLiftSession(day);if(!s){s={id:"s"+Date.now()+Math.random().toString(36).slice(2,5),dateISO:todayISO(),day,entries:{}};DB.sessions.push(s);}return s;}
-function liftLastTime(exId){const iso=todayISO();const past=DB.sessions.filter(s=>s.dateISO!==iso&&s.entries[exId]&&s.entries[exId].some(st=>st&&st.r&&st.w)).sort((a,b)=>b.dateISO.localeCompare(a.dateISO));if(!past.length)return null;return past[0].entries[exId].filter(st=>st&&st.r&&st.w);}
+function sessLoc(s){return (s&&s.loc)||"gym";}
+function findLiftSession(day){const iso=todayISO();return DB.sessions.find(s=>s.dateISO===iso&&s.day===day&&sessLoc(s)===LOC);}
+function ensureLiftSession(day){let s=findLiftSession(day);if(!s){s={id:"s"+Date.now()+Math.random().toString(36).slice(2,5),dateISO:todayISO(),day,loc:LOC,entries:{}};DB.sessions.push(s);}return s;}
+function liftLastTime(exId){const iso=todayISO();const past=DB.sessions.filter(s=>s.dateISO!==iso&&sessLoc(s)===LOC&&s.entries[exId]&&s.entries[exId].some(st=>setDone(exId,st))).sort((a,b)=>b.dateISO.localeCompare(a.dateISO));if(!past.length)return null;return past[0].entries[exId].filter(st=>setDone(exId,st));}
 const HOME_SUB={
  pa1:{n:"DB Floor Squeeze Press (2\u00d715 kg)",h:"Press the bells together hard, 4 s lowering; last set rest-pause to RIR 0."},
  pa2:{n:"Floor Z-Press (2\u00d715 kg)",h:"Sit tall on the mat, legs long; strict overhead \u2014 your core does the bracing."},
@@ -1410,11 +1449,11 @@ function sessionTimeEstimate(dayKey){
   const WORK=45; // seconds under the bar per set
   let fullS=0,coreS=0,isoRest=0,isoNames=[];
   d.ex.forEach(e=>{
-    const r=parseRest(e.rest),t=e.sets*(WORK+r);
+    const r=parseRest(e.rest),t=fxSets(e)*(WORK+r);
     fullS+=t;
-    if(e.cmp)coreS+=t;else{isoRest+=e.sets*r;if(isoNames.length<2)isoNames.push(e.name);}
+    if(e.cmp)coreS+=t;else{isoRest+=fxSets(e)*r;if(isoNames.length<2)isoNames.push(e.name);}
   });
-  const wu=9*60, topset=(dayKey==="extras")?0:2*60;
+  const wu=(dayKey==="extras"?5:9)*60, topset=(dayKey==="extras")?0:2*60;
   const full=Math.round((fullS+wu+topset)/60), core=Math.round((coreS+wu+topset)/60);
   const save=Math.round(isoRest*0.45/60);
   return {full,core:d.ex.some(e=>e.cmp)?core:full,save,isoNames};
@@ -1424,8 +1463,8 @@ function renderLiftDay(){
   const wIco='<svg class="tic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6m0 8v6M5 12H2m20 0h-3M6.3 6.3L4 4m16 16l-2.3-2.3M6.3 17.7L4 20M20 4l-2.3 2.3" stroke-linecap="round"/></svg>';
   const pIco='<svg class="tic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="4" height="12" rx="1"/><rect x="17" y="6" width="4" height="12" rx="1"/><path d="M7 12h10" stroke-linecap="round"/></svg>';
   const chev='<span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
-  let html=`<div class="tool" id="toolWarm"><div class="tool-h" data-tool="warm">${wIco}<h4>Warm-up &amp; cool-down</h4>${chev}</div><div class="tool-b"><div class="warmblk"><b>Warm-up (8-10 min — don't skip):</b> ${WARMUP[dt]}</div><div class="warmblk" style="margin-top:12px"><b>Cool-down (5 min):</b> ${COOLDOWN[dt]}</div></div></div>
-  <div class="tool" id="toolPlate"><div class="tool-h" data-tool="plate">${pIco}<h4>Plate &amp; warm-up calculator</h4>${chev}</div><div class="tool-b"><div class="plate-row"><div class="field"><label>Working weight (kg)</label><input type="number" inputmode="decimal" id="plW" placeholder="100"></div><div class="field"><label>Bar (kg)</label><input type="number" inputmode="decimal" id="plBar" value="20"></div></div><div id="plateOut"><div class="plate-txt" style="color:var(--text-3)">Enter a working weight to see what to load per side, plus your warm-up sets.</div></div></div></div>
+  let html=`<div class="tool" id="toolWarm"><div class="tool-h" data-tool="warm">${wIco}<h4>Warm-up &amp; cool-down</h4>${chev}</div><div class="tool-b"><div class="warmblk">${LOC==="home"?"<b>Warm-up (3 min, home):</b> 20 bodyweight squats \u2192 10 push-ups \u2192 10 bag good-mornings \u2192 10 overhead presses with the 5 kg bells \u2192 30 s dead-bug.":"<b>Warm-up (8-10 min \u2014 don't skip):</b> "+WARMUP[dt]}</div><div class="warmblk" style="margin-top:12px"><b>Cool-down (5 min):</b> ${COOLDOWN[dt]}</div></div></div>
+  ${LOC==="home"?"":`  <div class="tool" id="toolPlate"><div class="tool-h" data-tool="plate">${pIco}<h4>Plate &amp; warm-up calculator</h4>${chev}</div><div class="tool-b"><div class="plate-row"><div class="field"><label>Working weight (kg)</label><input type="number" inputmode="decimal" id="plW" placeholder="100"></div><div class="field"><label>Bar (kg)</label><input type="number" inputmode="decimal" id="plBar" value="20"></div></div><div id="plateOut"><div class="plate-txt" style="color:var(--text-3)">Enter a working weight to see what to load per side, plus your warm-up sets.</div></div></div></div>`}
   <div class="tool" id="toolAgg"><div class="tool-h" data-tool="agg"><svg class="tic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" stroke-linecap="round" stroke-linejoin="round"/></svg><h4>Aggressive growth techniques</h4>${chev}</div><div class="tool-b"><div class="prose" style="font-size:13.5px">
     <p style="color:var(--go);font-weight:700;margin-bottom:8px">Be aggressive in the gym, disciplined in the kitchen. This is how you train aggressively for lean muscle — none of it adds fat, all of it adds stimulus.</p>
     <p>• <b>Take the last set to the limit (RIR 0-1).</b> On the final set of each exercise, push until you genuinely couldn't get another clean rep (or maybe one). Keep 1-2 reps in the tank on earlier sets so you don't burn out before the money set. Training close to failure is the single biggest driver of growth.</p>
@@ -1433,7 +1472,7 @@ function renderLiftDay(){
     <p>• <b>Rest-pause:</b> at failure, rack the weight, breathe for 15 seconds, then squeeze out 3-5 more reps. Brutal and effective on machines and isolations.</p>
     <p>• <b>Partials past failure:</b> when you can't get a full rep, do a few short reps in the strongest part of the range. Extra stimulus when the muscle is already cooked.</p>
     <p>• <b>Supersets:</b> pair opposing muscles back-to-back (curls + pushdowns, chest + back) — more work in less time and a huge pump.</p>
-    <p>• <b>Progressive overload — the real engine.</b> Beat your last session almost every week: one more rep, or a little more weight. Use <b>double progression</b> — climb to the top of the rep range on all sets, then add weight and drop back to the bottom. Your logged sets show you exactly what to beat.</p>
+    <p>• <b>Progressive overload — the real engine.</b> Beat your last session almost every week: one more rep, or a little more weight. Use <b>double progression</b> — climb to the top of the rep range on all sets, then add weight and drop back to the bottom (in Aggressive mode the first working set is the trigger). The <b>Next</b> line on every card applies the rule to your log. Your logged sets show you exactly what to beat.</p>
     <p>• <b>Add volume over the block:</b> start at the listed sets; add 1 set to any lagging muscle every 1-2 weeks. When progress stalls or you feel beaten up, take a deload week (half the sets), then come back stronger.</p>
     <p><span class="hl">The catch:</span> aggressive training only works if recovery keeps up. That means hitting your max-lean-gain calories and protein, 7-9 hours of sleep, and a deload roughly every 6 weeks. Push hard <i>and</i> recover hard — that's how aggression becomes muscle instead of burnout or injury.</p>
   </div></div></div>`;
@@ -1444,11 +1483,11 @@ function renderLiftDay(){
     html+=`<div class="card" style="border-color:rgba(255,197,61,.35)"><div class="card-t" style="color:var(--gold)"><span class="ic">${ICON.lift}</span>\ud83c\udfe0 Home session \u2014 ${day.name}</div>
     <div class="calc-note"><b>Lay out:</b> ${kit.join(" \u00b7 ")} \u00b7 mat. Rest 60\u201390 s between sets \u2014 start the timer.</div>
     <div class="calc-note" style="margin-top:8px"><b>3-minute warm-up:</b> 20 bodyweight squats \u2192 10 push-ups \u2192 10 bag good-mornings \u2192 10 overhead presses with the 5 kg bells \u2192 30 s dead-bug. Then straight into exercise 1.</div>
-    ${focusOn?`<div style="display:flex;align-items:center;gap:8px;margin-top:10px"><button class="btn" style="flex:1;background:var(--panel-3);color:var(--text);border:1px solid var(--line)" onclick="focusIdx=Math.max(0,focusIdx-1);renderLiftDay()">\u2039 Prev</button><div style="flex:1.2;text-align:center;font-family:var(--f-mono);color:var(--gold)">Exercise ${cur+1} of ${N}</div>${cur<N-1?`<button class="btn btn-gold" style="flex:1" onclick="focusIdx=Math.min(${N-1},focusIdx+1);renderLiftDay();document.getElementById('liftBody').scrollIntoView({block:'start'})">Next \u203a</button>`:`<button class="btn btn-gold" style="flex:1" onclick="focusOn=false;focusIdx=0;renderLiftDay();toast('Session complete \u2014 log any missing sets',true)">Finish \u2713</button>`}</div>`:`<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-gold" style="flex:1" onclick="focusOn=true;focusIdx=0;renderLiftDay();document.getElementById('liftBody').scrollIntoView({block:'start'})">\u25b6 Guide me \u2014 one exercise at a time</button></div>`}
+    ${focusOn?`<div style="display:flex;align-items:center;gap:8px;margin-top:10px"><button class="btn" style="flex:1;background:var(--panel-3);color:var(--text);border:1px solid var(--line)" onclick="focusIdx=Math.max(0,focusIdx-1);renderLiftDay()">\u2039 Prev</button><div style="flex:1.2;text-align:center;font-family:var(--f-mono);color:var(--gold)">Exercise ${cur+1} of ${N}</div>${cur<N-1?`<button class="btn btn-gold" style="flex:1" onclick="focusIdx=Math.min(${N-1},focusIdx+1);renderLiftDay();(document.querySelector('#liftBody .ex')||document.getElementById('liftBody')).scrollIntoView({block:'start'})">Next \u203a</button>`:`<button class="btn btn-gold" style="flex:1" onclick="focusOn=false;focusIdx=0;renderLiftDay();toast('Session complete \u2014 log any missing sets',true)">Finish \u2713</button>`}</div>`:`<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-gold" style="flex:1" onclick="focusOn=true;focusIdx=0;renderLiftDay();(document.querySelector('#liftBody .ex')||document.getElementById('liftBody')).scrollIntoView({block:'start'})">\u25b6 Guide me \u2014 one exercise at a time</button></div>`}
     </div>`;}
   if(isDeloadWeek())html+=`<div class="note gold" style="margin-top:4px"><b>Deload week — roadmap week ${roadmapWeekNow()}.</b> Keep every exercise, cut loads to ~60–70% (or halve the sets), stay 3+ reps from failure, skip top sets. This is the week the last five turn into muscle — full intensity returns next week.</div>`;
-  if(bulkMode==="aggr"&&!isDeloadWeek())notes.push(`<div class="note gold" style="margin-top:4px"><b>Aggressive mode${aggrLive()?" \u2014 to the March check":""}:</b> the last set of <b>every</b> exercise goes to RIR 0; the first compound gets <b>one extra working set</b> (tap Add set); load goes up the first session you hit the top of the rep range on set one, not on all sets. The price: the waist brake is the band \u2014 +5 cm from baseline by March and not a centimetre more \u2014 and if sleep drops under 7 hours this mode switches off in Fuel. Deload weeks are still honoured.</div>`);
-  const _ps=day.ex.filter(e=>e.post).reduce((a,e)=>a+e.sets,0);
+  if(bulkMode==="aggr"&&!isDeloadWeek()&&dt!=="extras")notes.push(`<div class="note gold" style="margin-top:4px"><b>Aggressive mode${aggrLive()?" \u2014 to the March check":""}:</b> the last set of <b>every</b> exercise goes to RIR 0; the first compound gets <b>one extra working set</b> (already in the grid); load goes up the first session your first working set \u2014 the first back-off after any top set \u2014 reaches the top of the rep range. The <b>Next</b> line on each card does that maths for you. The price: the waist brake is the band \u2014 +5 cm from baseline by March and not a centimetre more \u2014 and if sleep drops under 7 hours this mode switches off in Fuel. Deload weeks are still honoured.</div>`);
+  const _ps=day.ex.filter(e=>e.post).reduce((a,e)=>a+fxSets(e),0);
   if(_ps>0)notes.push(`<div class="note cyan" style="margin-top:4px"><b>Posterior chain today: ${_ps} hard sets</b> — hamstrings, glutes, erectors, lats and traps. Drive these with intent; the back half is where the remaining mass lives.</div>`);
   if(dt!=="extras")notes.push(LOC==="home"
     ? `<div class="note gold" style="margin-top:4px"><b>Home strength rule \u2014 failure is the load:</b> no heavy bar exists here, so your \u201ctop set\u201d is the first exercise\u2019s hardest variation taken to <b>RIR 0 with a 4-second lowering</b>, then the listed back-offs. Beating last week\u2019s reps IS the progressive overload \u2014 log honestly.</div>`
@@ -1461,35 +1500,38 @@ function renderLiftDay(){
     </span>
     <b>Where the returns diminish:</b> the compounds above carry most of the stimulus \u2014 past ~10 hard sets per muscle in one session, extra sets add little. Rushed? Do the core, skip the rest guilt-free.${te.isoNames.length>=2?` <b>Save \u2248${te.save} min:</b> superset ${te.isoNames[0]} \u27c2 ${te.isoNames[1]} back-to-back (60s rest between pairs).`:""} Let the rest timer police the gaps \u2014 that\u2019s where sessions bloat.</div>`);
   {const _te=sessionTimeEstimate(curDay);const summ=[bulkMode==="aggr"&&!isDeloadWeek()?"Aggressive":null,_ps>0?_ps+" posterior sets":null,_te?"~"+_te.full+" min":null,LOC==="home"?"home kit":null,focusLB?"legs & back focus":null].filter(Boolean).join(" \u00b7 ");
-  if(notes.length)html+=`<div class="tool" id="rulesTool"><div class="tool-h"><span class="ic">${ICON.check}</span><h4>Today\u2019s rules \u2014 ${summ}</h4><span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div><div class="tool-b">${notes.join("")}</div></div>`;}
+  if(notes.length)html+=`<div class="tool" id="rulesTool"><div class="tool-h"><span class="ic">${ICON.check}</span><h4>Today\u2019s rules \u2014 ${summ}</h4>${chev}</div><div class="tool-b">${notes.join("")}</div></div>`;}
   ((LOC==="home"&&focusOn)?[day.ex[Math.min(focusIdx,day.ex.length-1)]]:day.ex).forEach(e=>{
     const logged=(session&&session.entries[e.id])||[],lt=liftLastTime(e.id);
     const hsx=(LOC==="home"&&HOME_SUB[e.id])||null,rx=hsx?homeRx(e,hsx):null;
     html+=`<div class="ex"><div class="ex-h"><div class="ex-n">${e.n}</div><div class="ex-ti"><div class="ex-nm">${hsx?"\ud83c\udfe0 "+hsx.n:e.name}</div><div class="ex-tag ${e.cmp?"cmp":"iso"}">${hsx?"replaces "+e.name+" \u00b7 "+rx.load:e.tag}</div></div></div>
-      <div class="chips">${hsx?`<span class="chip"><b>${rx.sets+fxDelta(e)}</b>×<b>${rx.reps}</b>${fxDelta(e)>0?' <span style="color:var(--go);font-weight:700">focus</span>':fxDelta(e)<0?' <span style="color:var(--text-3)">trim</span>':""}</span><span class="chip">tempo <b>${rx.tempo}</b></span><span class="chip">rest <b>${e.rest}</b></span><span class="chip rir">RIR <b>0</b> last set</span><span class="chip stretch">${rx.finisher}</span></div>`:`<span class="chip"><b>${fxSets(e)}</b>×<b>${e.reps}</b>${fxDelta(e)>0?' <span style="color:var(--go);font-weight:700">focus</span>':fxDelta(e)<0?' <span style="color:var(--text-3)">trim</span>':""}${bulkMode==="aggr"&&!isDeloadWeek()&&e===day.ex[0]&&e.cmp?' <span style="color:var(--gold);font-weight:700">+1</span>':""}</span><span class="chip">tempo <b>${e.tempo}</b></span><span class="chip">rest <b>${e.rest}</b></span><span class="chip rir">RIR <b>${e.rir}</b></span>${e.stretch?'<span class="chip stretch">stretch focus</span>':''}</div>`}`;
+      <div class="chips">${hsx?`<span class="chip"><b>${rx.sets+fxDelta(e)}</b>×<b>${rx.reps}</b>${fxDelta(e)>0?' <span style="color:var(--go);font-weight:700">focus</span>':fxDelta(e)<0?' <span style="color:var(--text-3)">trim</span>':""}</span><span class="chip">tempo <b>${rx.tempo}</b></span><span class="chip">rest <b>${homeRest(e.id)}s</b></span><span class="chip rir">RIR <b>0</b> last set</span><span class="chip stretch">${rx.finisher}</span></div>`:`<span class="chip"><b>${fxSets(e)}</b>×<b>${e.reps}</b>${fxDelta(e)>0?' <span style="color:var(--go);font-weight:700">focus</span>':fxDelta(e)<0?' <span style="color:var(--text-3)">trim</span>':""}${bulkMode==="aggr"&&!isDeloadWeek()&&e===day.ex[0]&&e.cmp?' <span style="color:var(--gold);font-weight:700">+1</span>':""}</span><span class="chip">tempo <b>${e.tempo}</b></span><span class="chip">rest <b>${e.rest}</b></span><span class="chip rir">RIR <b>${e.rir}</b></span>${e.stretch?'<span class="chip stretch">stretch focus</span>':''}</div>`}`;
     if(LOC==="home"&&HOME_SUB[e.id]){const hs=HOME_SUB[e.id];html+=`<div style="margin:8px 0 2px;padding:8px 10px;border-left:3px solid var(--gold);background:rgba(255,197,61,.07);border-radius:0 8px 8px 0;font-size:13px;line-height:1.45"><b>Cue:</b> ${hs.h}</div>`;}
-    if(lt)html+=`<div class="lastt" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>Last time: <b>${lt.map(s=>s.r+"×"+s.w+"kg").join(", ")}</b> — beat it.</span><button class="btn" style="flex:none;background:var(--panel-3);color:var(--gold);border:1px solid rgba(255,197,61,.4);padding:6px 10px;font-size:12px" onclick="fillFromLast('${e.id}')">\u21ba Fill</button></div>`;
+    if(lt)html+=`<div class="lastt" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="flex:1;min-width:0">Last time: <b>${lt.map(s=>s.r+"×"+s.w+"kg").join(", ")}</b> — beat it.</span><button class="btn" style="flex:none;width:auto;min-height:40px;background:var(--panel-3);color:var(--gold);border:1px solid rgba(255,197,61,.4);padding:6px 12px;font-size:12px" aria-label="Fill empty sets with last time's numbers" onclick="fillFromLast('${e.id}')">\u21ba Fill</button></div>`;
+    else if(LOC==="home"&&HOME_SUB[e.id])html+=`<div class="lastt">First home session for this move \u2014 pick a load you can take to RIR 0\u20131 inside the range; next time this card tells you what to beat.</div>`;
+    html+=progHTML(e);
     html+=`<button class="hw-tog" data-tg="${e.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>How to do it &amp; why it works</button>
       <div class="hw-b" id="hw-${e.id}"><div class="blk"><div class="lbl how">How To Do It</div><p>${e.how}</p></div><div class="blk"><div class="lbl why">Why It Builds Muscle</div><p>${e.why}</p></div></div>`;
-    const rows=Math.max(fxSets(e),logged.length,1);
+    const _want=(session&&session.rows&&session.rows[e.id])||defaultRows(e,day);let _last=-1;logged.forEach((st,li)=>{if(st&&(st.r||st.w||st.rpe))_last=li;});const rows=Math.max(1,_want,_last+1);
     html+=`<div class="sets"><table class="set-grid"><thead><tr><th>Set</th><th>Reps</th><th>Kg</th><th>RPE</th><th>1RM</th><th>✓</th></tr></thead><tbody>`;
-    for(let i=0;i<rows;i++){const st=logged[i]||{},filled=st.r&&st.w,v=e1rm(st.w,st.r);
-      html+=`<tr class="set-row${filled?" done":""}"><td class="set-no">${i+1}</td><td><input class="cell${st.r?" filled":""}" type="number" inputmode="numeric" placeholder="${lt&&lt[i]&&lt[i].r?lt[i].r:"—"}" value="${st.r||""}" data-ex="${e.id}" data-i="${i}" data-f="r"></td><td><input class="cell${st.w?" filled":""}" type="number" inputmode="decimal" placeholder="${lt&&lt[i]&&lt[i].w?lt[i].w:"—"}" value="${st.w||""}" data-ex="${e.id}" data-i="${i}" data-f="w"></td><td><input class="cell${st.rpe?" filled":""}" type="number" inputmode="decimal" step="0.5" placeholder="—" value="${st.rpe||""}" data-ex="${e.id}" data-i="${i}" data-f="rpe"></td><td class="e1">${v?Math.round(v)+"kg":"—"}</td><td><button class="chk${filled?" on":""}" data-chk="${e.id}" data-i="${i}">${ICON.check}</button></td></tr>`;
+    for(let i=0;i<rows;i++){const st=logged[i]||{},filled=setDone(e.id,st),v=e1rm(st.w,st.r);
+      html+=`<tr class="set-row${filled?" done":""}"><td class="set-no">${i+1}</td><td><input class="cell${st.r?" filled":""}" type="number" inputmode="numeric" placeholder="${lt&&lt[i]&&lt[i].r?lt[i].r:"—"}" value="${st.r||""}" data-ex="${e.id}" data-i="${i}" data-f="r" aria-label="Set ${i+1} reps"></td><td><input class="cell${st.w?" filled":""}" type="number" inputmode="decimal" placeholder="${lt&&lt[i]&&lt[i].w?lt[i].w:"—"}" value="${st.w||""}" data-ex="${e.id}" data-i="${i}" data-f="w" aria-label="Set ${i+1} kg"></td><td><input class="cell${st.rpe?" filled":""}" type="number" inputmode="decimal" step="0.5" placeholder="—" value="${st.rpe||""}" data-ex="${e.id}" data-i="${i}" data-f="rpe" aria-label="Set ${i+1} RPE"></td><td class="e1">${v?Math.round(v)+"kg":(filled?"BW":"—")}</td><td><button class="chk${filled?" on":""}" data-chk="${e.id}" data-i="${i}" aria-label="Set ${i+1} done \u2014 start the rest timer">${ICON.check}</button></td></tr>`;
     }
     html+=`</tbody></table><div class="set-act"><button class="mini" data-add="${e.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>Add set</button><button class="mini" data-del="${e.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14" stroke-linecap="round"/></svg>Remove</button></div></div></div>`;
   });
+  html+=sessStripHTML();
   document.getElementById("liftBody").innerHTML=html;
   document.querySelectorAll("#liftBody .cell").forEach(inp=>{
-    inp.addEventListener("input",()=>{const s=ensureLiftSession(curDay),ex=inp.dataset.ex,i=+inp.dataset.i,f=inp.dataset.f;s.entries[ex]=s.entries[ex]||[];s.entries[ex][i]=s.entries[ex][i]||{};s.entries[ex][i][f]=inp.value;DB.save();const row=inp.closest("tr"),st=s.entries[ex][i],v=e1rm(st.w,st.r);inp.classList.toggle("filled",!!inp.value);row.querySelector(".e1").textContent=v?Math.round(v)+"kg":"—";const chk=row.querySelector(".chk");if(st.r&&st.w){chk.classList.add("on");row.classList.add("done");}else{chk.classList.remove("on");row.classList.remove("done");}});
-    inp.addEventListener("change",()=>{const ex=inp.dataset.ex,i=+inp.dataset.i,s=findLiftSession(curDay),st=s&&s.entries[ex]&&s.entries[ex][i];if(st&&st.r&&st.w){const v=e1rm(st.w,st.r);let prev=0;DB.sessions.forEach(ss=>{(ss.entries[ex]||[]).forEach((x,xi)=>{if(ss.id===s.id&&xi===i)return;const vv=e1rm(x&&x.w,x&&x.r);if(vv>prev)prev=vv;});});if(v>prev&&prev>0)toast("New PR on "+EXMAP[ex].name+"! ~"+Math.round(v)+"kg");}});
+    inp.addEventListener("input",()=>{const s=ensureLiftSession(curDay),ex=inp.dataset.ex,i=+inp.dataset.i,f=inp.dataset.f;s.entries[ex]=s.entries[ex]||[];s.entries[ex][i]=s.entries[ex][i]||{};s.entries[ex][i][f]=inp.value;DB.save();const row=inp.closest("tr"),st=s.entries[ex][i],v=e1rm(st.w,st.r);inp.classList.toggle("filled",!!inp.value);row.querySelector(".e1").textContent=v?Math.round(v)+"kg":(setDone(ex,st)?"BW":"—");updateSessStrip();const chk=row.querySelector(".chk");if(setDone(ex,st)){chk.classList.add("on");row.classList.add("done");}else{chk.classList.remove("on");row.classList.remove("done");}});
+    inp.addEventListener("change",()=>{const ex=inp.dataset.ex,i=+inp.dataset.i,s=findLiftSession(curDay),st=s&&s.entries[ex]&&s.entries[ex][i];if(st&&st.r&&st.w){const v=e1rm(st.w,st.r);let prev=0;DB.sessions.forEach(ss=>{(ss.entries[ex]||[]).forEach((x,xi)=>{if(ss.id===s.id&&xi===i)return;const vv=e1rm(x&&x.w,x&&x.r);if(vv>prev)prev=vv;});});if(v>prev&&prev>0)toast("New PR on "+(EXMAP[ex]||{name:ex}).name+"! ~"+Math.round(v)+"kg");}});
   });
-  document.querySelectorAll("#liftBody .chk").forEach(b=>b.addEventListener("click",()=>{const ex=b.dataset.chk,i=+b.dataset.i,s=findLiftSession(curDay),st=s&&s.entries[ex]&&s.entries[ex][i];if(st&&st.r&&st.w){const exObj=GYM[curDay].ex.find(x=>x.id===ex);const sec=parseRest(exObj&&exObj.rest);startRest(sec);toast("Set done · resting "+fmtPace(sec),true);}else toast("Enter reps and weight first");}));
+  document.querySelectorAll("#liftBody .chk").forEach(b=>b.addEventListener("click",()=>{const ex=b.dataset.chk,i=+b.dataset.i,s=findLiftSession(curDay),st=s&&s.entries[ex]&&s.entries[ex][i];if(setDone(ex,st)){const eo=GYM[curDay].ex.find(x=>x.id===ex);const sec=(LOC==="home"&&HOME_SUB[ex])?homeRest(ex):parseRest(eo&&eo.rest);audioUnlock();startRest(sec);}else toast(isBWEx(ex)?"Enter the reps first":"Enter reps and kg first");}));
   document.querySelectorAll("#liftBody .tool-h").forEach(h=>h.addEventListener("click",()=>h.parentElement.classList.toggle("open")));
   const plW=document.getElementById("plW"),plBar=document.getElementById("plBar");
   if(plW){plW.addEventListener("input",drawPlates);plBar.addEventListener("input",drawPlates);}
   document.querySelectorAll("#liftBody .hw-tog").forEach(b=>b.addEventListener("click",()=>{document.getElementById("hw-"+b.dataset.tg).classList.toggle("open");b.classList.toggle("open");}));
-  document.querySelectorAll("#liftBody [data-add]").forEach(b=>b.addEventListener("click",()=>{const s=ensureLiftSession(curDay);s.entries[b.dataset.add]=s.entries[b.dataset.add]||[];s.entries[b.dataset.add].push({});DB.save();renderLiftDay();}));
-  document.querySelectorAll("#liftBody [data-del]").forEach(b=>b.addEventListener("click",()=>{const s=findLiftSession(curDay);if(s&&s.entries[b.dataset.del]&&s.entries[b.dataset.del].length>1){s.entries[b.dataset.del].pop();DB.save();renderLiftDay();}}));
+  document.querySelectorAll("#liftBody [data-add]").forEach(b=>b.addEventListener("click",()=>{const id=b.dataset.add,s=ensureLiftSession(curDay),n=document.querySelectorAll(`#liftBody input[data-ex="${id}"][data-f="r"]`).length;s.rows=s.rows||{};s.rows[id]=n+1;DB.save();renderLiftDay();}));
+  document.querySelectorAll("#liftBody [data-del]").forEach(b=>b.addEventListener("click",()=>{const id=b.dataset.del,n=document.querySelectorAll(`#liftBody input[data-ex="${id}"][data-f="r"]`).length;if(n<=1){toast("One set is the minimum");return;}const s=ensureLiftSession(curDay),arr=s.entries[id]||[],last=arr[n-1];if(last&&(last.r||last.w||last.rpe)){if(!confirm("Delete set "+n+" ("+(last.r||"?")+" \u00d7 "+(last.w?last.w+" kg":"BW")+")?"))return;arr.splice(n-1,1);}s.rows=s.rows||{};s.rows[id]=n-1;DB.save();renderLiftDay();}));
 }
 function drawPlates(){
   const target=parseFloat(document.getElementById("plW").value),bar=parseFloat(document.getElementById("plBar").value)||20,out=document.getElementById("plateOut");
@@ -1938,42 +1980,41 @@ let curTP="weight";
 function renderTrack(){
   const el=document.getElementById("view-track");
   el.innerHTML=`<h2 class="view-title">Track</h2>
-    <p class="view-sub">Watch both missions unfold: muscle on one side, race fitness on the other. Log consistently — the charts tell you if it's working.</p>
+    <p class="view-sub">Every number the engine runs on: bodyweight, lift progress straight from your Lift logs, weekly legs-and-back volume, tapes and scans. Log consistently — the lines tell you if it’s working.</p>
     <div class="storage-warn" id="storageWarn">&#9888; This browser is blocking local storage (private/preview mode). Logs won't persist. Download the file and open it directly for full tracking.</div>
-    <div class="track-tabs"><button class="on" data-tp="weight">Bodyweight</button><button data-tp="mileage">Run Mileage</button><button data-tp="pace">Run Pace</button><button data-tp="strength">Strength</button><button data-tp="measure">Measures</button></div>
+    <div class="track-tabs"><button class="on" data-tp="weight">Bodyweight</button><button data-tp="lifts">Lifts</button><button data-tp="volume">Volume</button><button data-tp="measure">Measures</button></div>
     <div class="track-pane on" id="tp-weight"><div class="quick"><div class="field"><label>Date</label><input type="date" id="wDate"></div><div class="field"><label>Weight (kg)</label><input type="number" inputmode="decimal" id="wVal" placeholder="85.0"></div><button class="btn btn-gold" id="wAdd" style="width:auto;align-self:flex-end;min-width:110px">Log</button></div><div class="chart-card"><div class="chart-head"><h3>Bodyweight Trend</h3><span class="chs" id="wSub">—</span></div><div id="wChart"></div></div><div class="log-list" id="wList"></div></div>
-    <div class="track-pane" id="tp-mileage"><div class="chart-card"><div class="chart-head"><h3>Weekly Running Volume</h3><span class="chs">km per week</span></div><div id="mChart"></div></div><div class="chart-card"><div class="chart-head"><h3>Longest Run</h3><span class="chs">target: 15-16 km</span></div><div id="lrChart"></div></div><div class="log-list" id="runList"></div></div>
-    <div class="track-pane" id="tp-pace"><div class="chart-card"><div class="chart-head"><h3>Easy-Run Pace Trend</h3><span class="chs">min/km · lower = faster</span></div><div id="paceChart"></div></div><div class="calc-note">As your aerobic engine grows, your easy pace gets faster at the same effort. That's fitness you can see.</div></div>
-    <div class="track-pane" id="tp-strength"><div class="quick"><div class="field" style="min-width:130px"><label>Lift</label><select id="lLift"><option>Bench Press</option><option>Overhead Press</option><option>Squat</option><option>Deadlift</option><option>Barbell Row</option></select></div><div class="field"><label>Kg</label><input type="number" inputmode="decimal" id="lW" placeholder="100"></div><div class="field"><label>Reps</label><input type="number" inputmode="numeric" id="lR" placeholder="5"></div><button class="btn btn-gold" id="lAdd" style="width:auto;align-self:flex-end;min-width:90px">Log</button></div><div class="chart-card"><div class="chart-head"><h3>Estimated 1-Rep-Max</h3><select class="field" id="liftSel" style="width:auto;padding:7px 10px;font-size:13px"></select></div><div id="liftChart"></div></div><div class="log-list" id="liftList"></div></div>
-    <div class="track-pane" id="tp-measure"><div class="input-grid"><div class="field"><label>Date</label><input type="date" id="meDate"></div><div class="field"><label>Waist (cm)</label><input type="number" inputmode="decimal" id="meWaist" placeholder="—"></div><div class="field"><label>Neck (cm)</label><input type="number" inputmode="decimal" id="meNeck" placeholder="— for body-fat estimate"></div><div class="field"><label>Arm (cm)</label><input type="number" inputmode="decimal" id="meArm" placeholder="—"></div><div class="field"><label>Chest (cm)</label><input type="number" inputmode="decimal" id="meChest" placeholder="—"></div><div class="field"><label>Thigh (cm)</label><input type="number" inputmode="decimal" id="meThigh" placeholder="—"></div></div><button class="btn btn-gold" id="meAdd" style="margin-bottom:16px">Save</button><div class="chart-card"><div class="chart-head"><h3>Waist vs Arm</h3><span class="chs">arm up, waist stable = winning</span></div><div id="meChart"></div></div><div class="log-list" id="meList"></div></div>
-    <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-ghost" id="exportBtn" style="flex:1;min-width:150px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke-linecap="round" stroke-linejoin="round"/></svg>Export Backup</button><button class="btn btn-ghost" id="importBtn" style="flex:1;min-width:150px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14" stroke-linecap="round" stroke-linejoin="round"/></svg>Import Backup</button><input type="file" id="importFile" accept="application/json,.json" hidden></div>
-    <p class="foot-note">All data stays private in this browser. Export monthly so you never lose your progress.</p>`;
+    <div class="track-pane" id="tp-lifts"><div id="exProg"></div><details class="tested"><summary>Tested maxes — optional manual log</summary><div class="quick"><div class="field" style="min-width:130px"><label>Lift</label><select id="lLift"><option>Bench Press</option><option>Overhead Press</option><option>Squat</option><option>Deadlift</option><option>Barbell Row</option></select></div><div class="field"><label>Kg</label><input type="number" inputmode="decimal" id="lW" placeholder="100"></div><div class="field"><label>Reps</label><input type="number" inputmode="numeric" id="lR" placeholder="5"></div><button class="btn btn-gold" id="lAdd" style="width:auto;align-self:flex-end;min-width:90px">Log</button></div><div class="chart-card"><div class="chart-head"><h3>Estimated 1-Rep-Max</h3><select class="field" id="liftSel" style="width:auto;padding:7px 10px;font-size:13px"></select></div><div id="liftChart"></div></div><div class="log-list" id="liftList"></div></details></div>
+    <div class="track-pane" id="tp-volume"><div id="volBody"></div></div>
+    <div class="track-pane" id="tp-measure"><div class="input-grid"><div class="field"><label>Date</label><input type="date" id="meDate"></div><div class="field"><label>Waist (cm)</label><input type="number" inputmode="decimal" id="meWaist" placeholder="—"></div><div class="field"><label>Neck (cm)</label><input type="number" inputmode="decimal" id="meNeck" placeholder="— for body-fat estimate"></div><div class="field"><label>Arm (cm)</label><input type="number" inputmode="decimal" id="meArm" placeholder="—"></div><div class="field"><label>Chest (cm)</label><input type="number" inputmode="decimal" id="meChest" placeholder="—"></div><div class="field"><label>Thigh (cm)</label><input type="number" inputmode="decimal" id="meThigh" placeholder="—"></div></div><button class="btn btn-gold" id="meAdd" style="margin-bottom:16px">Save</button><div class="chart-card"><div class="chart-head"><h3>Waist vs Arm</h3><span class="chs">arm up, waist stable = winning</span></div><div id="meChart"></div></div><div class="log-list" id="meList"></div><div id="dexaBody" style="margin-top:14px"></div></div>
+    <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-ghost" id="exportBtn" style="flex:1;min-width:150px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke-linecap="round" stroke-linejoin="round"/></svg>Download full backup</button><button class="btn btn-ghost" id="importBtn" style="flex:1;min-width:150px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14" stroke-linecap="round" stroke-linejoin="round"/></svg>Restore from file</button><input type="file" id="importFile" accept="application/json,.json" hidden></div>
+    <p class="foot-note">Everything stays on this phone (browser storage plus the IndexedDB vault). Save a backup file weekly — the Home Data card shows how old your last one is.</p>`;
   if(!STORAGE_OK)document.getElementById("storageWarn").classList.add("show");
   ["wDate","meDate"].forEach(id=>{const e=document.getElementById(id);if(e&&!e.value)e.value=todayISO();});
   document.querySelectorAll(".track-tabs button").forEach(b=>b.addEventListener("click",()=>{curTP=b.dataset.tp;document.querySelectorAll(".track-tabs button").forEach(x=>x.classList.toggle("on",x.dataset.tp===curTP));document.querySelectorAll(".track-pane").forEach(p=>p.classList.toggle("on",p.id==="tp-"+curTP));}));
-  wireTrack();renderWeight();renderMileage();renderPace();renderStrength();renderMeasure();
+  wireTrack();renderWeight();renderStrength();renderMeasure();renderExProg();renderVolume();renderDexa();
 }
 function wireTrack(){
-  document.getElementById("wAdd").addEventListener("click",()=>{const date=document.getElementById("wDate").value||todayISO(),v=parseFloat(document.getElementById("wVal").value);if(!v){toast("Enter a weight");return;}DB.weight=DB.weight.filter(x=>x.date!==date);DB.weight.push({date,v});DB.profile.weight=v;DB.save();document.getElementById("wVal").value="";renderWeight();toast("Weight logged");});
+  document.getElementById("wAdd").addEventListener("click",()=>{const date=document.getElementById("wDate").value||todayISO(),v=parseFloat(document.getElementById("wVal").value);if(!v){toast("Enter a weight");return;}DB.weight=DB.weight.filter(x=>x.date!==date);DB.weight.push({date,v});if(!DB.weight.some(x=>x.date>date))DB.profile.weight=v;DB.save();document.getElementById("wVal").value="";renderWeight();toast("Weight logged");});
   document.getElementById("lAdd").addEventListener("click",()=>{const lift=document.getElementById("lLift").value,w=parseFloat(document.getElementById("lW").value),r=parseFloat(document.getElementById("lR").value);if(!w||!r){toast("Enter weight and reps");return;}DB.lifts.push({date:todayISO(),lift,w,r});DB.save();document.getElementById("lW").value="";document.getElementById("lR").value="";renderStrength();toast("Logged · 1RM ~"+Math.round(e1rm(w,r))+"kg");});
   document.getElementById("meAdd").addEventListener("click",()=>{const g=id=>{const v=document.getElementById(id).value;return v?parseFloat(v):null;};const date=document.getElementById("meDate").value||todayISO(),e={date,waist:g("meWaist"),neck:g("meNeck"),arm:g("meArm"),chest:g("meChest"),thigh:g("meThigh")};if(e.waist==null&&e.neck==null&&e.arm==null&&e.chest==null&&e.thigh==null){toast("Enter at least one");return;}DB.measure=DB.measure.filter(x=>x.date!==date);DB.measure.push(e);DB.save();["meWaist","meArm","meChest","meThigh"].forEach(id=>document.getElementById(id).value="");renderMeasure();toast("Saved");});
-  document.getElementById("exportBtn").addEventListener("click",()=>{const payload={app:"ComebackBlueprint",version:2,exported:new Date().toISOString(),profile:DB.profile,sessions:DB.sessions,runs:DB.runs,weight:DB.weight,measure:DB.measure,lifts:DB.lifts};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="comeback-blueprint-"+todayISO()+".json";a.click();URL.revokeObjectURL(url);toast("Backup downloaded");});
+  document.getElementById("exportBtn").addEventListener("click",()=>downloadBackup());
   document.getElementById("importBtn").addEventListener("click",()=>document.getElementById("importFile").click());
-  document.getElementById("importFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!confirm("Import this backup? It replaces current data on this device."))return;if(d.profile)DB.profile=d.profile;DB.sessions=d.sessions||[];DB.runs=d.runs||[];DB.weight=d.weight||[];DB.measure=d.measure||[];DB.lifts=d.lifts||[];DB.save();toast("Backup restored");renderTrack();updateHeader();}catch(err){toast("Couldn't read that file");}};r.readAsText(f);e.target.value="";});
+  document.getElementById("importFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);let map=d;if(d&&d.app==="ComebackBlueprint")map={cb2_profile:d.profile,cb2_sessions:d.sessions,cb2_runs:d.runs,cb2_weight:d.weight,cb2_measure:d.measure,cb2_lifts:d.lifts};if(!map||typeof map!=="object"||!Object.keys(map).some(k=>/^cb2_/.test(k))){toast("That file isn’t a Comeback Blueprint backup");return;}if(!confirm("Restore this backup? It replaces what it contains on this device."))return;applyRestoreText(JSON.stringify(map));}catch(err){toast("Couldn’t read that file");}};r.readAsText(f);e.target.value="";});
 }
 /* ===== CHARTS ===== */
 function lineChart(series,opts){
-  opts=opts||{};const W=opts.w||640,H=opts.h||210,pad={t:14,r:14,b:28,l:42};
+  opts=opts||{};const W=opts.w||360,H=opts.h||200,pad={t:12,r:12,b:26,l:40};
   const all=[];series.forEach(s=>s.points.forEach(p=>all.push(p.value)));
   if(opts.band)series.forEach(s=>(s.band||[]).forEach(b=>{all.push(b.lo);all.push(b.hi);}));
   if(!all.length)return "";
   let min=Math.min(...all),max=Math.max(...all);if(min===max){min-=1;max+=1;}const rng=max-min;min-=rng*0.12;max+=rng*0.12;
   const dates=[...new Set(series.flatMap(s=>s.points.map(p=>p.x)))].sort();
   const px=iso=>pad.l+(dates.length>1?dates.indexOf(iso)/(dates.length-1):0.5)*(W-pad.l-pad.r),py=v=>pad.t+(1-(v-min)/(max-min))*(H-pad.t-pad.b);
-  let grid="",yl="";for(let g=0;g<=4;g++){const v=min+(max-min)*g/4,y=py(v);grid+=`<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="var(--line)"/>`;yl+=`<text x="${pad.l-7}" y="${y+3}" text-anchor="end" font-size="10" fill="var(--text-3)" font-family="var(--f-mono)">${opts.fmt?opts.fmt(v):v.toFixed(opts.dec!=null?opts.dec:0)}</text>`;}
+  let grid="",yl="";for(let g=0;g<=4;g++){const v=min+(max-min)*g/4,y=py(v);grid+=`<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="var(--line)"/>`;yl+=`<text x="${pad.l-7}" y="${y+3}" text-anchor="end" font-size="11" fill="var(--text-3)" font-family="var(--f-mono)">${opts.fmt?opts.fmt(v):v.toFixed(opts.dec!=null?opts.dec:0)}</text>`;}
   let bands="";series.forEach(s=>{if(s.band&&s.band.length){let t="";s.band.forEach((b,i)=>{t+=(i?"L":"M")+px(b.x).toFixed(1)+" "+py(b.hi).toFixed(1)+" ";});for(let i=s.band.length-1;i>=0;i--)t+="L"+px(s.band[i].x).toFixed(1)+" "+py(s.band[i].lo).toFixed(1)+" ";bands+=`<path d="${t}Z" fill="${s.color}" opacity="0.12"/>`;}});
-  let paths="",dots="";series.forEach(s=>{if(!s.points.length)return;let d="";s.points.forEach((p,i)=>{d+=(i?"L":"M")+px(p.x).toFixed(1)+" "+py(p.value).toFixed(1)+" ";});paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;s.points.forEach(p=>{dots+=`<circle cx="${px(p.x).toFixed(1)}" cy="${py(p.value).toFixed(1)}" r="3.3" fill="${s.color}" stroke="var(--panel)" stroke-width="1.5"/>`;});});
-  let xl="";const step=Math.ceil(dates.length/6);dates.forEach((dt,i)=>{if(i%step===0||i===dates.length-1)xl+=`<text x="${px(dt).toFixed(1)}" y="${H-9}" text-anchor="middle" font-size="9.5" fill="var(--text-3)" font-family="var(--f-mono)">${fmtShort(dt)}</text>`;});
+  let paths="",dots="";series.forEach(s=>{if(!s.points.length)return;let d="";s.points.forEach((p,i)=>{d+=(i?"L":"M")+px(p.x).toFixed(1)+" "+py(p.value).toFixed(1)+" ";});paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;s.points.forEach(p=>{dots+=`<circle cx="${px(p.x).toFixed(1)}" cy="${py(p.value).toFixed(1)}" r="3.6" fill="${s.color}" stroke="var(--panel)" stroke-width="1.5"/>`;});});
+  let xl="";const step=Math.ceil(dates.length/4);dates.forEach((dt,i)=>{if(i%step===0||i===dates.length-1)xl+=`<text x="${px(dt).toFixed(1)}" y="${H-9}" text-anchor="middle" font-size="10.5" fill="var(--text-3)" font-family="var(--f-mono)">${fmtShort(dt)}</text>`;});
   return `<svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${grid}${yl}${bands}${paths}${dots}${xl}</svg>`;
 }
 function barChart(data,opts){
@@ -2013,7 +2054,7 @@ function renderStrength(){
   const lifts=[...new Set(DB.lifts.map(l=>l.lift))],sel=document.getElementById("liftSel"),cur=sel.value||lifts[0]||"Bench Press";
   sel.innerHTML=lifts.length?lifts.map(l=>`<option${l===cur?" selected":""}>${l}</option>`).join(""):`<option>Bench Press</option>`;
   sel.onchange=()=>drawLift(sel.value);drawLift(sel.value||cur);
-  document.getElementById("liftList").innerHTML=[...DB.lifts].reverse().slice(0,30).map((l,i)=>`<div class="log-row"><span class="ld">${fmtShort(l.date)}</span><span class="lv">${l.w}<span style="font-size:10px;color:var(--text-3)">kg</span>×${l.r}</span><span class="lx">1RM ~${Math.round(e1rm(l.w,l.r))}kg · ${l.lift}</span><button class="del" data-dell="${DB.lifts.length-1-i}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`).join("");
+  document.getElementById("liftList").innerHTML=[...DB.lifts].reverse().slice(0,30).map((l,i)=>`<div class="log-row"><span class="ld">${fmtShort(l.date)}</span><span class="lv">${l.w}<span style="font-size:10px;color:var(--text-3)">kg</span>×${l.r}</span><span class="lx">1RM ~${Math.round(e1rm(l.w,l.r))}kg · ${l.lift}</span><button class="del" aria-label="Delete this tested max" data-dell="${DB.lifts.length-1-i}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`).join("");
   document.querySelectorAll("[data-dell]").forEach(b=>b.addEventListener("click",()=>{DB.lifts.splice(+b.dataset.dell,1);DB.save();renderStrength();}));
 }
 function drawLift(lift){
@@ -2026,7 +2067,7 @@ function renderMeasure(){
   const arr=[...DB.measure].sort((a,b)=>a.date.localeCompare(b.date)),el=document.getElementById("meChart");
   const waist=arr.filter(m=>m.waist!=null).map(m=>({x:m.date,value:m.waist})),arm=arr.filter(m=>m.arm!=null).map(m=>({x:m.date,value:m.arm}));
   el.innerHTML=(waist.length||arm.length)?lineChart([{points:waist,color:"var(--warn)"},{points:arm,color:"var(--cyan)"}],{dec:1}):emptyMsg("Log waist and arm to track muscle vs fat.");
-  document.getElementById("meList").innerHTML=[...arr].reverse().map(m=>{const ex=[];if(m.waist)ex.push("W "+m.waist);if(m.arm)ex.push("A "+m.arm);if(m.chest)ex.push("C "+m.chest);if(m.thigh)ex.push("T "+m.thigh);return `<div class="log-row"><span class="ld">${fmtShort(m.date)}</span><span class="lx" style="font-size:13px">${ex.join(" · ")}</span><button class="del" data-delme="${m.date}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`;}).join("");
+  document.getElementById("meList").innerHTML=[...arr].reverse().map(m=>{const ex=[];if(m.waist)ex.push("W "+m.waist);if(m.arm)ex.push("A "+m.arm);if(m.chest)ex.push("C "+m.chest);if(m.thigh)ex.push("T "+m.thigh);if(m.neck)ex.push("N "+m.neck);return `<div class="log-row"><span class="ld">${fmtShort(m.date)}</span><span class="lx" style="font-size:13px">${ex.join(" · ")}</span><button class="del" aria-label="Delete tapes from ${m.date}" data-delme="${m.date}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`;}).join("");
   document.querySelectorAll("[data-delme]").forEach(b=>b.addEventListener("click",()=>{DB.measure=DB.measure.filter(x=>x.date!==b.dataset.delme);DB.save();renderMeasure();}));
 }
 /* ===== GUIDE ===== */
@@ -2131,17 +2172,17 @@ function fastLegalHTML(){
   <div class="verdict ok" style="margin-top:12px"><b>So the plan is already the fastest legal plan.</b> What decides the speed now is not a setting \u2014 it is attendance, logged progression and sleep. Day 1 is ${fmtLong(START_ISO)}.</div></div>`;
 }
 function weekAvgWeight(ws,we){const a=DB.weight.filter(x=>x.date>=ws&&x.date<we).map(x=>parseFloat(x.v)).filter(v=>v>0);return a.length?a.reduce((p,q)=>p+q,0)/a.length:null;}
-function bestE1RMByEx(ws,we){const out={};DB.sessions.filter(x=>x.dateISO>=ws&&x.dateISO<we).forEach(sess=>{Object.entries(sess.entries||{}).forEach(([ex,sets])=>{(sets||[]).forEach(st=>{if(st&&st.r&&st.w){const v=e1rm(st.w,st.r);if(v&&(!out[ex]||v>out[ex]))out[ex]=v;}});});});return out;}
+function bestE1RMByEx(ws,we){const out={};DB.sessions.filter(x=>x.dateISO>=ws&&x.dateISO<we).forEach(sess=>{Object.entries(sess.entries||{}).forEach(([ex,sets])=>{const k=ex+"@"+sessLoc(sess);(sets||[]).forEach(st=>{if(st&&st.r&&st.w){const v=e1rm(st.w,st.r);if(v&&(!out[k]||v>out[k]))out[k]=v;}});});});return out;}
 function weeklyReview(){
-  const wk=planWeek(),ws=weekStartISO(wk),we=dateAdd(ws,7),pws=dateAdd(ws,-7);
-  const lifts=sessionsThisWeek().lifts;
+  const wk=reviewWeek(),ws=weekStartISO(wk),we=dateAdd(ws,7),pws=dateAdd(ws,-7);
+  const lifts=sessionsInRange(ws,we).length;
   const wi=DB.weight.filter(x=>x.date>=ws&&x.date<we).length;
   const avgNow=weekAvgWeight(ws,we),avgPrev=weekAvgWeight(pws,ws);
   const rate=(avgNow!=null&&avgPrev!=null)?avgNow-avgPrev:null;
   const target=gainModel("hyper").rateKgWk;const waistLimit=aggrLive()?marchTarget().limit:3;
   const waistAll=DB.measure.filter(x=>x.waist!=null).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   const waistD=waistAll.length>1?parseFloat(waistAll[waistAll.length-1].waist)-parseFloat(waistAll[0].waist):null;
-  const wAll=DB.weight.map(x=>parseFloat(x.v)).filter(v=>v>0);const estLean=(wAll.length>=2&&waistAll.length>=2)?(wAll[wAll.length-1]-wAll[0])-1.4*(parseFloat(waistAll[waistAll.length-1].waist)-parseFloat(waistAll[0].waist)):null;
+  const wAll=[...DB.weight].sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(x=>parseFloat(x.v)).filter(v=>v>0);const estLean=(wAll.length>=2&&waistAll.length>=2)?(wAll[wAll.length-1]-wAll[0])-1.4*(parseFloat(waistAll[waistAll.length-1].waist)-parseFloat(waistAll[0].waist)):null;
   const nowE=bestE1RMByEx(ws,we),prevE=bestE1RMByEx(pws,ws);
   let prs=0,stalls=0;Object.keys(nowE).forEach(ex=>{if(prevE[ex]){if(nowE[ex]>prevE[ex]+0.5)prs++;else stalls++;}});
   const total=DB.sessions.length+DB.weight.length+DB.measure.length;
@@ -2152,23 +2193,23 @@ function weeklyReview(){
   else if(rate!=null&&rate>target*1.6){verdict="Gaining "+rate.toFixed(2)+" kg/week against a "+target.toFixed(2)+" target \u2192 the surplus is too big; trim 250\u2013300 kcal.";cls="warn";}
   else if(rate!=null&&rate<target*0.25&&wk>=3){verdict="Gaining only "+rate.toFixed(2)+" kg/week against a "+target.toFixed(2)+" target \u2192 add 250 kcal, mostly carbs around training.";cls="warn";}
   else if(estLean!=null&&estLean>=3.3&&waistD!=null&&waistD>=4&&roadmapWeekNow()>=12&&bulkMode!=="cut"){verdict="Lean target banked (\u2248"+estLean.toFixed(1)+" kg estimated from weight minus waist) and the waist has moved +"+waistD.toFixed(1)+" cm \u2192 the cut can start now: switch Numbers to Cut for 4\u20136 weeks, then resume building.";cls="ok";}
-  else if((()=>{const sl=DB.sleep.filter(x=>x.date>=dateAdd(todayISO(),-7));return sl.length>=3&&sl.reduce((a,x)=>a+x.h,0)/sl.length<7;})()){const sl=DB.sleep.filter(x=>x.date>=dateAdd(todayISO(),-7));const avg=sl.reduce((a,x)=>a+x.h,0)/sl.length;verdict="Sleep averaged "+avg.toFixed(1)+" h this week \u2192 recovery is the limiter, not the program. Take Friday as a full rest day this week, fix lights-out before adding anything; if it stays under 7 h, step Aggressive down to Maximum.";cls="warn";}
+  else if((()=>{const sl=DB.sleep.filter(x=>x.date>dateAdd(todayISO(),-7));return sl.length>=3&&sl.reduce((a,x)=>a+x.h,0)/sl.length<7;})()){const sl=DB.sleep.filter(x=>x.date>dateAdd(todayISO(),-7));const avg=sl.reduce((a,x)=>a+x.h,0)/sl.length;verdict="Sleep averaged "+avg.toFixed(1)+" h this week \u2192 recovery is the limiter, not the program. Take Friday as a full rest day this week, fix lights-out before adding anything; if it stays under 7 h, step Aggressive down to Maximum.";cls="warn";}
   else if(lifts<6&&lateWeek){verdict=lifts+"/6 sessions this week \u2192 attendance is the limiter, not the program. Protect the six.";cls="warn";}
-  else if(stalls>0&&prs===0&&wk>=3){verdict="No e1RM improved on last week \u2192 add 2\u20133 sets to the stalled muscles, or deload them one week and come back.";cls="warn";}
+  else if(stalls>0&&prs===0&&wk>=3&&lateWeek){verdict="No e1RM improved on last week \u2192 add 2\u20133 sets to the stalled muscles, or deload them one week and come back.";cls="warn";}
   else verdict="On track. Keep everything; beat last week\u2019s reps.";
   return {wk,lifts,wi,avgNow,avgPrev,rate,target,waistD,prs,stalls,verdict,cls,total,estLean};
 }
 function weeklyReviewHTML(){
   if(!planStarted())return "";
   const r=weeklyReview();const f=(v,d)=>v==null?"\u2014":(+v).toFixed(d);
-  return `<div class="card"><div class="card-t"><span class="ic">${ICON.check}</span>Weekly Review \u2014 Week ${r.wk}</div>
+  return `<div class="card"><div class="card-t"><span class="ic">${ICON.check}</span>Weekly Review \u2014 Week ${r.wk}${r.wk<planWeek()?" (final)":""}</div>
   <div class="card-st">The app reads your log and applies the decision rules itself. One verdict, one adjustment \u2014 nothing to interpret.</div>
   <div class="dose-grid" style="margin-top:10px">
     <div class="dose"><div class="dn">Sessions</div><div class="dv">${r.lifts}<small>of 6 \u00b7 ${r.wi} weigh-ins</small></div></div>
     <div class="dose"><div class="dn">Gain rate</div><div class="dv">${r.rate==null?"\u2014":(r.rate>=0?"+":"")+f(r.rate,2)}<small>kg/wk \u00b7 target +${f(r.target,2)}</small></div></div>
     <div class="dose"><div class="dn">PRs / stalls</div><div class="dv">${r.prs}/${r.stalls}<small>e1RM vs last week</small></div></div>
   </div>
-  <div class="verdict ${r.cls}" style="margin-top:10px"><b>Verdict:</b> ${r.verdict}</div></div>`;
+  <div class="verdict ${r.cls}" style="margin-top:10px"><b>Verdict:</b> ${r.verdict}</div>${(()=>{const ws=weekStartISO(r.wk),prw=prEvents(ws).filter(x=>x.date<dateAdd(ws,7));return prw.length?`<div class="calc-note" id="reviewPRs" style="margin-top:8px"><b>All-time bests this week:</b> ${prw.map(x=>EXMAP[x.id].name+" "+Math.round(x.e)+" kg").join(" · ")}</div>`:"";})()}</div>`;
 }
 function currentBlock(){const w=roadmapWeekNow();
   if(w<=16)return {name:"Base block",span:"weeks 1\u201316",i:w,n:16,focus:"Every muscle twice a week. The muscle-memory window \u2014 the fastest gains of the whole arc happen here."};
@@ -2306,10 +2347,157 @@ function renderGuide(){
   </div><div class="disclaimer"><b>Note:</b> Educational information, not medical advice. Build running volume gradually, especially at 85-95 kg, to protect your joints. See a doctor before an aggressive surplus or any new training load if you have health concerns.</div></div>
   <p class="foot-note">The Comeback Blueprint · Strength + Speed · Built for 24 September 2026</p>`;
 }
+/* ===== HOME HELPERS (2026-09-26): mode labels, supplement line, peak-week and catch-up logic, review week ===== */
+var MODE_LABEL={lean:"Lean",balanced:"Balanced",max:"Maximum",aggr:"Aggressive",cut:"Cut"};
+function checkISO(){return dateAdd(MILESTONE_ISO,-1);}
+function peakLegsSkip(){const d=dayDiff(todayISO(),checkISO()),k=todayLiftKey();return d>=1&&d<=3&&!!k&&/^legs/.test(k);}
+function suppLine(kind){const heavy=/^(legsA|legsB|pullA)$/.test(todayLiftKey()||""),pm="20:00: creatine, ½ beta-alanine, omega-3, D3, ashwagandha, magnesium glycinate";
+  if(kind==="lift")return "04:30: caffeine + ½ beta-alanine"+(heavy?" + collagen 15 g with vitamin C (heavy day)":"")+" (citrulline only if training before ~07:00) · "+pm;
+  if(kind==="pump")return "04:30: ½ beta-alanine (caffeine optional) · "+pm;
+  return "Full rest — 04:30: ½ beta-alanine only · "+pm;}
+function hasLogsIn(d){return ["cb2_sessions","cb2_weight","cb2_measure","cb2_sleep","cb2_dexa","cb2_lifts"].some(k=>Array.isArray(d&&d[k])&&d[k].length>0);}
+function sessionsInRange(ws,we){return DB.sessions.filter(x=>x.dateISO>=ws&&x.dateISO<we&&Object.entries(x.entries||{}).some(([ex,arr])=>arr&&arr.some(st=>setDone(ex,st))));}
+function reviewWeek(){const cur=planWeek();if(cur<=1)return cur;const ws=weekStartISO(cur);return sessionsInRange(ws,dateAdd(ws,7)).length<2?cur-1:cur;}
+function firstMissedDay(){const ws=weekStartISO(planWeek()),done=new Set(sessionsInRange(ws,dateAdd(ws,7)).map(s=>s.day));return GYM_ORDER.find(d=>!done.has(d))||null;}
+function goToCatchUp(){const d=firstMissedDay();if(d){curDay=d;liftPhase="hyper";}curDayPicked=todayISO();switchView("lift");}
+/* ===== COACH PACK + ASK CLAUDE (2026-09-26) =====
+   Plain-text week summary built only from the log. Nothing leaves the phone until the user shares or copies it. */
+function escHTML(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function coachText(){const r=weeklyReview(),wk=r.wk,ws=weekStartISO(wk),we=dateAdd(ws,7),mt=marchTarget(),c=compute(),f=(v,d)=>v==null?"n/a":(+v).toFixed(d);
+  const L=["THE COMEBACK BLUEPRINT — week "+wk+" ("+ws+" to "+dateAdd(we,-1)+"), summary made "+todayISO(),
+    "Profile: "+(DB.profile.age||38)+" y, "+(DB.profile.height||177)+" cm; engine bodyweight "+f(DB.profile.weight,1)+" kg"+(()=>{const lw=[...DB.weight].sort((a,b)=>String(a.date).localeCompare(String(b.date))).slice(-1)[0];return lw?" (latest weigh-in "+f(lw.v,1)+" kg on "+lw.date+")":"";})()+", body fat "+f(DB.profile.bf,1)+"% (engine setting).",
+    "Goal: pure muscle, natural only. Natural-ceiling lean mass "+f(c.ceilLean,1)+" kg; estimated lean now "+f(c.leanNow,1)+" kg. March route: "+mt.label+" (waist brake +"+mt.limit+" cm). Body-fat band 18–24%.",
+    "Sessions: "+r.lifts+"/6 · weigh-ins "+r.wi+"/3"+(r.wk<planWeek()?" (week "+r.wk+", final)":"")+".",
+    "Bodyweight average: "+f(r.avgNow,1)+" kg (last week "+f(r.avgPrev,1)+"); rate "+(r.rate==null?"n/a":(r.rate>=0?"+":"")+r.rate.toFixed(2))+" kg/week against a +"+f(r.target,2)+" target.",
+    "Waist since first tape: "+(r.waistD==null?"n/a":(r.waistD>=0?"+":"")+r.waistD.toFixed(1)+" cm")+"."];
+  const sl=DB.sleep.filter(x=>x.date>dateAdd(todayISO(),-7));if(sl.length)L.push("Sleep, last 7 days: "+(sl.reduce((a,x)=>a+x.h,0)/sl.length).toFixed(1)+" h average over "+sl.length+" nights.");
+  const dx=latestDexa();if(dx)L.push("Latest DEXA ("+dx.date+"): "+dx.bf+"% body fat"+(dx.lean?", "+dx.lean+" kg lean":"")+".");
+  const ids=[];DB.sessions.filter(s=>s.dateISO>=ws&&s.dateISO<we).sort((a,b)=>a.dateISO.localeCompare(b.dateISO)).forEach(s=>Object.keys(s.entries||{}).forEach(ex=>{if(EXMAP[ex]&&!ids.includes(ex)&&(s.entries[ex]||[]).some(st=>st&&+st.r>0&&+st.w>0))ids.push(ex);}));
+  if(ids.length){L.push("","Lifts this week (best set · e1RM, Epley):");ids.forEach(ex=>{const h=exSessions(ex).filter(x=>x.date<we),cur=h.filter(x=>x.date>=ws),prev=h.filter(x=>x.date<ws);const b=bestSet(cur.flatMap(x=>x.sets)),pb=prev.length?bestSet(prev[prev.length-1].sets):null;
+    L.push("- "+EXMAP[ex].name+": "+b.r+"×"+fmtKg(b.w)+" kg · e1RM "+Math.round(b.e)+" kg"+(pb?" (previous session "+Math.round(pb.e)+" kg)":" (first time logged)")+(isStalled(exSessions(ex))?" · STALLED 3 sessions":""));});}
+  else L.push("","No lifts logged this week yet.");
+  const prs=prEvents(ws).filter(x=>x.date<we);if(prs.length)L.push("All-time bests this week: "+prs.map(x=>EXMAP[x.id].name+" "+Math.round(x.e)+" kg").join("; ")+".");
+  const nxt=ids.map(ex=>{const e=exObj(ex),p=e&&progFor(e,dateAdd(todayISO(),1));return p?"- "+EXMAP[ex].name+": "+p.text:null;}).filter(Boolean);if(nxt.length)L.push("","App's next-session targets:",...nxt);
+  L.push("","App verdict: "+r.verdict);return L.join("\n");}
+function askClaudeText(q){return coachText()+"\n\nYou are my strength coach. Work only from the numbers above and say plainly if something you need is missing. My rules: natural and legal only; stay inside the 18–24% body-fat band; never loosen the waist brake without showing the numbers; Friday is active recovery, not a seventh lifting day; South African English.\n"+(q?"My question: "+q:"My question: what is the single most useful adjustment for next week, and why?");}
+function selectCoachPre(msg){const pre=document.getElementById("coachPre");if(!pre){toast("Couldn’t copy on this browser");return;}const d=pre.closest("details");if(d)d.open=true;try{const rg=document.createRange();rg.selectNodeContents(pre);const s=getSelection();s.removeAllRanges();s.addRange(rg);}catch(e){}toast(msg||"Text selected — tap Copy");}
+function copyText(txt,msg){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(()=>toast(msg,true)).catch(()=>selectCoachPre());}else selectCoachPre();}
+async function shareCoach(kind){const qi=document.getElementById("coachQ"),q=qi?String(qi.value||"").trim():"",txt=kind==="claude"?askClaudeText(q):coachText();
+  const pre=document.getElementById("coachPre");if(pre)pre.textContent=txt;
+  if(kind!=="copy"&&navigator.share){try{await navigator.share({title:kind==="claude"?"Ask Claude — Comeback Blueprint":"Comeback Blueprint — weekly summary",text:txt});return;}catch(e){if(e&&e.name==="AbortError")return;}}
+  copyText(txt,kind==="claude"?"Copied — open the Claude app and paste it in":"Weekly summary copied");}
+function coachPackHTML(){if(!planStarted())return "";return `<div class="card" id="coachPack"><div class="card-t"><span class="ic">${ICON.check}</span>Coach pack &amp; Ask Claude</div><div class="card-st">Your week as plain text — for a coach, a physio, or Claude. Built from your own logs; nothing leaves the phone until you share it.</div>
+  <div class="field" style="margin-top:10px"><label for="coachQ">Question for Claude (optional)</label><input id="coachQ" type="text" autocomplete="off" placeholder="e.g. my squat stalled — what now?"></div>
+  <div class="coach-btns"><button class="btn btn-gold" id="askClaudeBtn" onclick="shareCoach('claude')">Ask Claude</button><button class="btn btn-ghost" id="shareCoachBtn" onclick="shareCoach('share')">Share summary</button><button class="btn btn-ghost" id="copyCoachBtn" onclick="shareCoach('copy')">Copy</button></div>
+  <div class="calc-note" style="margin-top:8px">Ask Claude opens the share sheet with your numbers and the plan’s rules attached: pick the Claude app, or paste into a Claude chat if it isn’t listed.</div>
+  <details class="tested" style="margin-top:10px"><summary>Preview what gets shared</summary><pre class="coach-pre" id="coachPre">${escHTML(coachText())}</pre></details></div>`;}
+/* ===== TRACK: LIFT PROGRESS, WEEKLY VOLUME, DEXA (2026-09-26) ===== */
+var curEx=load("cb2_curex",null);
+function loggedExIds(){const seen={};DB.sessions.forEach(s=>Object.entries(s.entries||{}).forEach(([ex,arr])=>{if(EXMAP[ex]&&(arr||[]).some(st=>st&&+st.r>0&&+st.w>0)){if(!seen[ex]||s.dateISO>seen[ex])seen[ex]=s.dateISO;}}));return Object.keys(seen).sort((a,b)=>seen[b].localeCompare(seen[a])||a.localeCompare(b));}
+function exObj(id){const d=EXMAP[id]&&GYM[EXMAP[id].day];return d?d.ex.find(x=>x.id===id):null;}
+function exHistory(id){let best=0;return exSessions(id).map(x=>{const b=bestSet(x.sets);const pr=best>0&&b.e>best+0.01;if(b.e>best)best=b.e;return {date:x.date,e:b.e,top:b,pr};});}
+function prEvents(sinceISO){const out=[];loggedExIds().forEach(id=>exHistory(id).forEach(h=>{if(h.pr&&(!sinceISO||h.date>=sinceISO))out.push({id,date:h.date,e:h.e,top:h.top});}));return out.sort((a,b)=>b.date.localeCompare(a.date)||b.e-a.e);}
+function progIcon(k){return {up:"↑",reps:"→",hold:"↔",reset:"↓",harder:"↑"}[k]||"→";}
+function renderExProg(){const el=document.getElementById("exProg");if(!el)return;const ids=loggedExIds();
+  if(!ids.length){el.innerHTML=`<div class="chart-card">${emptyMsg("Log a session in Lift and every exercise gets its own progress line here — no double entry.")}</div>`;return;}
+  if(!curEx||!ids.includes(curEx))curEx=ids[0];
+  const h=exHistory(curEx),e=exObj(curEx),first=h[0],last=h[h.length-1],best=h.reduce((a,x)=>x.e>a.e?x:a,h[0]);
+  const d=last.e-first.e,pct=first.e?d/first.e*100:0,p=e?progFor(e,dateAdd(todayISO(),1)):null,stal=isStalled(exSessions(curEx)),prs=h.filter(x=>x.pr);
+  const board=prEvents(dateAdd(todayISO(),-28)).slice(0,8),stalls=ids.filter(id=>isStalled(exSessions(id)));
+  el.innerHTML=`<div class="chart-card"><div class="chart-head"><h3>Lift progress</h3><select id="exSel" aria-label="Exercise" class="field" style="width:auto;max-width:64%;padding:7px 10px;font-size:13px">${ids.map(id=>`<option value="${id}"${id===curEx?" selected":""}>${EXMAP[id].name} · ${GYM[EXMAP[id].day].name}</option>`).join("")}</select></div>
+  <div id="exChart">${h.length>1?lineChart([{points:h.map(x=>({x:x.date,value:Math.round(x.e*10)/10})),color:"var(--gold)"}],{dec:0}):emptyMsg("One session logged — the line starts with the next one.")}</div>
+  <div class="ex-stats"><div><span>Best e1RM</span><b>${Math.round(best.e)} kg</b><small>${fmtShort(best.date)} · ${best.top.r}×${fmtKg(best.top.w)}</small></div><div><span>Since first</span><b class="${d>=0?"up":"down"}">${d>=0?"+":""}${d.toFixed(1)} kg</b><small>${pct>=0?"+":""}${pct.toFixed(1)}% · ${h.length} session${h.length===1?"":"s"}</small></div><div><span>Last top set</span><b>${last.top.r}×${fmtKg(last.top.w)}</b><small>${fmtShort(last.date)}${stal?" · stalled":""}</small></div></div>
+  ${p?`<div class="prog prog-${p.kind}" style="margin-top:10px"><span class="prog-ic" aria-hidden="true">${progIcon(p.kind)}</span><span class="prog-t"><b>Next session:</b> ${p.text}<small>${p.why}</small></span></div>`:""}
+  <div class="calc-note" style="margin-top:10px">e1RM is the Epley estimate — a model, most accurate on sets of about 10–12 reps or fewer; on high-rep work read it as a progress index, not a true max.${prs.length?" PRs on this lift: "+prs.map(x=>fmtShort(x.date)).join(", ")+".":""}</div></div>
+  <div class="chart-card"><div class="chart-head"><h3>PR board — last 4 weeks</h3><span class="chs">${board.length} PR${board.length===1?"":"s"}</span></div>${board.length?`<div class="log-list" id="prBoard">${board.map(x=>`<div class="log-row"><span class="ld">${fmtShort(x.date)}</span><span class="lv">${Math.round(x.e)}<span style="font-size:10px;color:var(--text-3)">kg</span></span><span class="lx">${EXMAP[x.id].name} · ${x.top.r}×${fmtKg(x.top.w)}</span></div>`).join("")}</div>`:emptyMsg("No PRs in the last four weeks yet — one lands whenever a session beats the best before it.")}
+  ${stalls.length?`<div class="verdict warn" style="margin-top:10px"><b>Stall watch:</b> ${stalls.map(id=>EXMAP[id].name).join(", ")} — no new best in three sessions. The Lift card already suggests the ~10% reset.</div>`:""}</div>`;
+  const sel=document.getElementById("exSel");if(sel)sel.addEventListener("change",()=>{curEx=sel.value;persist("cb2_curex",curEx);renderExProg();});}
+function regionDone(ws,we){const out={};Object.keys(REGION).forEach(r=>out[r]=0);DB.sessions.filter(s=>s.dateISO>=ws&&s.dateISO<we).forEach(s=>Object.entries(s.entries||{}).forEach(([ex,arr])=>{const n=(arr||[]).filter(st=>setDone(ex,st)).length;if(!n)return;Object.entries(REGION).forEach(([r,ids])=>{if(ids.includes(ex))out[r]+=n;});}));return out;}
+function renderVolume(){const el=document.getElementById("volBody");if(!el)return;const wk=planWeek(),ws=weekStartISO(wk),we=dateAdd(ws,7),done=regionDone(ws,we),prev=regionDone(dateAdd(ws,-7),ws),tgt=regionSets();
+  const rows=Object.keys(REGION).map(r=>{const t=tgt[r]||0,d=done[r]||0,p=prev[r]||0,f=t?Math.min(1,d/t):0;return `<div class="vol-row" data-region="${r}"><div class="vol-h"><b>${r[0].toUpperCase()+r.slice(1)}</b><span>${d} / ${t} sets${p?" · last wk "+p:""}</span></div><div class="vol-bar" role="progressbar" aria-label="${r} sets this week" aria-valuemin="0" aria-valuemax="${t}" aria-valuenow="${d}"><i style="width:${(f*100).toFixed(0)}%"></i></div></div>`;}).join("");
+  el.innerHTML=`<div class="chart-card"><div class="chart-head"><h3>Legs &amp; back volume — week ${wk}</h3><span class="chs">hard sets done vs planned</span></div>${rows}<div class="calc-note" style="margin-top:10px">Planned sets come from this week’s programme${focusLB?" with Legs &amp; Back focus on (+1 set on every target exercise, −1 on push and arm isolations)":""}. A set counts toward every region its exercise trains, the same way the plan counts it.</div></div>`;}
+function latestDexa(){const a=[...(DB.dexa||[])].sort((x,y)=>String(y.date).localeCompare(String(x.date)));return a[0]||null;}
+function applyDexaBF(){const l=latestDexa();if(!l)return;DB.profile.bf=l.bf;DB.save();const el=document.getElementById("pBf");if(el)el.value=l.bf;toast("Body fat set to "+l.bf+"% from your DEXA scan ✓",true);updateHeader();renderDexa();}
+function renderDexa(){const el=document.getElementById("dexaBody");if(!el)return;const arr=[...(DB.dexa||[])].sort((a,b)=>String(b.date).localeCompare(String(a.date))),l=arr[0],tape=estimateBF();
+  el.innerHTML=`<div class="chart-card"><div class="chart-head"><h3>DEXA scan</h3><span class="chs">beats the tape estimate</span></div>
+  <div class="input-grid"><div class="field"><label for="dxDate">Scan date</label><input type="date" id="dxDate" value="${todayISO()}"></div><div class="field"><label for="dxBf">Body fat %</label><input type="number" inputmode="decimal" id="dxBf" placeholder="e.g. 19.4"></div><div class="field"><label for="dxLean">Lean mass (kg)</label><input type="number" inputmode="decimal" id="dxLean" placeholder="optional"></div><div class="field"><label for="dxFat">Fat mass (kg)</label><input type="number" inputmode="decimal" id="dxFat" placeholder="optional"></div></div>
+  <button class="btn btn-gold" id="dxAdd" style="margin:4px 0 10px">Save scan</button>
+  ${l?`<div class="verdict ok" id="dexaLatest"><b>Latest scan ${fmtShort(l.date)}:</b> ${l.bf}% body fat${l.lean?" · "+l.lean+" kg lean":""}${l.fat?" · "+l.fat+" kg fat":""}.${tape?" Tape estimate on "+fmtShort(tape.date)+" said "+tape.bf+"% — "+(Math.abs(tape.bf-l.bf)<=2?"close enough to trust the tape between scans.":"a "+Math.abs(tape.bf-l.bf).toFixed(1)+"-point gap, so trust the scan and re-check your tape technique."):""} <button class="mini" id="dxUse" style="display:inline-flex;width:auto;margin-top:8px;min-height:44px" onclick="applyDexaBF()">Use ${l.bf}% in the engine</button></div>`:`<div class="calc-note">No scan yet. One scan now and one in the March check week is the hardest proof the bulk stayed lean. Type the numbers off the report; nothing is uploaded anywhere.</div>`}
+  ${arr.length>1?`<div class="log-list" style="margin-top:8px">${arr.map(x=>`<div class="log-row"><span class="ld">${fmtShort(x.date)}</span><span class="lx">${x.bf}%${x.lean?" · "+x.lean+" kg lean":""}</span><button class="del" aria-label="Delete the scan from ${x.date}" data-deldx="${x.date}">✕</button></div>`).join("")}</div>`:""}</div>`;
+  document.getElementById("dxAdd").addEventListener("click",()=>{const g=id=>{const v=parseFloat(document.getElementById(id).value);return v>0?v:null;};const date=document.getElementById("dxDate").value||todayISO(),bf=g("dxBf"),lean=g("dxLean"),fat=g("dxFat");if(!(bf>3&&bf<60)){toast("Enter the body-fat % from the scan (3–60)");return;}DB.dexa=(DB.dexa||[]).filter(x=>x.date!==date);DB.dexa.push({date,bf,lean,fat});DB.save();renderDexa();toast("Scan saved — tap “Use” to feed it to the engine",true);});
+  el.querySelectorAll("[data-deldx]").forEach(b=>b.addEventListener("click",()=>{DB.dexa=DB.dexa.filter(x=>x.date!==b.dataset.deldx);DB.save();renderDexa();}));}
+/* ===== AUTO-PROGRESSION + LIFT HISTORY (2026-09-26) =====
+   Double progression with an RPE guard: add load only when every working set at the top load reached the top of the
+   rep range; otherwise add reps at the same load; hold when a set fell below the range; after three exposures without
+   a new best estimated 1RM, reset ~10% and rebuild. Increments default to 2.5 kg barbell/machine/cable and 2 kg per
+   dumbbell (editable in Numbers). e1RM is Epley — a model, most accurate at about 10–12 reps or fewer. */
+var INCR=Object.assign({bar:2.5,db:2,mach:2.5},load("cb2_incr",{}));
+function repRange(e){const s=String(e&&e.reps||"").replace(/[–—]/g,"-");const m=s.match(/(\d+)\s*-\s*(\d+)/);if(m)return {lo:+m[1],hi:+m[2]};const n=s.match(/^(\d+)/);return n?{lo:+n[1],hi:+n[1]}:null;}
+function exEquip(e){const parts=String(e&&e.tag||"").split("·").map(x=>x.trim());const q=((parts[1]||"").split("/")[0]||"").toLowerCase();if(/barbell|smith/.test(q))return "bar";if(/dumbbell|^db$/.test(q))return "db";if(/machine/.test(q))return "mach";if(/cable/.test(q))return "cable";if(/bodyweight/.test(q))return "bw";return "other";}
+function exInc(e){const q=exEquip(e);return q==="bar"?INCR.bar:q==="db"?INCR.db:(q==="mach"||q==="cable")?INCR.mach:q==="bw"?2.5:2.5;}
+function roundTo(v,step){return Math.round(v/step)*step;}
+function exSessions(exId,beforeISO,loc){return DB.sessions.filter(s=>(!beforeISO||s.dateISO<beforeISO)&&(!loc||sessLoc(s)===loc)&&s.entries&&s.entries[exId]).map(s=>({date:s.dateISO,sets:(s.entries[exId]||[]).filter(st=>st&&+st.r>0&&+st.w>0).map(st=>({r:+st.r,w:+st.w,rpe:st.rpe?+st.rpe:null}))})).filter(x=>x.sets.length).sort((a,b)=>a.date.localeCompare(b.date));}
+function bestSet(sets){let b=null;(sets||[]).forEach(st=>{const v=e1rm(st.w,st.r);if(v&&(!b||v>b.e))b={r:st.r,w:st.w,rpe:st.rpe,e:v};});return b;}
+function platesPerSide(total,bar){bar=bar||20;let side=(total-bar)/2;if(!(side>0))return total>=bar?"empty bar":null;const P=[25,20,15,10,5,2.5,1.25],out=[];P.forEach(p=>{while(side>=p-1e-9){out.push(p);side-=p;}});return side>0.01?null:out.join(" + ");}
+function fmtKg(v){return (Math.round(v*100)/100).toString();}
+function isStalled(hist){const es=hist.map(h=>bestSet(h.sets).e);if(es.length<4)return false;const before=Math.max(...es.slice(0,-3)),recent=Math.max(...es.slice(-3));return recent<=before+0.5;}
+function workLoad(sets){const c={};sets.forEach(s=>{c[s.w]=(c[s.w]||0)+1;});return +Object.keys(c).sort((a,b)=>c[b]-c[a]||b-a)[0];}
+function progFor(e,beforeISO,loc){loc=loc||LOC;
+  const hist=exSessions(e.id,beforeISO||todayISO(),loc);if(!hist.length)return null;
+  const rr=repRange(e),last=hist[hist.length-1],W=workLoad(last.sets),atW=last.sets.filter(s=>s.w===W);
+  const minR=Math.min(...atW.map(s=>s.r)),reps=atW.map(s=>s.r).join("/"),eq=exEquip(e),home=loc==="home"&&!!HOME_SUB[e.id],aggr=bulkMode==="aggr"&&!isDeloadWeek(),trig=aggr?atW[0].r>=rr.hi:minR>=rr.hi;
+  const lastRpe=atW[atW.length-1].rpe,why="Last time "+reps+" at "+fmtKg(W)+" kg"+(rr?" · range "+rr.lo+"–"+rr.hi:"");
+  if(home){if(minR>=rr.hi)return {kind:"harder",w:null,text:"Every set hit "+rr.hi+"+ — slow the lowering to 4–5 s or add a 2 s pause; the kit caps the load",why};
+    return {kind:"reps",w:W,text:"Same "+fmtKg(W)+" kg — add a rep to each set (aim "+atW.map(s=>Math.min(rr.hi,s.r+1)).join("/")+")",why};}
+  if(!rr)return {kind:"reps",w:W,text:"Beat "+Math.max(...atW.map(s=>s.r))+" reps at "+fmtKg(W)+" kg",why};
+  if(isStalled(hist)){const nw=Math.max(eq==="bar"?20:INCR.db,roundTo(W*0.9,exInc(e)));return {kind:"reset",w:nw,text:"No new best in three sessions — drop to "+fmtKg(nw)+" kg and rebuild to "+rr.hi+" reps",why};}
+  const easy=lastRpe!=null&&lastRpe<=7&&minR>=rr.hi-1;
+  if(trig||easy){if(eq==="bw")return {kind:"up",w:W+2.5,text:"Top of the range — add 2.5 kg (belt or vest) or keep adding reps",why};
+    const nw=W+exInc(e),pl=eq==="bar"?platesPerSide(nw):null;return {kind:"up",w:nw,text:"Add load: "+fmtKg(nw)+" kg \u00d7 "+rr.lo+"\u2013"+rr.hi+(eq==="db"?" (each hand)":"")+(pl?" \u00b7 per side "+pl:""),why:why+(aggr&&minR<rr.hi&&atW[0].r>=rr.hi?" \u00b7 Aggressive: first working set hit "+rr.hi:"")+(easy&&!trig?" \u00b7 last set felt easy (RPE "+lastRpe+")":"")};}
+  if(minR<rr.lo)return {kind:"hold",w:W,text:"Hold "+fmtKg(W)+" kg until every set reaches "+rr.lo+" reps",why};
+  return {kind:"reps",w:W,text:"Same "+fmtKg(W)+" kg — add a rep (aim "+atW.map(s=>Math.min(rr.hi,s.r+1)).join("/")+")",why};}
+function progHTML(e){const p=progFor(e);if(!p)return "";const ic={up:"↑",reps:"→",hold:"↔",reset:"↓",harder:"↑"}[p.kind]||"→";
+  return `<div class="prog prog-${p.kind}" data-prog="${e.id}"><span class="prog-ic" aria-hidden="true">${ic}</span><span class="prog-t"><b>Next:</b> ${p.text}<small>${p.why}</small></span>${p.w!=null?`<button class="prog-use" onclick="applyProg('${e.id}')" aria-label="Load ${fmtKg(p.w)} kg into the empty sets">Use</button>`:""}</div>`;}
+function applyProg(exId){const day=GYM[curDay],e=day&&day.ex.find(x=>x.id===exId),p=e&&progFor(e);if(!p||p.w==null)return;let n=0;document.querySelectorAll(`#liftBody input[data-ex="${exId}"][data-f="w"]`).forEach(w=>{if(!w.value){w.value=fmtKg(p.w);w.dispatchEvent(new Event("input",{bubbles:true}));n++;}});toast(n?("Loaded "+fmtKg(p.w)+" kg into "+n+" set"+(n===1?"":"s")+" — now earn the reps"):"Kg already filled",!!n);}
+function sessStats(){const s=findLiftSession(curDay),sl=sessLoc(s);let sets=0,ton=0,prs=0;if(!s)return {sets,ton,prs};
+  Object.entries(s.entries||{}).forEach(([ex,arr])=>{(arr||[]).forEach(st=>{if(setDone(ex,st))sets++;});const done=(arr||[]).filter(st=>st&&+st.r>0&&+st.w>0).map(st=>({r:+st.r,w:+st.w}));done.forEach(st=>{ton+=st.r*st.w;});const t=bestSet(done);if(!t)return;const prev=exSessions(ex,todayISO(),sl);if(!prev.length)return;const pb=Math.max(...prev.map(h=>bestSet(h.sets).e));if(t.e>pb+0.01)prs++;});return {sets,ton,prs};}
+function sessStripHTML(){const x=sessStats();return `<div class="sess-strip" id="sessStrip" aria-live="polite"><span><b>${x.sets}</b> set${x.sets===1?"":"s"} done</span><span><b>${Math.round(x.ton).toLocaleString("en-ZA")}</b> kg moved</span><span class="${x.prs?"pr":""}"><b>${x.prs}</b> PR${x.prs===1?"":"s"} today</span></div>`;}
+function updateSessStrip(){const el=document.getElementById("sessStrip");if(el)el.outerHTML=sessStripHTML();}
+/* ===== PLATFORM (2026-09-26): install + offline, deep links, Shortcut import links, screen wake, rest beep ===== */
+var _wl=null,_wlWant=load("cb2_awake",true),_beepOn=load("cb2_beep",true),_ac=null,_curView="home",_restEnd=0;
+function nowMs(){try{if(window.performance&&performance.timeOrigin)return performance.timeOrigin+performance.now();}catch(e){}return Date.now();}
+function isWeb(){return /^https?:$/.test(location.protocol);}
+function pwaInit(){if(!isWeb())return;try{if(!document.querySelector('link[rel="manifest"]')){const l=document.createElement("link");l.rel="manifest";l.href="manifest.webmanifest";document.head.appendChild(l);}}catch(e){}
+  if(!("serviceWorker" in navigator))return;let had=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{if(had)toast("Updated to the latest build ✓",true);had=true;});
+  navigator.serviceWorker.register("sw.js").catch(()=>{});}
+function pwaStatus(){const standalone=!!((window.matchMedia&&matchMedia("(display-mode: standalone)").matches)||navigator.standalone===true);return {web:isWeb(),standalone,sw:!!(navigator.serviceWorker&&navigator.serviceWorker.controller)};}
+const VIEW_ALIAS={home:"home",today:"home",lift:"lift",train:"lift",events:"run",run:"run",calendar:"run",roadmap:"roadmap",fuel:"fuel",numbers:"numbers",track:"track",log:"track",guide:"guide"};
+function clearHash(){try{history.replaceState(null,"",location.pathname+location.search);}catch(e){try{location.hash="";}catch(_){}}}
+function routeFromHash(){let h=location.hash||"";if(h.length<2)return;h=h.slice(1);
+  if(/^import=/i.test(h)){let txt="";try{txt=decodeURIComponent(h.slice(7));}catch(e){txt=h.slice(7);}txt=txt.replace(/\|/g,"\n");
+    const r=importHealthText(txt);clearHash();
+    if(r.n){toast("Imported "+r.n+" reading"+(r.n===1?"":"s")+" from your Shortcut ("+Object.entries(r.kinds).map(([k,v])=>v+" "+k).join(", ")+") ✓",true);renderHome();updateHeader();}
+    else toast("That import link had nothing I could read — format: 2026-09-26,weight,88.4");return;}
+  let key="";try{key=decodeURIComponent(h).toLowerCase();}catch(e){key=h.toLowerCase();}
+  const v=VIEW_ALIAS[key];if(v&&typeof switchView==="function")switchView(v);}
+window.addEventListener("hashchange",()=>safeStep("routeFromHash",routeFromHash));
+function wakeSupported(){return !!(navigator.wakeLock&&navigator.wakeLock.request);}
+async function wakeOn(){if(!_wlWant||!wakeSupported()||_wl||document.visibilityState!=="visible")return;try{const w=await navigator.wakeLock.request("screen");_wl=w;w.addEventListener("release",()=>{if(_wl===w)_wl=null;awakeRowRender();});}catch(e){_wl=null;}awakeRowRender();}
+function wakeOff(){const w=_wl;_wl=null;if(w){try{w.release();}catch(e){}}awakeRowRender();}
+function toggleAwake(){_wlWant=!_wlWant;persist("cb2_awake",_wlWant);if(_wlWant&&_curView==="lift")wakeOn();else wakeOff();awakeRowRender();toast(_wlWant?"Screen stays awake on the Lift tab":"Screen sleeps normally again",true);}
+function audioUnlock(){if(!_beepOn)return;try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;_ac=_ac||new C();if(_ac.state==="suspended")_ac.resume();}catch(e){}}
+function beep(){if(!_beepOn||!_ac)return;try{const t=_ac.currentTime;[0,0.22,0.44].forEach((o,i)=>{const osc=_ac.createOscillator(),g=_ac.createGain();osc.type="sine";osc.frequency.value=i===2?1175:880;g.gain.setValueAtTime(0.0001,t+o);g.gain.exponentialRampToValueAtTime(0.35,t+o+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+o+0.18);osc.connect(g);g.connect(_ac.destination);osc.start(t+o);osc.stop(t+o+0.2);});}catch(e){}}
+function toggleBeep(){_beepOn=!_beepOn;persist("cb2_beep",_beepOn);if(_beepOn){audioUnlock();beep();}awakeRowRender();toast(_beepOn?"Rest beep on (muted when the phone is on silent)":"Rest beep off",true);}
+function awakeRowRender(){const el=document.getElementById("awakeRow");if(!el)return;const sup=wakeSupported(),on=_wlWant&&sup;
+  el.innerHTML=`<button class="awake-btn${on?" on":""}" id="awakeBtn" onclick="toggleAwake()" aria-pressed="${on}"${sup?"":" disabled"}>${!sup?"Keep-awake isn’t available in this browser":_wl?"☀️ Screen stays awake":_wlWant?"☀️ Keep screen awake: on":"🌙 Keep screen awake: off"}</button><button class="awake-btn${_beepOn?" on":""}" id="beepBtn" onclick="toggleBeep()" aria-pressed="${_beepOn}">${_beepOn?"🔔 Rest beep: on":"🔕 Rest beep: off"}</button>`;}
+function onViewChange(n){_curView=n;if(n==="lift"){awakeRowRender();wakeOn();}else if(_wl)wakeOff();}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&_curView==="lift")wakeOn();});
+function restTick(){_restLeft=Math.max(0,Math.ceil((_restEnd-nowMs())/1000));renderRest();if(_restLeft<=0){clearInterval(_restInt);_restInt=null;beep();if(navigator.vibrate){try{navigator.vibrate([120,60,120]);}catch(e){}}setTimeout(()=>{const b=document.getElementById("restTimer");if(b&&_restLeft<=0)b.classList.remove("show");},2200);}}
 /* ===== INIT ===== */
 function safeStep(n,f){try{f();}catch(e){try{window.onerror(n+": "+(e&&e.message||e),"",0,0,e);}catch(_){}}}
 document.addEventListener("visibilitychange",function(){if(document.visibilityState==="hidden")cloudSaveNow();});window.addEventListener("pagehide",function(){cloudSaveNow();});
-safeStep("wireRest",wireRest);safeStep("renderHome",renderHome);safeStep("updateHeader",updateHeader);setTimeout(function(){safeStep("idbBoot",idbBoot);safeStep("cloudBoot",cloudBoot);},600);try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}document.addEventListener("click",e=>{const r=e.target.closest("#radiusSeg button");if(r&&+r.dataset.r!==radiusKm){radiusKm=+r.dataset.r;persist("cb2_radius",radiusKm);switchView("run");}});document.addEventListener("click",e=>{const f=e.target.closest("#focusSeg button");if(f){const v=f.dataset.fx==="on";if(v!==focusLB){focusLB=v;persist("cb2_focuslb",focusLB);switchView("lift");}}});document.addEventListener("click",e=>{const m=e.target.closest("#marchSeg button");if(m&&m.dataset.mk!==marchKey){marchKey=m.dataset.mk;persist("cb2_march",marchKey);renderHome();updateHeader();toast("March route: "+marchTarget().label,true);}});document.addEventListener("click",e=>{const q=e.target.closest("#fuelQSeg button");if(q&&q.dataset.q!==fuelQ){fuelQ=q.dataset.q;persist("cb2_fuelq",fuelQ);switchView("fuel");}});document.addEventListener("click",e=>{const b=e.target.closest("#locSeg button");if(b&&b.dataset.loc!==LOC){LOC=b.dataset.loc;persist("cb2_loc",LOC);switchView("lift");}});
+safeStep("wireRest",wireRest);safeStep("renderHome",renderHome);safeStep("updateHeader",updateHeader);safeStep("pwaInit",pwaInit);safeStep("routeFromHash",routeFromHash);setTimeout(function(){safeStep("idbBoot",idbBoot);safeStep("cloudBoot",cloudBoot);},600);try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}document.addEventListener("click",e=>{const r=e.target.closest("#radiusSeg button");if(r&&+r.dataset.r!==radiusKm){radiusKm=+r.dataset.r;persist("cb2_radius",radiusKm);switchView("run");}});document.addEventListener("click",e=>{const f=e.target.closest("#focusSeg button");if(f){const v=f.dataset.fx==="on";if(v!==focusLB){focusLB=v;persist("cb2_focuslb",focusLB);switchView("lift");}}});document.addEventListener("click",e=>{const m=e.target.closest("#marchSeg button");if(m&&m.dataset.mk!==marchKey){marchKey=m.dataset.mk;persist("cb2_march",marchKey);renderHome();updateHeader();toast("March route: "+marchTarget().label,true);}});document.addEventListener("click",e=>{const q=e.target.closest("#fuelQSeg button");if(q&&q.dataset.q!==fuelQ){fuelQ=q.dataset.q;persist("cb2_fuelq",fuelQ);switchView("fuel");}});document.addEventListener("click",e=>{const b=e.target.closest("#locSeg button");if(b&&b.dataset.loc!==LOC){LOC=b.dataset.loc;persist("cb2_loc",LOC);switchView("lift");}});
 
 </script>
 </body>
