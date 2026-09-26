@@ -8,7 +8,12 @@
     "build": "python3 build.py",
     "qa": "bash qa/run.sh",
     "webkit": "npx playwright install webkit",
-    "qa:webkit": "node qa/webkit.js"
+    "qa:webkit": "node qa/webkit.js",
+    "qa:pwa": "node qa/pwa.js",
+    "qa:all": "bash qa/all.sh",
+    "audit": "node qa/audit.js",
+    "fonts": "bash tools/fetch_fonts.sh",
+    "icons": "node tools/make_icons.js"
   },
   "devDependencies": {
     "puppeteer": "^24.0.0",

@@ -258,5 +258,161 @@ const d5=await tt('2027-01-05');T('time: Jan = Posterior specialization block',/
 {const q=await page(b,'2026-10-23',()=>{localStorage.clear();localStorage.setItem('cb2_pure',JSON.stringify(true));});
  const d=await q.evaluate(()=>({deload:isDeloadWeek(),dow:DOW[new Date().getDay()],title:document.body.innerText.includes('Rest Day — Deload Week'),cta:document.querySelector('.cta')?.textContent||''}));
  T('rest: deload-week Friday = full rest',d.deload&&d.dow==='Fri'&&d.title&&/Deload week rest day/.test(d.cta),JSON.stringify(d));await q.close();}
+const dateAddN=(iso,n)=>{const d=new Date(iso+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+// ===== W–AU. Upgrade + audit-fix checks (2026-09-26). Isolated contexts, Johannesburg time, real UI. =====
+async function pg(b,iso,seed,opt){opt=opt||{};const ctx=await b.createBrowserContext();const p=await ctx.newPage();p.__ctx=ctx;await p.emulateTimezone('Africa/Johannesburg');await OFFLINE(p);
+  p.__errs=[];p.__dialogs=[];p.on('pageerror',e=>p.__errs.push(e.message));p.on('console',m=>{if(m.type()==='error')p.__errs.push(m.text());});p.on('dialog',d=>{p.__dialogs.push(d.message());d.accept();});
+  await p.evaluateOnNewDocument((iso,hh)=>{const R=Date;const fixed=new R(iso+'T'+hh+':00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;},iso,opt.time||'09:00');
+  await p.evaluateOnNewDocument(STORAGE);
+  await p.evaluateOnNewDocument(s=>{if(sessionStorage.getItem('__qs'))return;sessionStorage.setItem('__qs','1');localStorage.clear();localStorage.setItem('cb2_pure','true');if(s)for(const k in s)localStorage.setItem(k,JSON.stringify(s[k]));},seed||null);
+  await p.setViewport({width:390,height:844,deviceScaleFactor:1});
+  await p.goto('file://'+path.resolve('ComebackBlueprint.html')+(opt.hash||''),{waitUntil:'networkidle0'});await wait(900);return p;}
+const done=async p=>{await p.__ctx.close();};
+const SS=(d,day,ent,loc)=>({id:'q'+d+day+(loc||''),dateISO:d,day,loc:loc||'gym',entries:ent});
+const sets=(n,r,w)=>Array.from({length:n},()=>({r:String(r),w:String(w)}));
+// --- W. timezone: the user's phone is UTC+2
+{const wkSeed={cb2_sessions:[SS('2026-09-26','legsA',{ga1:sets(1,8,80)}),SS('2026-09-27','pushA',{pa1:sets(1,8,60)}),SS('2026-09-28','pullA',{la1:sets(1,8,60)}),SS('2026-09-29','legsB',{gb1:sets(1,8,100)}),SS('2026-09-30','pushB',{pb1:sets(1,8,40)}),SS('2026-10-01','pullB',{lb1:sets(1,8,60)})]};
+ const p=await pg(b,'2026-10-01',wkSeed,{time:'00:30'});const r=await p.evaluate(()=>({today:todayISO(),d0:dateAdd('2026-09-12',0),ws3:weekStartISO(3),end3:dateAdd(weekStartISO(3),6),dow:DOW[new Date().getDay()],lifts:sessionsThisWeek().lifts,home:document.body.innerText.includes('6/6')}));
+ T('tz: 00:30 SAST on Thu 1 Oct — today is 2026-10-01, not yesterday',r.today==='2026-10-01'&&r.dow==='Thu',JSON.stringify(r));
+ T('tz: dateAdd/weekStartISO keep calendar dates in UTC+2 (week 3 = 26 Sep–2 Oct)',r.d0==='2026-09-12'&&r.ws3==='2026-09-26'&&r.end3==='2026-10-02',JSON.stringify(r));
+ T('tz: Sat–Thu sessions all count — Lifts this week 6/6',r.lifts===6&&r.home,JSON.stringify(r));T('tz: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+// --- X. the Lift tab opens today's session; a manual pick sticks for the day
+for(const [iso,key] of [['2026-09-26','legsA'],['2026-09-27','pushA'],['2026-09-28','pullA'],['2026-09-29','legsB'],['2026-09-30','pushB'],['2026-10-01','pullB'],['2026-10-02','extras']]){
+ const p=await pg(b,iso);await p.click('.tab[data-view="lift"]');await wait(300);const d=await p.evaluate(()=>({cur:curDay,pill:document.querySelector('#dayPills .pill.on')?.textContent}));
+ T('lift tab on '+iso+' opens '+key,d.cur===key,JSON.stringify(d));
+ if(iso==='2026-09-27'){await p.evaluate(()=>[...document.querySelectorAll('#dayPills .pill')].find(x=>x.textContent==='Legs B').click());await wait(200);await p.click('.tab[data-view="home"]');await wait(200);await p.click('.tab[data-view="lift"]');await wait(300);T('lift: a manual day pick sticks for the rest of the day',await p.evaluate(()=>curDay==='legsB'));
+  const vis=await p.evaluate(()=>{const w=document.getElementById('dayPills'),on=w.querySelector('.pill.on');const a=w.getBoundingClientRect(),o=on.getBoundingClientRect();return o.left>=a.left-1&&o.right<=a.right+1;});T('lift: the selected day pill is scrolled into view',vis);}
+ await done(p);}
+// --- Y. auto-progression, Use button, stall reset, gym/home separation, AMRAP safety
+{const seed={cb2_sessions:[SS('2026-09-12','legsA',{ga1:sets(5,8,80)}),SS('2026-09-19','legsA',{ga1:[{r:'4',w:'100'}].concat(sets(4,8,85)),ga7:sets(3,15,60)}),SS('2026-09-24','pushB',{pb7:[{r:'14',w:''},{r:'12',w:''}]})]};
+ const p=await pg(b,'2026-09-26',seed);await p.click('.tab[data-view="lift"]');await wait(400);
+ const c=await p.evaluate(()=>({ga1:document.querySelector('[data-prog="ga1"]')?.innerText||'',ga7:document.querySelector('[data-prog="ga7"]')?.innerText||''}));
+ T('prog: heavier top set ignored — working load 85 kg, all back-offs at 8 → add load to 87.5 kg with plates per side',/Add load: 87\.5 kg/.test(c.ga1)&&/per side 25 \+ 5 \+ 3?\.?7?5?|per side/.test(c.ga1),c.ga1);
+ T('prog: machine calf raise at the top of 10–15 → +2.5 kg',/Add load: 62\.5 kg/.test(c.ga7),c.ga7);
+ await p.evaluate(()=>document.querySelector('[data-prog="ga1"] .prog-use').click());await wait(300);
+ T('prog: Use loads 87.5 kg into every empty kg cell',await p.evaluate(()=>[...document.querySelectorAll('#liftBody input[data-ex="ga1"][data-f="w"]')].every(i=>i.value==='87.5')));
+ await p.evaluate(()=>{[...document.querySelectorAll('#locSeg button')].find(x=>x.dataset.loc==='home').click();});await wait(400);
+ const h=await p.evaluate(()=>{const card=document.querySelector('input[data-ex="ga1"]').closest('.ex');return {last:/Last time/.test(card.innerText),first:/First home session/.test(card.innerText),ph:card.querySelector('input[data-f="w"]').placeholder};});
+ T('home mode never shows gym history (no 85 kg "Last time", first-session prompt instead)',!h.last&&h.first&&h.ph!=='85',JSON.stringify(h));
+ await p.evaluate(()=>{[...document.querySelectorAll('#locSeg button')].find(x=>x.dataset.loc==='gym').click();});await wait(300);
+ await p.click('.tab[data-view="home"]');await wait(400);T('AMRAP bodyweight log does not break Home (coach pack renders)',await p.evaluate(()=>!!document.getElementById('coachPack')));
+ T('Y: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+{const st=[['2026-09-05',82],['2026-09-12',82],['2026-09-16',82],['2026-09-19',82]].map(([d,w])=>SS(d,'legsA',{ga1:sets(4,6,w)}));
+ st[0].entries.ga1=sets(4,7,82);const p=await pg(b,'2026-09-26',{cb2_sessions:st});await p.click('.tab[data-view="lift"]');await wait(400);
+ T('prog: three sessions without a new best → ~10% reset suggestion',await p.evaluate(()=>/No new best in three sessions — drop to 72\.5 kg/.test(document.querySelector('[data-prog="ga1"]')?.innerText||'')),await p.evaluate(()=>document.querySelector('[data-prog="ga1"]')?.innerText));await done(p);}
+// --- Z. Add set / Remove set
+{const p=await pg(b,'2026-09-26');await p.click('.tab[data-view="lift"]');await wait(400);const rows=()=>p.evaluate(()=>document.querySelectorAll('#liftBody input[data-ex="ga2"][data-f="r"]').length);
+ const r0=await rows();await p.click('[data-add="ga2"]');await wait(300);const r1=await rows();T('sets: Add set adds exactly one row',r1===r0+1,r0+'→'+r1);
+ await p.evaluate(n=>{const r=document.querySelector(`#liftBody input[data-ex="ga2"][data-i="${n-1}"][data-f="r"]`),w=document.querySelector(`#liftBody input[data-ex="ga2"][data-i="${n-1}"][data-f="w"]`);r.value='9';r.dispatchEvent(new Event('input',{bubbles:true}));w.value='70';w.dispatchEvent(new Event('input',{bubbles:true}));},r1);await wait(300);
+ await p.click('[data-del="ga2"]');await wait(400);const r2=await rows();const e=await p.evaluate(()=>{const s=findLiftSession('legsA');return (s.entries.ga2||[]).filter(x=>x&&x.r).length;});
+ T('sets: Remove on a logged set asks first, then drops the row and its data',p.__dialogs.some(m=>/Delete set/.test(m))&&r2===r0&&e===0,JSON.stringify({r2,e,d:p.__dialogs}));
+ const n0=p.__dialogs.length;await p.click('[data-del="ga2"]');await wait(300);T('sets: Remove on an empty row needs no confirmation',p.__dialogs.length===n0&&(await rows())===r0-1);await done(p);}
+// --- AA. bodyweight sets count; AB. Extras PR never crashes
+{const p=await pg(b,'2026-09-26');await p.evaluate(()=>{[...document.querySelectorAll('.tab')].find(t=>t.dataset.view==='lift').click();});await wait(300);
+ await p.evaluate(()=>{[...document.querySelectorAll('#locSeg button')].find(x=>x.dataset.loc==='home').click();});await wait(400);
+ const id=await p.evaluate(()=>{const e=GYM.legsA.ex.find(x=>HOME_SUB[x.id]&&/bodyweight/.test(homeRx(x,HOME_SUB[x.id]).load));return e&&e.id;});
+ await p.evaluate(id=>{const r=document.querySelector(`#liftBody input[data-ex="${id}"][data-i="0"][data-f="r"]`);r.value='15';r.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector(`#liftBody [data-chk="${id}"][data-i="0"]`).click();},id);await wait(400);
+ const bw=await p.evaluate(()=>({timer:document.getElementById('restTimer').classList.contains('show'),lifts:sessionsThisWeek().lifts}));
+ T('bodyweight: reps alone tick the set, start the timer and count the session',!!id&&bw.timer&&bw.lifts===1,JSON.stringify({id,...bw}));
+ const t0=await p.evaluate(()=>document.getElementById('restTime').textContent);await wait(2300);const t1=await p.evaluate(()=>document.getElementById('restTime').textContent);
+ T('rest timer counts down on the real clock',t0!==t1,t0+' → '+t1);
+ T('home rest: the timer uses the home rest (60–90 s), not the gym 3 min',/^1:[0-3]\d$|^0:[5-9]\d$/.test(t0),t0);await done(p);}
+{const p=await pg(b,'2026-10-02',{cb2_sessions:[SS('2026-09-25','extras',{x2:sets(2,15,8)})]});await p.click('.tab[data-view="lift"]');await wait(400);
+ await p.evaluate(()=>{const r=document.querySelector('#liftBody input[data-ex="x2"][data-i="0"][data-f="r"]'),w=document.querySelector('#liftBody input[data-ex="x2"][data-i="0"][data-f="w"]');r.value='15';r.dispatchEvent(new Event('input',{bubbles:true}));w.value='10';w.dispatchEvent(new Event('input',{bubbles:true}));w.dispatchEvent(new Event('change',{bubbles:true}));});await wait(500);
+ T('extras: a PR on the Friday pump toasts the exercise name and throws nothing',p.__errs.length===0&&await p.evaluate(()=>/Lateral Raise/.test(document.getElementById('toast').textContent)),p.__errs.join('|'));
+ T('extras: RIR 2 prescription on Friday',await p.evaluate(()=>/RIR <b>2<\/b>|RIR 2/.test(document.getElementById('liftBody').innerHTML)));await done(p);}
+// --- AD. quick-log Edit; AE. measures merge into the day
+{const p=await pg(b,'2026-09-26',{cb2_weight:[{date:'2026-09-26',v:88.4}]});
+ await p.evaluate(()=>{[...document.querySelectorAll('#view-home button')].find(x=>x.textContent.trim()==='Edit').click();});await wait(300);
+ T('quick log: Edit opens an input without a script error',await p.evaluate(()=>!!document.getElementById('qW'))&&p.__errs.length===0,p.__errs.join('|'));
+ await p.evaluate(()=>{const i=document.getElementById('qW');i.value='88.9';[...document.querySelectorAll('#view-home button')].find(x=>x.textContent.trim()==='Save'&&x.previousElementSibling&&x.previousElementSibling.contains(i)).click();});await wait(300);
+ T('quick log: Save after Edit replaces today\'s weight',await p.evaluate(()=>DB.weight.filter(x=>x.date==='2026-09-26').map(x=>+x.v).join()==='88.9'));
+ await p.evaluate(()=>{const i=document.getElementById('qWa');i.value='86.5';quickLogWaist();});await wait(300);
+ await p.click('.tab[data-view="track"]');await wait(300);await p.evaluate(()=>{document.querySelector('.track-tabs button[data-tp="measure"]').click();document.getElementById('meNeck').value='39';document.getElementById('meAdd').click();});await wait(300);
+ const m=await p.evaluate(()=>({rec:DB.measure.find(x=>x.date==='2026-09-26'),bf:estimateBF()}));
+ T('measures: a neck-only save keeps the waist logged from Home (tape estimate works)',m.rec&&+m.rec.waist===86.5&&+m.rec.neck===39&&m.bf&&m.bf.bf>5,JSON.stringify(m));await done(p);}
+// --- AF. Weekly Review: cut-mode signs, last week's final verdict early in the week, extras never counted
+{const ws=[];let v=90;for(let i=0;i<22;i+=2){ws.push({date:dateAddN('2026-09-12',i),v:Math.round(v*10)/10});v-=0.13;}
+ const p=await pg(b,'2026-10-08',{cb2_weight:ws,cb2_bulk:'cut',cb2_sessions:[SS('2026-10-03','legsA',{ga1:sets(3,8,80)}),SS('2026-10-04','pushA',{pa1:sets(3,8,60)})]});
+ const r=await p.evaluate(()=>{const x=weeklyReview();return {v:x.verdict,t:x.target,rate:x.rate};});
+ T('review: an on-target loss in Cut mode is not told the surplus is too big',!/surplus is too big|Gaining only/.test(r.v)&&r.t<0,JSON.stringify(r));await done(p);}
+{const p=await pg(b,'2026-09-26',{cb2_sessions:[SS('2026-09-19','legsA',{ga1:sets(3,8,80)}),SS('2026-09-20','pushA',{pa1:sets(3,8,60)}),SS('2026-09-25','extras',{x2:sets(3,15,8)})]});
+ const r=await p.evaluate(()=>({title:(document.body.innerText.match(/Weekly Review — Week \d+[^\n]*/)||[''])[0],lifts:weeklyReview().lifts}));
+ T('review: on Saturday with <2 new sessions it shows last week (final)',/Week 2 \(final\)/.test(r.title),r.title);T('review: the Friday pump is never one of the six sessions',r.lifts===2,JSON.stringify(r));await done(p);}
+// --- AG. the retired run plan never drives Home again; AH. Friday copy follows the ledger
+for(const [iso,title,brief] of [['2026-11-12','Pull B — Strength','Today: Pull B'],['2026-09-27','Push A — Strength','Today: Push A'],['2026-09-29','Legs B — Strength','Today: Legs B']]){
+ const p=await pg(b,iso);const r=await p.evaluate(()=>({t:document.querySelector('.tb-title')?.textContent,body:document.body.innerText}));
+ T('run plan retired: '+iso+' Today card = '+title+' and Brief = '+brief,r.t===title&&r.body.includes(brief)&&!/RACE DAY|Long Run —|Easy Run —|Shake-Out/.test(r.body),r.t);await done(p);}
+{const p=await pg(b,'2026-10-02');const r=await p.evaluate(()=>({note:(document.body.innerText.match(/How the week works:[^\n]*/)||[''])[0],fri:[...document.querySelectorAll('.wd')].find(w=>w.querySelector('.wdn').textContent==='Fri')?.querySelector('.wdl').textContent,brief:(document.body.innerText.match(/Today: [^\n]*/)||[''])[0]}));
+ T('friday: copy says active recovery, strip says Pump, Brief says Extras pump',/Friday active recovery/.test(r.note)&&r.fri==='Pump'&&/Extras pump/.test(r.brief),JSON.stringify(r));await done(p);}
+{const p=await pg(b,'2026-10-23');const r=await p.evaluate(()=>({note:(document.body.innerText.match(/How the week works:[^\n]*/)||[''])[0],btn:[...document.querySelectorAll('#view-home button')].some(x=>/Extras Pump/.test(x.textContent))}));
+ T('deload friday: full rest copy and no pump buttons',/Friday full rest \(deload week\)/.test(r.note)&&!r.btn,JSON.stringify(r));await done(p);}
+{const p=await pg(b,'2027-03-02');const r=await p.evaluate(()=>({cta:document.querySelector('.cta')?.textContent,t:document.querySelector('.tb-title')?.textContent}));
+ T('peak week: D-3 Legs day becomes an upper-body pump (CTA and Today card agree)',/Peak week/.test(r.cta)&&/legs rest/.test(r.t),JSON.stringify(r));await done(p);}
+{const p=await pg(b,'2027-03-05');T('check day: CTA sends you to weigh in, tape and photograph',await p.evaluate(()=>/Check day/.test(document.querySelector('.cta')?.textContent||'')));await done(p);}
+// --- AI. two realistic weeks, every tab and Track pane: no errors, no leaked template text, no NaN/undefined
+{const probe=await pg(b,'2026-09-12');const prog=await probe.evaluate(()=>({order:GYM_ORDER,days:Object.fromEntries(GYM_ORDER.concat(['extras']).map(d=>[d,GYM[d].ex.map(e=>({id:e.id,cmp:!!e.cmp,reps:String(e.reps||''),n:fxSets(e)}))]))}));await done(probe);
+ const sess=[],wts=[],mea=[],sl=[];for(let n=0;n<14;n++){const d=dateAddN('2026-09-12',n),idx=n%7,wk=Math.floor(n/7);const day=idx<6?prog.order[idx]:'extras';
+  const entries={};prog.days[day].forEach((e,i)=>{const top=parseInt((e.reps.match(/(\d+)\s*[-–]\s*(\d+)/)||[])[2]||e.reps)||10;entries[e.id]=Array.from({length:e.n},(_,k)=>({r:String(Math.max(3,top-k)),w:/AMRAP/.test(e.reps)?'':String((e.cmp?(i===0?80:50):14)+2.5*wk),rpe:String(k===e.n-1?10:8.5)}));});
+  sess.push(SS(d,day,entries));if([0,2,4].includes(idx))wts.push({date:d,v:Math.round((88+0.06*n)*10)/10});if(idx===0)mea.push({date:d,waist:86+0.2*wk,neck:39,arm:37});sl.push({date:d,h:6.8+0.1*(n%3)});}
+ const p=await pg(b,'2026-09-26',{cb2_sessions:sess,cb2_weight:wts,cb2_measure:mea,cb2_sleep:sl});const bad=[];
+ for(const v of ['home','lift','run','roadmap','fuel','numbers','track','guide']){await p.evaluate(n=>switchView(n),v);await wait(250);const t=await p.evaluate(n=>document.getElementById('view-'+n).innerText,v);const m=t.match(/\$\{|NaN|undefined|\[object|Infinity/);if(m)bad.push(v+':'+m[0]);
+  const ow=await p.evaluate(()=>document.documentElement.scrollWidth);if(ow>391)bad.push(v+': page scrolls sideways '+ow);}
+ for(const tp of ['weight','lifts','volume','measure']){await p.evaluate(t=>document.querySelector('.track-tabs button[data-tp="'+t+'"]').click(),tp);await wait(200);const t=await p.evaluate(t=>document.getElementById('tp-'+t).innerText,tp);const m=t.match(/\$\{|NaN|undefined|\[object/);if(m)bad.push('track-'+tp+':'+m[0]);}
+ T('realistic data: all 8 tabs and 4 Track panes render with no leaked template text, NaN or undefined, and no sideways scroll',bad.length===0,bad.join(' | '));
+ T('realistic data: zero page errors across the walk',p.__errs.length===0,p.__errs.join('|').slice(0,300));
+ // Track panes with that data
+ await p.evaluate(()=>{switchView('track');document.querySelector('.track-tabs button[data-tp="lifts"]').click();});await wait(300);
+ const tr=await p.evaluate(()=>({opts:document.querySelectorAll('#exSel option').length,svg:!!document.querySelector('#exChart svg'),board:document.querySelectorAll('#prBoard .log-row').length,vol:document.querySelectorAll('#volBody .vol-row').length}));
+ T('track lifts: every logged exercise is selectable and charted from the Lift log',tr.opts>=30&&tr.svg,JSON.stringify(tr));T('track lifts: PR board lists the last four weeks of new bests',tr.board>=1,JSON.stringify(tr));T('track volume: seven legs-and-back regions',tr.vol===7,JSON.stringify(tr));
+ const cp=await p.evaluate(()=>({t:coachText(),a:askClaudeText('my squat stalled')}));
+ T('coach pack: summary carries sessions, lifts and the app verdict',/Sessions: /.test(cp.t)&&/Lifts this week/.test(cp.t)&&/App verdict:/.test(cp.t),cp.t.slice(0,200));
+ T('ask Claude: the question and the plan\'s rules travel with the numbers',/My question: my squat stalled/.test(cp.a)&&/natural and legal only/.test(cp.a)&&/18–24%/.test(cp.a));
+ await done(p);}
+// --- AJ. lean mass is anchored to measurement, not scale × typed %; AK. weight trend is a least-squares slope
+{const p=await pg(b,'2027-03-05',{cb2_weight:[{date:'2026-09-12',v:88},{date:'2027-03-05',v:98.7}]});const r=await p.evaluate(()=>{const c=compute();return {ffmi:+c.ffmiNorm.toFixed(2),toGo:+(c.ceilLean-c.leanNow).toFixed(2),src:leanEstimate().src};});
+ T('lean model: 98.7 kg on the scale no longer "reaches" FFMI 26 — gain is credited at the model rate',r.ffmi<25&&r.toGo>0.5&&r.src==='Day-1 weigh-in',JSON.stringify(r));await done(p);}
+{const w=[['2026-09-15',87.9],['2026-09-17',88.3],['2026-09-19',88.4],['2026-09-22',88.6],['2026-09-24',88.4],['2026-09-26',88.9]].map(([date,v])=>({date,v}));
+ const p=await pg(b,'2026-09-26',{cb2_weight:w});const r=await p.evaluate(()=>actualGainRate());
+ const xs=w.map(x=>(new Date(x.date)-new Date(w[0].date))/864e5),ys=w.map(x=>x.v),mx=xs.reduce((a,b)=>a+b)/xs.length,my=ys.reduce((a,b)=>a+b)/ys.length;let sxy=0,sxx=0;xs.forEach((x,i)=>{sxy+=(x-mx)*(ys[i]-my);sxx+=(x-mx)**2;});const exp=sxy/sxx*7;
+ T('gain rate: least-squares trend over 28 days (not first-vs-last weigh-in)',r&&r.method==='trend'&&Math.abs(r.kgWk-exp)<0.01,JSON.stringify({r,exp}));
+ const r3=await p.evaluate(()=>{DB.weight=DB.weight.slice(-3);return actualGainRate();});T('gain rate: fewer than 4 weigh-ins → no calorie instruction yet',r3===null);await done(p);}
+// --- AL. DEXA, full backup, legacy restore
+{const p=await pg(b,'2026-09-26',{cb2_weight:[{date:'2026-09-26',v:88.9}],cb2_sessions:[SS('2026-09-19','legsA',{ga1:sets(3,8,80)})]});await p.click('.tab[data-view="track"]');await wait(300);
+ await p.evaluate(()=>{document.querySelector('.track-tabs button[data-tp="measure"]').click();document.getElementById('dxBf').value='19.5';document.getElementById('dxLean').value='69.8';document.getElementById('dxAdd').click();});await wait(300);
+ T('dexa: a saved scan shows as the latest reading',await p.evaluate(()=>/19\.5% body fat/.test(document.getElementById('dexaLatest')?.innerText||'')));
+ await p.evaluate(()=>document.getElementById('dxUse').click());await wait(300);const dx=await p.evaluate(()=>({bf:DB.profile.bf,src:leanEstimate().src}));
+ T('dexa: Use writes the % to the engine and the scan anchors lean mass',+dx.bf===19.5&&dx.src==='DEXA',JSON.stringify(dx));
+ await p.evaluate(()=>document.getElementById('exportBtn').click());await wait(400);T('backup: Track "Download full backup" is the complete format and resets the age indicator',await p.evaluate(()=>!!localStorage.getItem('cb2_lastbackup')&&JSON.parse(backupJSON()).cb2_dexa.length===1));
+ const tmp=path.join(require('os').tmpdir(),'cb-legacy-'+process.pid+'.json');fs.writeFileSync(tmp,JSON.stringify({app:'ComebackBlueprint',version:2,profile:{weight:90,height:177,age:38,bf:18,goal:102.3,goalBf:24,act:1.55},sessions:[SS('2026-09-20','pushA',{pa1:sets(3,8,60)})],weight:[{date:'2026-09-20',v:90}],measure:[],lifts:[]}));
+ const nav=p.waitForNavigation({waitUntil:'load',timeout:15000});const fi=await p.$('#importFile');await fi.uploadFile(tmp);await nav;await wait(900);
+ const lr=await p.evaluate(()=>({s:DB.sessions.length,w:DB.weight.map(x=>x.v).join()}));T('backup: an old Track-format file restores (converted) instead of wiping the log',p.__dialogs.some(m=>/Restore this backup/.test(m))&&lr.s===1&&lr.w==='90',JSON.stringify(lr));fs.unlinkSync(tmp);await done(p);}
+// --- AN. Events · AO. Numbers · AP. Roadmap · AQ. Fuel · AR. Guide
+{const p=await pg(b,'2026-09-26');await p.evaluate(()=>switchView('run'));await wait(300);const t=await p.evaluate(()=>document.getElementById('view-run').innerText);
+ T('events: past September events are hidden and counted',!/Fri 18 Sep 2026|Sat 19 Sep 2026|Sun 20 Sep 2026|Sun 6 Sep 2026/.test(t)&&/earlier this month — already happened/.test(t),t.slice(0,300));
+ T('events: radius copy follows the selector; no hand-typed "inside 10 km"',!/within ~25 km|inside 10 km/.test(t)&&/within 30 km of home/.test(t));
+ T('events: unverified events are labelled, banner counts from the data',/UNVERIFIED/.test(t)&&/Those \d+ are the muscle-relevant anchors|That one is the muscle-relevant anchor/.test(t));
+ T('events: stored guessed distances and relative words are gone',await p.evaluate(()=>!RACES_12M.some(r=>/^~\d+\s*km/.test(r.km||'')||/Tomorrow|days out|twelve minutes/.test(r.note||''))));
+ await p.evaluate(()=>switchView('numbers'));await wait(300);const n=await p.evaluate(()=>({t:document.getElementById('view-numbers').innerText,g10:!!document.getElementById('pGoal10k'),ph:!!document.getElementById('phaseSeg'),pro:document.getElementById('rProN')?.textContent,lean:!!document.getElementById('leanSource')}));
+ T('numbers: race predictor, goal 10K and race phases are retired',!/Race Time Predictor/.test(n.t)&&!n.g10&&!n.ph,JSON.stringify({g10:n.g10,ph:n.ph}));T('numbers: protein tile shows the engine factor and lean mass shows its source',n.pro==='2.2 g/kg'&&n.lean,JSON.stringify(n.pro));
+ await p.evaluate(()=>switchView('roadmap'));await wait(300);const rm=await p.evaluate(()=>document.getElementById('view-roadmap').innerText);
+ T('roadmap: Start is Day 1 (12 Sep 26); no "second race"; no repeated "Week 9 —"',/12 Sep 26/.test(rm)&&!/second race|Week 9 — first bulk/.test(rm)&&!/29 Jun 26/.test(rm));
+ await p.evaluate(()=>switchView('fuel'));await wait(300);const fu=await p.evaluate(()=>document.getElementById('view-fuel').innerText);
+ T('fuel: no bicarbonate, race-day or run fuel; collagen at 04:30, magnesium at 20:00',!/Bicarbonate|race day|for your runs|long-run days/i.test(fu)&&/Collagen \+ vitamin C/.test(fu)&&/Magnesium glycinate/.test(fu));
+ await p.evaluate(()=>switchView('guide'));await wait(300);const gu=await p.evaluate(()=>({t:document.getElementById('view-guide').innerText,arch:!!document.getElementById('runArchive')&&!document.getElementById('runArchive').open,ic:[...document.querySelectorAll('#view-guide .card-t .ic svg')].every(s=>s.getBoundingClientRect().width>=18)}));
+ T('guide: running-era cards live in a collapsed archive; footer is pure muscle',gu.arch&&!/Strength \+ Speed|Built for 24 September/.test(gu.t)&&/Pure Muscle · FFMI 25/.test(gu.t),JSON.stringify({arch:gu.arch}));
+ T('guide: decision rules come from the engine (1.6× target, cut-mode flip)',/1\.6× target/.test(gu.t)&&/In Cut mode the rate rules flip/.test(gu.t));T('guide: card-header icons render at 20 px (were 0×0)',gu.ic);
+ T('AN–AR: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+{const p=await pg(b,'2026-10-10');await p.evaluate(()=>switchView('fuel'));await wait(300);T('fuel: beta-alanine steps down to 3.2 g/day after week 4 (1.6 g per window)',await p.evaluate(()=>document.getElementById('view-fuel').innerText.includes('1.6 g (½ of today’s 3.2 g)')));await done(p);}
+// --- AS. accessibility essentials · AT/AU. file:// mode stays server-free; deep and import links work there too
+{const p=await pg(b,'2026-09-26');const a=await p.evaluate(()=>{switchView('lift');const tabs=[...document.querySelectorAll('nav .tab')];const strip=document.querySelector('.track-tabs');return {sel:tabs.filter(t=>t.getAttribute('aria-selected')==='true').map(t=>t.dataset.view),lbl:(()=>{switchView('numbers');return !!document.querySelector('label[for="pWeight"]');})(),toast:document.getElementById('toast').getAttribute('role'),t3:getComputedStyle(document.documentElement).getPropertyValue('--text-3').trim(),bad:getComputedStyle(document.documentElement).getPropertyValue('--bad').trim()};});
+ T('a11y: the active tab reports aria-selected',a.sel.join()==='lift',a.sel.join());T('a11y: form labels are linked (label for=pWeight)',a.lbl);T('a11y: toasts are announced (role=status)',a.toast==='status');
+ T('a11y: tertiary text colour meets WCAG AA (#8A96B0) and the red token exists',a.t3.toUpperCase()==='#8A96B0'&&a.bad!=='',JSON.stringify(a));
+ await p.evaluate(()=>switchView('track'));await wait(200);T('a11y: all four Track tabs sit inside the strip at 390 px',await p.evaluate(()=>{const s=document.querySelector('.track-tabs').getBoundingClientRect();return [...document.querySelectorAll('.track-tabs button')].every(b=>{const r=b.getBoundingClientRect();return r.left>=s.left-1&&r.right<=s.right+1;});}));
+ T('file mode: no manifest link and no service worker (the file still opens with no server)',await p.evaluate(()=>!document.querySelector('link[rel="manifest"]')&&!(navigator.serviceWorker&&navigator.serviceWorker.controller)));await done(p);}
+{const p=await pg(b,'2026-09-26',null,{hash:'#track'});T('deep link: #track opens Track from a file too',await p.evaluate(()=>document.getElementById('view-track').offsetParent!==null));await done(p);}
+{const p=await pg(b,'2026-09-26',null,{hash:'#import='+encodeURIComponent('2026-09-25,weight,88.6|2026-09-25,sleep,7.4')});const r=await p.evaluate(()=>({w:DB.weight.map(x=>+x.v),s:DB.sleep.map(x=>+x.h),h:location.hash}));
+ T('import link: "|"-separated Shortcut text lands weight + sleep and clears the link',r.w.includes(88.6)&&r.s.includes(7.4)&&!/import/.test(r.h),JSON.stringify(r));await done(p);}
+
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));})();

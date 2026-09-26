@@ -571,7 +571,7 @@ details.tested summary{cursor:pointer;font-weight:700;color:var(--text-2);min-he
 .cell::placeholder{opacity:1}
 .cell{min-height:44px}
 nav.tabs .tab{min-height:44px;padding:4px 0!important}
-nav.tabs .tab span{font-size:10.5px}
+nav.tabs .tab span{font-size:10px;letter-spacing:0}
 .wd .wdl,.set-grid th,.rm-wn small,.macro .ml,.lm .lml,.sb-d small{font-size:10.5px}
 .cd-lab small{font-size:9.5px;letter-spacing:.4px;display:block;max-width:64px;margin:3px auto 0;line-height:1.15;text-align:center}
 .seg button,.track-tabs button{min-height:44px}
@@ -1267,7 +1267,7 @@ function renderHome(){
   ${!started?`<div class="startban"><div class="sb-d"><b>${daysToStart()}</b><small>${daysToStart()===1?"day":"days"}</small></div><div class="sb-t"><h4>Your plan starts ${fmtLong(START_ISO)}</h4><p>Everything below is set and ready. Week 1 opens with ${fsTitle.replace(/ — Strength$/,"")}. Get your kit, your gym bag and your kitchen ready.</p></div></div>`:""}
   <div class="hero"><div class="hero-top">
     <div class="hero-race"><div class="hr-l">The Mission</div><div class="hr-d">102 kg @ 24%</div><div class="hr-s">${todayISO()<MILESTONE_ISO?"Pure muscle · as big as possible by 5 Mar 2027":"Pure muscle · as fast as the law allows"}</div><div class="hr-s" style="color:var(--gold)">${(()=>{const c=compute();return `≈78 kg of muscle underneath · FFMI ${c.ffmiNorm.toFixed(1)} → 25.0 target`})()}</div></div>
-    <div class="cd-ring">${(()=>{const c=compute();const fr=Math.max(.03,Math.min(1,c.leanNow/c.ceilLean));return ringSVG(fr,"var(--gold)")})()}<div class="cd-lab"><b>${(()=>{const c=compute();return "+"+Math.max(0,c.ceilLean-c.leanNow).toFixed(1)})()}</b><small>kg lean to go</small></div></div>
+    <div class="cd-ring">${(()=>{const c=compute();const fr=Math.max(.03,Math.min(1,c.leanNow/c.ceilLean));return ringSVG(fr,"var(--gold)")})()}<div class="cd-lab"><b>${(()=>{const c=compute();return "+"+Math.max(0,c.ceilLean-c.leanNow).toFixed(1)})()}</b><small>kg lean<br>to go</small></div></div>
   </div></div>
   ${(()=>{const dow=DOW[new Date().getDay()],t=weekTemplate().find(x=>x.day===dow);
       if(!planStarted())return `<button class="btn btn-gold cta" onclick="switchView('lift')">Day 1 is ${fmtLong(START_ISO)} \u2014 preview the first session</button>`;
@@ -2502,12 +2502,12 @@ function workLoad(sets){const c={};sets.forEach(s=>{c[s.w]=(c[s.w]||0)+1;});retu
 function progFor(e,beforeISO,loc){loc=loc||LOC;
   const hist=exSessions(e.id,beforeISO||todayISO(),loc);if(!hist.length)return null;
   const rr=repRange(e),last=hist[hist.length-1],W=workLoad(last.sets),atW=last.sets.filter(s=>s.w===W);
-  const minR=Math.min(...atW.map(s=>s.r)),reps=atW.map(s=>s.r).join("/"),eq=exEquip(e),home=loc==="home"&&!!HOME_SUB[e.id],aggr=bulkMode==="aggr"&&!isDeloadWeek(),trig=aggr?atW[0].r>=rr.hi:minR>=rr.hi;
+  const minR=Math.min(...atW.map(s=>s.r)),reps=atW.map(s=>s.r).join("/"),eq=exEquip(e),home=loc==="home"&&!!HOME_SUB[e.id],aggr=bulkMode==="aggr"&&!isDeloadWeek(),trig=!!rr&&(aggr?atW[0].r>=rr.hi:minR>=rr.hi);
   const lastRpe=atW[atW.length-1].rpe,why="Last time "+reps+" at "+fmtKg(W)+" kg"+(rr?" · range "+rr.lo+"–"+rr.hi:"");
   if(home){if(minR>=rr.hi)return {kind:"harder",w:null,text:"Every set hit "+rr.hi+"+ — slow the lowering to 4–5 s or add a 2 s pause; the kit caps the load",why};
     return {kind:"reps",w:W,text:"Same "+fmtKg(W)+" kg — add a rep to each set (aim "+atW.map(s=>Math.min(rr.hi,s.r+1)).join("/")+")",why};}
   if(!rr)return {kind:"reps",w:W,text:"Beat "+Math.max(...atW.map(s=>s.r))+" reps at "+fmtKg(W)+" kg",why};
-  if(isStalled(hist)){const nw=Math.max(eq==="bar"?20:INCR.db,roundTo(W*0.9,exInc(e)));return {kind:"reset",w:nw,text:"No new best in three sessions — drop to "+fmtKg(nw)+" kg and rebuild to "+rr.hi+" reps",why};}
+  if(isStalled(hist)){const nw=Math.max(eq==="bar"?20:INCR.db,Math.floor(W*0.9/exInc(e)+1e-9)*exInc(e));return {kind:"reset",w:nw,text:"No new best in three sessions — drop to "+fmtKg(nw)+" kg and rebuild to "+rr.hi+" reps",why};}
   const easy=lastRpe!=null&&lastRpe<=7&&minR>=rr.hi-1;
   if(trig||easy){if(eq==="bw")return {kind:"up",w:W+2.5,text:"Top of the range — add 2.5 kg (belt or vest) or keep adding reps",why};
     const nw=W+exInc(e),pl=eq==="bar"?platesPerSide(nw):null;return {kind:"up",w:nw,text:"Add load: "+fmtKg(nw)+" kg \u00d7 "+rr.lo+"\u2013"+rr.hi+(eq==="db"?" (each hand)":"")+(pl?" \u00b7 per side "+pl:""),why:why+(aggr&&minR<rr.hi&&atW[0].r>=rr.hi?" \u00b7 Aggressive: first working set hit "+rr.hi:"")+(easy&&!trig?" \u00b7 last set felt easy (RPE "+lastRpe+")":"")};}

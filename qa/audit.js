@@ -6,7 +6,12 @@ const puppeteer=require('puppeteer');const path=require('path');const fs=require
 const [iso='2026-09-26',mode='seed',out='qa/audit-out',maxShots='14']=process.argv.slice(2);
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const MOCK=(iso)=>{const R=Date;const fixed=new R(iso+'T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;};
-const OFFLINE=async p=>{await p.setRequestInterception(true);p.on('request',r=>{const u=r.url();if(u.startsWith('file:')||u.startsWith('data:'))r.continue();else r.respond({status:200,contentType:'text/css',body:''});});};
+// Google Fonts: served from qa/.fonts when tools/fetch_fonts.sh has cached them (real typography), else answered empty.
+const FONTS=path.resolve(__dirname,'.fonts');const HAVE_FONTS=fs.existsSync(path.join(FONTS,'fonts.css'));
+const OFFLINE=async p=>{await p.setRequestInterception(true);p.on('request',r=>{const u=r.url();if(u.startsWith('file:')||u.startsWith('data:'))return r.continue();
+  if(HAVE_FONTS&&u.startsWith('https://fonts.googleapis.com/'))return r.respond({status:200,contentType:'text/css',body:fs.readFileSync(path.join(FONTS,'fonts.css'))});
+  if(HAVE_FONTS&&u.startsWith('https://fonts.gstatic.com/')){const f=path.join(FONTS,u.replace('https://fonts.gstatic.com/','').replace(/\//g,'_'));if(fs.existsSync(f))return r.respond({status:200,contentType:'font/woff2',headers:{'Access-Control-Allow-Origin':'*'},body:fs.readFileSync(f)});}
+  r.respond({status:200,contentType:'text/css',body:''});});};
 const file='file://'+path.resolve(__dirname,'../dist/ComebackBlueprint.html');
 const addDays=(s,n)=>{const d=new Date(s+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
 (async()=>{fs.mkdirSync(out,{recursive:true});

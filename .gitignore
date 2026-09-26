@@ -5,3 +5,5 @@ qa/qa_report.json
 # app icons are real deliverables (Home Screen install); only QA/audit screenshots stay ignored
 !src/pwa/*.png
 !dist/icons/*.png
+qa/.fonts/
+qa/shots/
