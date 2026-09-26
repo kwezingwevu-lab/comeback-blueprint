@@ -8,7 +8,7 @@ const OFFLINE=async p=>{await p.setRequestInterception(true);p.on('request',r=>{
 async function page(b,iso,extra){const p=await b.newPage();await p.emulateTimezone('Africa/Johannesburg');await OFFLINE(p);p.__errs=[];p.on('pageerror',e=>p.__errs.push(e.message));p.on('console',m=>{if(m.type()==='error')p.__errs.push(m.text());});
   await p.evaluateOnNewDocument(MOCK,iso);await p.evaluateOnNewDocument(STORAGE);if(extra)await p.evaluateOnNewDocument(extra);
   await p.goto('file://'+path.resolve('ComebackBlueprint.html'),{waitUntil:'networkidle0'});await p.setViewport({width:390,height:844,deviceScaleFactor:1});await wait(900);return p;}
-(async()=>{const b=await puppeteer.launch({headless:'new',args:['--no-sandbox','--disable-setuid-sandbox']});
+(async()=>{const b=await puppeteer.launch({headless:'new',args:['--no-sandbox','--disable-setuid-sandbox','--enable-unsafe-swiftshader','--use-angle=swiftshader']});
 // ===== A. Boot + all views (Fri 11 Sep) =====
 let p=await page(b,'2026-09-12');
 for(const v of ['home','lift','run','roadmap','fuel','numbers','track','guide']){await p.evaluate(n=>switchView(n),v);await wait(120);const vis=await p.evaluate(n=>document.getElementById('view-'+n).offsetParent!==null&&document.getElementById('view-'+n).innerHTML.length>500,v);T('view renders: '+v,vis);}
@@ -497,5 +497,34 @@ for(const [iso,title,brief] of [['2026-11-12','Pull B — Strength','Today: Pull
  const r=await p.evaluate(()=>({d:fmtShort('2026-09-14'),dm:fmtDM('2026-10-04'),ticks:[...document.querySelectorAll('#exChart svg text[text-anchor="end"]')].map(t=>t.textContent),x:[...document.querySelectorAll('#exChart svg text[text-anchor="middle"]')].map(t=>t.textContent)}));
  T('dates: compact dates are day-first with the month by name on any locale (14 Sep, never 09/14)',r.d==='14 Sep'&&r.dm==='4 Oct'&&r.x.every(x=>/^\d{1,2} [A-Z][a-z]{2}$/.test(x)),JSON.stringify(r));
  T('charts: a flat e1RM line gets five distinct y-axis labels',r.ticks.length===5&&new Set(r.ticks).size===5,JSON.stringify(r.ticks));await done(p);}
+// --- AW. Body Lab (3D + time) and the chart engine
+{const p=await pg(b,'2026-10-10');await p.click('.tab[data-view="roadmap"]');await wait(2200);
+ const r=await p.evaluate(()=>({card:!!document.getElementById('bodyLab'),probe:blProbe(),fb:!document.getElementById('blFallback').hidden,fbt:document.getElementById('blFallback').textContent,lab:document.getElementById('blWkLab').textContent,aria:BL.cv&&BL.cv.getAttribute('aria-label')}));
+ T('body lab: the 3D figure renders on the GPU (or says plainly why not)',r.card&&((r.probe.ok&&r.probe.lit>0.04&&r.probe.w>=r.probe.cssW)||(r.fb&&/WebGL|GPU/.test(r.fbt))),JSON.stringify(r));
+ T('body lab: opens on this week and describes itself for screen readers',/Week 5 · /.test(r.lab)&&/now/.test(r.lab)&&(!r.probe.ok||/3D model of the plan's body at week 5/.test(r.aria||'')),JSON.stringify(r));
+ const s=await p.evaluate(()=>{const S=blSeries(),R=S.rows,c=compute().ceilLean;let mono=true;for(let i=1;i<R.length;i++){if((R[i].type==='regain'||R[i].type==='bulk')&&R[i].lean<R[i-1].lean-1e-9)mono=false;}
+   return {n:R.length,mono,maxLean:Math.max(...R.map(x=>x.lean)),ceil:c,bfOk:R.every(x=>x.bf>4&&x.bf<40),w1:R[0].lean-S.lean0,sum:R.every(x=>Math.abs(x.bw-(x.lean+x.bf/100*x.bw))<0.05)};});
+ T('body lab model: 104 weeks, lean never falls while building, never passes the FFMI-25 ceiling, fat is weight minus lean',s.n===104&&s.mono&&s.maxLean<=s.ceil+1e-6&&s.bfOk&&s.w1>=0&&s.w1<0.2&&s.sum,JSON.stringify(s));
+ await p.evaluate(()=>{const w=document.getElementById('blWk');w.value='104';w.dispatchEvent(new Event('input',{bubbles:true}));});await wait(300);
+ const w=await p.evaluate(()=>({lab:document.getElementById('blWkLab').textContent,bw:document.getElementById('blBw').textContent,exp:blSeries().rows[103].bw.toFixed(1),lean:document.getElementById('blLean').textContent,phase:document.getElementById('blPhase').textContent}));
+ T('body lab: scrubbing to week 104 moves the figure and every readout to that week',/^Week 104 · /.test(w.lab)&&w.bw===w.exp&&w.phase.length>3,JSON.stringify(w));
+ await p.evaluate(()=>{const w=document.getElementById('blWk');w.value='1';w.dispatchEvent(new Event('input',{bubbles:true}));});await p.evaluate(()=>document.getElementById('blPlay').click());await wait(900);
+ const pl=await p.evaluate(()=>({pressed:document.getElementById('blPlay').getAttribute('aria-pressed'),wk:BL.wk,ok:BL.ok}));await p.evaluate(()=>{if(BL.play)document.getElementById('blPlay').click();});
+ T('body lab: Play runs the weeks forward (time is the fourth axis)',!pl.ok||(pl.pressed==='true'&&pl.wk>1),JSON.stringify(pl));
+ await p.evaluate(()=>document.querySelector('#blModes button[data-bl="growth"]').click());await wait(1500);
+ const m=await p.evaluate(()=>({stored:JSON.parse(localStorage.getItem('cb2_blmode')),on:document.querySelector('#blModes button.on')?.dataset.bl,leg:document.querySelector('.bl-legend')?.innerText||'',probe:blProbe()}));
+ T('body lab: Growth mode sticks, shows its legend and still renders',m.stored==='growth'&&m.on==='growth'&&/muscle depth added since Day 1/.test(m.leg)&&(!m.probe.ok||m.probe.lit>0.04),JSON.stringify(m));
+ await p.click('.tab[data-view="home"]');await wait(300);T('body lab: leaving Roadmap stops playback',await p.evaluate(()=>BL.play===false));
+ T('AW-1: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+{const S=(d,w)=>SS(d,'legsA',{ga1:sets(3,8,w)});const p=await pg(b,'2026-10-10',{cb2_sessions:[S('2026-09-12',80),S('2026-09-19',82.5),S('2026-09-26',85),S('2026-10-03',87.5)],cb2_measure:[{date:'2026-09-12',waist:86,arm:37},{date:'2026-10-03',waist:86.5,arm:37.4}]});
+ await p.click('.tab[data-view="track"]');await wait(300);await p.evaluate(()=>document.querySelector('.track-tabs button[data-tp="lifts"]').click());await wait(400);
+ const c=await p.evaluate(()=>{const sv=document.querySelector('#exChart svg'),r=sv.getBoundingClientRect();sv.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:r.left+r.width*0.99,clientY:r.top+r.height/2,pointerType:'touch'}));
+   return {grad:sv.querySelectorAll('linearGradient').length,curve:/ C/.test(sv.querySelector('path[fill="none"]').getAttribute('d')),aria:sv.getAttribute('aria-label'),tip:sv.querySelector('g.cx text')?.textContent||'',last:[...sv.querySelectorAll('text')].some(t=>/^\d+ kg$/.test(t.textContent))};});
+ T('charts: smooth monotone curve, gradient fill, latest value labelled, screen-reader summary',c.grad===1&&c.curve&&c.last&&/4 readings from 12 Sep/.test(c.aria),JSON.stringify(c));
+ T('charts: touching a chart reads out the nearest date and value',/^3 Oct · \d+ kg$/.test(c.tip),c.tip);
+ await p.evaluate(()=>document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:5,clientY:5})));T('charts: touching elsewhere clears the readout',await p.evaluate(()=>!document.querySelector('svg.chart-svg g.cx')));
+ await p.evaluate(()=>document.querySelector('.track-tabs button[data-tp="measure"]').click());await wait(400);
+ T('charts: two-series charts get no area fill (it would bury the second line)',await p.evaluate(()=>{const sv=[...document.querySelectorAll('#view-track .chart-svg')].find(s=>/cm/.test(s.getAttribute('data-pts')||''));return !!sv&&sv.querySelectorAll('linearGradient').length===0;}));
+ T('AW-2: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));})();

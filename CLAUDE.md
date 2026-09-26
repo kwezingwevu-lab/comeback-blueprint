@@ -67,6 +67,10 @@ Never edit `dist/` directly. Never use `re.sub` with replacements containing `\u
 - Events: `RACES_12M` entries `{ym,d,name,co:[lat,lon],dist,km,st,type,note}`; `HOME_LL`; `radiusKm` (`cb2_radius`, selector 15/30/45/60); `evKm()`, `evVenue()`; weekly club block is static text.
 - Storage: `DB` (profile, sessions, weight, measure, lifts, sleep, rhr, steps), `DB.save()` → `persist()` per key + `cloudQueue()` → IndexedDB mirror (`idbSave`) + Claude account mirror when `cloudOK()`; `idbBoot()`/`cloudBoot()` restore on empty; `backupJSON()`/`applyRestoreText()`; `shareBackup()` (Web Share → iCloud Drive/Google Drive), `downloadBackup()`; keys listed in the `BACKUP_KEYS` array inside `backupJSON` — add every new key there.
 - Watch import: `importHealthText()` accepts Shortcut lines (`date,weight|sleep|rhr|steps,value`), Garmin CSV (auto-detected header), or JSON.
+- Progression and history: `e1rm()` (singles = load), `E1RM_MAXREPS` (10), `exKey()/splitKey()/exLabel()` (history keyed "id@gym|home"), `loggedExKeys()`, `exHistory(key)`, `prEvents()`, `isStalled()` (3 non-deload exposures, rep-PR escape, RPE≤7 = under-effort), `deloadWks()`, `progFor(e,beforeISO,loc)` (add load / reps / hold / missed-rep back-off / stall reset).
+- Visuals: `lineChart()` + `monoPath()` + `chartScrub()` (data-pts on every chart); Body Lab `BL`, `BL_FS` (shader), `blSeries()`, `blShape()`, `blDraw(fine)`, `blMount()`, `bodyLabHTML()`, test hook `blProbe()`; `cb2_blmode`.
+- Platform: `pwaInit()`, `pwaStatus()`, `routeFromHash()` (`#view`, `#import=`), wake lock (`wakeOn`), `beep()`, voice cue (`say`, `cb2_voice`), `phoneCapsRender()`, `icsText()`/`downloadICS()`, coach pack (`coachText`, `askClaudeText`).
+- Events: every `RACES_12M` entry carries `src` (shown under the chip); `tools/calendar_refresh.js` makes the approval report.
 
 ## 6. Known gotchas — the "never twice" list (also in LEARNINGS.md)
 
@@ -88,6 +92,10 @@ Never edit `dist/` directly. Never use `re.sub` with replacements containing `\u
 16. The shell loads Google Fonts with a render-blocking `<link>`; in a sandbox without outbound access that request hangs, the app `<script>` waits on it, and any fixed `wait()` after a reload sees `DB is not defined`. Both harnesses now answer the request locally and wait for the reload navigation instead of sleeping.
 17. `build.py` prints a character count (`len(str)`), not bytes; compare files with `wc -c` or `cmp`, not against that number.
 18. Playwright's WebKit download succeeds without its shared libraries; `install-deps webkit` is a separate step on Linux, and the failure message is a dependency list, not a download error.
+19. Dates in SAST: never `toISOString()` a local-midnight Date; use `isoLocal`/`dateAdd` (T12:00). Harnesses run in Africa/Johannesburg.
+20. Tool input turns `\uXXXX` into literal characters: recon anchors with `ascii()`, use raw strings for escaped anchors.
+21. WebGL in headless Chrome needs `--enable-unsafe-swiftshader --use-angle=swiftshader`; Body Lab must also pass its no-WebGL fallback.
+22. All gates: `bash qa/all.sh` (Chromium, PWA over http, WebKit, calendar-helper self-test) must print ALL GATES GREEN.
 
 ## 7. Honesty rules for content
 

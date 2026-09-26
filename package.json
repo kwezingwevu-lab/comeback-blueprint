@@ -1,7 +1,7 @@
 {
   "name": "comeback-blueprint",
   "private": true,
-  "version": "2026.09.12",
+  "version": "2026.09.26",
   "description": "The Comeback Blueprint - single-file HTML fitness app (Kwezi). Factory + QA suite.",
   "scripts": {
     "check": "node --check src/app_full.js",

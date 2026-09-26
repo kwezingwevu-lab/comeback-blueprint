@@ -487,6 +487,7 @@ function renderRoadmap(){
   el.innerHTML=`
     <div class="eyebrow">2-Year Master Plan</div><h2 class="view-title">Roadmap</h2>
     <p class="view-sub">${started?"You're on the road.":"Starts "+fmtLong(START_ISO)+"."} 104 weeks from your start to ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+dateAdd(START_ISO,728).slice(5,7)-1]+" "+dateAdd(START_ISO,728).slice(0,4)} — every week dated, with a bodyweight target, a training focus, and the milestones that keep you honest. Built to approach your natural ceiling, not a fantasy number.</p>
+    ${bodyLabHTML()}
     ${etaCardHTML()}
     <div class="card"><div class="card-t"><span class="ic">${ICON.lift}</span>The Two-Year Arc</div>
       <div class="card-st">Your projected bodyweight path through every phase. A guide, not a guarantee — recalibrate from your real weight trend in Track.</div>
@@ -789,7 +790,7 @@ const RACES_12M=[
  {ym:"2026-10",d:"Sat 3 Oct 2026",name:"Blair Atholl MTB",co:[-25.94, 27.92],dist:"10 / 20 / 40 km mountain bike",km:"Blair Atholl, Lanseria",st:"confirmed",type:"cycle",note:"From R100. Off-road cycling, close to home.",src:"Bike Hub event listing, checked 26 Sep 2026"},
  {ym:"2026-10",d:"Sat 3 Oct 2026",name:"Supa Store Soweto Race",co:[-26.26436, 27.86814],dist:"8 / 5 km",km:"Elkah Stadium, Rockville",st:"confirmed",type:"road",note:"R180 (8 km) · R150 (5 km). 07:00 start.",src:"RunningCalendar, checked 26 Sep 2026"},
  {ym:"2026-10",d:"Sat 3 Oct 2026",name:"Black Eagle Mountain Run",co:[-26.0823, 27.8297],dist:"2 / 4 / 8 / 16 km trail",km:"Walter Sisulu Botanical Garden",st:"confirmed",type:"trail",note:"16 km R390 · 8 km R370 · 4 km R270 · 2 km R180 (R120 is the kids’ 2 km). Proper hills; a hike at the short distances.",src:"Wild Africa Experiences booking page, checked 26 Sep 2026"},
- {ym:"2026-10",d:"Sat 10 Oct 2026",name:"Owl Project 5 km Fun Run & Walk",co:[-26.104654, 27.940397],dist:"5 km",km:"Loerie Dog Park, Randburg",st:"confirmed",type:"walk",note:"07:00 start. Explicitly a walk option; fee on the organiser page.",src:"RunningCalendar + Starting Line, checked 26 Sep 2026"},
+ {ym:"2026-10",d:"Sat 10 Oct 2026",name:"Owl Project 5 km Fun Run & Walk",co:[-26.104654, 27.940397],dist:"5 km",km:"Loerie Dog Park, Randburg",st:"confirmed",type:"walk",note:"07:00 start. From R195. Explicitly a walk option.",src:"RunningCalendar + RaceSpace listing, checked 26 Sep 2026"},
  {ym:"2026-10",d:"Sun 11 Oct 2026",name:"TinMan Joburg #4 Triathlon",co:[-25.9538, 28.1854],dist:"Sprint triathlon",km:"Prime View, Olifantsfontein",st:"confirmed",type:"tri",note:"Series race; reference only.",src:"Modern Athlete calendar, checked 26 Sep 2026"},
  {ym:"2026-10",d:"Sun 18 Oct 2026",name:"Hollywoodbets Joburg 10 km / 5 km",co:[-26.2427, 27.9813],dist:"10 / 5 km",km:"Rand Show Rd & Nasrec Rd (Expo Centre), Nasrec",st:"confirmed",type:"road",note:"07:30 start. The start/finish moved from Melrose to Nasrec this year, and the organiser page shows Sold Out.",src:"Hollywood Athletics Club event page, checked 26 Sep 2026"},
  {ym:"2026-10",d:"Fri 23 Oct 2026",name:"Hollard Daredevil Run",co:[-26.158165, 28.028489],dist:"5 km",km:"Zoo Lake Sports Club",st:"confirmed",type:"road",note:"15:00 start. R200 via Ticketpro. Men’s cancer-awareness run — in purple Speedos. Zero pace pressure, maximum story.",src:"hollard.co.za, checked 26 Sep 2026"},
@@ -1449,8 +1450,16 @@ function wireTrack(){
   document.getElementById("importFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);let map=d;if(d&&d.app==="ComebackBlueprint")map={cb2_profile:d.profile,cb2_sessions:d.sessions,cb2_runs:d.runs,cb2_weight:d.weight,cb2_measure:d.measure,cb2_lifts:d.lifts};if(!map||typeof map!=="object"||!Object.keys(map).some(k=>/^cb2_/.test(k))){toast("That file isn’t a Comeback Blueprint backup");return;}if(!confirm("Restore this backup? It replaces what it contains on this device."))return;applyRestoreText(JSON.stringify(map));}catch(err){toast("Couldn’t read that file");}};r.readAsText(f);e.target.value="";});
 }
 /* ===== CHARTS ===== */
+/* Charts (2026-09-26): monotone cubic curves (no overshoot past real readings), a gradient area under the lead series,
+   a haloed latest point with its value, hairline strokes that stay crisp at any zoom, and a touch/pointer scrub that
+   reads out the date and every series' value. Tick labels keep text-anchor start/end/middle attributes for the tests. */
+var _chartN=0;
+function monoPath(P){const n=P.length;if(n<3)return P.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");
+  const dx=[],m=[],t=[];for(let i=0;i<n-1;i++){dx[i]=P[i+1][0]-P[i][0];m[i]=dx[i]?(P[i+1][1]-P[i][1])/dx[i]:0;}
+  t[0]=m[0];t[n-1]=m[n-2];for(let i=1;i<n-1;i++)t[i]=(m[i-1]*m[i]<=0)?0:3*(dx[i-1]+dx[i])/((2*dx[i]+dx[i-1])/m[i-1]+(dx[i]+2*dx[i-1])/m[i]);
+  let d="M"+P[0][0].toFixed(1)+" "+P[0][1].toFixed(1);for(let i=0;i<n-1;i++){const q=dx[i]/3;d+=" C"+(P[i][0]+q).toFixed(1)+" "+(P[i][1]+t[i]*q).toFixed(1)+" "+(P[i+1][0]-q).toFixed(1)+" "+(P[i+1][1]-t[i+1]*q).toFixed(1)+" "+P[i+1][0].toFixed(1)+" "+P[i+1][1].toFixed(1);}return d;}
 function lineChart(series,opts){
-  opts=opts||{};const W=opts.w||360,H=opts.h||200,pad={t:12,r:12,b:26,l:40};
+  opts=opts||{};const W=opts.w||360,H=opts.h||200,pad={t:14,r:14,b:26,l:40},id="cg"+(++_chartN),unit=opts.unit?" "+opts.unit:"";
   const all=[];series.forEach(s=>s.points.forEach(p=>all.push(p.value)));
   if(opts.band)series.forEach(s=>(s.band||[]).forEach(b=>{all.push(b.lo);all.push(b.hi);}));
   if(!all.length)return "";
@@ -1458,12 +1467,28 @@ function lineChart(series,opts){
   const dates=[...new Set(series.flatMap(s=>s.points.map(p=>p.x)))].sort();
   const px=iso=>pad.l+(dates.length>1?dates.indexOf(iso)/(dates.length-1):0.5)*(W-pad.l-pad.r),py=v=>pad.t+(1-(v-min)/(max-min))*(H-pad.t-pad.b);
   let dec=opts.dec!=null?opts.dec:0;if(!opts.fmt)while(dec<2&&new Set([0,1,2,3,4].map(g=>(min+(max-min)*g/4).toFixed(dec))).size<5)dec++;
-  let grid="",yl="";for(let g=0;g<=4;g++){const v=min+(max-min)*g/4,y=py(v);grid+=`<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="var(--line)"/>`;yl+=`<text x="${pad.l-7}" y="${y+3}" text-anchor="end" font-size="11" fill="var(--text-3)" font-family="var(--f-mono)">${opts.fmt?opts.fmt(v):v.toFixed(dec)}</text>`;}
+  const fv=v=>opts.fmt?opts.fmt(v):(+v).toFixed(Math.max(dec,opts.dec!=null?opts.dec:1));
+  let grid="",yl="";for(let g=0;g<=4;g++){const v=min+(max-min)*g/4,y=py(v).toFixed(1);grid+=`<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="var(--line)" stroke-dasharray="${g?"2 4":"0"}" vector-effect="non-scaling-stroke" shape-rendering="crispEdges"/>`;yl+=`<text class="yl" x="${pad.l-7}" y="${(+y+3).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--text-3)" font-family="var(--f-mono)">${opts.fmt?opts.fmt(v):v.toFixed(dec)}</text>`;}
   let bands="";series.forEach(s=>{if(s.band&&s.band.length){let t="";s.band.forEach((b,i)=>{t+=(i?"L":"M")+px(b.x).toFixed(1)+" "+py(b.hi).toFixed(1)+" ";});for(let i=s.band.length-1;i>=0;i--)t+="L"+px(s.band[i].x).toFixed(1)+" "+py(s.band[i].lo).toFixed(1)+" ";bands+=`<path d="${t}Z" fill="${s.color}" opacity="0.12"/>`;}});
-  let paths="",dots="";series.forEach(s=>{if(!s.points.length)return;let d="";s.points.forEach((p,i)=>{d+=(i?"L":"M")+px(p.x).toFixed(1)+" "+py(p.value).toFixed(1)+" ";});paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;s.points.forEach(p=>{dots+=`<circle cx="${px(p.x).toFixed(1)}" cy="${py(p.value).toFixed(1)}" r="3.6" fill="${s.color}" stroke="var(--panel)" stroke-width="1.5"/>`;});});
-  let xl="";const step=Math.ceil(dates.length/4);dates.forEach((dt,i)=>{if(i%step===0||i===dates.length-1)xl+=`<text x="${px(dt).toFixed(1)}" y="${H-9}" text-anchor="middle" font-size="10.5" fill="var(--text-3)" font-family="var(--f-mono)">${fmtShort(dt)}</text>`;});
-  return `<svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${grid}${yl}${bands}${paths}${dots}${xl}</svg>`;
+  let defs="",areas="",paths="",dots="",last="";
+  series.forEach((s,si)=>{if(!s.points.length)return;const P=s.points.map(p=>[px(p.x),py(p.value)]),d=monoPath(P);
+    if(si===0&&series.length===1&&P.length>1){defs+=`<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${s.color};stop-opacity:.32"/><stop offset="1" style="stop-color:${s.color};stop-opacity:0"/></linearGradient>`;areas+=`<path d="${d} L${P[P.length-1][0].toFixed(1)} ${H-pad.b} L${P[0][0].toFixed(1)} ${H-pad.b} Z" fill="url(#${id})"/>`;}
+    paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+    s.points.forEach((p,i)=>{if(i===s.points.length-1)return;dots+=`<circle cx="${P[i][0].toFixed(1)}" cy="${P[i][1].toFixed(1)}" r="3" fill="var(--panel)" stroke="${s.color}" stroke-width="1.6"/>`;});
+    const L=P[P.length-1],lv=s.points[s.points.length-1].value;last+=`<circle cx="${L[0].toFixed(1)}" cy="${L[1].toFixed(1)}" r="8" fill="${s.color}" opacity=".18"/><circle cx="${L[0].toFixed(1)}" cy="${L[1].toFixed(1)}" r="4.2" fill="${s.color}" stroke="var(--panel)" stroke-width="1.8"/>`;
+    if(si===0)last+=`<text x="${Math.min(L[0],W-pad.r).toFixed(1)}" y="${Math.max(11,L[1]-12).toFixed(1)}" style="text-anchor:end" font-size="11.5" font-weight="700" fill="${s.color}" font-family="var(--f-mono)">${fv(lv)}${unit}</text>`;});
+  let xl="";const step=Math.ceil(dates.length/4);dates.forEach((dt,i)=>{if(i%step===0||i===dates.length-1)xl+=`<text class="xl" x="${px(dt).toFixed(1)}" y="${H-9}" text-anchor="middle" font-size="10.5" fill="var(--text-3)" font-family="var(--f-mono)">${fmtShort(dt)}</text>`;});
+  const pts=dates.map(dt=>[+px(dt).toFixed(1),series.map(s=>{const p=s.points.find(q=>q.x===dt);return p?[+py(p.value).toFixed(1),s.color]:null;}).filter(Boolean),fmtShort(dt)+" · "+series.map(s=>{const p=s.points.find(q=>q.x===dt);return p?fv(p.value)+unit:null;}).filter(Boolean).join(" / ")]);
+  const s0=series[0]&&series[0].points,aria=s0&&s0.length?"Chart, "+s0.length+" readings from "+fmtShort(s0[0].x)+" ("+fv(s0[0].value)+unit+") to "+fmtShort(s0[s0.length-1].x)+" ("+fv(s0[s0.length-1].value)+unit+"). Touch to read any point.":"Chart";
+  return `<svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${aria}" data-h="${H-pad.b}" data-t="${pad.t}" data-w="${W}" data-pts='${JSON.stringify(pts).replace(/'/g,"&#39;")}'><defs>${defs}</defs>${grid}${yl}${bands}${areas}${paths}${dots}${last}${xl}</svg>`;
 }
+function chartScrub(e){const sv=e.target&&e.target.closest?e.target.closest("svg.chart-svg[data-pts]"):null;document.querySelectorAll("svg.chart-svg g.cx").forEach(g=>{if(g.ownerSVGElement!==sv)g.remove();});if(!sv||!sv.getScreenCTM)return;
+  let pts;try{pts=JSON.parse(sv.dataset.pts);}catch(_){return;}if(!pts.length)return;const pt=sv.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const q=pt.matrixTransform(sv.getScreenCTM().inverse());
+  let b=pts[0];pts.forEach(p=>{if(Math.abs(p[0]-q.x)<Math.abs(b[0]-q.x))b=p;});const W=+sv.dataset.w,H=+sv.dataset.h,T=+sv.dataset.t,ns="http://www.w3.org/2000/svg";
+  let g=sv.querySelector("g.cx");if(!g){g=document.createElementNS(ns,"g");g.setAttribute("class","cx");g.setAttribute("pointer-events","none");sv.appendChild(g);}
+  const tw=Math.max(70,b[2].length*6.3+16),tx=Math.max(4,Math.min(W-tw-4,b[0]-tw/2));
+  g.innerHTML=`<line x1="${b[0]}" x2="${b[0]}" y1="${T}" y2="${H}" stroke="var(--text-3)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>${b[1].map(v=>`<circle cx="${b[0]}" cy="${v[0]}" r="5" fill="${v[1]}" stroke="var(--ink)" stroke-width="2"/>`).join("")}<rect x="${tx.toFixed(1)}" y="0" width="${tw.toFixed(1)}" height="20" rx="6" fill="var(--ink)" stroke="var(--line)"/><text x="${(tx+tw/2).toFixed(1)}" y="13.5" style="text-anchor:middle" font-size="10.5" font-weight="600" fill="var(--text)" font-family="var(--f-mono)">${b[2]}</text>`;}
+document.addEventListener("pointerdown",chartScrub,{passive:true});document.addEventListener("pointermove",e=>{if(e.pointerType==="mouse"||e.buttons)chartScrub(e);},{passive:true});
 function barChart(data,opts){
   opts=opts||{};const W=opts.w||640,H=opts.h||210,pad={t:14,r:14,b:28,l:42};
   if(!data.length)return "";
@@ -1508,12 +1533,12 @@ function drawLift(lift){
   const el=document.getElementById("liftChart"),rows=DB.lifts.filter(l=>l.lift===lift).sort((a,b)=>a.date.localeCompare(b.date)),byDate={};
   rows.forEach(l=>{const v=e1rm(l.w,l.r);if(!byDate[l.date]||v>byDate[l.date])byDate[l.date]=v;});
   const pts=Object.keys(byDate).sort().map(d=>({x:d,value:Math.round(byDate[d])}));
-  el.innerHTML=pts.length>1?lineChart([{points:pts,color:"var(--gold)"}],{dec:0}):emptyMsg("Log this lift on 2+ days to chart your strength curve. In the regain phase it should climb fast.");
+  el.innerHTML=pts.length>1?lineChart([{points:pts,color:"var(--gold)"}],{dec:0,unit:"kg"}):emptyMsg("Log this lift on 2+ days to chart your strength curve. In the regain phase it should climb fast.");
 }
 function renderMeasure(){
   const arr=[...DB.measure].sort((a,b)=>a.date.localeCompare(b.date)),el=document.getElementById("meChart");
   const waist=arr.filter(m=>m.waist!=null).map(m=>({x:m.date,value:m.waist})),arm=arr.filter(m=>m.arm!=null).map(m=>({x:m.date,value:m.arm}));
-  el.innerHTML=(waist.length||arm.length)?lineChart([{points:waist,color:"var(--warn)"},{points:arm,color:"var(--cyan)"}],{dec:1}):emptyMsg("Log waist and arm to track muscle vs fat.");
+  el.innerHTML=(waist.length||arm.length)?lineChart([{points:waist,color:"var(--warn)"},{points:arm,color:"var(--cyan)"}],{dec:1,unit:"cm"}):emptyMsg("Log waist and arm to track muscle vs fat.");
   document.getElementById("meList").innerHTML=[...arr].reverse().map(m=>{const ex=[];if(m.waist)ex.push("W "+m.waist);if(m.arm)ex.push("A "+m.arm);if(m.chest)ex.push("C "+m.chest);if(m.thigh)ex.push("T "+m.thigh);if(m.neck)ex.push("N "+m.neck);return `<div class="log-row"><span class="ld">${fmtShort(m.date)}</span><span class="lx" style="font-size:13px">${ex.join(" · ")}</span><button class="del" aria-label="Delete tapes from ${m.date}" data-delme="${m.date}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`;}).join("");
   document.querySelectorAll("[data-delme]").forEach(b=>b.addEventListener("click",()=>{DB.measure=DB.measure.filter(x=>x.date!==b.dataset.delme);DB.save();renderMeasure();}));
 }
@@ -1874,7 +1899,7 @@ function renderExProg(){const el=document.getElementById("exProg");if(!el)return
   const d=last.e-first.e,pct=first.e?d/first.e*100:0,p=e?progFor(e,dateAdd(todayISO(),1),cx.loc):null,stal=isStalled(exSessions(cx.id,null,cx.loc)),prs=h.filter(x=>x.pr),idx=best.top.r>E1RM_MAXREPS;
   const board=prEvents(dateAdd(todayISO(),-28)).slice(0,8),stalls=keys.filter(k=>{const x=splitKey(k);return isStalled(exSessions(x.id,null,x.loc));});
   el.innerHTML=`<div class="chart-card"><div class="chart-head"><h3>Lift progress</h3><select id="exSel" aria-label="Exercise" class="field" style="width:auto;max-width:64%;padding:7px 10px;font-size:13px">${keys.map(k=>`<option value="${k}"${k===curEx?" selected":""}>${exLabel(k)} · ${GYM[EXMAP[splitKey(k).id].day].name}</option>`).join("")}</select></div>
-  <div id="exChart">${h.length>1?lineChart([{points:h.map(x=>({x:x.date,value:Math.round(x.e*10)/10})),color:"var(--gold)"}],{dec:0}):emptyMsg("One session logged — the line starts with the next one.")}</div>
+  <div id="exChart">${h.length>1?lineChart([{points:h.map(x=>({x:x.date,value:Math.round(x.e*10)/10})),color:"var(--gold)"}],{dec:0,unit:"kg"}):emptyMsg("One session logged — the line starts with the next one.")}</div>
   <div class="ex-stats"><div><span>${idx?"Best index":"Best e1RM"}</span><b>${Math.round(best.e)} kg</b><small>${fmtShort(best.date)} · ${best.top.r}×${fmtKg(best.top.w)}</small></div><div><span>Since first</span><b class="${d>=0?"up":"down"}">${d>=0?"+":""}${d.toFixed(1)} kg</b><small>${pct>=0?"+":""}${pct.toFixed(1)}% · ${h.length} session${h.length===1?"":"s"}</small></div><div><span>Last top set</span><b>${last.top.r}×${fmtKg(last.top.w)}</b><small>${fmtShort(last.date)}${stal?" · stalled":""}</small></div></div>
   ${p?`<div class="prog prog-${p.kind}" style="margin-top:10px"><span class="prog-ic" aria-hidden="true">${progIcon(p.kind)}</span><span class="prog-t"><b>Next session:</b> ${p.text}<small>${p.why}</small></span></div>`:""}
   <div class="calc-note" id="e1rmNote" style="margin-top:10px">e1RM is the Epley estimate — a model, most accurate on sets of ${E1RM_MAXREPS} reps or fewer (Reynolds, Gordon &amp; Robergs, 2006). Past ${E1RM_MAXREPS} reps, as in most home work, read the line as a progress index, not a true max.${idx?" This lift’s best came from a "+best.top.r+"-rep set, so its number is an index.":""}${cx.loc==="home"?" Home sets chart apart from the gym lift: a different movement, so they never share a PR.":""}${prs.length?" PRs on this lift: "+prs.map(x=>fmtShort(x.date)).join(", ")+".":""}</div></div>
@@ -2012,9 +2037,147 @@ function speakPrime(sec){if(!_voiceOn||!voiceOK())return;const m=sec/60;say("Res
 function toggleVoice(){_voiceOn=!_voiceOn;persist("cb2_voice",_voiceOn);if(_voiceOn)say("Voice cue on");awakeRowRender();toast(_voiceOn?"Voice cue on — it calls the rest and says go at the end":"Voice cue off",true);}
 function awakeRowRender(){const el=document.getElementById("awakeRow");if(!el)return;const sup=wakeSupported(),on=_wlWant&&sup;
   el.innerHTML=`<button class="awake-btn${on?" on":""}" id="awakeBtn" onclick="toggleAwake()" aria-pressed="${on}"${sup?"":" disabled"}>${!sup?"Keep-awake isn’t available in this browser":_wl?"☀️ Screen stays awake":_wlWant?"☀️ Keep screen awake: on":"🌙 Keep screen awake: off"}</button><button class="awake-btn${_beepOn?" on":""}" id="beepBtn" onclick="toggleBeep()" aria-pressed="${_beepOn}">${_beepOn?"🔔 Rest beep: on":"🔕 Rest beep: off"}</button><button class="awake-btn${_voiceOn&&voiceOK()?" on":""}" id="voiceBtn" onclick="toggleVoice()" aria-pressed="${_voiceOn&&voiceOK()}"${voiceOK()?"":" disabled"}>${!voiceOK()?"Voice cue isn’t available here":_voiceOn?"🗣️ Voice cue: on":"🗣️ Voice cue: off"}</button>`;}
-function onViewChange(n){_curView=n;if(n==="lift"){awakeRowRender();wakeOn();}else if(_wl)wakeOff();}
+function onViewChange(n){_curView=n;if(n!=="roadmap"&&typeof BL!=="undefined")BL.play=false;if(n==="lift"){awakeRowRender();wakeOn();}else if(_wl)wakeOff();}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&_curView==="lift")wakeOn();});
 function restTick(){_restLeft=Math.max(0,Math.ceil((_restEnd-nowMs())/1000));renderRest();if(_restLeft<=0){clearInterval(_restInt);_restInt=null;beep();if(_voiceOn)say("Rest over. Next set.");if(navigator.vibrate){try{navigator.vibrate([120,60,120]);}catch(e){}}setTimeout(()=>{const b=document.getElementById("restTimer");if(b&&_restLeft<=0)b.classList.remove("show");},2200);}}
+/* ===== BODY LAB (2026-09-26): 3D + time. A real-time WebGL render of the plan's body, week by week =====
+   Signed-distance anatomy (smooth-blended ellipsoids and tapered limbs) ray-marched on the phone's GPU: wrap-lit satin
+   material, crease shading that deepens as body fat drops, ambient occlusion, a soft contact shadow, ACES tone mapping
+   and dithering. The fourth dimension is time: scrub or play weeks 1–104 and the figure follows the model — scale weight
+   from buildRoadmap(), lean mass from the stated lean-gain model (0.6 kg/month to March, 0.35 after, tapering near the
+   ceiling; flat in cuts), fat = weight − lean. Muscle radius scales with √(lean ÷ Day-1 lean): girth grows with the
+   square root of muscle volume at fixed length. An illustration of the numbers, not a scan. Renders on demand only
+   (never an idle loop), drops resolution while moving and refines to full device resolution the moment it rests. */
+var BL={cv:null,gl:null,pr:null,u:{},yaw:0.55,pitch:0.1,zoom:1,wk:null,mode:"form",play:false,raf:0,moving:0,drag:null,ok:null,why:"",ser:null,serK:"",heat:[0,0,0,0,0,0,0],lost:false,frames:0,ms:0,q:1};
+var BL_REG=["quads","hamstrings","glutes","calves","lower back","mid back","upper back"];
+var BL_FS=`precision highp float;
+uniform vec2 uR;uniform float uYaw,uPit,uZoom,uM,uFat,uWaist,uDef,uMode,uM0,uFat0,uWaist0;uniform float uH[7];
+float sdE(vec3 p,vec3 r){float k0=length(p/r),k1=length(p/(r*r));return k0*(k0-1.0)/max(k1,1e-5);}
+float sdRC(vec3 p,vec3 a,vec3 b,float r1,float r2){vec3 ba=b-a;float l2=dot(ba,ba),rr=r1-r2,a2=l2-rr*rr,il2=1.0/l2;vec3 pa=p-a;float y=dot(pa,ba),z=y-l2;vec3 xv=pa*l2-ba*y;float x2=dot(xv,xv),y2=y*y*l2,z2=z*z*l2,k=sign(rr)*rr*rr*x2;
+ if(sign(z)*a2*z2>k)return sqrt(x2+z2)*il2-r2;if(sign(y)*a2*y2<k)return sqrt(x2+y2)*il2-r1;return (sqrt(x2*a2*il2)+y*rr)*il2-r1;}
+float smin(float a,float b,float k){float h=clamp(0.5+0.5*(b-a)/k,0.0,1.0);return mix(b,a,h)-k*h*(1.0-h);}
+vec4 D;float HM;
+void U(float d,float id,float k,float gr){if(d<HM){HM=d;D.y=id;}float h=clamp(0.5+0.5*(d-D.x)/k,0.0,1.0),s=mix(d,D.x,h)-k*h*(1.0-h);D.z+=max(min(D.x,d)-s,0.0);D.w=mix(gr,D.w,h);D.x=s;}
+vec4 body(vec3 p,float m,float fat,float waist){
+ vec3 q=vec3(abs(p.x),p.y,p.z);D=vec4(1e3,0.0,0.0,0.0);HM=1e3;float k=0.022+fat*1.6,mr=m;
+ U(sdE(p-vec3(0.0,1.64,0.012),vec3(0.077,0.104,0.091)),0.0,0.01,0.0);
+ U(sdE(p-vec3(0.0,1.572,0.03),vec3(0.058,0.05,0.066)),0.0,0.03,0.0);
+ U(sdRC(p,vec3(0.0,1.46,-0.008),vec3(0.0,1.57,0.004),0.06*mr,0.05),0.0,0.03,(m-uM0)*0.0600);
+ U(sdRC(q,vec3(0.0,1.525,-0.035),vec3(0.155,1.455,-0.035),0.046*mr,0.03*mr),7.0,0.04,(m-uM0)*0.0380);
+ U(sdE(p-vec3(0.0,1.3,-0.004),vec3(0.158*mr,0.17,0.1)),0.0,k,(m-uM0)*0.1580);
+ U(sdE(p-vec3(0.0,1.345,-0.07),vec3(0.125*mr,0.1,0.042*mr)),7.0,k,(m-uM0)*0.0835);
+ U(sdE(q-vec3(0.1,1.235,-0.045),vec3(0.082*mr,0.135,0.058*mr)),6.0,k,(m-uM0)*0.0700);
+ U(sdE(q-vec3(0.078,1.336,0.066),vec3(0.092*mr,0.052*mr,0.03*mr)),0.0,k,(m-uM0)*0.0580);
+ U(sdRC(q,vec3(0.0,1.445,-0.012),vec3(0.175,1.432,-0.012),0.052*mr,0.048*mr),0.0,k,(m-uM0)*0.0500);
+ U(sdE(q-vec3(0.205,1.415,0.0),vec3(0.062*mr,0.068*mr,0.064*mr)),0.0,k,(m-uM0)*0.0647);
+ U(sdE(p-vec3(0.0,1.08,0.0),vec3(0.122+waist,0.16,0.082+waist*1.1)),0.0,k*1.3,0.0);
+ U(sdE(q-vec3(0.045,1.13,0.058),vec3(0.042,0.085,0.022+waist*0.5)),0.0,0.03,0.0);
+ U(sdRC(q,vec3(0.036,0.985,-0.07),vec3(0.042,1.2,-0.078),0.03*mr,0.024*mr),5.0,k,(m-uM0)*0.0270);
+ U(sdE(p-vec3(0.0,0.93,0.0),vec3(0.152+waist*0.6,0.1,0.098+waist*0.4)),0.0,k,0.0);
+ U(sdE(q-vec3(0.075,0.9,-0.063),vec3(0.079*mr,0.085*mr,0.068*mr)),3.0,k,(m-uM0)*0.0773);
+ U(sdRC(q,vec3(0.203,1.382,-0.004),vec3(0.236,1.118,0.0),0.047*mr,0.035*mr),0.0,k,(m-uM0)*0.0410);
+ U(sdE(q-vec3(0.217,1.255,0.023),vec3(0.034*mr,0.072,0.034*mr)),0.0,k,(m-uM0)*0.0340);
+ U(sdE(q-vec3(0.225,1.275,-0.03),vec3(0.035*mr,0.082,0.036*mr)),0.0,k,(m-uM0)*0.0355);
+ U(sdRC(q,vec3(0.238,1.09,0.0),vec3(0.262,0.852,0.022),0.038*mr,0.025),0.0,k,(m-uM0)*0.0380);
+ U(sdE(q-vec3(0.268,0.785,0.026),vec3(0.024,0.066,0.038)),0.0,0.02,0.0);
+ U(sdRC(q,vec3(0.09,0.905,0.0),vec3(0.1,0.5,0.004),0.084*mr,0.054),0.0,k,(m-uM0)*0.0840);
+ U(sdE(q-vec3(0.1,0.705,0.036),vec3(0.067*mr,0.17,0.058*mr)),1.0,k,(m-uM0)*0.0625);
+ U(sdE(q-vec3(0.071,0.565,0.036),vec3(0.04*mr,0.06,0.04*mr)),1.0,k,(m-uM0)*0.0400);
+ U(sdE(q-vec3(0.095,0.7,-0.042),vec3(0.06*mr,0.17,0.05*mr)),2.0,k,(m-uM0)*0.0550);
+ U(sdE(q-vec3(0.1,0.49,0.012),vec3(0.049,0.05,0.049)),0.0,0.03,0.0);
+ U(sdRC(q,vec3(0.1,0.47,0.006),vec3(0.1,0.085,-0.004),0.05,0.031),0.0,k,0.0);
+ U(sdE(q-vec3(0.1,0.36,-0.036),vec3(0.05*mr,0.092,0.047*mr)),4.0,k,(m-uM0)*0.0485);
+ U(sdE(q-vec3(0.1,0.036,0.045),vec3(0.044,0.035,0.105)),0.0,0.03,0.0);
+ D.x-=fat;return D;}
+float mapD(vec3 p){return body(p,uM,uFat,uWaist).x;}
+vec3 nrm(vec3 p){vec2 e=vec2(0.0007,-0.0007);return normalize(e.xyy*mapD(p+e.xyy)+e.yyx*mapD(p+e.yyx)+e.yxy*mapD(p+e.yxy)+e.xxx*mapD(p+e.xxx));}
+float ao(vec3 p,vec3 n){float o=0.0,s=1.0;for(int i=1;i<6;i++){float h=0.012*float(i);o+=(h-mapD(p+n*h))*s;s*=0.72;}return clamp(1.0-3.2*o,0.0,1.0);}
+float shadow(vec3 ro,vec3 rd){float r=1.0,t=0.02;for(int i=0;i<28;i++){float h=mapD(ro+rd*t);r=min(r,10.0*h/t);t+=clamp(h,0.012,0.12);if(r<0.002||t>1.9)break;}return clamp(r,0.0,1.0);}
+vec3 aces(vec3 x){return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0);}
+vec3 heat(float t){t=clamp(t,0.0,1.0);return mix(mix(vec3(0.16,0.2,0.3),vec3(0.14,0.72,0.66),smoothstep(0.0,0.5,t)),vec3(1.0,0.76,0.2),smoothstep(0.5,1.0,t));}
+float hv(float id){float v=0.0;for(int i=0;i<7;i++){if(abs(id-float(i+1))<0.5)v=uH[i];}return v;}
+void main(){
+ vec2 uv=(gl_FragCoord.xy*2.0-uR)/uR.y;
+ float cy=cos(uYaw),sy=sin(uYaw),cp=cos(uPit),sp=sin(uPit),dist=2.95/uZoom;
+ vec3 ta=vec3(0.0,0.9,0.0),ro=ta+dist*vec3(sy*cp,sp,cy*cp);vec3 ww=normalize(ta-ro),uu=normalize(cross(ww,vec3(0.0,1.0,0.0))),vv=cross(uu,ww);
+ vec3 rd=normalize(uv.x*uu+uv.y*vv+2.75*ww);
+ vec3 bg=mix(vec3(0.0022,0.0028,0.0055),vec3(0.009,0.012,0.022),smoothstep(-1.0,1.0,uv.y));bg+=vec3(0.9,0.6,0.15)*0.012*exp(-2.5*dot(uv-vec2(0.0,0.4),uv-vec2(0.0,0.4)));bg*=1.0-0.35*dot(uv*0.6,uv*0.6);
+ vec3 col=bg;vec3 L=normalize(vec3(0.55,0.8,0.62));
+ vec3 bmin=vec3(-0.46,-0.02,-0.34),bmax=vec3(0.46,1.8,0.34);vec3 t0=(bmin-ro)/rd,t1=(bmax-ro)/rd,tn=min(t0,t1),tf=max(t0,t1);float tN=max(max(tn.x,tn.y),tn.z),tF=min(min(tf.x,tf.y),tf.z);
+ float tg=rd.y<0.0?-ro.y/rd.y:1e3;bool hit=false;float t=max(tN,0.0);vec4 B;
+ if(tF>max(tN,0.0)){for(int i=0;i<96;i++){vec3 p=ro+rd*t;float d=mapD(p);if(d<0.0006*t){hit=true;break;}t+=d*0.92;if(t>tF)break;}}
+ if(tg<1e2&&(!hit||tg<t)){vec3 gp=ro+rd*tg;float r=length(gp.xz);float sh=r<0.75?shadow(gp+vec3(0.0,0.002,0.0),L):1.0;float occ=r<0.6?clamp(0.35+0.65*smoothstep(0.0,0.42,mapD(gp+vec3(0.0,0.05,0.0))),0.0,1.0):1.0;
+  vec3 fl=vec3(0.012,0.014,0.022)*(0.3+0.7*sh)*occ;fl+=vec3(1.0,0.7,0.25)*0.018*exp(-5.0*r*r)*(0.4+0.6*sh);float fade=smoothstep(2.4,0.6,r);col=mix(bg,fl,fade*0.92);}
+ if(hit){vec3 p=ro+rd*t;B=body(p,uM,uFat,uWaist);vec3 n=nrm(p);float a=ao(p,n);float crease=clamp(B.z*55.0,0.0,1.0)*uDef;
+  vec3 base=vec3(0.11,0.12,0.145);float id=B.y,hvv=hv(id);
+  if(uMode>0.5&&uMode<1.5){base=id>0.5?pow(heat(hvv),vec3(2.2)):vec3(0.07,0.075,0.09);}
+  if(uMode>1.5){float g=clamp(B.w/0.003,0.0,1.0);base=g<0.5?mix(vec3(0.07,0.075,0.09),vec3(0.02,0.42,0.16),g*2.0):mix(vec3(0.02,0.42,0.16),vec3(0.95,0.55,0.05),g*2.0-1.0);}
+  float nl=dot(n,L),wrap=clamp((nl+0.12)/1.12,0.0,1.0);vec3 L2=normalize(vec3(-0.7,0.35,0.45)),L3=normalize(vec3(-0.25,0.6,-0.75));float fill=clamp(dot(n,L2),0.0,1.0),back=clamp(dot(n,L3),0.0,1.0);float sh=shadow(p+n*0.004,L);
+  vec3 h=normalize(L-rd);float spec=pow(clamp(dot(n,h),0.0,1.0),48.0)*(0.25+0.6*sh);float fres=pow(1.0-clamp(dot(n,-rd),0.0,1.0),4.0);
+  float fz=pow(1.0-clamp(dot(n,-rd),0.0,1.0),2.0);vec3 rim=vec3(0.3,0.8,0.75)*pow(clamp(dot(n,normalize(vec3(-0.6,0.25,-0.75))),0.0,1.0),1.5)*fz*0.9;
+  vec3 c=base*(vec3(2.7,2.4,2.05)*wrap*(0.2+0.8*sh)+vec3(0.42,0.5,0.7)*fill+vec3(1.1,0.95,0.75)*back*0.9+vec3(0.1,0.12,0.18)*(0.5+0.5*n.y))*a;
+  c+=vec3(1.0,0.86,0.62)*spec*0.9+rim*a+vec3(0.95,0.7,0.3)*fres*0.07*a;c*=1.0-0.6*crease;col=c;}
+ col=aces(col*1.6);col=pow(col,vec3(0.4545));col+=(fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)-0.5)/255.0;
+ gl_FragColor=vec4(col,1.0);}`;
+var BL_VS="attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}";
+function blSeries(){const k=[bulkMode,marchKey,DB.profile.weight,DB.profile.bf,DB.profile.height,DB.weight.length].join("|");if(BL.ser&&BL.serK===k)return BL.ser;
+  const rm=buildRoadmap(),h=(parseFloat(DB.profile.height)||177)/100,ceil=compute().ceilLean,bf0=parseFloat(DB.profile.bf)||18,lean0=dayOneWeight()*(1-bf0/100);let lean=lean0,prevBw=dayOneWeight();
+  const out=rm.map(w=>{const pre=w.start<MILESTONE_ISO,grow=w.type==="regain"||w.type==="bulk";if(grow){const rem=ceil-lean,inc=(pre&&bulkMode==="aggr"?0.6:0.35)/4.345*Math.max(0.15,Math.min(1,rem/4));lean=Math.min(ceil,lean+Math.max(0,Math.min(inc,w.bw-prevBw)));}
+    else if(w.bw<prevBw)lean=Math.max(lean0,lean-0.25*(prevBw-w.bw));prevBw=w.bw;const bf=Math.max(3,(w.bw-lean)/w.bw*100);return {wk:w.wk,start:w.start,phase:w.phase,type:w.type,bw:w.bw,lean,bf,ffmi:lean/(h*h)+6.1*(1.8-h)};});
+  BL.ser={rows:out,lean0,bf0,bw0:dayOneWeight()};BL.serK=k;return BL.ser;}
+function blShape(lean,bf,lean0){return {m:Math.sqrt(lean/lean0),fat:Math.max(0,bf-10)*0.0007,waist:Math.max(0,bf-10)*0.0021,def:Math.max(0,Math.min(1,(24-bf)/12))};}
+function blHeat(){try{const wk=planWeek(),ws=weekStartISO(wk),we=dateAdd(ws,7),done=regionDone(ws,we),tgt=regionSets();return BL_REG.map(r=>tgt[r]?Math.min(1,(done[r]||0)/tgt[r]):0);}catch(e){return [0,0,0,0,0,0,0];}}
+function blInitGL(){if(BL.gl&&!BL.lost)return true;const cv=BL.cv;let gl=null;try{const o={antialias:false,alpha:false,depth:false,stencil:false,premultipliedAlpha:false,preserveDrawingBuffer:false,powerPreference:"high-performance"};gl=cv.getContext("webgl",o)||cv.getContext("experimental-webgl",o);}catch(e){}
+  if(!gl){BL.ok=false;BL.why="This browser has no WebGL, so the 3D view is off. Every number below still works.";return false;}
+  const sh=(t,s)=>{const x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(x);if(!gl.getShaderParameter(x,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(x)||"shader");return x;};
+  try{const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,BL_VS));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,BL_FS));gl.bindAttribLocation(pr,0,"a");gl.linkProgram(pr);if(!gl.getProgramParameter(pr,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(pr)||"link");
+    const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);gl.useProgram(pr);
+    BL.u={};["uR","uYaw","uPit","uZoom","uM","uFat","uWaist","uDef","uMode","uM0","uFat0","uWaist0","uH"].forEach(n=>BL.u[n]=gl.getUniformLocation(pr,n==="uH"?"uH[0]":n));BL.gl=gl;BL.pr=pr;BL.ok=true;BL.lost=false;return true;}
+  catch(e){BL.ok=false;BL.why="The 3D view could not start on this GPU ("+String(e.message||e).slice(0,60)+"). Every number below still works.";return false;}}
+function blSize(fine){const cv=BL.cv;if(!cv)return;const w=Math.max(200,cv.clientWidth||340),h=Math.max(240,cv.clientHeight||420),dpr=Math.min(window.devicePixelRatio||1,3),s=fine?Math.min(dpr,Math.sqrt(2.4e6/(w*h))):Math.max(0.5,Math.min(dpr,1.5)*BL.q);const W=Math.round(w*s),H=Math.round(h*s);if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}}
+function blRow(){const S=blSeries(),R=S.rows,x=Math.max(1,Math.min(R.length,BL.wk||roadmapWeekNow()))-1,i=Math.floor(x),f=x-i,a=R[i],b=R[Math.min(R.length-1,i+1)];if(!f)return a;
+  const L=(k)=>a[k]+(b[k]-a[k])*f;return Object.assign({},a,{bw:L("bw"),lean:L("lean"),bf:L("bf"),ffmi:L("ffmi")});}
+function blDraw(fine){if(!BL.cv||!blInitGL())return false;const gl=BL.gl,u=BL.u,S=blSeries(),r=blRow(),s=blShape(r.lean,r.bf,S.lean0),s0=blShape(S.lean0,S.bf0,S.lean0);blSize(fine);
+  const t0=performance.now();gl.viewport(0,0,BL.cv.width,BL.cv.height);gl.uniform2f(u.uR,BL.cv.width,BL.cv.height);gl.uniform1f(u.uYaw,BL.yaw);gl.uniform1f(u.uPit,BL.pitch);gl.uniform1f(u.uZoom,BL.zoom);
+  gl.uniform1f(u.uM,s.m);gl.uniform1f(u.uFat,s.fat);gl.uniform1f(u.uWaist,s.waist);gl.uniform1f(u.uDef,s.def);gl.uniform1f(u.uM0,s0.m);gl.uniform1f(u.uFat0,s0.fat);gl.uniform1f(u.uWaist0,s0.waist);
+  gl.uniform1f(u.uMode,BL.mode==="heat"?1:BL.mode==="growth"?2:0);gl.uniform1fv(u.uH,new Float32Array(BL.heat));gl.drawArrays(gl.TRIANGLES,0,3);BL.frames++;
+  if(!fine){const ms=performance.now()-t0;BL.ms=BL.ms?BL.ms*0.8+ms*0.2:ms;if(BL.ms>28)BL.q=Math.max(0.5,BL.q*0.85);else if(BL.ms<10)BL.q=Math.min(1,BL.q*1.08);}
+  return true;}
+function blKick(){BL.moving=performance.now();if(!BL.raf)BL.raf=requestAnimationFrame(blTick);}
+function blTick(now){BL.raf=0;if(!BL.cv||!document.body.contains(BL.cv))return;
+  if(BL.play){const S=blSeries();BL.wk=(BL.wk||1)+0.25;if(BL.wk>S.rows.length){BL.wk=S.rows.length;BL.play=false;blSyncUI();}else if(Math.abs(BL.wk-Math.round(BL.wk))<0.01)blSyncUI();}
+  const active=BL.play||BL.drag||now-BL.moving<120;blDraw(!active);if(active)BL.raf=requestAnimationFrame(blTick);}
+function blSyncUI(){const r=blRow(),S=blSeries(),el=id=>document.getElementById(id);if(!el("blWk"))return;const wk=Math.round(BL.wk||r.wk);
+  el("blWk").value=wk;el("blWkLab").textContent="Week "+r.wk+" · "+fmtDMY(r.start)+(r.wk===roadmapWeekNow()?" · now":"");el("blPhase").textContent=r.phase;
+  el("blBw").textContent=r.bw.toFixed(1);el("blLean").textContent=r.lean.toFixed(1);el("blBf").textContent=r.bf.toFixed(1);el("blFfmi").textContent=r.ffmi.toFixed(1);
+  el("blDelta").textContent=(r.lean-S.lean0>=0?"+":"")+(r.lean-S.lean0).toFixed(1)+" kg lean vs Day 1";const pb=el("blPlay");if(pb){pb.textContent=BL.play?"❚❚ Pause":"▶ Play the plan";pb.setAttribute("aria-pressed",BL.play);}
+  const cv=BL.cv;if(cv)cv.setAttribute("aria-label","3D model of the plan's body at week "+r.wk+": "+r.bw.toFixed(1)+" kg, "+r.lean.toFixed(1)+" kg lean, "+r.bf.toFixed(1)+"% body fat. Drag to turn.");}
+function bodyLabHTML(){setTimeout(()=>safeStep("blMount",blMount),0);const r=blRow(),legend=BL.mode==="heat"?`<div class="bl-legend"><span>0%</span><i class="bl-ramp heat"></i><span>100% of this week’s planned legs &amp; back sets</span></div>`:BL.mode==="growth"?`<div class="bl-legend"><span>0 mm</span><i class="bl-ramp grow"></i><span>3+ mm of muscle depth added since Day 1 (fat held equal)</span></div>`:"";
+  return `<div class="card bl-card" id="bodyLab"><div class="card-t"><span class="ic">${ICON.lift}</span>Body Lab · 3D + time</div>
+  <div class="card-st">The plan’s body at any week of the 104: drag to turn it, scrub the weeks or press play. Weight comes from the roadmap, lean mass from the lean-gain model, fat is the rest.</div>
+  <div class="bl-stage" id="blStage"><div class="bl-hud"><b id="blPhase">${r.phase}</b><span id="blDelta"></span></div><div class="bl-fallback" id="blFallback" hidden></div></div>
+  <div class="seg bl-modes" id="blModes" role="radiogroup" aria-label="What the colours show">${[["form","Form"],["heat","Training heat"],["growth","Growth"]].map(([k,l])=>`<button data-bl="${k}" role="radio" aria-checked="${BL.mode===k}"${BL.mode===k?" class=on":""}>${l}</button>`).join("")}</div>${legend}
+  <div class="bl-time"><button class="bl-play" id="blPlay" aria-pressed="false">▶ Play the plan</button><input type="range" id="blWk" min="1" max="104" step="1" value="${r.wk}" aria-label="Plan week"><div class="bl-wklab" id="blWkLab"></div></div>
+  <div class="bl-stats"><div><span>Scale</span><b id="blBw">–</b><small>kg</small></div><div><span>Lean</span><b id="blLean">–</b><small>kg</small></div><div><span>Body fat</span><b id="blBf">–</b><small>%</small></div><div><span>FFMI</span><b id="blFfmi">–</b><small>norm.</small></div></div>
+  <div class="calc-note" style="margin-top:8px">Still a model and an illustration, not a scan: muscle girth scales with the square root of lean mass, fat thickens the waist first, and muscle separations sharpen as body fat drops. Your logged weigh-ins and tape readings live in Track.</div></div>`;}
+function blMount(){const st=document.getElementById("blStage");if(!st)return;if(BL.wk==null)BL.wk=roadmapWeekNow();
+  if(!BL.cv){const cv=document.createElement("canvas");cv.className="bl-cv";cv.id="blCanvas";cv.setAttribute("role","img");cv.tabIndex=0;BL.cv=cv;
+    cv.addEventListener("webglcontextlost",e=>{e.preventDefault();BL.lost=true;BL.gl=null;});cv.addEventListener("webglcontextrestored",()=>{BL.lost=false;blKick();});
+    cv.addEventListener("pointerdown",e=>{BL.drag={x:e.clientX,y:e.clientY,yaw:BL.yaw,pit:BL.pitch};try{cv.setPointerCapture(e.pointerId);}catch(_){}blKick();});
+    cv.addEventListener("pointermove",e=>{if(!BL.drag)return;BL.yaw=BL.drag.yaw+(e.clientX-BL.drag.x)*0.011;BL.pitch=Math.max(-0.35,Math.min(0.6,BL.drag.pit+(e.clientY-BL.drag.y)*0.006));blKick();});
+    const end=()=>{BL.drag=null;blKick();};cv.addEventListener("pointerup",end);cv.addEventListener("pointercancel",end);
+    cv.addEventListener("wheel",e=>{e.preventDefault();BL.zoom=Math.max(0.8,Math.min(2.2,BL.zoom*(e.deltaY>0?0.92:1.08)));blKick();},{passive:false});
+    cv.addEventListener("dblclick",()=>{BL.zoom=BL.zoom>1.2?1:1.7;blKick();});
+    cv.addEventListener("keydown",e=>{if(e.key==="ArrowLeft"){BL.yaw-=0.25;blKick();e.preventDefault();}else if(e.key==="ArrowRight"){BL.yaw+=0.25;blKick();e.preventDefault();}});}
+  st.insertBefore(BL.cv,st.firstChild);BL.heat=blHeat();
+  if(!blInitGL()){BL.cv.hidden=true;const fb=document.getElementById("blFallback");fb.hidden=false;fb.textContent=BL.why;}else BL.cv.hidden=false;
+  const wk=document.getElementById("blWk");wk.max=blSeries().rows.length;wk.addEventListener("input",()=>{BL.wk=+wk.value;BL.play=false;blSyncUI();blKick();});
+  document.getElementById("blPlay").addEventListener("click",()=>{if(!BL.ok)return;if(!BL.play&&Math.round(BL.wk)>=blSeries().rows.length)BL.wk=1;BL.play=!BL.play;blSyncUI();blKick();});
+  document.querySelectorAll("#blModes button").forEach(b=>b.addEventListener("click",()=>{BL.mode=b.dataset.bl;persist("cb2_blmode",BL.mode);if(typeof renderRoadmap==="function")renderRoadmap();}));
+  blSyncUI();if(BL.ok){blDraw(true);if(!BL.intro&&!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)){BL.intro=true;const y0=BL.yaw,t0=performance.now();const spin=now=>{const k=Math.min(1,(now-t0)/1600);BL.yaw=y0-0.9*(1-Math.pow(1-k,3));blDraw(k>=1);if(k<1&&BL.cv&&document.body.contains(BL.cv))requestAnimationFrame(spin);};requestAnimationFrame(spin);}}}
+/* test hook: renders one frame and reports how much of it is the figure (not background) */
+function blProbe(){if(!BL.cv||!blDraw(true))return {ok:false,why:BL.why};const gl=BL.gl,w=BL.cv.width,h=BL.cv.height,px=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,px);const c0=px[0]+px[1]+px[2];let lit=0,n=0;for(let i=0;i<px.length;i+=4*7){n++;if(px[i]+px[i+1]+px[i+2]>c0+60)lit++;}return {ok:true,w,h,cssW:BL.cv.clientWidth,lit:lit/n,frames:BL.frames};}
+BL.mode=load("cb2_blmode","form");
 /* ===== ACCESSIBILITY (2026-09-26): roles, states and keyboard for the div-based accordions and headings ===== */
 function a11yEnhance(){try{document.querySelectorAll(".tool-h,.supp-h,.rweek-h").forEach(h=>{if(!h.hasAttribute("role")){h.setAttribute("role","button");h.setAttribute("tabindex","0");}const open=h.classList.contains("open")||(h.parentElement&&h.parentElement.classList.contains("open"));h.setAttribute("aria-expanded",open?"true":"false");});
   document.querySelectorAll(".hw-tog").forEach(b=>{const id=b.dataset.tg,box=id&&document.getElementById("hw-"+id);b.setAttribute("aria-expanded",box&&box.classList.contains("open")?"true":"false");});

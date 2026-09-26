@@ -84,12 +84,21 @@ function matchApp(card, races) {
   return best;
 }
 function gazetteer(races) { return races.filter(r => r.co).map(r => ({ t: toks(r.km || ""), co: r.co, from: r.name })); }
-function venueCoords(venue, gaz) { const vt = toks(venue); let best = null; gaz.forEach(g => { const j = jac(vt, g.t); if (j >= 0.6 && (!best || j > best.j)) best = { j, co: g.co, from: g.from }; }); return best; }
+// containment, not Jaccard: "Marks Park, Judith Rd, Emmarentia" must match the app's "Marks Park, Emmarentia"
+function venueCoords(venue, gaz) { const vt = toks(venue); let best = null; gaz.forEach(g => { if (!g.t.size || !vt.size) return; let n = 0; g.t.forEach(x => { if (vt.has(x)) n++; });
+  const j = n / Math.min(g.t.size, vt.size); if (n >= 2 && j >= 0.75 && (!best || j > best.j)) best = { j, co: g.co, from: g.from }; }); return best; }
+// OpenStreetMap search, most specific first: the full venue, then its first + last parts, then the town alone
+// (a town centre is marked as such: good enough to say "outside 30 km", never good enough to add an event)
 async function geocode(venue, problems) {
-  const q = encodeURIComponent(venue + ", Gauteng, South Africa");
-  try { const j = JSON.parse(await fetchText(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&countrycodes=za&limit=1`)); await sleep(1100);
-    return j[0] ? { co: [+(+j[0].lat).toFixed(6), +(+j[0].lon).toFixed(6)], label: j[0].display_name } : null; }
-  catch (e) { problems.push("geocode " + venue + ": " + e.message); return null; }
+  const parts = venue.split(",").map(x => x.trim()).filter(Boolean), tries = [[venue, "venue"]];
+  if (parts.length > 2) tries.push([parts[0] + ", " + parts[parts.length - 1], "venue, approximate"]);
+  if (parts.length > 1) tries.push([parts[parts.length - 1], "town centre only"]);
+  for (const [q, how] of tries) {
+    try { const j = JSON.parse(await fetchText(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ", Gauteng, South Africa")}&format=json&countrycodes=za&limit=1`)); await sleep(1100);
+      if (j[0]) return { co: [+(+j[0].lat).toFixed(6), +(+j[0].lon).toFixed(6)], label: how + ": " + j[0].display_name }; }
+    catch (e) { problems.push("geocode " + q + ": " + e.message); return null; }
+  }
+  return null;
 }
 
 // ---------- diff ----------
@@ -155,6 +164,8 @@ function selftest() {
   T("distances use HOME_LL and the app's maths (Fat Cats ~16 km)", havKm(app.home, [-26.015085, 28.1073947]) === 16, "");
   const g = venueCoords("Mall of Africa, Waterfall City", gazetteer(app.races));
   T("venues already in the app give coordinates without any lookup", g && Math.abs(g.co[0] + 26.015) < 0.01, JSON.stringify(g));
+  const g2 = venueCoords("Marks Park, Judith Rd, Emmarentia, Randburg", gazetteer(app.races));
+  T("a longer street address still finds a venue the app knows (containment match)", g2 && Math.abs(g2.co[0] + 26.166) < 0.01, JSON.stringify(g2));
   T("the helper never writes to src/app_full.js", !/writeFileSync\([^)]*app_full/.test(fs.readFileSync(__filename, "utf8")), "");
   const bad = R.filter(x => !x.ok); bad.forEach(x => console.log("FAIL: " + x.n + " → " + x.d));
   console.log(bad.length ? "CALENDAR HELPER SELFTEST FAILED" : "CALENDAR HELPER SELFTEST PASS"); console.log("CALENDAR HELPER RESULT: " + (R.length - bad.length) + "/" + R.length);

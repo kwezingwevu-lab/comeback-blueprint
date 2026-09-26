@@ -20,3 +20,15 @@ See CLAUDE.md §6 for the numbered list. Additions:
 - 2026-09-11: `build.py` prints `len()` of the text (characters), not bytes; a size mismatch against `wc -c` is not drift. Use `cmp`.
 - 2026-09-11: A multi-file doc batch that writes each file inside the loop is not atomic: a bad tuple shape on file two left file one already written. Collect every patched string first and write all files only after every assert has passed.
 - 2026-09-11: GitHub Mobile can create repositories (May 2026) but file upload is done on the website in Safari.
+
+- 2026-09-26: `toISOString()` on a local-midnight Date is the previous day in SAST (UTC+2). Build ISO dates from local parts (`isoLocal`) and add days at T12:00. Every harness now runs in Africa/Johannesburg so this class of bug shows up.
+- 2026-09-26: Tool-call input decodes `\uXXXX` into literal characters, so a Python anchor typed with `\u2014` no longer matches a file that stores the escape. Recon with `ascii()`/`repr()` and use raw strings for escaped anchors.
+- 2026-09-26: `*.png` in .gitignore silently dropped the app icons; deliverable images need explicit `!` negations.
+- 2026-09-26: Playwright `setOffline(true)` breaks every WebKit navigation ("internal error"); prove offline by shutting the server down.
+- 2026-09-26: `waitForNavigation` can be satisfied by an earlier download (the Track export); poll for the expected post-reload state and re-read after the vault/cloud boots.
+- 2026-09-26: When the rest beep plays, Chrome's media session fetches the page's touch icon; a harness copy of the page without `icons/` beside it logs a console error. Mirror the dist layout in the harness.
+- 2026-09-26: Header wrapping in sandbox screenshots is fallback fonts; `tools/fetch_fonts.sh` caches the real fonts into qa/.fonts for true-to-device shots.
+- 2026-09-26: Headless Chrome needs `--enable-unsafe-swiftshader --use-angle=swiftshader` for WebGL; without it the Body Lab falls back to text (which is also tested).
+- 2026-09-26: A ray-marched SDF body in linear light needs sRGB-looking inputs converted to linear before lighting; gamma on display-space colours washed the first render out. A rim light must be weighted by the view angle or it floods back views.
+- 2026-09-26: Subtracting two smooth-min ellipsoid bounds is not a distance (contour rings). Carry per-primitive values through the same smooth-min weights for anything measured on the surface.
+- 2026-09-26: Chart area fills bury the second line on multi-series charts; fill single-series charts only.

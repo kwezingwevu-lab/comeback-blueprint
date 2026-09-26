@@ -54,7 +54,11 @@ T('webkit: no page/console errors',errs.length===0,errs.join('|').slice(0,300));
  const vc=await q.evaluate(()=>{const b=document.getElementById('voiceBtn');if(b&&!b.disabled)b.click();return {btn:!!b,said:window.__said.slice()};});
  T('webkit: voice cue button renders and speaks when switched on',vc.btn&&vc.said.includes('Voice cue on'),JSON.stringify(vc));
  await q.evaluate(()=>switchView('home'));await wait(600);T('webkit: phone panel measures this browser live',await q.evaluate(()=>/This phone, checked live/i.test(document.getElementById('phoneCaps')?.innerText||'')&&/offline file copy/.test(document.getElementById('phoneCaps').innerText)));
- await q.evaluate(()=>switchView('roadmap'));await wait(300);await q.screenshot({path:path.resolve(__dirname,'shots/webkit-roadmap-ics-390.png'),fullPage:false});
+ await q.evaluate(()=>switchView('roadmap'));await wait(1800);
+ const bl=await q.evaluate(()=>{const p=blProbe();const fb=document.getElementById('blFallback');return {p,fb:fb&&!fb.hidden?fb.textContent:''};});
+ T('webkit: Body Lab renders in Safari’s engine, or states plainly why not',(bl.p.ok&&bl.p.lit>0.04)||/WebGL|GPU/.test(bl.fb),JSON.stringify(bl));
+ await q.evaluate(()=>document.getElementById('bodyLab').scrollIntoView({block:'start'}));await wait(300);await q.screenshot({path:path.resolve(__dirname,'shots/webkit-bodylab-390.png'),fullPage:false});
+ await q.evaluate(()=>document.getElementById('icsCard').scrollIntoView({block:'start'}));await wait(200);await q.screenshot({path:path.resolve(__dirname,'shots/webkit-roadmap-ics-390.png'),fullPage:false});
  T('webkit: upgrade walk has no page errors',e2.length===0,e2.join('|'));await c2.close();}
 // --- offline install in the Safari engine: serve dist/ over http like GitHub Pages
 {const http=require('http');const DIST=path.resolve(__dirname,'../dist'),BASE='/comeback-blueprint/dist/';const TY={'.html':'text/html; charset=utf-8','.js':'text/javascript','.webmanifest':'application/manifest+json','.png':'image/png'};
