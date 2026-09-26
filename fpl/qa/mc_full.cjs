@@ -232,7 +232,16 @@ while ((mm = DECL.exec(SRC))) FN_NAMES.push(mm[1]);
 const EPILOGUE = "\nmodule.exports.__FNS__ = {" +
   FN_NAMES.map(function (n) { return JSON.stringify(n) + ": (typeof " + n + " === \"function\" ? " + n + " : null)"; }).join(",") +
   "};\nmodule.exports.__WEEKLY__ = (typeof WEEKLY !== \"undefined\" ? WEEKLY : null);\n" +
-  "module.exports.__LIVE__ = (typeof LIVE !== \"undefined\" ? LIVE : null);\n";
+  "module.exports.__LIVE__ = (typeof LIVE !== \"undefined\" ? LIVE : null);\n" +
+  /* The engine's own registry of moving constants, read out of the assembled file rather than
+     typed here. E-084's class applied to a constant: `moves: 3` and `models: 9` below were both
+     frozen expectations that a correct change to the engine turned red. Reading them from the
+     artifact under test also means a drift between src/engine.js and the assembled app cannot
+     hide behind a matching literal in two places. */
+  "module.exports.__REG__ = {" +
+  "MAX_SWAPS: (typeof MAX_SWAPS !== \"undefined\" ? MAX_SWAPS : null)," +
+  "MAX_GREEDY_SWAPS: (typeof MAX_GREEDY_SWAPS !== \"undefined\" ? MAX_GREEDY_SWAPS : null)," +
+  "TOURNAMENT_MODELS: (typeof TOURNAMENT_MODELS !== \"undefined\" ? TOURNAMENT_MODELS : null)};\n";
 
 let CODE;
 try {
@@ -326,6 +335,28 @@ const MISSING = FN_NAMES.filter(function (n) { return typeof FNS[n] !== "functio
 fixture("mc_full-no-extracted-name-is-missing-from-the-evaluated-scope", MISSING.length === 0, MISSING.join(", "));
 fixture("mc_full-the-weekly-block-and-the-live-block-are-both-in-scope",
   MODULE.exports.__WEEKLY__ !== null && MODULE.exports.__LIVE__ !== null, "WEEKLY or LIVE missing from the assembled file");
+
+/* The registry the published caps are read from. Every value is checked here, because a cap that
+   quietly becomes `undefined` is worse than no cap: P12 skips an undefined cap and the group goes
+   green while guarding nothing. So a registry that did not come through is fatal, and the suite
+   never falls back to a literal. */
+const REG = MODULE.exports.__REG__ || {};
+{
+  const bad = [];
+  const ints = { MAX_SWAPS: REG.MAX_SWAPS, MAX_GREEDY_SWAPS: REG.MAX_GREEDY_SWAPS };
+  for (const k in ints) if (!Number.isInteger(ints[k]) || ints[k] < 1) bad.push(k + " = " + String(ints[k]));
+  if (Number.isInteger(REG.MAX_SWAPS) && Number.isInteger(REG.MAX_GREEDY_SWAPS) && REG.MAX_GREEDY_SWAPS < REG.MAX_SWAPS)
+    bad.push("MAX_GREEDY_SWAPS " + REG.MAX_GREEDY_SWAPS + " below MAX_SWAPS " + REG.MAX_SWAPS);
+  if (!Array.isArray(REG.TOURNAMENT_MODELS) || !REG.TOURNAMENT_MODELS.length) bad.push("TOURNAMENT_MODELS is not a non-empty array");
+  else if (!REG.TOURNAMENT_MODELS.every(function (m) { return m && typeof m.key === "string" && m.key; })) bad.push("a TOURNAMENT_MODELS entry has no key");
+  if (bad.length) {
+    console.log("FAIL mc_full-the-engine-registry-is-in-scope — " + bad.join("; "));
+    console.log("SUITE mc_full 0 iters · 0 assertions · 0/0 · 1");
+    process.exit(1);
+  }
+  fixture("mc_full-the-engine-registry-is-in-scope", true,
+    "MAX_SWAPS " + REG.MAX_SWAPS + " · MAX_GREEDY_SWAPS " + REG.MAX_GREEDY_SWAPS + " · " + REG.TOURNAMENT_MODELS.length + " tournament models");
+}
 
 const F = function (n) { return FNS[n]; };
 
@@ -599,10 +630,25 @@ const TENTH_KEYS = ["cost", "now_cost", "bank", "bankafter", "budget", "purchase
 // is a candidate pool and is legitimately longer — and "bench" is "whatever was not picked", so
 // its cap is the input list minus the eleven (4 for a real fifteen, and stricter than a flat 4
 // whenever the caller passed fewer than fifteen).
-// models is 9 from v88: the eight of E5 plus the F5 player-xG challenger.
-const CAPS = { squad: 15, xi: 11, moves: 3, order: 8, models: 9, claims: 20, alternatives: 3, reasons: 60, relaxations: 12,
+// Two of these caps used to be typed here and both went stale the week the engine moved.
+//   · `moves: 3` was MAX_SWAPS — the exhaustive search's own limit — standing in for the week's
+//     limit. Free transfers bank to five, so the week allows min(FT + 1, MAX_GREEDY_SWAPS) swaps
+//     and a five-move plan is correct (engine transferProtocol, ERRORS.md E-090). Measured on the
+//     shipped snapshot: FT 3 returns a four-move plan and FT 4 a five-move plan.
+//   · `models: 9` was the count of challengers before hier_pool became the tenth.
+// Both now come off the engine's registry, so registering a challenger or lifting the swap
+// ceiling is one line in src/engine.js and no churn in this suite. A search limit is never allowed
+// to masquerade as a published cap.
+const CAPS = { squad: 15, xi: 11, moves: REG.MAX_GREEDY_SWAPS, order: 8, models: REG.TOURNAMENT_MODELS.length,
+  claims: 20, alternatives: 3, reasons: 60, relaxations: 12,
   terms: 12, plan: 8, candidates: 16, sets: 2, bins: 20, x: 8, beta: 8, opponents: 4 };
 const IDS_CAP = { bestXI: 11, pickXI: 11, wildcardSolver: 15, wildcardOptions: 15, sanitiseState: 15 };
+// `order` means three different things in three returns — a transfer execution order, a draft
+// waiver order, a bench order — so the one that moves with the swap ceiling is capped per
+// function, the way `ids` is. transferProtocol pushes a sell and a buy per swap and then the
+// captain and the vice steps, so its ceiling follows MAX_GREEDY_SWAPS and is not a number typed
+// here: at the frozen 8 a correct five-move plan (order of 12, measured) would have gone red.
+const ORDER_CAP = { transferProtocol: 2 * REG.MAX_GREEDY_SWAPS + 2 };
 
 function walk(v, visit) {
   let nodes = 0;
@@ -759,6 +805,7 @@ const GROUPS = [
       const key = String(k);
       let cap = CAPS[key];
       if (key === "ids") cap = IDS_CAP[r.name];
+      if (key === "order" && ORDER_CAP[r.name] !== undefined) cap = ORDER_CAP[r.name];
       if (key === "bench") cap = srcLen > 11 ? srcLen - 11 : (srcLen ? 0 : 4);
       if (cap !== undefined && v.length > cap) bad = (p || key) + " holds " + v.length + " (cap " + cap + ")";
     });
@@ -839,12 +886,17 @@ const GROUPS = [
     const gk = r.out.filter(function (id) { return CTX.els[id] && CTX.els[id].element_type === 1; });
     return gk.length ? { ok: false, detail: "goalkeeper " + gk.join(",") + " in the outfield bench order" } : null;
   }],
-  ["P22", "transferProtocol never exceeds the FT budget and prices hits at −4 (E-004)", function (r) {
+  // The ceiling here is the WEEK's, min(FT + 1, MAX_GREEDY_SWAPS), read from the engine. It used
+  // to read Math.min(ft + 1, 3), which is MAX_SWAPS — the exhaustive search's limit — and would
+  // have gone red on the correct four- and five-move plans the greedy extension now returns
+  // (E-090). −4 a hit stays a literal: that is a rule of the game, not an observation.
+  ["P22", "transferProtocol never exceeds the week's transfer ceiling and prices hits at −4 (E-004, E-090)", function (r) {
     if (r.name !== "transferProtocol" || r.threw || !r.out) return null;
     const o = r.out;
     const k = Number(o.k), ft = Number(o.ft), hits = Number(o.hits);
     if (!isFinite(k) || !isFinite(ft) || !isFinite(hits)) return { ok: false, detail: "k " + o.k + " ft " + o.ft + " hits " + o.hits };
-    if (k > Math.min(ft + 1, 3)) return { ok: false, detail: r.kinds + " → k " + k + " with ft " + ft };
+    const weekK = Math.min(ft + 1, REG.MAX_GREEDY_SWAPS);
+    if (k > weekK) return { ok: false, detail: r.kinds + " → k " + k + " with ft " + ft + " (the week allows " + weekK + ")" };
     if (hits !== Math.max(0, k - ft) * 4) return { ok: false, detail: "hits " + hits + " for k " + k + " ft " + ft };
     return Array.isArray(o.moves) && o.moves.length === k ? null : { ok: false, detail: "k " + k + " but " + (o.moves ? o.moves.length : "no") + " moves" };
   }],
@@ -882,11 +934,16 @@ const GROUPS = [
     if (Number(r.out.gwsOfData) >= 8) return null;
     return r.out.pWin === null ? null : { ok: false, detail: r.kinds + " → pWin " + r.out.pWin + " on " + r.out.gwsOfData + " gameweeks" };
   }],
-  ["P29", "tournament returns the nine named models with ρ in [-1,1] or null", function (r) {
+  ["P29", "tournament returns the engine's registered models, in order, with ρ in [-1,1] or null", function (r) {
     if (r.name !== "tournament" || r.threw || !r.out || !Array.isArray(r.out.models)) return null;
-    const want = ["season_mean", "last_gw", "per90", "shrunk_per90", "ict_rate", "bps_rate", "blend", "component_xp", "player_xg"];
+    /* Derived from the engine's registry, never a typed list: this held the nine keys of v88 and
+       went red the week hier_pool became the tenth challenger, which was a correct change to the
+       engine. Registering an eleventh is now one line in src/engine.js and nothing here. The
+       registry is proved non-empty by the mc_full-the-engine-registry-is-in-scope fixture, so an
+       empty `want` cannot make this comparison vacuous. */
+    const want = REG.TOURNAMENT_MODELS.map(function (m) { return m.key; });
     const keys = r.out.models.map(function (m) { return m.key; });
-    if (keys.join(",") !== want.join(",")) return { ok: false, detail: "models " + keys.join(",") };
+    if (keys.join(",") !== want.join(",")) return { ok: false, detail: "models " + keys.join(",") + " against the registry's " + want.join(",") };
     const bad = r.out.models.filter(function (m) { return m.spearman !== null && !(m.spearman >= -1 && m.spearman <= 1); });
     return bad.length ? { ok: false, detail: "ρ out of range for " + bad.map(function (m) { return m.key; }).join(",") } : null;
   }],

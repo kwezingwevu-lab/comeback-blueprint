@@ -27086,6 +27086,7 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
             gain += g, moves.push({ out: o[j], in: i[j], outName: ctx.els[o[j]].web_name, inName: ctx.els[i[j]].web_name, xpOut: ctx.xp[o[j]].xp5, xpIn: ctx.xp[i[j]].xp5, gain: g, forced: isForced, priceOut: sellPrice(num(ctx.els[o[j]].now_cost, 0), purchase[o[j]]), priceIn: num(ctx.els[i[j]].now_cost, 0) });
           }
         }
+        if (moves.length !== k2) return null;
         var bankAfter2 = bankAfter_(bank, moves);
         return bankAfter2 < 0 ? null : (moves.sort(function(a, b) {
           return b.forced - a.forced || b.gain - a.gain;
@@ -27180,13 +27181,17 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
         plans.sort(function(a, b) {
           return b.value - a.value || a.k - b.k;
         });
-        for (var grown = plans[0], gk = MAX_SWAPS + 1; gk <= weekK; gk++) {
-          var used = {};
-          grown.outs.forEach(function(id) {
+        for (var grown = plans[0], step = 0; step < weekK && grown.moves.length < weekK; step++) {
+          var baseOuts = grown.moves.map(function(m) {
+            return m.out;
+          }), baseIns = grown.moves.map(function(m) {
+            return m.in;
+          }), gk = baseOuts.length + 1, used = {};
+          baseOuts.forEach(function(id) {
             used[id] = !0;
           });
           var usedIn = {};
-          grown.ins.forEach(function(id) {
+          baseIns.forEach(function(id) {
             usedIn[id] = !0;
           });
           var bestNext = null, stillOut = squad.filter(function(id) {
@@ -27199,7 +27204,7 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
             var cands = candByPos[elType(ctx.els[outId])] || [];
             cands.slice(0, 8).forEach(function(inId) {
               if (!usedIn[inId]) {
-                var p = evalPlan(grown.outs.concat([outId]), grown.ins.concat([inId]), gk);
+                var p = evalPlan(baseOuts.concat([outId]), baseIns.concat([inId]), gk);
                 p && (!bestNext || p.value > bestNext.value) && (bestNext = p);
               }
             });
@@ -30710,6 +30715,9 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
       tRef: 0,
       teams: [],
       fitCheck: { predicted: 0, observed: 0, gap: 0 },
+      shrink: !0,
+      shrinkK: TS_K,
+      games: {},
       note: ""
     };
     try {
@@ -30782,7 +30790,16 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
       var predSum = 0, obsSum = 0;
       ms.forEach(function(m) {
         predSum += m.w * (mu * att[m.h] * def[m.a] * gamma2 + mu * att[m.a] * def[m.h]), obsSum += m.w * (m.hg + m.ag);
-      }), res.fitCheck = { predicted: predSum, observed: obsSum, gap: obsSum > 0 ? Math.abs(predSum - obsSum) / obsSum : 0 }, res.iters = it, res.converged = moved <= DC_TOL, res.att = att, res.def = def, res.mu = mu, res.gamma = gamma2, res.weightSum = sum(ms, function(m) {
+      }), res.fitCheck = { predicted: predSum, observed: obsSum, gap: obsSum > 0 ? Math.abs(predSum - obsSum) / obsSum : 0 }, res.shrink = o.shrink !== !1, res.shrinkK = TS_K;
+      var gOf = {};
+      ids.forEach(function(t) {
+        gOf[t] = 0;
+      }), ms.forEach(function(m) {
+        gOf[m.h] += m.w, gOf[m.a] += m.w;
+      }), res.games = gOf, res.shrink && ids.forEach(function(t) {
+        var w = gOf[t] / (gOf[t] + TS_K);
+        att[t] = clamp(w * att[t] + (1 - w), 0.05, 5), def[t] = clamp(w * def[t] + (1 - w), 0.05, 5);
+      }), res.iters = it, res.converged = moved <= DC_TOL, res.att = att, res.def = def, res.mu = mu, res.gamma = gamma2, res.weightSum = sum(ms, function(m) {
         return m.w;
       });
       var lo = -1, hi = 1;
@@ -30807,7 +30824,7 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
       ms.forEach(function(m) {
         var lh = mu * att[m.h] * def[m.a] * gamma2, la = mu * att[m.a] * def[m.h], base = -lh + m.hg * Math.log(Math.max(1e-12, lh)) - logGamma(m.hg + 1) - la + m.ag * Math.log(Math.max(1e-12, la)) - logGamma(m.ag + 1);
         ll += m.w * (base + Math.log(Math.max(1e-12, dcTau(m.hg, m.ag, lh, la, res.rho))));
-      }), res.loglik = isFinite(ll) ? ll : 0, res.ok = !0, res.note = "Dixon-Coles on " + res.basis + ": " + ms.length + " matches, effective weight " + res.weightSum.toFixed(2) + " at a decay of " + res.xi + " per day (half-life " + (res.xi > 0 ? (Math.log(2) / res.xi).toFixed(0) : "infinite") + " days), home factor " + res.gamma.toFixed(3) + ", rho " + res.rho.toFixed(4) + " inside [" + res.rhoRange.lo.toFixed(3) + ", " + res.rhoRange.hi.toFixed(3) + "], mean rate " + res.mu.toFixed(3) + " per team-match (fitted total " + res.fitCheck.predicted.toFixed(2) + " against the observed " + res.fitCheck.observed.toFixed(2) + ", gap " + (res.fitCheck.gap * 100).toFixed(3) + "%)" + (res.basis === "xg" ? " (xG is not a scoreline, so the low-cell correction is applied at prediction time with a rho fitted on goals, never fitted on xG itself)" : "") + ", " + res.iters + " iterations" + (res.converged ? ", converged" : ", NOT converged") + ".";
+      }), res.loglik = isFinite(ll) ? ll : 0, res.ok = !0, res.note = "Dixon-Coles on " + res.basis + ": " + ms.length + " matches, effective weight " + res.weightSum.toFixed(2) + " at a decay of " + res.xi + " per day (half-life " + (res.xi > 0 ? (Math.log(2) / res.xi).toFixed(0) : "infinite") + " days), home factor " + res.gamma.toFixed(3) + ", rho " + res.rho.toFixed(4) + " inside [" + res.rhoRange.lo.toFixed(3) + ", " + res.rhoRange.hi.toFixed(3) + "], mean rate " + res.mu.toFixed(3) + " per team-match (fitted total " + res.fitCheck.predicted.toFixed(2) + " against the observed " + res.fitCheck.observed.toFixed(2) + ", gap " + (res.fitCheck.gap * 100).toFixed(3) + "%)" + (res.basis === "xg" ? " (xG is not a scoreline, so the low-cell correction is applied at prediction time with a rho fitted on goals, never fitted on xG itself)" : "") + ", " + res.iters + " iterations" + (res.converged ? ", converged" : ", NOT converged") + (res.shrink ? ", attack and defence shrunk towards the league with w = g/(g+" + TS_K + ") as E2 does" : ", NO shrinkage (raw maximum likelihood)") + ".";
     } catch (e) {
       res.note = "engine error: " + errMsg(e);
     }
@@ -30841,15 +30858,17 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
       if (keys.length < 2)
         return res.note = "a walk-forward needs at least two finished gameweeks; this snapshot has " + keys.length, res;
       var defs = [
-        { key: "lite", name: "TS lite (xG, no tau, no decay)" },
-        { key: "dc_goals", name: "Dixon-Coles on goals (tau + decay)" },
-        { key: "dc_xg", name: "Dixon-Coles on xG (tau from goals + decay)" }
+        { key: "lite", name: "TS lite (xG, shrunk, no tau, no decay)" },
+        { key: "dc_goals", name: "Dixon-Coles on goals (tau + decay, shrunk)" },
+        { key: "dc_xg", name: "Dixon-Coles on xG (tau from goals + decay, shrunk)" },
+        { key: "dc_goals_raw", name: "Dixon-Coles on goals, no shrinkage" },
+        { key: "dc_xg_raw", name: "Dixon-Coles on xG, no shrinkage" }
       ], P = {}, Y = [], perGw = [];
       defs.forEach(function(d) {
         P[d.key] = [];
       });
       for (var lastRho = null, i = 1; i < keys.length; i++) {
-        var g = keys[i], cut = keys[i - 1], cutLive = truncateLive(live, cut), st = teamStrength(cutLive), dcg = dixonColes(live, { basis: "goals", upto: cut, xi: xiD }), dcx = dixonColes(live, { basis: "xg", upto: cut, xi: xiD, rho: dcg.ok ? dcg.rho : 0 });
+        var g = keys[i], cut = keys[i - 1], cutLive = truncateLive(live, cut), st = teamStrength(cutLive), dcg = dixonColes(live, { basis: "goals", upto: cut, xi: xiD }), dcx = dixonColes(live, { basis: "xg", upto: cut, xi: xiD, rho: dcg.ok ? dcg.rho : 0 }), dcgR = dixonColes(live, { basis: "goals", upto: cut, xi: xiD, shrink: !1 }), dcxR = dixonColes(live, { basis: "xg", upto: cut, xi: xiD, rho: dcg.ok ? dcg.rho : 0, shrink: !1 });
         dcg.ok && (lastRho = dcg.rho);
         var rowsGw = { gw: g, n: 0, rho: dcg.ok ? dcg.rho : null, matches: dcg.matches, byModel: {} };
         defs.forEach(function(d) {
@@ -30865,9 +30884,13 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
                 var y = side.conceded === 0 ? 1 : 0, preds = {
                   lite: tsPcs(side.t, side.o, side.home, st.TS),
                   dc_goals: dcg.ok ? dcPcs(side.t, side.o, side.home, dcg) : null,
-                  dc_xg: dcx.ok ? dcPcs(side.t, side.o, side.home, dcx) : null
-                };
-                preds.dc_goals === null || preds.dc_xg === null || (defs.forEach(function(d) {
+                  dc_xg: dcx.ok ? dcPcs(side.t, side.o, side.home, dcx) : null,
+                  dc_goals_raw: dcgR.ok ? dcPcs(side.t, side.o, side.home, dcgR) : null,
+                  dc_xg_raw: dcxR.ok ? dcPcs(side.t, side.o, side.home, dcxR) : null
+                }, missing = !1;
+                defs.forEach(function(d) {
+                  (preds[d.key] === null || preds[d.key] === void 0) && (missing = !0);
+                }), !missing && (defs.forEach(function(d) {
                   P[d.key].push(preds[d.key]), rowsGw.byModel[d.key].pred.push(preds[d.key]), rowsGw.byModel[d.key].y.push(y);
                 }), Y.push(y), rowsGw.n++);
               }

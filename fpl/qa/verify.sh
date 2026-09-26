@@ -348,14 +348,108 @@ done
 if [ -z "$missing" ]; then ok "every-suite-file-present-in-qa" "$present of 12 suite files present"
 else bad "every-suite-file-present-in-qa" "$present of 12 present; missing:$missing"; fi
 
-# I8 · dist/index.html exists and is not older than the sources it is built from
-if [ ! -f "$DIST" ]; then
-  bad "dist-index-html-exists-and-is-not-older-than-src" "$DIST does not exist"
-else
-  newer="$(find src data build.cjs -type f -newer "$DIST" 2>/dev/null | head -3 | tr '\n' ' ')"
-  if [ -z "$newer" ]; then ok "dist-index-html-exists-and-is-not-older-than-src" "$DIST ($(wc -c < "$DIST") bytes) is at least as new as src/, data/ and build.cjs"
-  else bad "dist-index-html-exists-and-is-not-older-than-src" "newer than dist: $newer — run node build.cjs"; fi
+# I8 · what ships was built from the sources as they stand — compared by content, not by clock
+#
+# This check was `find src data build.cjs -newer dist/index.html`. Four faults, each measured:
+#   · mtime is not content. Append a line to src/engine.js, do not rebuild, then touch
+#     dist/index.html: the old form went GREEN on a page that was missing that line. Any
+#     `cp -p`, checkout or touch could hand it a fresh clock over a stale artefact.
+#   · it over-reached. `find data` covers data/validate_live.cjs and data/fetch_live.cjs,
+#     which the build never reads, so touching a validator reported the page as stale.
+#   · it under-reached. It never looked at app/FPL_Mission_Control.jsx, so a build that
+#     assembled the app and then died before writing the page read GREEN.
+#   · its verdict moved under its own feet — red inside a gate run, green seconds later by
+#     hand, because a second overlapping gate rebuilt dist/ in between. Both readings were
+#     true of the clock at the instant they were taken; neither was a reading of the artefact.
+#
+# CONTRACT §2 fixes the assembled file as a verbatim concatenation, so the comparison below is
+# exact: the engine, the weekly block and the ui body must stand in app/FPL_Mission_Control.jsx
+# byte for byte, and the LIVE literal must parse to the same data as data/live.json. It reads
+# 1.1 MB of sources against the 1.1 MB app in 40 ms, and no clock can flatter it.
+#
+# dist/index.html is esbuild output, which cannot be compared to its input without restating
+# build.cjs's bundler options here — a second copy that would call a fresh page stale the day
+# those options change. That last hop stays a clock comparison, and only between the two files
+# one build writes in a fixed order, so a build landing inside the same second (or the same
+# nanosecond) is green: only the app strictly newer than the page is a fault.
+#
+# Nothing here is tolerated away. The whole check is simply taken a second time, unchanged, if
+# the first reading is red: build.cjs writes the app 0.82-0.90 s before the page (five builds
+# measured, whole build 0.94-1.00 s), so a sample taken inside ANOTHER gate's build sees the
+# app ahead of the page, or catches the 1.1 MB app half-written. Four seconds is over four
+# times the longest build measured here; a real fault is still there afterwards, a build in
+# flight is not. Do not turn this into a tolerance on the gap itself — and the proper cure for
+# overlapping runs is a lock in qa/run.sh, not a wait here.
+i8_probe() { node -e 'const fs = require("fs");
+const APP = "app/FPL_Mission_Control.jsx";
+const DIST = "dist/index.html";
+const bad = [];
+const note = [];
+const need = [APP, DIST, "src/engine.js", "src/ui.jsx", "data/weekly.js", "data/live.json", "build.cjs"];
+for (const f of need) {
+  if (!fs.existsSync(f)) { console.log(f + " does not exist"); process.exit(1); }
+  if (fs.statSync(f).size === 0) { console.log(f + " is empty"); process.exit(1); }
+}
+const app = fs.readFileSync(APP, "utf8");
+function between(a, b) {
+  const i = app.indexOf(a), j = app.indexOf(b);
+  if (i < 0 || j < 0 || j < i) { console.log("marker missing or out of order in " + APP + ": " + a + " / " + b); process.exit(1); }
+  return app.slice(i + a.length, j).trim();
+}
+function same(label, shipped, source) {
+  if (shipped === source) { note.push(label + " " + source.length + "B verbatim"); return; }
+  let k = 0;
+  const n = Math.min(shipped.length, source.length);
+  while (k < n && shipped[k] === source[k]) k++;
+  bad.push(label + " differs from byte " + k + " (source " + source.length + "B, shipped " + shipped.length + "B)");
+}
+same("engine", between("// ENGINE — START", "// ENGINE — END"), fs.readFileSync("src/engine.js", "utf8").trim());
+same("weekly", between("// WEEKLY STRATEGY ENGINE — START", "// WEEKLY STRATEGY ENGINE — END"), fs.readFileSync("data/weekly.js", "utf8").trim());
+const liveBlock = between("// LIVE DATA — START", "// LIVE DATA — END");
+const head = "const LIVE = ";
+if (!liveBlock.startsWith(head) || !liveBlock.endsWith(";")) {
+  bad.push("the LIVE block is not one " + head + "<literal>; statement");
+} else {
+  let shipped = null, source = null;
+  try { shipped = JSON.stringify(JSON.parse(liveBlock.slice(head.length, -1))); } catch (e) { bad.push("the shipped LIVE literal does not parse as JSON: " + e.message); }
+  try { source = JSON.stringify(JSON.parse(fs.readFileSync("data/live.json", "utf8"))); } catch (e) { bad.push("data/live.json does not parse as JSON: " + e.message); }
+  if (shipped && source) same("live", shipped, source);
+}
+/* The ui body, lifted the way build.cjs lifts it: blank lines, comments and imports off the top,
+   and everything from the first other statement on is the body (CONTRACT section 2 item 5). */
+const lines = fs.readFileSync("src/ui.jsx", "utf8").split("\n");
+let k = 0;
+for (; k < lines.length; k++) {
+  const t = lines[k].trim();
+  if (t === "" || t.startsWith("//") || t.startsWith("import ")) continue;
+  break;
+}
+const uiBody = lines.slice(k).join("\n").trim();
+if (app.indexOf(uiBody) >= 0) note.push("ui body " + uiBody.length + "B verbatim");
+else bad.push("the src/ui.jsx body after its imports (" + uiBody.length + "B) is not in " + APP + " verbatim");
+/* The one hop no content comparison reaches: esbuild output against its input. Both files come
+   out of one build.cjs run, the assembled app first, so only the app NEWER than the page is a
+   fault, and equal timestamps pass. build.cjs is held the same way: nothing else covers it. */
+const ns = function (f) { return fs.statSync(f, { bigint: true }).mtimeNs; };
+const appNs = ns(APP), distNs = ns(DIST), buildNs = ns("build.cjs");
+const ms = function (a, b) { return (Number(a - b) / 1e6).toFixed(0); };
+if (appNs > distNs) bad.push(APP + " is " + ms(appNs, distNs) + " ms newer than " + DIST + ", so the page was not written by that build");
+else note.push(DIST + " written " + ms(distNs, appNs) + " ms after " + APP);
+if (buildNs > appNs) bad.push("build.cjs is " + ms(buildNs, appNs) + " ms newer than " + APP + ", so the assembler changed after the last assembly");
+if (bad.length) { console.log(bad.join("; ")); process.exit(1); }
+console.log(note.join(", ") + "; " + fs.statSync(DIST).size + " bytes shipped");
+process.exit(0);' 2>&1; }
+i8_out="$(i8_probe)"
+i8_rc=$?
+i8_again=""
+if [ "$i8_rc" -ne 0 ]; then
+  sleep 4
+  i8_out="$(i8_probe)"
+  i8_rc=$?
+  i8_again=" [re-read 4 s later: a build in flight would have finished]"
 fi
+if [ "$i8_rc" -eq 0 ]; then ok "dist-and-app-are-built-from-the-current-sources" "$(printf '%s' "$i8_out" | tail -1)$i8_again"
+else bad "dist-and-app-are-built-from-the-current-sources" "$(printf '%s' "$i8_out" | tail -3 | tr '\n' ' ') — run node build.cjs$i8_again"; fi
 
 # I9 · no hyperlink in the app copy (A1 working style: no hyperlinks in deliverables)
 links="$(grep -n -e '<a ' -e 'href=' -e '](http' src/ui.jsx "$APP" 2>/dev/null | head -3 || true)"

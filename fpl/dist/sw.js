@@ -4,7 +4,7 @@
  * deploy. Nothing cross-origin and nothing that is not a GET is ever cached — the D4
  * refresh path is a POST to api.anthropic.com and must always hit the network. */
 "use strict";
-var CACHE = "fpl-mc-v89-3f86325b2a44";
+var CACHE = "fpl-mc-v89-48090f7ae0bb";
 var SHELL = ["./","./index.html","./manifest.webmanifest","./icon.svg","./icon-192.png","./icon-512.png","./icon-maskable-512.png"];
 
 self.addEventListener('install', function (e) {

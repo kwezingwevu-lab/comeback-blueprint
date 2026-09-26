@@ -918,3 +918,78 @@ the other side, so neither suite is the only thing standing between a raw feed a
 leak was removed from the branch as well as from the tree: the commit that introduced it was
 rewritten before it went any further, because a name that has been pushed is not un-shipped by a
 later deletion.
+
+### E-092 · v110 · the greedy transfer extension counted from a constant instead of from the plan it was growing
+CAUSE: the extension that takes a transfer plan past three swaps ran `for (gk = MAX_SWAPS + 1; gk <= weekK; gk++)`
+while the plan it grows from is whatever won the exhaustive search — and that winner is often a one- or two-swap
+plan, because a k-swap out-set is forced to carry min(forced, k) forced sells, and two forced sells plus one
+high-gain choice can beat three forced sells. Growing a two-swap plan therefore produced three moves labelled
+k = 4. Three consequences, all shipped: `moves.length !== k`; a hit charged at four points for a transfer nobody
+made, because the hit is priced off the same k; and the last free transfer left unused, because the counter ran out
+before the plan did. A plan whose moves disagree with its k is not a plan, it is a lie with a price on it.
+CAUGHT: v110, by `qa/mc_all.cjs` I55 — 82 failures across its synthetic universes. My own first attempt to
+reproduce it on the live snapshot failed and I reported that it did not reproduce there: I swept FT 0–5 against
+bank 0–40 tenths in steps of ten and got 0 mismatches in 36 states. Stepping the bank by one instead finds **27 of
+246 live states**, every one at a tight bank (FT 3, bank 1–9; FT 4, bank 1–9). At the shipped bank of 16 it does
+not fire. A coarse sweep is not a reproduction, and "it does not reproduce on live data" was the wrong conclusion
+drawn from too few samples.
+RULE: two rules, and the second is the one that makes it impossible.
+  1. A loop that grows a structure counts from that structure, never from the constant that bounded the previous
+     stage. The step now reads `grown.moves`: the base pairs come from the moves the plan actually reports, the new
+     k is one more than that count, and the loop runs while that count is below the week's limit.
+  2. `evalPlan` refuses to return a plan whose moves length differs from its k. The pairing already refuses an out
+     whose position has no candidate left; this is the backstop for any caller that miscounts the swaps it asked
+     for, so no future caller can reintroduce the same class from outside.
+TEST: `qa/mc_all.cjs` I55 and I54, and `qa/unit_engine.cjs`'s three E-090 checks — the week-limit sweep across
+FT 0–5, the monotonicity of the greedy extension, and the naming of a forced sell the plan keeps. 266/266 and
+`mc_full` 246/246 with 114,013 assertions. The reproduction harness drove mc_all's own universe generator at its
+own seed rather than inventing one, so the failing shapes are the suite's own: u32 (gwN 8, FT 4, bank 8, three
+forced sells → k=4 with 3 moves) and u63 (gwN 3, FT 5, bank 18 → k=5 with 4 moves).
+
+### E-093 · v110 · the check that what ships was built from the sources compared clocks, not content
+CAUSE: `qa/verify.sh` I8 was `find src data build.cjs -type f -newer dist/index.html`. Four faults, each measured
+rather than argued:
+  · mtime is not content. Append a line to `src/engine.js`, do not rebuild, then `touch dist/index.html`: the old
+    form went GREEN on a page missing that line. Any `cp -p`, checkout or touch hands it a fresh clock over a stale
+    artefact.
+  · it over-reached. `find data` covers `data/validate_live.cjs` and `data/fetch_live.cjs`, which the build never
+    reads, so touching a validator reported the shipped page as stale.
+  · it under-reached. It never looked at `app/FPL_Mission_Control.jsx`, so a build that assembled the app and then
+    died before writing the page read GREEN.
+  · its verdict moved under its own feet — red inside a gate run, green seconds later by hand — because a second
+    overlapping gate run rebuilt `dist/` in between. Both readings were true of the clock at the instant they were
+    taken; neither was a reading of the artefact.
+CAUGHT: v110. The flap is what drew attention, and the flap was the least of it: the mutation that matters is the
+one where the old check passed a page that genuinely did not contain the code it claimed to ship.
+RULE: compare content, not clocks, wherever the contract makes content comparable. CONTRACT §2 fixes the assembled
+file as a verbatim concatenation, so the engine, the weekly block and the ui body must stand in
+`app/FPL_Mission_Control.jsx` byte for byte, and the LIVE literal must parse to the same data as `data/live.json`.
+That reads 1.1 MB against 1.1 MB in 40 ms and no clock can flatter it. `dist/index.html` is esbuild output and
+cannot be compared to its input without restating build.cjs's bundler options — a second copy that would call a
+fresh page stale the day those options change — so that last hop stays a clock comparison, between the two files
+one build writes in a fixed order, and only the app STRICTLY newer than the page is a fault.
+  Nothing is tolerated away. A red first reading is simply taken again, unchanged, four seconds later: build.cjs
+writes the app 0.82–0.90 s before the page across five measured builds, so a sample taken inside another gate's
+build sees the app ahead of the page or catches the 1.1 MB app half-written, while a real fault is still there
+afterwards. This is not a tolerance on the gap, and the proper cure for overlapping runs is a lock in `qa/run.sh`,
+which is still open.
+TEST: `bash qa/verify.sh` 33/33, with the mutation that the old form could not fail: append a line to
+`src/engine.js`, touch `dist/index.html`, and I8 goes red naming the byte offset where the engine diverges —
+"engine differs from byte 75695 (source 334243B, shipped 330613B)".
+
+### E-094 · v110 · two suites published a cap that was a search limit and a model count that was a photograph
+CAUSE: `qa/mc_full.cjs` CAPS typed `moves: 3` and `models: 9`. `moves: 3` was `MAX_SWAPS`, the exhaustive search's
+own limit, standing in for the week's limit — and free transfers bank to five, so a five-move plan is correct
+(E-090). `models: 9` counted the tournament's challengers before `hier_pool` was registered as the tenth. `P29` in
+mc_full and `I95` in mc_all each pinned the nine v88 model keys as a literal array, which was never an invariant
+about the engine, only a photograph of one release. Two further instances of the same staleness were found in the
+same files and were not yet red: `P22` asserted against `min(ft + 1, 3)`, and `CAPS.order` was `2 × 3 + 2`, the
+three-swap execution list plus the captain and vice steps.
+CAUGHT: v110, by the full gate: P12 12 failures, P29 12, I95 1777 of 1777 runs. A correct engine change turned
+three suites red, which is the signature of the class.
+RULE: E-084's rule applies to a constant exactly as it applies to a date. A published cap is a limit the engine
+declares, read from the engine — `MAX_SWAPS`, `MAX_GREEDY_SWAPS`, `TOURNAMENT_MODELS.length` — never a number
+retyped in a suite. Registering an eleventh challenger is then one line in the engine and no churn in the suites.
+TEST: `qa/mc_full.cjs` 246/246 at 114,013 assertions and `qa/mc_all.cjs`'s I95, both reading the registry; and
+`qa/no_frozen.cjs` 6/6, which is the machine-checked form of the rule. Mutation-proven by reverting one registry
+read to a literal and confirming the check goes red again.

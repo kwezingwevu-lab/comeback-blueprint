@@ -1233,6 +1233,12 @@ function transferProtocol(state, ctx) {
           moves.push({ out: o[j], in: i[j], outName: ctx.els[o[j]].web_name, inName: ctx.els[i[j]].web_name, xpOut: ctx.xp[o[j]].xp5, xpIn: ctx.xp[i[j]].xp5, gain: g, forced: isForced, priceOut: sellPrice(num(ctx.els[o[j]].now_cost, 0), purchase[o[j]]), priceIn: num(ctx.els[i[j]].now_cost, 0) });
         }
       }
+      /* E-092: k is what every caller downstream believes about this plan — the number of
+         transfers, the hit priced at 4 each, the "k of your FT free" line on the landing card. A
+         plan whose moves disagree with its k is not a plan, it is a lie with a price on it, so it
+         never leaves this function. The pairing above already refuses an out whose position has no
+         candidate left; this is the backstop for any caller that miscounts the swaps it asked for. */
+      if (moves.length !== k) return null;
       var bankAfter = bankAfter_(bank, moves);
       if (bankAfter < 0) return null;
       moves.sort(function (a, b) { return (b.forced - a.forced) || (b.gain - a.gain); });
@@ -1261,13 +1267,26 @@ function transferProtocol(state, ctx) {
        so far and add the single best further swap, while the week still allows one. Exhaustive
        would mean C(15,4) out-sets times the candidates per slot, and that is not a search a phone
        finishes. Greedy is monotone here — a swap is only added when it raises the plan's value —
-       so a four-swap plan never scores worse than the three-swap plan it grew from. */
+       so a four-swap plan never scores worse than the three-swap plan it grew from.
+
+       E-092: the loop used to count `gk` from MAX_SWAPS + 1 to weekK while the plan it grows from
+       is whatever won the exhaustive search — and that winner is often a one- or two-swap plan,
+       because a k-swap out-set is forced to carry min(forced, k) forced sells, and two forced sells
+       plus one high-gain choice can beat three forced sells. Growing a two-swap plan then produced
+       three moves labelled k = 4: `moves.length !== k` (mc_all I55), a hit charged for a transfer
+       nobody made (I54 prices the hit off the same k), and the last free transfer left unused
+       because the counter ran out before the plan did. The step now reads the plan's own moves: the
+       base pairs come from `grown.moves`, the new k is one more than the moves the plan actually
+       reports, and the loop runs while that count is below the week's limit. */
     if (weekK > MAX_SWAPS && plans.length) {
       plans.sort(function (a, b) { return b.value - a.value || a.k - b.k; });
       var grown = plans[0];
-      for (var gk = MAX_SWAPS + 1; gk <= weekK; gk++) {
-        var used = {}; grown.outs.forEach(function (id) { used[id] = true; });
-        var usedIn = {}; grown.ins.forEach(function (id) { usedIn[id] = true; });
+      for (var step = 0; step < weekK && grown.moves.length < weekK; step++) {
+        var baseOuts = grown.moves.map(function (m) { return m.out; });
+        var baseIns = grown.moves.map(function (m) { return m.in; });
+        var gk = baseOuts.length + 1;
+        var used = {}; baseOuts.forEach(function (id) { used[id] = true; });
+        var usedIn = {}; baseIns.forEach(function (id) { usedIn[id] = true; });
         var bestNext = null;
         var stillOut = squad.filter(function (id) { return !used[id] && !protectedIds[id]; });
         // Forced sells still in the squad come first, then the rest by lowest five-week xp.
@@ -1279,7 +1298,7 @@ function transferProtocol(state, ctx) {
           var cands = candByPos[elType(ctx.els[outId])] || [];
           cands.slice(0, 8).forEach(function (inId) {
             if (usedIn[inId]) return;
-            var p = evalPlan(grown.outs.concat([outId]), grown.ins.concat([inId]), gk);
+            var p = evalPlan(baseOuts.concat([outId]), baseIns.concat([inId]), gk);
             if (!p) return;
             if (!bestNext || p.value > bestNext.value) bestNext = p;
           });
@@ -5037,7 +5056,8 @@ function dixonColes(live, opts) {
   var res = {
     ok: false, basis: "goals", xi: DC_DECAY_PER_DAY, upto: null, mu: LBAR_PRIOR, gamma: HOME_ADV,
     att: {}, def: {}, rho: 0, rhoRange: { lo: -1, hi: 1 }, rhoLogLik: 0, matches: 0, weightSum: 0,
-    iters: 0, converged: false, loglik: 0, tRef: 0, teams: [], fitCheck: { predicted: 0, observed: 0, gap: 0 }, note: ""
+    iters: 0, converged: false, loglik: 0, tRef: 0, teams: [], fitCheck: { predicted: 0, observed: 0, gap: 0 },
+    shrink: true, shrinkK: TS_K, games: {}, note: ""
   };
   try {
     var o = isObj(opts) ? opts : {};
@@ -5117,6 +5137,25 @@ function dixonColes(live, opts) {
       obsSum += m.w * (m.hg + m.ag);
     });
     res.fitCheck = { predicted: predSum, observed: obsSum, gap: obsSum > 0 ? Math.abs(predSum - obsSum) / obsSum : 0 };
+    /* Shrinkage, and why it is here. A raw maximum-likelihood Dixon-Coles fit on five gameweeks
+       gives every team at most five matches, so a side that has kept two clean sheets is fitted a
+       defence at the clamp and a 93% clean-sheet probability. The incumbent TS shrinks towards the
+       league with w = g/(g+TS_K), and leaving that out would make this comparison a test of
+       "shrinkage or no shrinkage" wearing the label "tau and decay". So the SAME shrinkage is
+       applied here, held constant across the models being compared, and opts.shrink === false
+       returns the raw fit so the cost of leaving it out can be measured rather than argued about.
+       fitCheck above is taken on the unshrunk fit: it is a test of the fit, not of the prior. */
+    res.shrink = o.shrink !== false;
+    res.shrinkK = TS_K;
+    var gOf = {};
+    ids.forEach(function (t) { gOf[t] = 0; });
+    ms.forEach(function (m) { gOf[m.h] += m.w; gOf[m.a] += m.w; });
+    res.games = gOf;
+    if (res.shrink) ids.forEach(function (t) {
+      var w = gOf[t] / (gOf[t] + TS_K);
+      att[t] = clamp(w * att[t] + (1 - w), 0.05, 5);
+      def[t] = clamp(w * def[t] + (1 - w), 0.05, 5);
+    });
     res.iters = it; res.converged = moved <= DC_TOL;
     res.att = att; res.def = def; res.mu = mu; res.gamma = gamma;
     res.weightSum = sum(ms, function (m) { return m.w; });
@@ -5168,7 +5207,8 @@ function dixonColes(live, opts) {
       ", mean rate " + res.mu.toFixed(3) + " per team-match (fitted total " + res.fitCheck.predicted.toFixed(2) +
       " against the observed " + res.fitCheck.observed.toFixed(2) + ", gap " + (res.fitCheck.gap * 100).toFixed(3) + "%)" +
       (res.basis === "xg" ? " (xG is not a scoreline, so the low-cell correction is applied at prediction time with a rho fitted on goals, never fitted on xG itself)" : "") +
-      ", " + res.iters + " iterations" + (res.converged ? ", converged" : ", NOT converged") + ".";
+      ", " + res.iters + " iterations" + (res.converged ? ", converged" : ", NOT converged") +
+      (res.shrink ? ", attack and defence shrunk towards the league with w = g/(g+" + TS_K + ") as E2 does" : ", NO shrinkage (raw maximum likelihood)") + ".";
   } catch (e) { res.note = "engine error: " + errMsg(e); }
   return res;
 }
@@ -5213,9 +5253,11 @@ function cleanSheetCalibration(live, opts) {
     var keys = Object.keys(live.gw).map(function (k) { return num(k, NaN); }).filter(isFinite).sort(sortNum);
     if (keys.length < 2) { res.note = "a walk-forward needs at least two finished gameweeks; this snapshot has " + keys.length; return res; }
     var defs = [
-      { key: "lite", name: "TS lite (xG, no tau, no decay)" },
-      { key: "dc_goals", name: "Dixon-Coles on goals (tau + decay)" },
-      { key: "dc_xg", name: "Dixon-Coles on xG (tau from goals + decay)" }
+      { key: "lite", name: "TS lite (xG, shrunk, no tau, no decay)" },
+      { key: "dc_goals", name: "Dixon-Coles on goals (tau + decay, shrunk)" },
+      { key: "dc_xg", name: "Dixon-Coles on xG (tau from goals + decay, shrunk)" },
+      { key: "dc_goals_raw", name: "Dixon-Coles on goals, no shrinkage" },
+      { key: "dc_xg_raw", name: "Dixon-Coles on xG, no shrinkage" }
     ];
     var P = {}, Y = [], perGw = [];
     defs.forEach(function (d) { P[d.key] = []; });
@@ -5226,6 +5268,8 @@ function cleanSheetCalibration(live, opts) {
       var st = teamStrength(cutLive);
       var dcg = dixonColes(live, { basis: "goals", upto: cut, xi: xiD });
       var dcx = dixonColes(live, { basis: "xg", upto: cut, xi: xiD, rho: dcg.ok ? dcg.rho : 0 });
+      var dcgR = dixonColes(live, { basis: "goals", upto: cut, xi: xiD, shrink: false });
+      var dcxR = dixonColes(live, { basis: "xg", upto: cut, xi: xiD, rho: dcg.ok ? dcg.rho : 0, shrink: false });
       if (dcg.ok) lastRho = dcg.rho;
       var rowsGw = { gw: g, n: 0, rho: dcg.ok ? dcg.rho : null, matches: dcg.matches, byModel: {} };
       defs.forEach(function (d) { rowsGw.byModel[d.key] = { pred: [], y: [] }; });
@@ -5240,9 +5284,13 @@ function cleanSheetCalibration(live, opts) {
           var preds = {
             lite: tsPcs(side.t, side.o, side.home, st.TS),
             dc_goals: dcg.ok ? dcPcs(side.t, side.o, side.home, dcg) : null,
-            dc_xg: dcx.ok ? dcPcs(side.t, side.o, side.home, dcx) : null
+            dc_xg: dcx.ok ? dcPcs(side.t, side.o, side.home, dcx) : null,
+            dc_goals_raw: dcgR.ok ? dcPcs(side.t, side.o, side.home, dcgR) : null,
+            dc_xg_raw: dcxR.ok ? dcPcs(side.t, side.o, side.home, dcxR) : null
           };
-          if (preds.dc_goals === null || preds.dc_xg === null) return;
+          var missing = false;
+          defs.forEach(function (d) { if (preds[d.key] === null || preds[d.key] === undefined) missing = true; });
+          if (missing) return;
           defs.forEach(function (d) { P[d.key].push(preds[d.key]); rowsGw.byModel[d.key].pred.push(preds[d.key]); rowsGw.byModel[d.key].y.push(y); });
           Y.push(y); rowsGw.n++;
         });

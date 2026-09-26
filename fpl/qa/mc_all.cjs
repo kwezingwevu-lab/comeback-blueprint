@@ -1124,10 +1124,19 @@ inv("I94", "the engine never reads ep_this or ep_next (D1)", 3, function () {
 
 /* --- tournament and chips ------------------------------------------------- */
 
-inv("I95", "the tournament always carries the nine named models", 8, function (u) {
+/* E-084's class applied to a constant rather than a date. This invariant held the nine model keys
+   of v88 as a literal list and went red the week hier_pool was registered as the tenth challenger
+   — a correct change to the engine turning a suite red is the defect the no_frozen rule exists to
+   stop. The expectation is now derived from E.TOURNAMENT_MODELS and asserts the tournament returns
+   exactly that list, in that order, so registering an eleventh challenger is one line in the
+   engine and no churn here. The registry is proved non-empty first: an empty `want` would make the
+   comparison vacuous, and a check that cannot fail is worse than no check. */
+inv("I95", "the tournament carries exactly the engine's registered models, in order", 8, function (u) {
+  if (!Array.isArray(E.TOURNAMENT_MODELS) || !E.TOURNAMENT_MODELS.length) return bad("the engine exports no TOURNAMENT_MODELS registry");
   const t = E.tournament(u.snap);
-  const want = ["season_mean", "last_gw", "per90", "shrunk_per90", "ict_rate", "bps_rate", "blend", "component_xp", "player_xg"];
-  return t.models.map(function (m) { return m.key; }).join(",") === want.join(",") ? OK : bad(t.models.map(function (m) { return m.key; }).join(","));
+  const want = E.TOURNAMENT_MODELS.map(function (m) { return m.key; });
+  const got = t.models.map(function (m) { return m.key; });
+  return got.join(",") === want.join(",") ? OK : bad(got.join(",") + " against the registry's " + want.join(","));
 });
 inv("I96", "every Spearman ρ is null or inside [-1,1]", 8, function (u) {
   const t = E.tournament(u.snap);
@@ -1137,7 +1146,7 @@ inv("I96", "every Spearman ρ is null or inside [-1,1]", 8, function (u) {
 // E-086: `decidable` is the transition-count half of the gate — enough transitions exist for the
 // gate to be DECIDED. `promotable` is the honest reading of the word: at least one model's own
 // gate is open. The two are asserted separately, and a promotable result must name a model.
-inv("I97", "decidable is the transition count, promotable is a model actually passing, and the leader is one of the nine", 8, function (u) {
+inv("I97", "decidable is the transition count, promotable is a model actually passing, and the leader is a registered model", 8, function (u) {
   const t = E.tournament(u.snap);
   if (t.decidable !== (t.transitions >= 3)) return bad("decidable " + t.decidable + " at " + t.transitions + " transitions");
   const anyOpen = t.models.some(function (m) { return m.promotable === true; });

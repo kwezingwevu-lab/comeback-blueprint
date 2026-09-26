@@ -1224,6 +1224,12 @@ function transferProtocol(state, ctx) {
           moves.push({ out: o[j], in: i[j], outName: ctx.els[o[j]].web_name, inName: ctx.els[i[j]].web_name, xpOut: ctx.xp[o[j]].xp5, xpIn: ctx.xp[i[j]].xp5, gain: g, forced: isForced, priceOut: sellPrice(num(ctx.els[o[j]].now_cost, 0), purchase[o[j]]), priceIn: num(ctx.els[i[j]].now_cost, 0) });
         }
       }
+      /* E-092: k is what every caller downstream believes about this plan — the number of
+         transfers, the hit priced at 4 each, the "k of your FT free" line on the landing card. A
+         plan whose moves disagree with its k is not a plan, it is a lie with a price on it, so it
+         never leaves this function. The pairing above already refuses an out whose position has no
+         candidate left; this is the backstop for any caller that miscounts the swaps it asked for. */
+      if (moves.length !== k) return null;
       var bankAfter = bankAfter_(bank, moves);
       if (bankAfter < 0) return null;
       moves.sort(function (a, b) { return (b.forced - a.forced) || (b.gain - a.gain); });
@@ -1252,13 +1258,26 @@ function transferProtocol(state, ctx) {
        so far and add the single best further swap, while the week still allows one. Exhaustive
        would mean C(15,4) out-sets times the candidates per slot, and that is not a search a phone
        finishes. Greedy is monotone here — a swap is only added when it raises the plan's value —
-       so a four-swap plan never scores worse than the three-swap plan it grew from. */
+       so a four-swap plan never scores worse than the three-swap plan it grew from.
+
+       E-092: the loop used to count `gk` from MAX_SWAPS + 1 to weekK while the plan it grows from
+       is whatever won the exhaustive search — and that winner is often a one- or two-swap plan,
+       because a k-swap out-set is forced to carry min(forced, k) forced sells, and two forced sells
+       plus one high-gain choice can beat three forced sells. Growing a two-swap plan then produced
+       three moves labelled k = 4: `moves.length !== k` (mc_all I55), a hit charged for a transfer
+       nobody made (I54 prices the hit off the same k), and the last free transfer left unused
+       because the counter ran out before the plan did. The step now reads the plan's own moves: the
+       base pairs come from `grown.moves`, the new k is one more than the moves the plan actually
+       reports, and the loop runs while that count is below the week's limit. */
     if (weekK > MAX_SWAPS && plans.length) {
       plans.sort(function (a, b) { return b.value - a.value || a.k - b.k; });
       var grown = plans[0];
-      for (var gk = MAX_SWAPS + 1; gk <= weekK; gk++) {
-        var used = {}; grown.outs.forEach(function (id) { used[id] = true; });
-        var usedIn = {}; grown.ins.forEach(function (id) { usedIn[id] = true; });
+      for (var step = 0; step < weekK && grown.moves.length < weekK; step++) {
+        var baseOuts = grown.moves.map(function (m) { return m.out; });
+        var baseIns = grown.moves.map(function (m) { return m.in; });
+        var gk = baseOuts.length + 1;
+        var used = {}; baseOuts.forEach(function (id) { used[id] = true; });
+        var usedIn = {}; baseIns.forEach(function (id) { usedIn[id] = true; });
         var bestNext = null;
         var stillOut = squad.filter(function (id) { return !used[id] && !protectedIds[id]; });
         // Forced sells still in the squad come first, then the rest by lowest five-week xp.
@@ -1270,7 +1289,7 @@ function transferProtocol(state, ctx) {
           var cands = candByPos[elType(ctx.els[outId])] || [];
           cands.slice(0, 8).forEach(function (inId) {
             if (usedIn[inId]) return;
-            var p = evalPlan(grown.outs.concat([outId]), grown.ins.concat([inId]), gk);
+            var p = evalPlan(baseOuts.concat([outId]), baseIns.concat([inId]), gk);
             if (!p) return;
             if (!bestNext || p.value > bestNext.value) bestNext = p;
           });
