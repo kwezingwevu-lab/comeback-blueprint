@@ -1,0 +1,35 @@
+# Runs the full QA on every push and pull request: Chromium functional suite, PWA offline acceptance,
+# WebKit (Safari engine) acceptance, and a reproducible-build check (dist/ must equal a fresh build of src/).
+name: QA
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps webkit
+      - name: Chromium suite + PWA offline acceptance
+        run: bash qa/run.sh
+      - name: WebKit (Safari engine) acceptance
+        run: node qa/webkit.js
+      - name: dist/ is a faithful build of src/ (never hand-edited)
+        run: python3 build.py && git diff --exit-code -- dist/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-screenshots-and-report
+          path: |
+            qa/shots/
+            qa/qa_report.json
+          if-no-files-found: ignore

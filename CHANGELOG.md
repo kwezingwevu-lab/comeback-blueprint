@@ -1,5 +1,26 @@
 # CHANGELOG.md — what has shipped (newest first)
 
+## 2026-09-26 (plan week 3) — coherence sweep + technology layer
+Full register with test names: IMPROVEMENTS.md. Verified: Chromium 226/226, PWA offline 8/8, WebKit 21/21, calendar tool self-test pass.
+- Home tells one story: the Coach's Brief and Today card no longer read the retired run plan (Sunday "Long Run", Tuesday "Easy Run", Thursday "RACE DAY — Absa" from week 9); peak week drops legs D-3..D-1 and makes D-1 a 30-minute upper pump on the card, Brief, button and Jump In; deload Friday is full rest everywhere; Friday strip reads "Pump"; Jump In says Events; ceiling pillar names both fat levels; "9 days away" under two weeks.
+- March engine: targets anchored to the Day-1 weigh-in (no drift with time alone); every route capped at 1% of bodyweight a week with the unmet gap priced, not chased (final-week route no longer asks for +6.9 kg/week); the milestone card prints the rate the engine actually uses beside what the route needs; route table readable.
+- Roadmap: week-16 base-block milestone replaces "week 9 bulk banked"; run-era focus text and "second race" retired.
+- Training intelligence: auto-progression targets on every exercise card (double progression, top-set aware, deload 65%, home kit progresses by tempo); sessions tagged home/gym; readiness nudge after a sub-6 h night.
+- Track: Lifts (e1RM curves and bests from the Lift log, PB flags) and Regions (hard sets logged per region vs plan, last week beside) replace the run tabs; tabs fit at 390 px.
+- Scan body fat (DEXA/InBody/Bod Pod) sets the profile and outranks older tape estimates.
+- Device: installable offline app when served over https (manifest, service worker, PNG icons, build-stamped cache); Screen Wake Lock on Lift with a toggle; rest timer on the wall clock with an audio cue; non-blocking fonts.
+- AI: "Copy this week for Claude" check-in text in the Weekly Review.
+- Data safety: Track Export = full backup; restore accepts the older format and only cb2_ keys; settings travel in backups; same-day tapes merge; lifts default fixed; PR toast no longer crashes on Extras/Upper exercises.
+- Calendar: 22 venues re-located on OpenStreetMap, every typed "~N km" removed, verified corrections (Deadly Dozen 19–20 Sep, Hollywoodbets → Nasrec and sold out, Versus sold out, Warrior #3 Syringa Park, NPC show at Silverstar Casino, Hope In Motion 18 Oct), unverified Deadly Dozen Pretoria removed, 11 verified additions; club heading honest ("within about 15 km"); tools/calendar-refresh.js reports new and moved events from Peak Timing and 12 months of RaceSpace for approval.
+- Engineering: GitHub Actions CI (Chromium, PWA, WebKit, reproducible build); QA exits non-zero on any failure; isolated browser contexts per test group; Johannesburg time zone in both harnesses; screenshot helpers; Publish-app workflow for GitHub Pages.
+- Accessibility: reduced motion honoured, labels on icon buttons and new inputs, Fill button width, header truncation.
+
+## 2026-09-11 (session 2, pre-Day-1)
+- Run-era copy retired on Lift, Numbers, Guide, Fuel, footer and disclaimer; Foundation becomes an honest 4-day fallback; Race Time Predictor and Goal-10K field removed.
+- Dates fixed for Johannesburg time (todayISO/dateAdd/normDate were a day early); QA runs in Africa/Johannesburg.
+- Calendar: ISO dates, past events drop off, countdowns, radius-true text, computed anchors box, nearest parkrun from parkrun's own list.
+- Session time estimate honours the focus toggle and the aggressive extra set.
+
 ## 2026-09-11 (pre-Day-1)
 - Bundle unpacked to the repository root (first cloud session from the phone route); zip removed. `dist/` rebuilt and confirmed byte-identical to the shipped file. Chromium suite 157/157. New `qa/webkit.js` Safari-engine acceptance (15/15: boot, eight views, storage mirrors, restore across reload) with 390×844 screenshots; both harnesses made offline-deterministic (fonts answered locally, reload awaited). App unchanged.
 - IPHONE.md v2: phone-first numbered steps (GitHub app creates the repo; Safari uploads the zip; Claude Code unpacks; GitHub Pages runs it, public-vs-Pro stated). Earlier: verified cloud-session route from the Claude iOS app (Code tab → New Session → GitHub repo); .gitignore; CLAUDE.md §2b. App unchanged (157/157).

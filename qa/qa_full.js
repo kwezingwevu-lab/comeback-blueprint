@@ -292,14 +292,14 @@ const d5=await tt('2027-01-05');T('time: Jan = Posterior specialization block',/
  T('fuel: beta-alanine reason is lifting-only',/15–25-rep calf work/.test(f)&&!/Tuesday track work|600 m rep/.test(f));
  const te=await q.evaluate(()=>{const on=focusLB;focusLB=true;const a=sessionTimeEstimate('legsB').full;focusLB=false;const b2=sessionTimeEstimate('legsB').full;focusLB=on;const sets=GYM.legsB.ex.reduce((n,e)=>n+fxSets(e),0);return {a,b2,sets};});
  T('time estimate honours the Legs & Back focus (+sets → longer session)',te.a>te.b2&&te.a-te.b2>=8,JSON.stringify(te));
- const cal=await q.evaluate(()=>({n:RACES_12M.filter(r=>r.iso).length,ok:RACES_12M.filter(r=>r.iso).every(r=>r.iso.slice(0,7)===r.ym&&/^\d{4}-\d{2}-\d{2}$/.test(r.iso)),pk:evKm(RACES_12M.find(r=>r.st==='weekly'))}));
- T('calendar: 27 dated entries carry an iso that matches their month; nearest parkrun is ~3 km',cal.n===27&&cal.ok&&cal.pk===3,JSON.stringify(cal));
+ const cal=await q.evaluate(()=>({n:RACES_12M.filter(r=>r.iso).length,ok:RACES_12M.filter(r=>r.iso).every(r=>r.iso.slice(0,7)===r.ym&&/^\d{4}-\d{2}-\d{2}$/.test(r.iso)),miss:RACES_12M.filter(r=>/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)(–(Mon|Tue|Wed|Thu|Fri|Sat|Sun))? \d/.test(r.d)&&!r.iso).map(r=>r.name),pk:evKm(RACES_12M.find(r=>r.st==='weekly'))}));
+ T('calendar: every weekday-dated entry carries an iso that matches its month; nearest parkrun is ~3 km',cal.n>=30&&cal.ok&&cal.miss.length===0&&cal.pk===3,JSON.stringify(cal));
  T('W: no errors',q.__errs.length===0,q.__errs.join('|'));await q.close();}
 {const q=await page(b,'2026-09-11',()=>{localStorage.clear();localStorage.setItem('cb2_pure',JSON.stringify(true));});
  await q.evaluate(()=>switchView('run'));await wait(300);
  const r=await q.evaluate(()=>document.getElementById('view-run').innerText);
- T('calendar (11 Sep): past event hidden, Deadly Dozen shows "in 9 days", Warrior "in 8 days", Golden Harvest parkrun block',!/Hope In Motion/.test(r)&&/Deadly Dozen[\s\S]{0,400}in 9 days/.test(r)&&/Warrior #2[\s\S]{0,300}in 8 days/.test(r)&&/Golden Harvest/.test(r)&&/32 parkruns/.test(r),r.slice(0,200));
- T('calendar (11 Sep): anchors box is computed, date-sorted (Warrior 19 Sep before Deadly Dozen 20 Sep) with computed distances',/Built for your goal, not for runners:\s*Warrior #2 — Taroko Trail Park \(Sat 19 Sep 2026, ~19 km\) · Deadly Dozen Fitness Race — Johannesburg \(Sun 20 Sep 2026, ~15 km\)/.test(r)&&new RegExp('HYROX Johannesburg \\(Fri–Sun 27–29 Nov 2026, ~'+await q.evaluate(()=>evKm(RACES_12M.find(x=>/HYROX Johannesburg$/.test(x.name))))+' km\\)').test(r)&&/calendar of races within 30 km/.test(r),r.slice(0,600));
+ T('calendar (11 Sep): Hope In Motion re-dated to 18 Oct, Deadly Dozen shows "in 8 days", Warrior "in 8 days", Golden Harvest parkrun block',/Hope In Motion[\s\S]{0,200}Sun 18 Oct 2026/.test(r)&&/Deadly Dozen[\s\S]{0,400}in 8 days/.test(r)&&/Warrior #2[\s\S]{0,300}in 8 days/.test(r)&&/Golden Harvest/.test(r)&&/32 parkruns/.test(r),r.slice(0,200));
+ T('calendar (11 Sep): anchors box is computed, date-sorted (Warrior 19 Sep before Deadly Dozen 20 Sep) with computed distances',new RegExp('Built for your goal, not for runners:\\s*Warrior #2 — Taroko Trail Park \\(Sat 19 Sep 2026, ~'+await q.evaluate(()=>evKm(RACES_12M.find(x=>/^Warrior #2/.test(x.name))))+' km\\) · Deadly Dozen Fitness Race — Johannesburg \\(Sat–Sun 19–20 Sep 2026, ~15 km\\)').test(r)&&new RegExp('HYROX Johannesburg \\(Fri–Sun 27–29 Nov 2026, ~'+await q.evaluate(()=>evKm(RACES_12M.find(x=>/HYROX Johannesburg$/.test(x.name))))+' km\\)').test(r)&&/calendar of races within 30 km/.test(r),r.slice(0,600));
  await q.evaluate(()=>{document.querySelector('#radiusSeg button[data-r="15"]').click();});await wait(300);
  const r15=await q.evaluate(()=>document.getElementById('view-run').innerText);
  T('calendar: fallback text follows the chosen radius',/No published event within 15 km yet/.test(r15)&&!/~25 km yet/.test(r15));
@@ -313,5 +313,126 @@ const d5=await tt('2027-01-05');T('time: Jan = Posterior specialization block',/
 {const q=await page(b,'2026-09-12',()=>{localStorage.clear();localStorage.setItem('cb2_pure',JSON.stringify(true));const R=Date;const fixed=new R('2026-09-12T01:30:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;});
  const e=await q.evaluate(()=>({t:todayISO(),started:planStarted(),cta:document.querySelector('.cta')?.textContent||''}));
  T('dates: at 01:30 on Day 1 the app already knows it is Day 1 (was "yesterday" via UTC)',e.t==='2026-09-12'&&e.started&&/Legs A/.test(e.cta),JSON.stringify(e));await q.close();}
+
+// ===== X. Coherence fixes + tech layer (26 Sep 2026). Each group runs in its own browser context: storage and IndexedDB are isolated. =====
+const SEED=o=>'localStorage.clear();'+Object.entries(Object.assign({cb2_pure:true},o)).map(([k,v])=>'localStorage.setItem('+JSON.stringify(k)+','+JSON.stringify(JSON.stringify(v))+');').join('');
+const ctxPage=async(iso,seed,more)=>{const c=await b.createBrowserContext();const q=await page(c,iso,SEED(seed||{})+(more||''));q.__ctx=c;return q;};
+const done=async q=>{await q.__ctx.close();};
+const S=(date,day,entries,loc)=>({id:'s'+date+day,dateISO:date,day,loc:loc||'gym',entries});
+const sets=(arr)=>arr.map(([r,w,rpe])=>rpe?{r:String(r),w:String(w),rpe:String(rpe)}:{r:String(r),w:String(w)});
+// X1 Brief + Today card follow the lifting template only (the retired run plan leaked in on Sun/Tue/Thu)
+for(const [iso,lab] of [['2026-09-27','Push A'],['2026-09-29','Legs B'],['2026-11-12','Pull B']]){const q=await ctxPage(iso);
+ const h=await q.evaluate(()=>document.getElementById('view-home').innerText);
+ T('brief/today '+iso+': '+lab+', no run-plan leakage',new RegExp('Today: '+lab).test(h)&&!/Absa|RACE DAY|Long Run|Easy Run|Run tab/.test(h),h.match(/Today:[^\n]*/)+'');
+ T('home '+iso+': no errors',q.__errs.length===0,q.__errs.join('|'));await done(q);}
+// X2 Peak week: no lower-body session D-3..D-1, D-1 is a 30-minute upper pump; Today card, Brief, CTA and Jump In agree
+{const q=await ctxPage('2027-03-02');const h=await q.evaluate(()=>({t:document.getElementById('view-home').innerText,cta:document.querySelector('.cta').textContent}));
+ T('peak D-3 (Tue 2 Mar): Legs B replaced everywhere',/D-3 — no lower-body session/.test(h.t)&&/Today: D-3 — no lower-body session/.test(h.t)&&/legs off/.test(h.cta)&&!/Start Legs/.test(h.t),h.cta);await done(q);}
+{const q=await ctxPage('2027-03-04');const h=await q.evaluate(()=>({t:document.getElementById('view-home').innerText,cta:document.querySelector('.cta').textContent}));
+ T('peak D-1 (Thu 4 Mar): 30-minute upper-body pump',/D-1 — 30-minute upper-body pump/.test(h.t)&&/upper-body pump/.test(h.cta),h.cta);
+ await q.evaluate(()=>document.querySelector('.cta').click());await wait(300);T('peak D-1: CTA opens the Extras pump',await q.evaluate(()=>curDay==='extras'));await done(q);}
+// X3 Deload Friday: Brief says full rest, Today card has no pump buttons; X4 week strip labels
+{const q=await ctxPage('2026-10-23');const h=await q.evaluate(()=>({t:document.getElementById('view-home').innerText,h:document.getElementById('view-home').innerHTML}));
+ T('deload Friday: Brief = full rest, no Extras Pump button',/Today: Full rest — deload week/.test(h.t)&&!/goToExtras\(\)">[^<]*<svg[\s\S]{0,400}Extras Pump/.test(h.h)&&!/Main day instead/.test(h.t),h.t.match(/Today:[^\n]*/)+'');
+ T('strip: deload-week Friday reads Rest',/FRI\s*\n?\s*Rest/i.test(h.t.replace(/\n+/g,'\n')),'');await done(q);}
+{const q=await ctxPage('2026-09-26');const h=await q.evaluate(()=>document.getElementById('view-home').innerText);
+ T('strip: normal Friday reads Pump; Jump In says Events, not Run Plan',/FRI\s*\n?\s*Pump/i.test(h.replace(/\n+/g,'\n'))&&/Events/.test(h)&&!/Run Plan/.test(h));
+ T('pillar: ceiling states both fat levels',/ceiling ~\d+ kg at 18% · ~\d+ at 24%/.test(h));await done(q);}
+// X5 March route: Day-1 anchored target, 1%/week ceiling, honest engine line, readable table
+{const a=await ctxPage('2026-09-12');const k0=await a.evaluate(()=>['band','edge','mass'].map(k=>+marchTarget(k).kg.toFixed(1)));await done(a);
+ const q=await ctxPage('2026-12-01');const k1=await q.evaluate(()=>['band','edge','mass'].map(k=>+marchTarget(k).kg.toFixed(1)));
+ T('march: targets anchored to Day 1 (no drift with time alone)',JSON.stringify(k0)===JSON.stringify(k1),JSON.stringify([k0,k1]));
+ const e=await q.evaluate(()=>{const t=document.getElementById('view-home').innerText;return {line:(t.match(/Engine now targets[^\n]*/)||[''])[0],g:+gainModel('hyper').rateKgWk.toFixed(2)};});
+ T('march: engine line prints the rate the engine uses (band route)',e.line.includes('+'+e.g.toFixed(2)+' kg/week')&&/route itself needs/.test(e.line),e.line);await done(q);}
+{const q=await ctxPage('2027-03-02',{cb2_march:'edge',cb2_bulk:'aggr'});const m=await q.evaluate(()=>{const r=['band','edge','mass'].map(k=>marchTarget(k));return {kcal:r.map(x=>x.surplus),cap:r.map(x=>x.capped),g:gainModel('hyper').rateKgWk,w:+DB.profile.weight,line:(document.getElementById('view-home').innerText.match(/Engine now targets[^\n]*/)||[''])[0]};});
+ T('march (final week): no route prescribes more than 1%/week (was +6.9 kg/wk, 7,590 kcal)',m.kcal.every(k=>k<=1000)&&m.g<=m.w*0.01+1e-9&&m.cap.some(Boolean)&&/priced, not chased/.test(m.line),JSON.stringify(m));await done(q);}
+{const q=await ctxPage('2027-02-25');T('milestone: under two weeks counts days ("9 days away")',/9 days away/.test(await q.evaluate(()=>document.getElementById('view-home').innerText)));await done(q);}
+// X6 Roadmap copy
+{const q=await ctxPage('2026-09-26');const r=await q.evaluate(()=>{const rm=buildRoadmap();return {w9:rm[8].milestone||'',w16:rm[15].milestone||'',txt:JSON.stringify(rm)};});
+ T('roadmap: week-16 base-block milestone, no week-9 bulk banner, no run-era copy',/base block complete/.test(r.w16)&&!/first bulk block/.test(r.txt)&&!/Running drops away|concurrent|second race/.test(r.txt),r.w9+' | '+r.w16);await done(q);}
+// X7 Readiness from last night's sleep
+{const q=await ctxPage('2026-09-26',{cb2_sleep:[{date:'2026-09-25',h:5.2}]});const h=await q.evaluate(()=>document.getElementById('view-home').innerText);
+ T('readiness: a 5.2 h night triggers the RIR-2 nudge on a lift day',/Short night — 5.2 h logged/.test(h));await done(q);}
+// X8 Auto-progression (double progression) on the real Lift cards
+const LEG_A_PREV={ga1:sets([[3,110],[8,100],[8,100],[8,100],[8,100]]),ga2:sets([[10,80],[9,80],[8,80]]),ga3:sets([[12,150],[9,150],[12,150]])};
+{const q=await ctxPage('2026-09-26',{cb2_sessions:[S('2026-09-19','legsA',LEG_A_PREV)]});await q.evaluate(()=>goToLift());await wait(400);
+ const t=await q.evaluate(()=>[...document.querySelectorAll('#liftBody .nextt')].map(x=>x.dataset.kind+'|'+x.innerText));
+ T('progression: squat all sets at 8 of 5–8 → +2.5 kg, top set noted',t.some(x=>/^up\|Next target: 102.5 kg × 5–8/.test(x)&&/Top set \(110 kg\)/.test(x)),JSON.stringify(t));
+ T('progression: RDL 10/9/8 → same load, add a rep to the weakest set',t.some(x=>/^reps\|Next target: 80 kg × 8–12[\s\S]*weakest set \(8\)/.test(x)),JSON.stringify(t));
+ T('progression: leg press set below range → hold the load',t.some(x=>/^hold\|Next target: 150 kg × 10–15/.test(x)),JSON.stringify(t));
+ T('X8: no errors',q.__errs.length===0,q.__errs.join('|'));await done(q);}
+{const q=await ctxPage('2026-10-17',{cb2_sessions:[S('2026-10-10','legsA',LEG_A_PREV)]});await q.evaluate(()=>goToLift());await wait(400);
+ const t=await q.evaluate(()=>[...document.querySelectorAll('#liftBody .nextt')].map(x=>x.dataset.kind+'|'+x.innerText));
+ T('progression: deload week → about 65% of the working weight',t.some(x=>/^deload\|Next target: 65 kg/.test(x)),JSON.stringify(t));await done(q);}
+{const q=await ctxPage('2026-09-26',{cb2_loc:'home',cb2_sessions:[S('2026-09-19','legsA',{ga1:sets([[15,15],[15,15],[15,15],[15,15]])},'home'),S('2026-09-12','legsA',{ga1:sets([[5,140]])},'gym')]});await q.evaluate(()=>goToLift());await wait(400);
+ const t=await q.evaluate(()=>[...document.querySelectorAll('#liftBody .nextt')].map(x=>x.dataset.kind+'|'+x.innerText));
+ T('progression (home): fixed bells → make the rep harder; gym numbers never leak in',t.some(x=>/^harder\|/.test(x))&&!t.some(x=>/140|142.5/.test(x)),JSON.stringify(t));await done(q);}
+// X9 Lifts + Regions analytics on Track, driven by the Lift log
+{const q=await ctxPage('2026-09-26',{cb2_sessions:[S('2026-09-12','legsA',{ga1:sets([[8,95],[8,95]]),ga2:sets([[10,70]])}),S('2026-09-19','legsA',{ga1:sets([[8,100],[8,100]])}),S('2026-09-26','legsA',{ga2:sets([[10,80],[10,80],[10,80]]),ga7:sets([[12,60],[12,60]])})]});
+ await q.evaluate(()=>switchView('track'));await wait(300);
+ const tabs=await q.evaluate(()=>[...document.querySelectorAll('.track-tabs button')].map(x=>x.textContent).join('|'));
+ T('track: tabs are Weight|Lifts|Regions|Tests|Tapes and all five fit at 390 px (run tabs retired)',tabs==='Weight|Lifts|Regions|Tests|Tapes'&&await q.evaluate(()=>{const w=document.querySelector('.track-tabs');return w.scrollWidth<=w.clientWidth+1;}),tabs);
+ await q.evaluate(()=>document.querySelector('.track-tabs button[data-tp="lifts"]').click());await wait(200);
+ const l=await q.evaluate(()=>({t:document.getElementById('tp-lifts').innerText,svg:!!document.querySelector('#tp-lifts svg'),vis:document.getElementById('tp-lifts').classList.contains('on')}));
+ T('lifts: e1RM curve + table built from the Lift log, squat PB flagged',l.vis&&l.svg&&/Barbell Back Squat \(or Hack Squat\)\s+127\s+\+6\s+PB/.test(l.t),l.t.slice(0,300));
+ await q.evaluate(()=>{const s=document.getElementById('lhSel');s.value=[...s.options].find(o=>/Romanian/.test(o.text)).value;s.dispatchEvent(new Event('change'));});await wait(200);
+ T('lifts: switching exercise redraws the curve',await q.evaluate(()=>curLiftKey==='ga2|gym'&&!!document.querySelector('#tp-lifts svg')));
+ await q.evaluate(()=>document.querySelector('.track-tabs button[data-tp="regions"]').click());await wait(200);
+ const r=await q.evaluate(()=>{const g=n=>document.querySelector('#tp-regions [data-rg="'+n+'"]').innerText.replace(/\s+/g,' ');return {h:g('hamstrings'),c:g('calves'),lb:g('lower back'),plan:regionSets()};});
+ T('regions: this week logged/planned per region (RDL → hamstrings, glutes, lower back; calf raise → calves)',r.h.includes('3 / '+r.plan.hamstrings)&&r.lb.includes('3 / '+r.plan['lower back'])&&r.c.includes('2 / '+r.plan.calves),JSON.stringify(r));
+ T('X9: no errors',q.__errs.length===0,q.__errs.join('|'));await done(q);}
+// X10 Screen wake lock follows the Lift view and the toggle
+{const WL="window.__wl={req:0,rel:0};Object.defineProperty(navigator,'wakeLock',{configurable:true,value:{request:async()=>{window.__wl.req++;const l={released:false,addEventListener(){},release:async()=>{window.__wl.rel++;}};return l;}}});";
+ const q=await ctxPage('2026-09-26',{},WL);await q.evaluate(()=>switchView('lift'));await wait(300);const a=await q.evaluate(()=>({...window.__wl,seg:!!document.getElementById('wakeSeg')}));
+ await q.evaluate(()=>switchView('home'));await wait(300);const b2=await q.evaluate(()=>({...window.__wl}));
+ T('wake lock: requested on Lift, released on leaving',a.req===1&&a.seg&&b2.rel===1,JSON.stringify([a,b2]));
+ await q.evaluate(()=>switchView('lift'));await wait(200);await q.evaluate(()=>document.querySelector('#wakeSeg button[data-wk="off"]').click());await wait(300);
+ const c=await q.evaluate(()=>({...window.__wl,stored:localStorage.getItem('cb2_wakelock')}));
+ T('wake lock: toggle off releases and persists',c.stored==='false'&&c.rel>=2,JSON.stringify(c));await done(q);}
+// X11 Rest timer runs on the wall clock (survives a locked screen) and cues the end
+{const q=await ctxPage('2026-09-26');await q.evaluate(()=>goToLift());await wait(300);
+ await q.evaluate(()=>{const r=document.querySelector('#liftBody input[data-f="r"]'),w=document.querySelector('#liftBody input[data-f="w"]');r.value='8';r.dispatchEvent(new Event('input',{bubbles:true}));w.value='60';w.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#liftBody .chk').click();});await wait(300);
+ const s0=await q.evaluate(()=>({show:document.getElementById('restTimer').classList.contains('show'),t:document.getElementById('restTime').textContent}));
+ await q.evaluate(()=>{const f=Date.now();Date.now=()=>f+400000;document.dispatchEvent(new Event('visibilitychange'));});await wait(200);
+ const s1=await q.evaluate(()=>({t:document.getElementById('restTime').textContent,beeps:window.__beeps||0}));
+ T('rest timer: starts on the set tick, finishes from wall-clock time after the phone was away, beeps',s0.show&&/^\d:\d\d$/.test(s0.t)&&s1.t==='Go!'&&s1.beeps>=1,JSON.stringify([s0,s1]));
+ await q.evaluate(()=>document.getElementById('restPlus').click());await wait(200);
+ T('rest timer: +15s after it finished starts a fresh 15 s',await q.evaluate(()=>document.getElementById('restTime').textContent==='0:15'&&document.getElementById('restTimer').classList.contains('show')));await done(q);}
+// X12 Weekly check-in for Claude (clipboard path, textarea fallback)
+{const CB="window.__clip=null;Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async t=>{window.__clip=t;}}});";
+ const q=await ctxPage('2026-09-26',{cb2_sessions:[S('2026-09-19','legsA',{ga1:sets([[8,100],[8,100]])})],cb2_weight:[{date:'2026-09-19',v:88.4},{date:'2026-09-26',v:88.9}],cb2_measure:[{date:'2026-09-19',waist:92,neck:40}]},CB);
+ await q.evaluate(()=>document.getElementById('coachBtn').click());await wait(300);const t=await q.evaluate(()=>window.__clip||'');
+ T('claude check-in: copied text carries the log, the region table and the no-guessing instruction',/plan week 3/.test(t)&&/Barbell Back Squat \(or Hack Squat\): 8×100 kg, 8×100 kg/.test(t)&&/2026-09-26 88.9 kg/.test(t)&&/waist 92 cm/.test(t)&&/Hard sets per region this week/.test(t)&&/Use only the numbers above/.test(t)&&!/@|Bellcanto|North Riding/.test(t),t.slice(0,240));await done(q);}
+{const q=await ctxPage('2026-09-26',{},"Object.defineProperty(navigator,'clipboard',{configurable:true,value:undefined});Object.defineProperty(navigator,'share',{configurable:true,value:undefined});");
+ await q.evaluate(()=>document.getElementById('coachBtn').click());await wait(300);
+ T('claude check-in: no clipboard or share sheet → the text appears, selected, in a box',await q.evaluate(()=>{const b=document.getElementById('coachBox');return !b.hidden&&/Weekly check-in/.test(b.value);}));await done(q);}
+// X13 Scan body fat (DEXA/InBody) overrides the tape
+{const q=await ctxPage('2026-09-26',{cb2_measure:[{date:'2026-09-19',waist:95,neck:39}]});await q.evaluate(()=>switchView('numbers'));await wait(300);
+ await q.evaluate(()=>{document.getElementById('scanKind').value='DEXA';document.getElementById('scanBf').value='21.4';document.getElementById('scanDate').value='2026-09-24';document.getElementById('scanApply').click();});await wait(400);
+ const r=await q.evaluate(()=>({bf:DB.profile.bf,m:DB.measure.find(x=>x.date==='2026-09-24'),t:document.getElementById('view-numbers').innerText}));
+ T('scan: DEXA 21.4% sets the profile, is stored, and outranks the older tape',r.bf===21.4&&r.m&&r.m.scanBf===21.4&&/so the scan stands/.test(r.t)&&/Last scan: 21.4%/.test(r.t),JSON.stringify({bf:r.bf,m:r.m}));await done(q);}
+// X14 Data safety: full backup keys, legacy restore format, key whitelist, measure merge, Track export = full backup
+{const q=await ctxPage('2026-09-26',{cb2_loc:'home',cb2_wakelock:false});const k=await q.evaluate(()=>Object.keys(JSON.parse(backupJSON())));
+ T('backup: preferences (location, wake lock) travel with the backup',k.includes('cb2_loc')&&k.includes('cb2_wakelock'),k.join(','));
+ const r=await q.evaluate(()=>{localStorage.removeItem('cb2_weight');applyRestoreText(JSON.stringify({app:'ComebackBlueprint',version:2,weight:[{date:'2026-09-20',v:89}],sleep:[{date:'2026-09-20',h:7}],evil:1}));return {w:localStorage.getItem('cb2_weight'),s:localStorage.getItem('cb2_sleep'),e:localStorage.getItem('evil')};});
+ T('restore: the older Track-export format maps onto the full keys; unknown keys are refused',/89/.test(r.w||'')&&/"h":7/.test(r.s||'')&&r.e===null,JSON.stringify(r));await done(q);}
+{const q=await ctxPage('2026-09-26');await q.evaluate(()=>switchView('track'));await wait(300);await q.evaluate(()=>document.querySelector('.track-tabs button[data-tp="measure"]').click());
+ await q.evaluate(()=>{const s=(i,v)=>{const e=document.getElementById(i);e.value=v;};s('meDate','2026-09-26');s('meWaist','93');s('meNeck','40');document.getElementById('meAdd').click();});await wait(200);
+ await q.evaluate(()=>{const s=(i,v)=>{const e=document.getElementById(i);e.value=v;};s('meDate','2026-09-26');s('meArm','39');document.getElementById('meAdd').click();});await wait(200);
+ const m=await q.evaluate(()=>DB.measure.find(x=>x.date==='2026-09-26'));T('measures: a second entry the same day merges (waist and neck kept, arm added)',m&&m.waist===93&&m.neck===40&&m.arm===39,JSON.stringify(m));
+ await q.evaluate(()=>document.getElementById('exportBtn').click());await wait(300);T('track export: writes the full backup (backup-age clock resets)',await q.evaluate(()=>!!localStorage.getItem('cb2_lastbackup')));await done(q);}
+// X15 PR toast no longer crashes on Extras / Upper exercises
+{const q=await ctxPage('2026-09-25',{cb2_sessions:[S('2026-09-18','extras',{x1:sets([[15,20]])})]});await q.evaluate(()=>{curDay='extras';switchView('lift');});await wait(300);
+ await q.evaluate(()=>{const r=document.querySelector('input[data-ex="x1"][data-f="r"]'),w=document.querySelector('input[data-ex="x1"][data-f="w"]');r.value='15';r.dispatchEvent(new Event('input',{bubbles:true}));w.value='25';w.dispatchEvent(new Event('input',{bubbles:true}));w.dispatchEvent(new Event('change',{bubbles:true}));});await wait(300);
+ T('PR on an Extras exercise: toast names it, no crash',await q.evaluate(()=>/New PR on Face Pull/.test(document.getElementById('toast').innerText))&&q.__errs.length===0,q.__errs.join('|'));await done(q);}
+// X16 Calendar hygiene + shell
+{const q=await ctxPage('2026-09-26');await q.evaluate(()=>switchView('run'));await wait(300);const c=await q.evaluate(()=>({t:document.getElementById('view-run').innerText,stale:RACES_12M.filter(r=>/^~\d/.test(r.km||'')).length,pta:RACES_12M.some(r=>/Deadly Dozen.*Pretoria/.test(r.name)),box:(document.getElementById('view-run').innerText.match(/Built for your goal, not for runners:[^\n]*/)||[''])[0]}));
+ T('calendar: no typed distances left, unverified Pretoria date removed, club heading honest',c.stale===0&&!c.pta&&/within about 15 km/.test(c.t)&&!/inside 10 km/.test(c.t));
+ T('calendar (26 Sep): anchors start with HYROX (Deadly Dozen and Warrior #2 have run)',/not for runners:\s*Virgin Active HYROX Johannesburg/.test(c.box),c.box.slice(0,160));
+ T('calendar: verified additions render with computed distances',/Fat Cats 10K[\s\S]{0,200}~16 km from home/.test(c.t)&&/Sandton Half Marathon/.test(c.t),'');
+ const sh=await q.evaluate(()=>({d:document.querySelector('meta[name=description]').content,f:document.querySelector('link[href*="fonts.googleapis.com/css2"]').media,mf:!!document.querySelector('link[rel=manifest]')}));
+ T('shell: description retired the 15K race, fonts are non-blocking, no manifest link on file://',!/15K|race plan/.test(sh.d)&&sh.f==='all'&&!sh.mf,JSON.stringify(sh));
+ for(const v of ['home','lift','run','roadmap','fuel','numbers','track','guide']){await q.evaluate(n=>switchView(n),v);await wait(120);}
+ T('X16: all eight views, no errors',q.__errs.length===0,q.__errs.join('|'));await done(q);}
 await b.close();
-const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));})();
+const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));process.exit(pass===R.length?0:1);})().catch(e=>{console.error('QA CRASH:',e&&e.stack||e);process.exit(2);});

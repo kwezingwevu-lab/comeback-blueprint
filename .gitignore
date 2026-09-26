@@ -2,3 +2,7 @@ node_modules/
 qa/ComebackBlueprint.html
 qa/qa_report.json
 *.png
+!src/pwa/*.png
+!dist/*.png
+qa/shots/
+tools/out/

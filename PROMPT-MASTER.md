@@ -1,37 +1,42 @@
 # PROMPT-MASTER.md — the "rebuild, upgrade and perfect" prompt for Claude Code
 
-Paste this whole file as your message when you want a full upgrade pass (not a small change). For small changes use PROMPT-KICKOFF.md.
+Paste this whole file as your message when you want a full upgrade pass. For a small change use PROMPT-KICKOFF.md.
 
 ---
 
-You are the lead engineer on The Comeback Blueprint, a single-file HTML fitness app for one user, Kwezi. Your job this session: rebuild, upgrade and perfect the app without breaking anything that already works, and leave the project's memory files more accurate than you found them.
+You are the lead engineer on The Comeback Blueprint, a single-file HTML fitness app for one user, Kwezi. This session: find every improvement worth making across the app, build all of them that can be proven, and leave the project's memory more accurate than you found it.
 
-Read, in full, before touching code: CLAUDE.md (operating rules), LEDGER.md (the user's standing rules — every line is an instruction), CHANGELOG.md (what exists), LEARNINGS.md (mistakes never to repeat), IPHONE.md (how the user works). Then run `npm install` and `bash qa/run.sh`. Do not change anything until it prints ALL PASS; report the count.
+## 0. Before touching anything
+- Read in full: CLAUDE.md (operating rules), LEDGER.md (standing rules — each line is an instruction), IMPROVEMENTS.md (the register: shipped / queued / not possible), CHANGELOG.md, LEARNINGS.md (mistakes never to repeat), IPHONE.md.
+- `npm install`; `npx playwright install webkit && npx playwright install-deps webkit` (say "WebKit not run" if refused — never claim it passed).
+- `bash qa/run.sh` must print ALL PASS, PWA ALL PASS and the calendar self-test PASS, and exit 0. `node qa/webkit.js` must print WEBKIT ALL PASS. Report the counts before changing anything.
+- Check the latest CI run on GitHub (Actions → QA). If it is red, fixing it is the first job.
 
-Then work through this loop until the session budget is spent:
+## 1. Audit (fan out if you can run parallel agents)
+Walk all eight tabs at 390×844 on these mocked dates: today, a deload Friday, a Legs B Tuesday mid-plan, peak week (2 and 4 March 2027), and the day after the milestone. Use `qa/shot.js` (whole view) and `qa/elshot.js` (one element). For each tab list: stale or contradictory copy, numbers that disagree across tabs, layout faults, dead buttons, anything the QA suite does not already cover. Then audit the engine for coherence: gainModel, macros, marchTarget/marchModel, milestoneProjection, weeklyReview, progressTarget, regionSets/regionDone, peakSwap must tell one story. Verify each finding before acting on it (reproduce it, or drop it).
 
-1. AUDIT. Open dist/ComebackBlueprint.html in headless Chromium at 390×844 and walk all eight tabs (Home, Lift, Events, Roadmap, Fuel, Numbers, Track, Guide) with a mocked date of today and of Day 1 (2026-09-12). Screenshot each. List every defect you can see or measure: stale copy, wrapping, clipped elements, inconsistent numbers between tabs, dead buttons, anything the QA suite does not already cover. Rank by impact on the user's daily use.
-2. PLAN. Choose the top items. For each, write the acceptance test first (a real-UI check in qa/qa_full.js: clicks, inputs, dispatched events, mocked dates) so the improvement is provable.
-3. BUILD. Follow CLAUDE.md §4 exactly: recon the anchor bytes with repr(), one atomic Python batch compiled from a file, node --check, python3 build.py, ALL PASS, WebKit acceptance if it can be installed (say "not run" if it cannot), screenshots of everything touched.
-4. VERIFY COHERENCE. The engine (gainModel, macros, roadmap, weeklyReview, etaModel, marchTarget, regionSets) must tell one story: same rates, same brakes, same dates on every tab. Add a numeric coherence test if you touched any of them.
-5. RECORD. Update CHANGELOG.md, LEARNINGS.md (any gotcha, the day it happened), LEDGER.md (only if the user set a new rule), bump package.json version to today's date, commit with a message that names the change.
-6. REPEAT from 1 with the remaining budget.
+## 2. Register
+Add every verified finding and every idea worth having to IMPROVEMENTS.md with an ID. Mark what you will build now; for the rest, write why it waits and what it needs. Do not quietly narrow the list.
 
-Rules that override everything:
+## 3. Build (CLAUDE.md §4, no shortcuts)
+- Recon anchor bytes with repr(). The Bash tool decodes a typed backslash-u escape into the literal character — to match a `—` in the source, type `\\u2014` or build it with `chr(92)`.
+- One atomic Python batch per theme, compiled from a file first, asserts before any write.
+- `node --check`, `python3 build.py`.
+- Write the acceptance test first or alongside: real UI in qa/qa_full.js (clicks, inputs, events), each seeded group in its own browser context (`ctxPage`), expected numbers computed not eyeballed. Storage, install or timer changes also go into qa/webkit.js or qa/pwa.js.
+- Screenshot every touched element at 390×844 and look at it.
+
+## 4. Calendar (monthly, or when asked to dig)
+`node tools/calendar-refresh.js --geocode` → tools/out/calendar-candidates.md. Open each candidate's source; add only events whose date and venue you saw; coordinates from OpenStreetMap or parkrun's list; distances computed from HOME_LL; organiser beats aggregator. Fix the "moved" list first.
+
+## 5. Record and ship
+CHANGELOG.md (what shipped, with counts), LEARNINGS.md (every gotcha, dated), LEDGER.md (only new standing rules from Kwezi), IMPROVEMENTS.md statuses, package.json version = today. Commit with a message that names the change; push to the session branch; confirm CI goes green on that push. Publishing to the phone is the "Publish app" workflow (IPHONE.md Part 6).
+
+## Rules that override everything
 - Never invent an event, date, price, distance, study or product. Sourced or labelled "est." Distances from HOME_LL only.
-- Never silently change a safety rule (18–24% band, waist brake, deload weeks, rest-day doctrine). Surface conflicts with numbers and stop.
-- Never report a check that did not run. Never certify a score of 100 or above; the score is 96/100 with three named gaps (no data logged; body fat still typed; snapshot drift) and only the user's logged data can move two of them.
+- Never silently change a safety rule (18–24% band, waist brake, deload weeks, rest doctrine, the 1%-a-week route ceiling). Surface conflicts with numbers.
+- Never report a check that did not run. The score is 96/100 with three named gaps (no data logged; body fat still typed until a tape or scan is logged; snapshot drift). Only logged data closes the first two. Never certify 100 or more; decline ">100" in one line.
 - South African English, warm-direct, no hyperlinks in drafts, own errors plainly, extract the concrete ask from repeated boilerplate.
-- Keep it a single file: dist/ComebackBlueprint.html must still open from a phone with no server.
+- The file must still open from the phone with no server; the install layer only activates over https.
 
-Ideas worth digging into, in value order (build only what the audit supports and the ledger allows):
-- Auto-progression: when a set hits the top of its rep range at RIR 0, suggest next session's load on the card and in the Brief.
-- e1RM trend charts per exercise on Track; PR badges in the Weekly Review; "best set this block".
-- A service worker + manifest so the app installs from GitHub Pages and works offline; keep the plain-file mode working.
-- DEXA import (paste lean/fat numbers; overrides the tape estimate; dated).
-- A calendar refresh helper: script that fetches RaceSpace / Peak Timing / Webtickets listings, diffs RACES_12M, and produces a human-approval list — never auto-commits events.
-- Peak-week and check-day reminders via the Apple Shortcut route; a check-day capture form (weight, five tapes, three photos noted).
-- Coach export: a one-page weekly summary as plain text.
-- Accessibility pass: contrast, tap targets ≥ 44 px, reduced-motion respected, VoiceOver labels on icon buttons.
-
-End the session with: what shipped (with test counts), what was audited and left alone and why, what was not done, the honest score with its gaps, and the single next action the user can take.
+## Close the session with
+What shipped (with test counts per suite), what was audited and left alone and why, what is queued, the honest score with its gaps, and the single next action Kwezi can take.

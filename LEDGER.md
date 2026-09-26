@@ -20,3 +20,5 @@
 18. "Have minimal rest days — only enough to promote maximum and optimal muscle growth": Friday is active recovery by default (Extras pump, RIR 2, 30–40 min); full rest only in deload weeks or when the Weekly Review flags stalls/sleep; never a seventh lifting day; rest between compound sets stays 2–3 min.
 19. The project must be buildable from the iPhone: repo on GitHub, Claude app → Code → cloud session, kickoff prompt, dist file opened in Safari. Never report a QA step that did not run.
 20. Style: SA English, warm-direct, own errors, no hyperlinks in drafts, AI Invisibility Standard.
+21. "Think of an exhaustive list of improvements, enhancements, upgrades and refinements across the board and implement all" (26 Sep 2026): every session refreshes IMPROVEMENTS.md, builds everything on it that can be verified, and states why the rest waits. Shipped means a named check proves it.
+22. "Make it as technologically advanced as possible": prefer real device capability (offline install, wake lock, wall-clock timers, on-device analytics) over decoration; never claim a capability the platform does not have (no direct Garmin/Health/Drive sync from a web page).

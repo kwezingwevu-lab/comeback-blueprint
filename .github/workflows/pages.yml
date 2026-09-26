@@ -1,0 +1,27 @@
+# Publishes dist/ to GitHub Pages so the app installs to the iPhone Home Screen and works offline.
+# Manual on purpose (Actions tab -> "Publish app" -> Run workflow): it needs Settings -> Pages -> Source = "GitHub Actions",
+# and Pages on a private repository needs a paid plan. The published site is reachable by anyone with the link.
+name: Publish app
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

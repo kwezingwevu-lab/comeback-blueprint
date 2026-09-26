@@ -20,3 +20,14 @@ See CLAUDE.md §6 for the numbered list. Additions:
 - 2026-09-11: `build.py` prints `len()` of the text (characters), not bytes; a size mismatch against `wc -c` is not drift. Use `cmp`.
 - 2026-09-11: A multi-file doc batch that writes each file inside the loop is not atomic: a bad tuple shape on file two left file one already written. Collect every patched string first and write all files only after every assert has passed.
 - 2026-09-11: GitHub Mobile can create repositories (May 2026) but file upload is done on the website in Safari.
+
+- 2026-09-26: ROOT CAUSE of the most repeated mistake in this project: the Bash tool decodes \uXXXX in the command text before the shell sees it, so a batch typed with a backslash-u escape arrives holding the literal character (verified with od -c). Anchors in app_full.js that contain \u escapes then never match. Write \\u in a heredoc to get a literal backslash-u, or build it in Python with chr(92)+'u2014'. New code can simply use literal characters.
+- 2026-09-26: A service worker must store only the app's own response under the app's cache key. Caching the site-root redirect page there produced an offline reload loop (the cached "app" was a meta refresh to itself). qa/pwa.js now kills the server and reloads to prove offline boot.
+- 2026-09-26: qa/run.sh piped the suite through tail, so it exited 0 even when checks failed. set -o pipefail plus process.exit(pass===total?0:1). Never trust a green shell exit without the RESULT line.
+- 2026-09-26: .gitignore had *.png, which would have silently dropped the PWA icons from the commit. Exceptions added for src/pwa and dist; check git check-ignore before committing new binary files.
+- 2026-09-26: Seeded tests must run in their own browser context (browser.createBrowserContext()); storage and IndexedDB are then isolated and the vault cannot restore another test's data.
+- 2026-09-26: Compute expected numbers in tests (Epley 100 kg x 8 = 126.7, not 133). Two of this session's first failures were test arithmetic, not app bugs.
+- 2026-09-26: For a local-server test in the sandbox, launch Chromium with --no-proxy-server and map external hosts to ~NOTFOUND; otherwise the proxy hangs requests.
+- 2026-09-26: Aggregators and organisers disagree (RaceSpace listed Hollywoodbets at James & Ethel Gray Park; the organiser says Nasrec). The organiser wins; say so in the note.
+- 2026-09-26: A one-word event name ("Vaal") matched a different race in the calendar helper; one-word names must match exactly.
+- 2026-09-26: Relative model horizons drift: projecting "months from today" made March targets shrink every week with no data. Anchor targets to Day 1.

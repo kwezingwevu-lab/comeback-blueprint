@@ -48,23 +48,36 @@ The GitHub app is for browsing; uploading a file is done on the website.
 
 ---
 
-## Part 6 — Run the app on the phone
+## Part 6 — Run the app on the phone (installed, works offline)
 
-GitHub shows HTML files as text, so opening the file in the GitHub app does not run it. You need it served as a web page. Two honest options:
+GitHub shows HTML files as text, so opening the file in the GitHub app does not run it. It has to be served as a web page, and once it is, it installs to your Home Screen and keeps working with no signal.
 
-**Option A — GitHub Pages (free, but the repository must be public).** In Safari: repository → **Settings** → **Pages** → Source: *Deploy from a branch* → Branch `main`, folder `/ (root)` → Save. After a few minutes the app is at
-`https://kwezingwevu-lab.github.io/comeback-blueprint/dist/ComebackBlueprint.html` (your GitHub username is kwezingwevu-lab)
-Open it in Safari → Share → **Add to Home Screen**. It launches like an app.
-*Know what public means:* the file contains suburb-level coordinates for the calendar distances (two decimals, roughly a kilometre) and your profile defaults (age, height, starting weight). No house number, no logged data — your logs live only in the phone's browser storage and your backup files. If that is more than you want public, use Option B.
+**One-time setup (5 minutes, in Safari):**
+1. Repository → **Settings** → **Pages** → Source: **GitHub Actions**. (Pages on a private repository needs GitHub Pro; on the free plan the repository must be public — see "know what public means" below.)
+2. Repository → **Actions** → **Publish app** → **Run workflow** → Run. Wait for the green tick (about a minute).
+3. Open `https://kwezingwevu-lab.github.io/comeback-blueprint/` in Safari. It forwards to the app.
+4. Share → **Add to Home Screen**. From now on it opens full-screen like an app, and works offline after the first visit.
+5. After any build session, run **Publish app** again; the next time the phone is online the app picks up the new version by itself.
 
-**Option B — keep it private (GitHub Pro).** GitHub Pages on a private repository needs the Pro plan (paid). Same Settings → Pages steps; the site is still reachable by anyone with the link, but the source repository stays private.
+**Moving your data to the installed app (do this once).** Each web address has its own storage, and on iPhone a Home Screen app keeps its storage apart from Safari even at the same address, so logs made in another copy do not appear automatically. In the old copy: Home → Data → **Save backup to iCloud Drive**. In the installed app: Home → Data → **Restore** → pick that file.
 
-Either way, once the app is on your Home Screen, your data lives in Safari's storage for that site plus the app's IndexedDB vault. Back up weekly with the app's own **Save backup to iCloud Drive / Google Drive** button; restore anywhere with the Data card's Restore picker.
+*Know what public means:* the app contains suburb-level coordinates for the calendar distances (two decimals, roughly a kilometre) and your profile defaults (age, height, starting weight). No house number and no logged data — your logs live only on the phone and in your backup files.
 
----
+## Part 7 — Automatic checks on every change (CI)
+
+Every push runs the full QA on GitHub's machines: the Chromium suite, the offline test, the Safari-engine test, and a check that the shipped file is a faithful build of the source. On the phone: GitHub app → repository → **Actions** shows a green tick or a red cross per push. A red cross means do not publish; ask Claude Code to fix it ("CI is red on the latest push — fix it").
+
+## Part 8 — The weekly loop that makes the app smarter
+
+1. Log every set in Lift. The next-target line on each exercise tells you the load for next time.
+2. Friday: Home → Weekly Review → **Copy this week for Claude** → paste into a Claude chat. Act on the one change it gives you.
+3. Saturday: Home → Data → **Save backup to iCloud Drive**.
+4. Monthly: start a Claude Code session with PROMPT-KICKOFF.md and the ask "run the calendar helper and add the verified events".
 
 ## Things that are not possible, so you do not waste time trying
 
 - Opening `dist/ComebackBlueprint.html` in the GitHub app or via the "Raw" link: shows source code, not the app.
 - Running Claude Code *on* the iPhone: the app is a client; the cloud session does the work.
 - Linking the app directly to iCloud Drive or Google Drive: no web API for that; the backup file is the permanent copy.
+- Direct Garmin or Apple Health sync from a web page: not possible; the Shortcut paste route in the Data card is the bridge.
+- Vibration on iPhone: Safari has no vibration API; the rest timer beeps instead (turn the ringer on).

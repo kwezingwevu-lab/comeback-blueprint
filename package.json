@@ -1,14 +1,18 @@
 {
   "name": "comeback-blueprint",
   "private": true,
-  "version": "2026.09.12",
-  "description": "The Comeback Blueprint - single-file HTML fitness app (Kwezi). Factory + QA suite.",
+  "version": "2026.09.26",
+  "description": "The Comeback Blueprint - single-file HTML fitness app (Kwezi). Factory, QA suites, PWA layer, calendar helper.",
   "scripts": {
     "check": "node --check src/app_full.js",
     "build": "python3 build.py",
     "qa": "bash qa/run.sh",
     "webkit": "npx playwright install webkit",
-    "qa:webkit": "node qa/webkit.js"
+    "qa:webkit": "node qa/webkit.js",
+    "qa:pwa": "node qa/pwa.js",
+    "icons": "node src/pwa/make-icons.js",
+    "calendar": "node tools/calendar-refresh.js --geocode",
+    "calendar:selftest": "node tools/calendar-refresh.js --selftest"
   },
   "devDependencies": {
     "puppeteer": "^24.0.0",

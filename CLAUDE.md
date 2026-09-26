@@ -16,7 +16,7 @@ You are continuing a long-running build of **The Comeback Blueprint**, a single-
 ## 2. Non-negotiables (the standing ledger, abbreviated — full text in LEDGER.md)
 
 1. Pure muscle; FFMI 25 is the target; anabolics excluded by the user's own rule ("at any cost that's legal").
-2. Honest scoring. Current score **96/100** with three named gaps: (a) no data logged yet, (b) body-fat truth (tape estimator built; needs waist + neck logged), (c) snapshot drift (inherent to a static file). The score moves only when a named gap opens or closes. **Never certify 100 or anything above 100.** Decline ">100" in one line, every time.
+2. Honest scoring. Current score **96/100** with three named gaps: (a) no data logged yet, (b) body-fat truth (tape estimator and DEXA/InBody import built; needs waist + neck or a scan logged), (c) snapshot drift (reduced: the published app updates itself on every build and the calendar helper finds new events, but the event list is still a snapshot a human approves). The score moves only when a named gap opens or closes. **Never certify 100 or anything above 100.** Decline ">100" in one line, every time.
 3. Never invent an event, date, price, distance or study. Calendar entries carry a status (`confirmed` / `expected` / `weekly`) and a source; prices are "verified <month>" or "est."; distances are computed from `HOME_LL`.
 4. Never make the same error twice: every gotcha goes into `LEARNINGS.md` the session it happens, and the build protocol below is not optional.
 5. South African English, warm-direct tone, own errors plainly, no hyperlinks in drafts, the "AI Invisibility Standard" on all deliverables (nothing in the app or its copy should read as machine-generated boilerplate).
@@ -31,27 +31,32 @@ See `IPHONE.md`. Cloud sessions run from the GitHub repo; the phone only steers.
 ```
 src/app_full.js        # the ONLY source of app logic (single source of truth)
 src/blueprint.html     # shell: CSS + HTML + a <script> containing the placeholder
-build.py               # injects app_full.js into the shell -> dist/ComebackBlueprint.html
-dist/ComebackBlueprint.html   # the shipped single-file app (never edit by hand)
-qa/qa_full.js          # 150+ functional checks (Puppeteer, headless Chromium)
-qa/run.sh              # node --check -> build -> QA
-qa/webkit.js           # WebKit (Safari engine) acceptance: boot, 8 views, storage paths, 390×844 screenshots -> qa/shots/
-package.json           # puppeteer + playwright dev deps
-CLAUDE.md LEDGER.md CHANGELOG.md LEARNINGS.md   # project memory (keep current)
-IPHONE.md              # how to run sessions from the Claude iOS app (cloud sessions via GitHub)
+src/pwa/               # install layer: manifest.webmanifest, sw.js (stamped __BUILD__), icons, make-icons.js
+build.py               # injects app_full.js into the shell -> dist/ComebackBlueprint.html; copies the install layer; stamps sw.js
+dist/                  # the shipped app + install layer + index.html redirect (never edit by hand; CI checks dist == build(src))
+qa/qa_full.js          # 220+ functional checks (Puppeteer, headless Chromium, Africa/Johannesburg time)
+qa/pwa.js              # install/offline acceptance: local HTTP server, service worker, server killed, app still boots
+qa/run.sh              # node --check -> build -> qa_full -> pwa -> calendar tool self-test; exits non-zero on any failure
+qa/webkit.js           # WebKit (Safari engine) acceptance: boot, 8 views, storage paths, tech layer, 390×844 shots -> qa/shots/
+qa/shot.js qa/clip.js qa/elshot.js   # screenshot helpers: whole view / region / one element, mocked date, seeded storage
+tools/calendar-refresh.js            # reads Peak Timing + 12 months of RaceSpace, reports new and moved events (never edits the app)
+.github/workflows/     # qa.yml (CI on every push), pages.yml (manual "Publish app" to GitHub Pages)
+package.json           # puppeteer + playwright dev deps; scripts: qa, qa:pwa, qa:webkit, icons, calendar
+CLAUDE.md LEDGER.md CHANGELOG.md LEARNINGS.md IMPROVEMENTS.md   # project memory (keep current)
+IPHONE.md              # how to run sessions from the Claude iOS app, CI, publishing to the Home Screen
 ```
 
 Setup once per machine: `npm install` then `npx playwright install webkit` (WebKit acceptance = Safari/iOS behaviour). Node 22.
 
 ## 4. Editing protocol (mandatory, in this order)
 
-1. **Recon before editing.** Print the exact bytes of every anchor you intend to replace (`python3 -c` with `repr()`); the file mixes literal Unicode and `\u` escapes, and several anchors have a stray space or a different dash.
+1. **Recon before editing.** Print the exact bytes of every anchor you intend to replace (`python3 -c` with `repr()`); the file mixes literal Unicode and `\u` escapes, and several anchors have a stray space or a different dash. **The Bash tool decodes `\uXXXX` in your command text before the shell sees it**: to put a literal backslash-u into a heredoc batch, type `\\u`, or build it in Python with `chr(92)+'u2014'`. New code can use literal characters.
 2. **Atomic batch.** Write the edit as a Python script that reads `src/app_full.js`, applies `rep(old,new,tag)` calls guarded by `assert s.count(old)==1`, and writes the file only at the end. One failed assert = nothing written.
 3. **Compile the batch from a file first** (`python3 -c "compile(open('batch.py').read(),'b','exec')"`) — quoting errors inside long template strings are the most repeated mistake in this project's history.
 4. `node --check src/app_full.js`, then `python3 build.py`.
-5. **QA:** `bash qa/run.sh` must print `ALL PASS`. Extend `qa/qa_full.js` with checks for every new feature — drive the real UI (clicks, inputs, `input` events), not just functions.
+5. **QA:** `bash qa/run.sh` must print `ALL PASS`, `PWA ALL PASS` and the calendar self-test PASS, and exit 0. Extend `qa/qa_full.js` with checks for every new feature — drive the real UI (clicks, inputs, `input` events), not just functions. Seeded tests use their own browser context (`ctxPage(iso, seed)` in section X) so storage cannot leak.
 6. **WebKit acceptance:** `node qa/webkit.js` must print `WEBKIT ALL PASS` (boot, all eight views, weigh-in → localStorage/IndexedDB/account mirror, backup → wipe → restore across the reload). Extend it for any touched view or storage path; it already carries the `window.storage` mock `cloudBoot` needs.
-7. **Screenshot the touched UI at 390×844** and look at it. Several defects (button widths, wrapping headers, giant icons, stale copy) were only caught visually.
+7. **Screenshot the touched UI at 390×844** (`node qa/elshot.js <date> <out.png> "<selector>" "<seed JS>" "<action JS>"`) and look at it. Several defects (button widths, wrapping headers, giant icons, stale copy) were only caught visually.
 8. Ship: `dist/ComebackBlueprint.html` is the deliverable. Grep-verify the new anchors exist in it and that the placeholder comment is gone.
 9. Update `CHANGELOG.md` (what shipped), `LEARNINGS.md` (any gotcha), `LEDGER.md` (any new standing rule from the user).
 
@@ -66,6 +71,7 @@ Never edit `dist/` directly. Never use `re.sub` with replacements containing `\u
 - Fuel: `SUPP_TIERS` items carry `hi` (highest recommended dose), `prem` (premium pick with SA price), `how`, `why`; `fuelQ` (standard/premium, `cb2_fuelq`); `MP_DAYS` (costed 3-day plan with `pf` premium swaps); `MEALS`.
 - Events: `RACES_12M` entries `{ym,d,name,co:[lat,lon],dist,km,st,type,note}`; `HOME_LL`; `radiusKm` (`cb2_radius`, selector 15/30/45/60); `evKm()`, `evVenue()`; weekly club block is static text.
 - Storage: `DB` (profile, sessions, weight, measure, lifts, sleep, rhr, steps), `DB.save()` → `persist()` per key + `cloudQueue()` → IndexedDB mirror (`idbSave`) + Claude account mirror when `cloudOK()`; `idbBoot()`/`cloudBoot()` restore on empty; `backupJSON()`/`applyRestoreText()`; `shareBackup()` (Web Share → iCloud Drive/Google Drive), `downloadBackup()`; keys listed in the `BACKUP_KEYS` array inside `backupJSON` — add every new key there.
+- Tech layer (26 Sep): `progressTarget(e)` (double progression from `lastSessionFor(id, loc)`; sessions carry `loc`), `liftHistory()`/`renderLiftsPane()` (Track → Lifts), `regionDone(weekStart)`/`renderRegionsPane()` (Track → Regions), `peakSwap(templateDay)` (D-3..D-1 legs off, D-1 pump), `lastSleep()` (readiness nudge), `marchModel()`/`day1Lean()` (Day-1 anchored March targets; routes capped at 1%/week, `need` vs `rate`), `coachText()`/`shareCoachText()` (Claude check-in), `scanBF()`/`applyScanBF()` (DEXA/InBody), `wakeLockSync()` + `wakeOn` (`cb2_wakelock`), `restTick()`/`restResync()` (wall-clock rest timer, `_restEnd`), `pwaBoot` (manifest + service worker only on http/https). `EXMAP` now covers every day incl. Upper and Extras. `RUN_PLAN` is parked: no view may read it.
 - Watch import: `importHealthText()` accepts Shortcut lines (`date,weight|sleep|rhr|steps,value`), Garmin CSV (auto-detected header), or JSON.
 
 ## 6. Known gotchas — the "never twice" list (also in LEARNINGS.md)
@@ -88,6 +94,13 @@ Never edit `dist/` directly. Never use `re.sub` with replacements containing `\u
 16. The shell loads Google Fonts with a render-blocking `<link>`; in a sandbox without outbound access that request hangs, the app `<script>` waits on it, and any fixed `wait()` after a reload sees `DB is not defined`. Both harnesses now answer the request locally and wait for the reload navigation instead of sleeping.
 17. `build.py` prints a character count (`len(str)`), not bytes; compare files with `wc -c` or `cmp`, not against that number.
 18. Playwright's WebKit download succeeds without its shared libraries; `install-deps webkit` is a separate step on Linux, and the failure message is a dependency list, not a download error.
+19. The Bash tool turns a typed `\uXXXX` into the literal character (see step 1). This was the hidden cause of most failed anchors.
+20. The service worker stores only the app's own response under the app key; caching the root redirect there made an offline reload loop.
+21. `qa/run.sh` must run with `pipefail`; a pipe into `tail` once hid every failure.
+22. `.gitignore` ignores `*.png`; the icon folders are excepted. Check `git check-ignore` for any new binary.
+23. Model horizons measured "from today" drift; targets are anchored to Day 1.
+24. For local-server tests: Chromium with `--no-proxy-server` and external hosts mapped to `~NOTFOUND`.
+25. Organiser pages beat aggregators when they disagree; say so in the event note.
 
 ## 7. Honesty rules for content
 
@@ -106,13 +119,6 @@ Never edit `dist/` directly. Never use `re.sub` with replacements containing `\u
 5. Close with: what shipped, what was verified (counts), what was NOT done and why, the honest score, and the single next action the user can take.
 6. Propose the next three improvements from the backlog below — but never build unrequested scope that changes a standing rule.
 
-## 9. Backlog (candidates, in rough value order)
+## 9. Backlog
 
-- Retire the run-era copy still shipping in the Lift view: the intro says "4 lifting days a week" and the Pure Muscle note says "Post-race growth (after 24 Sep)"; the footer says "Strength + Speed · Built for 24 September 2026". All three contradict the pure-muscle mission and Day 1 = 12 Sep (seen in the WebKit screenshots, 11 Sep 2026).
-- Hosted PWA (Netlify/GitHub Pages) with a service worker so the app installs to the home screen and works offline; keep the file-based version working.
-- e1RM progression charts per exercise on Track; PR badges in the Weekly Review.
-- Auto-progression: when a set hits the top of its rep range at RIR 0, suggest next session's load.
-- DEXA import (paste the lean/fat numbers; overrides the tape estimate).
-- Calendar auto-refresh helper: a script that re-scrapes RaceSpace/Peak Timing and diffs `RACES_12M` for the human to approve.
-- Peak-week countdown notifications via the Shortcut route.
-- A "coach export": weekly summary as text for a real coach or physio.
+The live list is `IMPROVEMENTS.md` (section K = queued with the reason; section L = not possible from a web app). Every session refreshes it, builds what can be verified, and moves items to "Shipped" only when a named check proves them. Run `node tools/calendar-refresh.js --geocode` once a month and add only the events you have opened at the source.
