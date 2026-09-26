@@ -79,7 +79,7 @@ T('roadmap: 104 weeks',rm.total===104);T('roadmap: end ≤ ceiling+0.5',rm.end<=
 // ===== I. Events + Guide =====
 await p.evaluate(()=>switchView('run'));await wait(350);
 const ev=await p.evaluate(()=>{const t=document.body.innerText;return {months:(t.match(/\d+ events?\n/g)||[]).length,confirmed:(t.match(/CONFIRMED/g)||[]).length,hyrox:t.includes('HYROX Johannesburg'),parkedHidden:document.getElementById('toolParked').offsetParent===null};});
-T('events: 12-month calendar',ev.months===12);T('events: ≥20 confirmed within 30 km of home',ev.confirmed>=20,ev.confirmed);T('events: home-distance filter (Lanseria in, Benoni out, Deadly Dozen ~15 km)',await p.evaluate(()=>{const t=document.body.innerText;const km=n=>evKm(RACES_12M.find(r=>r.name===n));return t.includes('within 30 km of home')&&km('Blair Atholl MTB')<=30&&km('Johnson Crane Hire Marathon')>30&&/Deadly Dozen Fitness Race — Johannesburg[\s\S]{0,700}~1[3-7] km from home/.test(t)&&t.includes('Just outside 30 km')&&t.includes('Johnson Crane Hire Marathon (Benoni');}));T('events: HYROX listed',ev.hyrox);T('events: race plan hidden',ev.parkedHidden);
+T('events: 12-month calendar',ev.months===12);T('events: ≥20 confirmed within 30 km of home',ev.confirmed>=20,ev.confirmed);T('events: home-distance filter (Lanseria in, Benoni out, Deadly Dozen ~15 km)',await p.evaluate(()=>{const t=document.body.innerText;const km=n=>evKm(RACES_12M.find(r=>r.name===n));return t.includes('within 30 km of home')&&km('Blair Atholl MTB')<=30&&km('Johnson Crane Hire Marathon')>30&&/Deadly Dozen Fitness Race — Johannesburg[\s\S]{0,700}~1[3-7] km from home/.test(t)&&t.includes('Just outside 30 km')&&t.includes('Johnson Crane Hire Marathon (Willowmoore Park, Benoni');}));T('events: HYROX listed',ev.hyrox);T('events: race plan hidden',ev.parkedHidden);
 await p.evaluate(()=>switchView('guide'));await wait(350);
 const gd=await p.evaluate(()=>{const t=document.body.innerText;return ['The Win Plan','As Fast As Legally Possible','Where Money Actually Buys Muscle','The Long Game','The Posterior Chain Case','Mode: Pure Muscle'].map(k=>t.includes(k));});
 T('guide: all six doctrine cards',gd.every(Boolean),gd.join());
@@ -224,7 +224,7 @@ const d5=await tt('2027-01-05');T('time: Jan = Posterior specialization block',/
  await q.evaluate(()=>switchView('run'));await wait(300);
  const c30=await q.evaluate(()=>(document.body.innerText.match(/CONFIRMED/g)||[]).length);
  await q.evaluate(()=>{[...document.querySelectorAll('#radiusSeg button')].find(x=>x.dataset.r==='60').click();});await wait(400);
- const c60=await q.evaluate(()=>({n:(document.body.innerText.match(/CONFIRMED/g)||[]).length,jc:document.body.innerText.includes('Sun 28 Feb 2027'),persisted:JSON.parse(localStorage.getItem('cb2_radius'))}));
+ const c60=await q.evaluate(()=>({n:(document.body.innerText.match(/CONFIRMED/g)||[]).length,jc:/~40 km from home · Willowmoore Park, Benoni/.test(document.body.innerText),persisted:JSON.parse(localStorage.getItem('cb2_radius'))}));
  await q.evaluate(()=>{[...document.querySelectorAll('#radiusSeg button')].find(x=>x.dataset.r==='15').click();});await wait(400);
  const c15=await q.evaluate(()=>(document.body.innerText.match(/CONFIRMED/g)||[]).length);
  T('radius: 60 km shows more than 30, 15 shows fewer; persists',c60.n>c30&&c60.jc&&c15<c30&&c60.persisted===60,JSON.stringify({c15,c30,c60}));
@@ -385,8 +385,11 @@ for(const [iso,title,brief] of [['2026-11-12','Pull B — Strength','Today: Pull
  T('dexa: Use writes the % to the engine and the scan anchors lean mass',+dx.bf===19.5&&dx.src==='DEXA',JSON.stringify(dx));
  await p.evaluate(()=>document.getElementById('exportBtn').click());await wait(400);T('backup: Track "Download full backup" is the complete format and resets the age indicator',await p.evaluate(()=>!!localStorage.getItem('cb2_lastbackup')&&JSON.parse(backupJSON()).cb2_dexa.length===1));
  const tmp=path.join(require('os').tmpdir(),'cb-legacy-'+process.pid+'.json');fs.writeFileSync(tmp,JSON.stringify({app:'ComebackBlueprint',version:2,profile:{weight:90,height:177,age:38,bf:18,goal:102.3,goalBf:24,act:1.55},sessions:[SS('2026-09-20','pushA',{pa1:sets(3,8,60)})],weight:[{date:'2026-09-20',v:90}],measure:[],lifts:[]}));
- const nav=p.waitForNavigation({waitUntil:'load',timeout:15000});const fi=await p.$('#importFile');await fi.uploadFile(tmp);await nav;await wait(900);
- const lr=await p.evaluate(()=>({s:DB.sessions.length,w:DB.weight.map(x=>x.v).join()}));T('backup: an old Track-format file restores (converted) instead of wiping the log',p.__dialogs.some(m=>/Restore this backup/.test(m))&&lr.s===1&&lr.w==='90',JSON.stringify(lr));fs.unlinkSync(tmp);await done(p);}
+ const fi=await p.$('#importFile');await fi.uploadFile(tmp);
+ // waitForNavigation can be satisfied by the export download above, so poll for the restored state across the reload,
+ // then re-read after the vault (600 ms) and cloud boots to prove nothing old is written back
+ const rd=()=>p.evaluate(()=>({s:DB.sessions.length,w:DB.weight.map(x=>x.v).join()})).catch(()=>null);let lr=null;const until=Date.now()+15000;
+ while(Date.now()<until){lr=await rd();if(lr&&lr.w==='90')break;await wait(300);}await wait(1500);lr=await rd()||lr;T('backup: an old Track-format file restores (converted) instead of wiping the log',p.__dialogs.some(m=>/Restore this backup/.test(m))&&lr.s===1&&lr.w==='90',JSON.stringify(lr));fs.unlinkSync(tmp);await done(p);}
 // --- AN. Events · AO. Numbers · AP. Roadmap · AQ. Fuel · AR. Guide
 {const p=await pg(b,'2026-09-26');await p.evaluate(()=>switchView('run'));await wait(300);const t=await p.evaluate(()=>document.getElementById('view-run').innerText);
  T('events: past September events are hidden and counted',!/Fri 18 Sep 2026|Sat 19 Sep 2026|Sun 20 Sep 2026|Sun 6 Sep 2026/.test(t)&&/earlier this month — already happened/.test(t),t.slice(0,300));
@@ -414,5 +417,85 @@ for(const [iso,title,brief] of [['2026-11-12','Pull B — Strength','Today: Pull
 {const p=await pg(b,'2026-09-26',null,{hash:'#import='+encodeURIComponent('2026-09-25,weight,88.6|2026-09-25,sleep,7.4')});const r=await p.evaluate(()=>({w:DB.weight.map(x=>+x.v),s:DB.sleep.map(x=>+x.h),h:location.hash}));
  T('import link: "|"-separated Shortcut text lands weight + sleep and clears the link',r.w.includes(88.6)&&r.s.includes(7.4)&&!/import/.test(r.h),JSON.stringify(r));await done(p);}
 
+// --- AV. research integration (26 Sep 2026): e1RM rep cap, gym/home split, stall window, back-off, big steps,
+//         calendar file, voice cue, phone panel, sourced events, lifting references
+{const seed={cb2_sessions:[SS('2026-09-13','legsA',{ga1:sets(3,20,15)},'home'),SS('2026-09-19','legsA',{ga1:sets(3,18,15)},'home'),SS('2026-09-20','legsA',{ga1:sets(3,8,100)}),SS('2026-09-26','legsA',{ga1:sets(3,22,15)},'home')]};
+ const p=await pg(b,'2026-09-26',seed);
+ const f=await p.evaluate(()=>({one:e1rm(100,1),ten:Math.round(e1rm(100,10)*10)/10,pr:prEvents().map(x=>x.key+'|'+x.date+'|'+x.top.r)}));
+ T('e1RM: a true single is its own max; 10 reps still Epley',f.one===100&&f.ten===133.3,JSON.stringify(f));
+ T('PRs: a gym session never counts as a PR over home sets (only the home 22-rep best is a PR)',f.pr.length===1&&f.pr[0]==='ga1@home|2026-09-26|22',JSON.stringify(f.pr));
+ await p.click('.tab[data-view="track"]');await wait(300);await p.evaluate(()=>document.querySelector('.track-tabs button[data-tp="lifts"]').click());await wait(300);
+ const t=await p.evaluate(()=>({opts:[...document.querySelectorAll('#exSel option')].map(o=>o.value+'|'+o.textContent),lbl:document.querySelector('.ex-stats span').textContent,note:document.getElementById('e1rmNote').innerText,board:document.getElementById('prBoard')?.innerText||''}));
+ T('Track: home and gym squat are separate lines in the picker',t.opts.length===2&&t.opts.some(o=>/^ga1@home\|.*\(home\)/.test(o))&&t.opts.some(o=>/^ga1@gym\|Barbell Back Squat/.test(o)),JSON.stringify(t.opts));
+ T('Track: a best from a >10-rep set is labelled an index, with the source named',t.lbl==='Best index'&&/Reynolds, Gordon & Robergs, 2006/.test(t.note)&&/Home sets chart apart/.test(t.note),JSON.stringify(t));
+ T('Track: PR board names the home movement and marks the index',/\(home\)/.test(t.board)&&/· index/.test(t.board),t.board);
+ await p.evaluate(()=>{const s=document.getElementById('exSel');s.value='ga1@gym';s.dispatchEvent(new Event('change'));});await wait(250);
+ const g=await p.evaluate(()=>({lbl:document.querySelector('.ex-stats span').textContent,best:document.querySelector('.ex-stats b').textContent,stored:JSON.parse(localStorage.getItem('cb2_curex'))}));
+ T('Track: switching to the gym line shows a true e1RM (127 kg) and remembers the pick',g.lbl==='Best e1RM'&&g.best==='127 kg'&&g.stored==='ga1@gym',JSON.stringify(g));
+ const ct=await p.evaluate(()=>coachText());T('coach pack: home lifts are named as home movements and >10-rep bests flagged as an index',/\(home\): \d+×15 kg · e1RM \d+ kg \(index\)/.test(ct),ct.split('\n').filter(l=>/^- /.test(l)).join(' / '));
+ T('AV-1: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+{const p=await pg(b,'2026-10-31');const r=await p.evaluate(()=>{const H=(d,r,w,rpe)=>({date:d,sets:[0,1,2].map(()=>({r,w,rpe:rpe==null?null:rpe}))});
+  return {flat:isStalled([H('2026-09-14',8,100),H('2026-09-21',8,100),H('2026-09-28',8,100),H('2026-10-05',8,100)]),
+   easy:isStalled([H('2026-09-14',8,100),H('2026-09-21',8,100,7),H('2026-09-28',8,100,7),H('2026-10-05',8,100,6.5)]),
+   repPR:isStalled([H('2026-09-14',8,100),H('2026-09-21',8,100),H('2026-09-28',12,90),H('2026-10-05',8,100)]),
+   deload:isStalled([H('2026-09-14',8,100),H('2026-09-21',8,100),H('2026-10-19',8,100),H('2026-10-26',8,100)]),dl6:deloadWks().has(6)&&wkOfISO('2026-10-19')===6};});
+ T('stall: four flat exposures → stalled',r.flat===true,JSON.stringify(r));T('stall: easy sets (RPE ≤ 7) are under-effort, not a stall',r.easy===false,JSON.stringify(r));
+ T('stall: a rep PR at a lighter load counts as progress',r.repPR===false,JSON.stringify(r));T('stall: deload-week sessions never count toward the window',r.deload===false&&r.dl6===true,JSON.stringify(r));await done(p);}
+{const W=d=>SS(d,'pullA',{la1:sets(3,8,100)});const p=await pg(b,'2026-10-10',{cb2_sessions:[W('2026-09-14'),W('2026-09-21'),W('2026-09-28'),W('2026-10-05')]});
+ const r=await p.evaluate(()=>{const w=weeklyReview();return {st:w.stalls,k:w.stallKeys,lbl:document.getElementById('view-home').innerText.includes('all-time bests / 3-session stalls')};});
+ T('Weekly Review: stalls come from the three-session window, keyed by place',r.st===1&&r.k[0]==='la1@gym'&&r.lbl,JSON.stringify(r));
+ await p.click('.tab[data-view="track"]');await wait(300);await p.evaluate(()=>document.querySelector('.track-tabs button[data-tp="lifts"]').click());await wait(300);
+ T('Track: stall watch names the lift and the rule',await p.evaluate(()=>/Barbell Row.*no new best and no rep PR in three sessions \(deload weeks don’t count\)/.test(document.getElementById('stallWatch')?.innerText||'')));await done(p);}
+{const p=await pg(b,'2026-09-26',{cb2_sessions:[SS('2026-09-19','legsA',{ga1:[{r:'3',w:'100'},{r:'3',w:'100'},{r:'2',w:'100'}]})]});await p.click('.tab[data-view="lift"]');await wait(400);
+ const c=await p.evaluate(()=>document.querySelector('[data-prog="ga1"]')?.innerText||'');
+ T('prog: first set 2 reps under the range → back off ~8% to 92.5 kg (rounded to the bar step, capped at 10%)',/Back off to 92\.5 kg — the first set came up 2 reps short of 5/.test(c)&&/about 4% per missed rep/.test(c),c);
+ await p.evaluate(()=>document.querySelector('[data-prog="ga1"] .prog-use').click());await wait(300);
+ T('prog: Use loads the back-off weight',await p.evaluate(()=>[...document.querySelectorAll('#liftBody input[data-ex="ga1"][data-f="w"]')].every(i=>i.value==='92.5')));await done(p);}
+{const p=await pg(b,'2026-09-27',{cb2_sessions:[SS('2026-09-20','pushA',{pa6:sets(4,20,8)})]});await p.click('.tab[data-view="lift"]');await wait(400);
+ const c=await p.evaluate(()=>document.querySelector('[data-prog="pa6"]')?.innerText||'');
+ T('prog: a dumbbell step over 10% says so (8 → 10 kg is +25%, expect 12 reps first)',/Add load: 10 kg/.test(c)&&/\+25% is a big step, so expect 12 reps at first/.test(c),c);await done(p);}
+{const p=await pg(b,'2026-09-26');const r=await p.evaluate(()=>{const w=buildRoadmap(),m=n=>w.find(x=>x.wk===n).milestone||'';return {w10:m(10),w26:m(26),w78:m(78)};});
+ T('roadmap: week 10 shows the phase change AND the re-test',/New phase begins/.test(r.w10)&&/Re-test/.test(r.w10),r.w10);
+ T('roadmap: week 26 carries the check weekend, the re-test and the 6-monthly bloodwork',/Soft milestone/.test(r.w26)&&/Re-test/.test(r.w26)&&/bloodwork/.test(r.w26),r.w26);
+ T('roadmap: week 78 bloodwork is no longer hidden behind the re-test',/Re-test/.test(r.w78)&&/bloodwork/.test(r.w78),r.w78);
+ const c=await p.evaluate(()=>{const t=icsText(),L=t.split('\r\n'),enc=new TextEncoder(),un=t.replace(/\r\n /g,''),U=L.filter(l=>/^UID:/.test(l)),dl=buildRoadmap().filter(w=>w.deload&&w.start>=weekStartISO(roadmapWeekNow())).length;
+  return {start:t.startsWith('BEGIN:VCALENDAR\r\n'),end:t.endsWith('END:VCALENDAR\r\n'),bareLF:/[^\r]\n/.test(t),long:L.filter(l=>enc.encode(l).length>75).length,ev:(t.match(/BEGIN:VEVENT/g)||[]).length,evEnd:(t.match(/END:VEVENT/g)||[]).length,alarms:(t.match(/BEGIN:VALARM/g)||[]).length,uids:U.length,uniq:new Set(U).size,
+   am:un.includes('DTSTART;TZID=Africa/Johannesburg:20260926T043000'),pm:un.includes('DTSTART;TZID=Africa/Johannesburg:20260926T200000'),rr:(un.match(/RRULE:FREQ=DAILY;UNTIL=2028\d{4}T000000Z/g)||[]).length,
+   check:un.includes('DTSTART;VALUE=DATE:20270305')&&un.includes('DTEND;VALUE=DATE:20270308'),peak:un.includes('DTSTART;VALUE=DATE:20270226'),dlEv:(un.match(/SUMMARY:Deload week starts/g)||[]).length,dl,tz:un.includes('TZID:Africa/Johannesburg')&&un.includes('TZOFFSETTO:+0200')};});
+ T('calendar file: valid frame, CRLF only, every line ≤ 75 octets',c.start&&c.end&&!c.bareLF&&c.long===0,JSON.stringify(c));
+ T('calendar file: every event closed, alerted and uniquely identified',c.ev>20&&c.ev===c.evEnd&&c.alarms===c.ev&&c.uids===c.ev&&c.uniq===c.ev,JSON.stringify(c));
+ T('calendar file: 04:30 and 20:00 supplement windows repeat daily in SAST',c.am&&c.pm&&c.rr===2&&c.tz,JSON.stringify(c));
+ T('calendar file: check weekend 5–7 Mar, peak week and every future deload come from the roadmap',c.check&&c.peak&&c.dlEv===c.dl&&c.dl>=10,JSON.stringify(c));
+ await p.click('.tab[data-view="roadmap"]');await wait(300);
+ await p.evaluate(()=>{window.__dl=[];URL.createObjectURL=x=>{window.__blob=x;return 'blob:stub';};HTMLAnchorElement.prototype.click=function(){window.__dl.push(this.download);};document.getElementById('icsBtn').click();});await wait(300);
+ const d=await p.evaluate(async()=>({dl:window.__dl,type:window.__blob&&window.__blob.type,has:window.__blob?(await window.__blob.text()).includes('BEGIN:VEVENT'):false,toast:document.getElementById('toast').innerText,card:/\d+ events/.test(document.getElementById('icsCard').innerText)}));
+ T('calendar file: the Roadmap button downloads ComebackBlueprint-plan.ics as text/calendar',d.dl[0]==='ComebackBlueprint-plan.ics'&&/^text\/calendar/.test(d.type||'')&&d.has&&/Calendar file saved/.test(d.toast)&&d.card,JSON.stringify(d));
+ T('AV-2: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+{const p=await pg(b,'2026-09-26');
+ await p.evaluate(()=>{window.__said=[];Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{speak(u){window.__said.push(u.text);},cancel(){}}});});
+ await p.click('.tab[data-view="lift"]');await wait(400);await p.evaluate(()=>document.getElementById('voiceBtn').click());await wait(200);
+ const v1=await p.evaluate(()=>({said:window.__said.slice(),on:document.getElementById('voiceBtn').getAttribute('aria-pressed'),stored:localStorage.getItem('cb2_voice'),ow:document.documentElement.scrollWidth}));
+ T('voice cue: the toggle speaks, presses and persists; the three-button row fits 390 px',v1.said.includes('Voice cue on')&&v1.on==='true'&&v1.stored==='true'&&v1.ow<=391,JSON.stringify(v1));
+ await p.evaluate(()=>{const set=(f,v)=>{const i=document.querySelector('#liftBody input[data-ex="ga1"][data-f="'+f+'"]');i.value=v;i.dispatchEvent(new Event('input',{bubbles:true}));};set('r','8');set('w','80');});await wait(150);
+ await p.evaluate(()=>document.querySelector('#liftBody .chk[data-chk="ga1"][data-i="0"]').click());await wait(200);
+ await p.evaluate(()=>{_restEnd=nowMs()-1000;restTick();});await wait(100);
+ const v2=await p.evaluate(()=>window.__said.slice());
+ T('voice cue: ticking a set calls the rest inside the tap, and the timer says go at the end',v2.includes('Rest 3 minutes')&&v2.includes('Rest over. Next set.'),JSON.stringify(v2));
+ await p.click('.tab[data-view="home"]');await wait(500);
+ const pc=await p.evaluate(()=>({t:document.getElementById('phoneCaps')?.innerText||'',inst:!!document.getElementById('installNote')}));
+ T('phone panel: measured live — file copy mode, storage, wake, share and voice rows; no install nag outside Safari',/This phone, checked live/i.test(pc.t)&&/offline file copy/.test(pc.t)&&/Storage/.test(pc.t)&&/Voice rest cue/.test(pc.t)&&!pc.inst,pc.t);
+ await p.click('.tab[data-view="run"]');await wait(300);
+ const e=await p.evaluate(()=>({all:RACES_12M.every(r=>r.src),hope:RACES_12M.find(r=>r.name==='Hope In Motion').d,hy:RACES_12M.find(r=>r.name==='Virgin Active HYROX Johannesburg').d,jc:RACES_12M.find(r=>r.name==='Johnson Crane Hire Marathon').st,src:document.getElementById('view-run').innerHTML.includes('Source: Entry Ninja event page, checked 26 Sep 2026'),conf:(document.getElementById('view-run').innerText.match(/CONFIRMED/g)||[]).length}));
+ T('events: every entry names its source; the moved, re-dated and downgraded entries carry the 26 Sep check',e.all&&e.hope==='Sun 18 Oct 2026'&&/^Thu–Sun 26–29 Nov 2026/.test(e.hy)&&e.jc==='expected'&&e.src,JSON.stringify(e));
+ T('events: at least 30 confirmed events within 30 km from here on',e.conf>=30,e.conf);
+ await p.click('.tab[data-view="guide"]');await wait(300);
+ T('guide: the lifting-model references are listed and marked as heuristics where no study exists',await p.evaluate(()=>{const t=document.getElementById('liftRefs')?.innerText||'';return /Reynolds, Gordon & Robergs \(2006\)/.test(t)&&/Grgic, Lazinica & Schoenfeld \(2020\)/.test(t)&&/coaching heuristics/.test(t);}));
+ T('AV-3: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+
+{const W=d=>SS(d,'pullA',{la1:sets(3,8,100)});const p=await pg(b,'2026-10-10',{cb2_sessions:[W('2026-09-14'),W('2026-09-21'),W('2026-09-28'),W('2026-10-05')]});
+ await p.click('.tab[data-view="track"]');await wait(300);await p.evaluate(()=>{document.querySelector('.track-tabs button[data-tp="lifts"]').click();const s=document.getElementById('exSel');s.value='la1@gym';s.dispatchEvent(new Event('change'));});await wait(300);
+ const r=await p.evaluate(()=>({d:fmtShort('2026-09-14'),dm:fmtDM('2026-10-04'),ticks:[...document.querySelectorAll('#exChart svg text[text-anchor="end"]')].map(t=>t.textContent),x:[...document.querySelectorAll('#exChart svg text[text-anchor="middle"]')].map(t=>t.textContent)}));
+ T('dates: compact dates are day-first with the month by name on any locale (14 Sep, never 09/14)',r.d==='14 Sep'&&r.dm==='4 Oct'&&r.x.every(x=>/^\d{1,2} [A-Z][a-z]{2}$/.test(x)),JSON.stringify(r));
+ T('charts: a flat e1RM line gets five distinct y-axis labels',r.ticks.length===5&&new Set(r.ticks).size===5,JSON.stringify(r.ticks));await done(p);}
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));})();

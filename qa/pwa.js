@@ -45,6 +45,15 @@ T('pwa: #import= link logs weight + sleep',imp.w.includes(88.6)&&imp.s.includes(
 T('pwa: #import= hash cleared after applying (no double import on reload)',!/import=/.test(imp.hash),imp.hash);
 await p.reload({waitUntil:'load'});await wait(900);
 T('pwa: reload does not import twice',await p.evaluate(()=>DB.weight.filter(x=>x.date==='2026-09-25').length===1));
+// iPhone Safari tab: install advice with the storage facts; installed app, empty log: restore prompt
+for(const mode of ['tab','standalone']){const c2=await b.createBrowserContext();const q=await c2.newPage();await q.setRequestInterception(true);q.on('request',r=>{const u=r.url();if(/fonts\.(googleapis|gstatic)\.com/.test(u))r.respond({status:200,contentType:'text/css',body:''});else r.continue();});
+  q.on('pageerror',e=>errs.push(mode+': '+e.message));await q.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Mobile/15E148 Safari/604.1');
+  if(mode==='standalone')await q.evaluateOnNewDocument(()=>{const mm=window.matchMedia.bind(window);window.matchMedia=s=>/display-mode: fullscreen/.test(s)?{matches:true,media:s,addListener(){},removeListener(){},addEventListener(){},removeEventListener(){}}:mm(s);});
+  await q.goto(APP,{waitUntil:'load'});await wait(900);await q.evaluate(()=>switchView('home'));await wait(500);
+  const r=await q.evaluate(()=>({t:document.getElementById('phoneCaps')?.innerText||'',inst:!!document.getElementById('installNote'),rest:!!document.getElementById('restoreNote'),sa:pwaStatus().standalone}));
+  if(mode==='tab')T('pwa: iPhone Safari tab shows the install advice (7-day clean-up, separate storage)',r.inst&&!r.rest&&/browser tab/.test(r.t),JSON.stringify(r));
+  else T('pwa: iOS standalone (reported as display-mode: fullscreen) is detected and an empty install offers Restore',r.sa&&r.rest&&!r.inst&&/Home Screen app/.test(r.t),JSON.stringify(r));
+  await c2.close();}
 T('pwa: no page errors',errs.length===0,errs.join('|').slice(0,300));
 await b.close();srv.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'PWA ALL PASS');console.log('PWA RESULT:',pass+'/'+R.length);process.exit(pass===R.length?0:1);

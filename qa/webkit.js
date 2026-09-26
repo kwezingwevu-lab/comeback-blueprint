@@ -47,6 +47,14 @@ T('webkit: no page/console errors',errs.length===0,errs.join('|').slice(0,300));
  await q.evaluate(()=>{switchView('track');document.querySelector('.track-tabs button[data-tp="lifts"]').click();});await wait(400);
  T('webkit: Track Lifts pane charts the logged exercise',await q.evaluate(()=>!!document.querySelector('#exChart svg')&&document.querySelectorAll('#exSel option').length>=1));
  await q.evaluate(()=>switchView('home'));await wait(300);T('webkit: coach pack renders on Home',await q.evaluate(()=>!!document.getElementById('coachPack')&&/App verdict/.test(coachText())));
+ await q.evaluate(()=>switchView('track'));await wait(200);T('webkit: Track picker keys lifts by place (gym/home never share a line)',await q.evaluate(()=>[...document.querySelectorAll('#exSel option')].every(o=>/@(gym|home)$/.test(o.value))));
+ const ic=await q.evaluate(()=>{const t=icsText(),enc=new TextEncoder();return {ok:t.startsWith('BEGIN:VCALENDAR\r\n')&&t.endsWith('END:VCALENDAR\r\n'),long:t.split('\r\n').filter(l=>enc.encode(l).length>75).length,ev:(t.match(/BEGIN:VEVENT/g)||[]).length};});
+ T('webkit: calendar file builds in Safari’s engine (valid frame, folded lines)',ic.ok&&ic.long===0&&ic.ev>20,JSON.stringify(ic));
+ await q.evaluate(()=>{window.__said=[];try{Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{speak(u){window.__said.push(u.text);},cancel(){}}});}catch(e){}switchView('lift');});await wait(300);
+ const vc=await q.evaluate(()=>{const b=document.getElementById('voiceBtn');if(b&&!b.disabled)b.click();return {btn:!!b,said:window.__said.slice()};});
+ T('webkit: voice cue button renders and speaks when switched on',vc.btn&&vc.said.includes('Voice cue on'),JSON.stringify(vc));
+ await q.evaluate(()=>switchView('home'));await wait(600);T('webkit: phone panel measures this browser live',await q.evaluate(()=>/This phone, checked live/i.test(document.getElementById('phoneCaps')?.innerText||'')&&/offline file copy/.test(document.getElementById('phoneCaps').innerText)));
+ await q.evaluate(()=>switchView('roadmap'));await wait(300);await q.screenshot({path:path.resolve(__dirname,'shots/webkit-roadmap-ics-390.png'),fullPage:false});
  T('webkit: upgrade walk has no page errors',e2.length===0,e2.join('|'));await c2.close();}
 // --- offline install in the Safari engine: serve dist/ over http like GitHub Pages
 {const http=require('http');const DIST=path.resolve(__dirname,'../dist'),BASE='/comeback-blueprint/dist/';const TY={'.html':'text/html; charset=utf-8','.js':'text/javascript','.webmanifest':'application/manifest+json','.png':'image/png'};

@@ -7,3 +7,4 @@ qa/qa_report.json
 !dist/icons/*.png
 qa/.fonts/
 qa/shots/
+qa/icons/
