@@ -2,7 +2,7 @@
 
 Every session adds to this list, builds everything on it that can be verified, and says plainly why the rest waits. "Shipped" means a named check in the QA suites proves it; nothing is marked shipped on the strength of reading the code.
 
-Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then a 64-finding adversarial review round fixed and proven (section R); 12 queued with the reason; 6 not possible from a web app, with the honest alternative.
+Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then a 64-finding adversarial review round fixed and proven (section R), then a visual round (section V, 14 items); 14 queued with the reason; 6 not possible from a web app, with the honest alternative.
 
 ## A. Correctness and coherence (every tab tells the same story)
 
@@ -115,6 +115,25 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then 
 | Calendar data and helper | 13 | Section Y, helper self-test 9/9 |
 | Tests and docs honesty (mutant-proof checks, disclosures, gotchas) | 12 | Section Y, docs |
 
+## V. Visual round (26 Sep): measured at 390 px, fixed, proven
+
+| # | Item | Status |
+|---|---|---|
+| V1 | Roadmap chart and FFMI gauge drawn at 680 units, labels 4–6 px on the phone | Shipped · Z1, Z2, WebKit visual |
+| V2 | ETA and fast-track labels under 10 px | Shipped · Z1 |
+| V3 | Chart engine: true scale (320), 11 px labels, monotone curves, round ticks, latest-value pill, halos, screen-reader labels | Shipped · Z1, Z2 |
+| V4 | Roadmap: round ticks, month-and-year dates, legend (ceiling label sat under the data) | Shipped · Z5 |
+| V5 | ETA legend; milestone value no longer breaks mid-phrase | Shipped · screenshot |
+| V6 | Fast-track header doubled dash | Shipped · Z6 |
+| V7 | Text floor: micro-labels 10–10.5 px, tab labels 10 px, units 11 px | Shipped · Z3 |
+| V8 | Tap targets: segments, tabs, buttons ≥ 40 px, set buttons 38, Fill 36, tick hit area 42, delete 35×38 | Shipped · Z4 |
+| V9 | Undo after deleting a weigh-in, tape entry or lift | Shipped · Z7, WebKit storage path 3 |
+| V10 | "Strength" pillar showed bodyweight, now "Mass"; ring label fits the ring | Shipped · screenshot |
+| V11 | Weight target band, Lifts chart in kg, Tapes chart as change since the first tape | Shipped · screenshot, section X |
+| V12 | Fonts cached by the installed app for offline use; clean failure with no copy | Shipped · PWA no-network path only (sandbox cannot reach Google Fonts) |
+| V13 | Screenshot helpers render with the real typefaces (qa/fonts, qa/fontroute.js) | Shipped · probe reports Manrope and IBM Plex Mono loaded |
+| V14 | Harness: one-line FAILs, null-safe UI steps, 390 px probe, WebKit shot helper | Shipped · mutation run 255/261 with 6 named FAILs |
+
 ## K. Queued (not built yet) — what each needs
 
 | # | Item | Why it waits |
@@ -131,6 +150,8 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then 
 | K10 | Dark/light theme switch | App is dark-only by design; low value for the effort |
 | K11 | Home Screen reminders at 04:30 and 20:00 | Web push on iPhone needs a push server; the Shortcuts app can do it today (see IPHONE.md) |
 | K12 | Split the 380 KB single file into modules | Only if the file becomes hard to edit; single-file is a feature for the phone |
+| K13 | Tap a chart point to read its date and value | Needs touch handling plus a test that drives it; worth doing once real weigh-ins exist to read |
+| K14 | Check the visual round on your iPhone | The sandbox WebKit is Playwright’s build, not iOS Safari; open the published app on the phone and report anything that looks off |
 
 ## L. Not possible from a web app (and the honest alternative)
 

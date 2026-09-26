@@ -479,7 +479,7 @@ const nextT=async q=>q.evaluate(()=>[...document.querySelectorAll('#liftBody .ne
 {const q=await ctxPage('2026-10-03',{cb2_weight:[{date:'2026-09-19',v:88.8},{date:'2026-10-03',v:89.9}]});await q.evaluate(()=>switchView('roadmap'));await wait(300);
  const rm=await q.evaluate(()=>document.getElementById('view-roadmap').innerText);
  await q.evaluate(()=>{switchView('track');document.getElementById('wDate').value='2026-09-12';document.getElementById('wVal').value='88.0';document.getElementById('wAdd').click();});await wait(300);
- T('Y roadmap starts at Day 1 (12 Sep), and backfilling the Day-1 weigh-in keeps the profile on the latest reading',/12 Sep 26/.test(rm)&&!/29 Jun/.test(rm)&&await q.evaluate(()=>DB.profile.weight===89.9&&day1W()===88),rm.slice(0,120));await done(q);}
+ T('Y roadmap starts at Day 1 (12 Sep), and backfilling the Day-1 weigh-in keeps the profile on the latest reading',/12 Sep ’26/.test(rm)&&!/29 Jun/.test(rm)&&await q.evaluate(()=>DB.profile.weight===89.9&&day1W()===88),rm.slice(0,120));await done(q);}
 {const c=await b.createBrowserContext();const q=await page(c,'2026-09-26',SEED_ONCE({}));await q.evaluate(()=>{DB.weight.push({date:todayISO(),v:88.9});DB.save();});await wait(700);
  await q.evaluate(()=>localStorage.clear());await q.reload({waitUntil:'networkidle0'});await wait(1600);
  T('Y vault: a real wipe (no flags re-seeded) restores from IndexedDB',await q.evaluate(()=>DB.weight.some(x=>+x.v===88.9)),await q.evaluate(()=>JSON.stringify(DB.weight)));await c.close();}
@@ -508,5 +508,42 @@ const nextT=async q=>q.evaluate(()=>[...document.querySelectorAll('#liftBody .ne
 {const q=await ctxPage('2026-11-28');await q.evaluate(()=>switchView('run'));await wait(300);const t=await q.evaluate(()=>document.getElementById('view-run').innerText);
  T('Y calendar: HYROX stays listed on its third day as "on now"; estate name not rendered; parkrun distances computed',/Virgin Active HYROX Johannesburg[\s\S]{0,300}on now/.test(t)&&!/Bellcanto/.test(t)&&/Nearest by straight line: Golden Harvest ~3 km/.test(t),'');
  T('Y backup keys: one global list, every setting included',await q.evaluate(()=>Array.isArray(BACKUP_KEYS)&&['cb2_wakelock','cb2_loc','cb2_fuelq','cb2_focuslb','cb2_radius','cb2_march','cb2_bulk'].every(k=>BACKUP_KEYS.includes(k))));await done(q);}
+// ===== Z. Visual layer (26 Sep 2026): true-scale charts, a text floor, finger-sized targets, undo on delete. Measured at 390 px, the phone width. =====
+{const VSEED={cb2_weight:[{date:'2026-09-12',v:88},{date:'2026-09-19',v:88.4},{date:'2026-09-25',v:88.8}],cb2_measure:[{date:'2026-09-12',waist:92,neck:39,arm:37},{date:'2026-09-26',waist:92.4,neck:39,arm:37.3}],cb2_sessions:[S('2026-09-12','legsA',{ga1:sets([[8,100],[8,100]])}),S('2026-09-19','legsA',{ga1:sets([[8,102.5],[8,102.5]])})]};
+ const q=await ctxPage('2026-09-26',VSEED);await q.setViewport({width:390,height:844});await wait(300);
+ const m=await q.evaluate(()=>{const out={svgMin:99,svgWorst:'',htmlMin:99,htmlWorst:'',tapMin:99,tapWorst:'',scale:[],aria:0,charts:0,views:0};
+  for(const v of [...document.querySelectorAll('.tab[data-view]')].map(t=>t.dataset.view)){switchView(v);out.views++;
+   document.querySelectorAll('#view-'+v+' .tool').forEach(t=>t.classList.add('open'));document.querySelectorAll('#view-'+v+' details').forEach(d=>d.open=true);
+   const panes=v==='track'?[...document.querySelectorAll('.track-tabs button')]:[null];
+   for(const pb of panes){if(pb)pb.click();const root=document.getElementById('view-'+v);
+    root.querySelectorAll('*').forEach(el=>{const cs=getComputedStyle(el);if(!el.getClientRects().length||cs.visibility==='hidden')return;
+     const own=[...el.childNodes].some(n=>n.nodeType===3&&n.textContent.trim().length>1);
+     if(own){let fs=parseFloat(cs.fontSize);const svg=el.closest('svg');
+      if(svg){const vb=svg.viewBox&&svg.viewBox.baseVal;if(vb&&vb.width)fs*=svg.getBoundingClientRect().width/vb.width;if(fs<out.svgMin){out.svgMin=fs;out.svgWorst=v+':'+el.textContent.trim().slice(0,24);}}
+      else if(fs<out.htmlMin){out.htmlMin=fs;out.htmlWorst=v+':'+(el.className||el.tagName)+':'+el.textContent.trim().slice(0,24);}}
+     if(el.matches('.seg button,.track-tabs button,.btn,.mini,.del')){const r=el.getBoundingClientRect();if(r.height<out.tapMin){out.tapMin=r.height;out.tapWorst=v+':'+el.className+':'+el.textContent.trim().slice(0,20);}}
+     if(el.matches('svg.chart-svg,svg.gauge-svg')){out.charts++;if(el.getAttribute('role')==='img'&&(el.getAttribute('aria-label')||'').length>8)out.aria++;const r=el.getBoundingClientRect(),vb=el.viewBox.baseVal;if(r.width>0)out.scale.push(+(r.width/vb.width).toFixed(2));}});}}
+  const c=document.querySelector('.chk');out.chkHit=c?getComputedStyle(c,'::after').top:'none';
+  out.nav=parseFloat(getComputedStyle(document.querySelector('nav.tabs .tab span')).fontSize);return out;});
+ T('Z charts: every chart text renders at 10.5 px or more on a 390 px phone (the roadmap and gauge were ~4-5 px)',m.svgMin>=10.5,m.svgMin.toFixed(2)+' '+m.svgWorst);
+ T('Z charts: drawn at true scale (rendered width within 15% of the drawing width) and every chart is labelled for screen readers',m.scale.length>=5&&m.scale.every(x=>x>=0.85&&x<=1.15)&&m.aria===m.charts,JSON.stringify({scale:m.scale,aria:m.aria,charts:m.charts}));
+ T('Z text floor: no text below 9.5 px anywhere in the eight views; tab labels 10 px',m.views===8&&m.htmlMin>=9.5&&m.nav>=10,m.htmlMin+' '+m.htmlWorst+' nav '+m.nav);
+ T('Z targets: buttons, segments, track tabs, set buttons and delete icons are at least 36 px tall; the set tick has a 42 px hit area',m.tapMin>=36&&m.chkHit==='-7px',m.tapMin+' '+m.tapWorst+' chk '+m.chkHit);
+ await q.evaluate(()=>switchView('roadmap'));await wait(150);
+ const rm=await q.evaluate(()=>{const svg=document.querySelector('#rmChart svg');const t=[...svg.querySelectorAll('text')].map(x=>x.textContent);const ys=t.filter(x=>/^\d+$/.test(x)).map(Number);const xs=t.filter(x=>!/^\d+$/.test(x));const st=ys[1]-ys[0];
+  return {ys,xs,round:ys.length>=3&&ys.every((y,i)=>i===0||y-ys[i-1]===st)&&ys.every(y=>y%st===0),legend:document.getElementById('rmChart').innerText};});
+ T('Z roadmap: round-number weight ticks, month-and-year dates across the three calendar years, and a legend for the lines and dots',rm.round&&rm.xs.length>=3&&rm.xs.every(x=>/^[A-Z][a-z]{2} ’\d\d$/.test(x))&&/natural ceiling ~\d+ kg/.test(rm.legend)&&/March milestone/.test(rm.legend)&&/re-test/.test(rm.legend),JSON.stringify(rm));
+ const ft=await q.evaluate(()=>document.getElementById('view-home').innerText);T('Z fast-track header: one dash, not two',/Fastest way to the 3\.3 kg — in \d+ weeks/.test(ft)&&!/— —/.test(ft),(ft.match(/Fastest way[^\n]*/)||[''])[0]);
+ await done(q);}
+{const q=await ctxPage('2026-09-26',{cb2_weight:[{date:'2026-09-19',v:88.2},{date:'2026-09-25',v:88.8}],cb2_measure:[{date:'2026-09-12',waist:92,neck:39},{date:'2026-09-26',waist:92.4,neck:39}]});
+ await q.evaluate(()=>switchView('track'));await wait(200);
+ await q.evaluate(()=>document.querySelector('[data-delw="2026-09-25"]').click());await wait(150);
+ const a=await q.evaluate(()=>({n:DB.weight.length,undo:!!document.querySelector('#toast.show .undo'),clickable:getComputedStyle(document.getElementById('toast')).pointerEvents}));
+ await q.evaluate(()=>(document.querySelector('#toast .undo')||{click(){}}).click());await wait(150);
+ const b2=await q.evaluate(()=>({n:DB.weight.length,ls:JSON.parse(localStorage.getItem('cb2_weight')).length,row:/88\.8/.test(document.getElementById('wList').innerText),toast:document.getElementById('toast').innerText}));
+ await q.evaluate(()=>{document.querySelector('.track-tabs button[data-tp="measure"]').click();(document.querySelector('[data-delme="2026-09-26"]')||{click(){}}).click();});await wait(150);
+ const c1=await q.evaluate(()=>DB.measure.length);await q.evaluate(()=>(document.querySelector('#toast .undo')||{click(){}}).click());await wait(150);const c2=await q.evaluate(()=>({n:DB.measure.length,ls:JSON.parse(localStorage.getItem('cb2_measure')).length}));
+ T('Z undo: deleting a weigh-in or a tape entry offers Undo, and Undo restores it on screen and in storage',a.n===1&&a.undo&&a.clickable==='auto'&&b2.n===2&&b2.ls===2&&b2.row&&/Restored/.test(b2.toast)&&c1===1&&c2.n===2&&c2.ls===2,JSON.stringify({a,b2,c1,c2}));
+ await done(q);}
 await b.close();
-const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));process.exit(pass===R.length?0:1);})().catch(e=>{console.error('QA CRASH:',e&&e.stack||e);process.exit(2);});
+const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+String(x.detail||'').replace(/\s+/g,' ').slice(0,400)).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));process.exit(pass===R.length?0:1);})().catch(e=>{console.error('QA CRASH:',e&&e.stack||e);process.exit(2);});

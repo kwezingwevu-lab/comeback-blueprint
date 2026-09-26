@@ -28,6 +28,16 @@ T('webkit storage: weigh-in → localStorage',st.ls===1,JSON.stringify(st));T('w
 const backup=await p.evaluate(()=>backupJSON());
 const nav=p.waitForNavigation({waitUntil:'load',timeout:15000});await p.evaluate(j=>{localStorage.clear();applyRestoreText(j);},backup);await nav;await wait(900);
 T('webkit storage: restore survives reload',await p.evaluate(()=>DB.weight.length===1&&+DB.weight[0].v===88.4));
+// Storage path 3: delete → Undo puts the entry back in localStorage and the account mirror (26 Sep visual round).
+await p.evaluate(()=>switchView('track'));await wait(200);
+await p.evaluate(()=>document.querySelector('[data-delw]').click());await wait(250);
+const del=await p.evaluate(()=>({n:DB.weight.length,undo:!!document.querySelector('#toast.show .undo')}));
+await p.evaluate(()=>{const u=document.querySelector('#toast .undo');if(u)u.click();});await wait(900);
+const und=await p.evaluate(()=>({n:DB.weight.length,ls:JSON.parse(localStorage.getItem('cb2_weight')||'[]').length,cs:(window.__cs['cb2_all']||'').includes('88.4')}));
+T('webkit storage: delete offers Undo; Undo restores localStorage and the account mirror',del.n===0&&del.undo&&und.n===1&&und.ls===1&&und.cs,JSON.stringify({del,und}));
+// Visual: charts drawn at true scale, so Safari renders their labels at full size (the roadmap and gauge were ~4-5 px).
+const chartPx=await p.evaluate(async()=>{let min=99,where='';for(const v of ['roadmap','numbers']){switchView(v);await new Promise(r=>setTimeout(r,150));document.querySelectorAll('#view-'+v+' svg.chart-svg,#view-'+v+' svg.gauge-svg').forEach(s=>{const k=s.getBoundingClientRect().width/s.viewBox.baseVal.width;s.querySelectorAll('text').forEach(t=>{const f=parseFloat(getComputedStyle(t).fontSize)*k;if(f<min){min=f;where=v+':'+t.textContent;}});});}return {min:+min.toFixed(2),where};});
+T('webkit visual: roadmap, ETA and gauge labels render at 10.5 px or more at 390 px',chartPx.min>=10.5,JSON.stringify(chartPx));
 await p.evaluate(()=>switchView('home'));await wait(300);
 fs.mkdirSync(path.resolve(__dirname,'shots'),{recursive:true});await p.screenshot({path:path.resolve(__dirname,'shots/webkit-home-390.png'),fullPage:false});
 await p.evaluate(()=>switchView('lift'));await wait(300);await p.screenshot({path:path.resolve(__dirname,'shots/webkit-lift-390.png'),fullPage:false});
@@ -38,4 +48,4 @@ T('webkit tech: Track Lifts and Regions panes render (7 regions)',await p.evalua
 T('webkit tech: no manifest or service worker on file:// (install layer is http-only)',await p.evaluate(()=>!document.querySelector('link[rel=manifest]')&&!window.__swReg));
 T('webkit: no page/console errors',errs.length===0,errs.join('|').slice(0,300));
 await b.close();
-const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'WEBKIT ALL PASS');console.log('WEBKIT RESULT:',pass+'/'+R.length);process.exit(pass===R.length?0:1);})().catch(e=>{console.error('WEBKIT CRASH:',e.message);process.exit(2);});
+const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+String(x.detail||'').replace(/\s+/g,' ').slice(0,400)).join('\n')||'WEBKIT ALL PASS');console.log('WEBKIT RESULT:',pass+'/'+R.length);process.exit(pass===R.length?0:1);})().catch(e=>{console.error('WEBKIT CRASH:',e.message);process.exit(2);});

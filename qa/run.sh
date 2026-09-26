@@ -8,7 +8,8 @@ export TZ=Africa/Johannesburg
 node --check src/app_full.js
 python3 build.py
 cp dist/ComebackBlueprint.html qa/ComebackBlueprint.html
-cd qa && node qa_full.js | tail -3
+# Every FAIL prints on one line (a multi-line detail once pushed the failing check's name out of a tail -3).
+cd qa && node qa_full.js | grep -E '^(FAIL|ALL PASS|RESULT)'
 # Installable/offline acceptance: serves dist/ over local HTTP, installs the service worker, kills the server, reloads.
 node pwa.js | tail -2
 # Calendar refresh helper: parser and diff self-test (the live sweep is run by hand: node tools/calendar-refresh.js --geocode).

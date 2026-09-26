@@ -37,3 +37,11 @@ See CLAUDE.md §6 for the numbered list. Additions:
 - 2026-09-26: Relative targets compared with a typed-body-fat lean estimate go negative as weight rises; price routes from Day 1, not from "now".
 - 2026-09-26: innerText applies CSS text-transform — assert with case-insensitive patterns on uppercase labels.
 - 2026-09-26: A service worker's network-first page needs a timeout and must treat HTTP errors like failures, or "offline-ready" still shows a blank or error screen on bad signal.
+- 2026-09-26 (visual round): An SVG drawn in a 680-unit viewBox and shown in a 316 px card scales every label by 0.46: font-size 9 became 4 px on the phone. Draw charts at the width they render (320 at 390 px) and measure effective size as font-size × rendered width ÷ viewBox width. Section Z enforces 10.5 px.
+- 2026-09-26: Sandbox screenshots used fallback fonts (DejaVu is much wider than Manrope), so text-fit judgments from them were wrong in both directions. qa/fonts now vendors the real typefaces (OFL) and the helpers serve them offline; judge fit only from those shots.
+- 2026-09-26: qa/probe.js never set a viewport, so every measurement it made was for an 800×600 window (labels 726 px wide "overflowing" a 390 px phone). Set the viewport in every measuring tool.
+- 2026-09-26: A region-edit end marker ('</svg>') matched the accordion's chevron icon before the chart. End markers must be text that only the target contains (here "+30 weeks</text></svg>").
+- 2026-09-26: run.sh piped the suite through tail -3; a failure whose detail spanned lines pushed its own name out of view. FAIL lines are now one line each and run.sh greps for them.
+- 2026-09-26: A test that clicks an element the broken build no longer renders throws, and the throw ends the whole suite (every later result lost). UI actions in tests must be null-safe so a broken feature is a named FAIL.
+- 2026-09-26: A mutation run whose anchor did not match (a literal em dash where the build holds a \u escape) mutates nothing and "passes"; assert every mutation applied (count == 1) before reading a mutation run.
+- 2026-09-26: Bigger delete targets raise the odds of a stray tap. When a target grows, check what the tap does; deletes now offer Undo.
