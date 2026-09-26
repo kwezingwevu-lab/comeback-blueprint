@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SDF text - scale, angle and legibility</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#131a2e; --line:#26304d; --text:#e8ecf7; --dim:#9aa6c4;
+    --grn:#37e08b; --cyn:#49d7f2; --pnk:#ff5ea8; --warn:#ffc94d; --err:#ff5a5a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-text-size-adjust:100%}
+  main{max-width:720px;margin:0 auto;padding:16px}
+  h1{font-size:19px;margin:0 0 4px}
+  h2{font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);
+     margin:22px 0 8px;font-weight:600}
+  p{margin:8px 0}
+  .sub{color:var(--dim);font-size:13px;margin:0 0 14px}
+  canvas{width:100%;height:auto;display:block;border-radius:10px;background:#000}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0}
+  .badge{display:inline-block;padding:2px 8px;border-radius:99px;border:1px solid var(--line);
+    font-size:12px;color:var(--dim);margin:0 6px 6px 0}
+  .badge b{color:var(--grn);font-weight:600}
+  label{display:flex;align-items:center;gap:10px;font-size:13px;margin:8px 0;color:var(--dim)}
+  label span{flex:0 0 116px}
+  input[type=range]{flex:1 1 0;min-width:0}
+  button{font:inherit;font-size:13px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);
+    background:#1b2440;color:var(--text);cursor:pointer}
+  button:hover{border-color:var(--cyn)}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums}
+  th,td{text-align:right;padding:5px 6px;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--dim);font-weight:600}
+  .ok{color:var(--grn)} .bad{color:var(--err)} .note{color:var(--dim);font-size:12.5px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .alt{border-left:3px solid var(--cyn);padding:8px 10px;background:#101733;border-radius:0 8px 8px 0;
+    font-size:13.5px}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--cyn)}
+</style>
+</head>
+<body>
+<main>
+  <h1>SDF text - crisp at any scale, with no font file</h1>
+  <p class="sub">Every glyph edge below is reconstructed in the fragment shader from a
+     signed distance field baked into the module. Nothing is fetched; no font file ships.</p>
+
+  <div id="tiers"></div>
+
+  <canvas id="scene" role="img" aria-describedby="alt"></canvas>
+  <p id="alt" class="alt"></p>
+  <p class="note" id="motion"></p>
+
+  <h2>Controls</h2>
+  <div class="card">
+    <label><span>Label size</span><input id="cSize" type="range" min="6" max="120" value="40" step="1"><output id="oSize"></output></label>
+    <label><span>Outline</span><input id="cOut" type="range" min="0" max="30" value="0" step="1"><output id="oOut"></output></label>
+    <label><span>Halo</span><input id="cHalo" type="range" min="0" max="60" value="0" step="1"><output id="oHalo"></output></label>
+    <label><span>Y inclination</span><input id="cTilt" type="range" min="0" max="80" value="60" step="1"><output id="oTilt"></output></label>
+    <label><span>Thicken</span><input id="cThick" type="range" min="-30" max="30" value="0" step="1"><output id="oThick"></output></label>
+    <p><button id="bP3">Toggle Display-P3 encode</button> <button id="bStill">Toggle motion</button></p>
+  </div>
+
+  <h2>Edge width: SDF against a bitmap baseline</h2>
+  <div class="card">
+    <p class="note">The same glyph rendered at four sizes and at an inclination, read back
+      from the framebuffer. A signed distance field holds a roughly constant edge width in
+      device pixels because the shader solves the edge analytically. A bitmap's edge width
+      grows with magnification, which is what blurry 3D text is.</p>
+    <p><button id="bMeasure">Run the measurement</button></p>
+    <div id="edges"></div>
+  </div>
+
+  <h2>What this module does and does not do</h2>
+  <div class="card">
+    <p class="note" id="facts"></p>
+  </div>
+</main>
+
+<script src="./sdftext.js"></script>
+<script>
+(function () {
+  'use strict';
+  var S = window.SDFText;
+  var cv = document.getElementById('scene');
+  var altEl = document.getElementById('alt');
+  var tiersEl = document.getElementById('tiers');
+  var LABELS = ['ARS 12.4', 'MCI ·8.5m', 'BRE 2-1 WHU', 'TOT 61%'];
+
+  function badge(t, v) { return '<span class="badge">' + t + ' <b>' + v + '</b></span>'; }
+
+  var DPR = Math.min(window.devicePixelRatio || 1, 3);
+  var CSSW = Math.min(document.querySelector('main').clientWidth - 32, 688);
+  if (!(CSSW > 0)) CSSW = 358;
+  var CSSH = Math.round(CSSW * 1.55);
+  cv.style.height = CSSH + 'px';
+  var W = Math.round(CSSW * DPR), H = Math.round(CSSH * DPR);
+  cv.width = W; cv.height = H;
+
+  var tier = S.tier(cv);
+  var reduced = S.reducedMotion();
+  // A screen reader can reach the canvas before the first frame has rendered, so
+  // the alternative is populated up front and kept current by every frame after.
+  altEl.textContent = 'The canvas reads: ' + S.describe(LABELS) + '. Not yet rendered.';
+  var still = reduced;
+  document.getElementById('motion').textContent = reduced
+    ? 'prefers-reduced-motion is on, so the scene is a single still frame.'
+    : 'Motion is on. Turn on prefers-reduced-motion, or press the button, for a still frame.';
+
+  document.getElementById('facts').innerHTML =
+    'Atlas ' + S.font.atlasWidth + '×' + S.font.atlasHeight +
+    ' single-channel signed distance field, em ' + S.font.em + ' px, spread ' + S.font.spread +
+    ' px, ' + S.font.inkGlyphs + ' inked glyphs of ' + S.font.glyphCount +
+    ', ' + S.font.kernPairs + ' kerning pairs. Source: ' + S.font.source + '.' +
+    ' The field is a greyscale PNG inlined as a data URL, so the browser’s own deflate' +
+    ' decoder unpacks it and this module carries no decompressor.' +
+    ' Single channel, so a sharp corner is cut by a fraction of one atlas texel;' +
+    ' run the measurement above to see it. Rotation, zoom and device pixel ratio cost nothing' +
+    ' in sharpness. A bitmap atlas cannot say the same.';
+
+  /* ---------------- tier 0 / tier 1 degradation ---------------------- */
+
+  if (tier < 2) {
+    var msg = tier === 1
+      ? 'No WebGL2 here, so the scene falls back to the 2D canvas and the system font. '
+        + 'Shapes and metrics are the system font’s, not the baked field’s.'
+      : 'No canvas at all. The labels are below as text.';
+    tiersEl.innerHTML = badge('tier', String(tier)) + badge('renderer', tier === 1 ? '2D canvas' : 'DOM text')
+      + '<p class="note">' + msg + '</p>';
+    altEl.textContent = 'The canvas reads: ' + S.describe(LABELS)
+      + '. Rendered by the ' + (tier === 1 ? '2D canvas in the system font' : 'DOM, as text')
+      + ', not by the distance field.';
+    // The page's own headline claims the shader draws these glyphs. At this tier
+    // it does not, so the claim is withdrawn rather than left standing.
+    var sub = document.querySelector('.sub');
+    if (sub) sub.textContent = tier === 1
+      ? 'No WebGL2 on this device, so nothing below is drawn by the distance field.'
+        + ' What you see is the system font on a 2D canvas.'
+      : 'No canvas on this device, so nothing below is drawn at all. The labels are listed as text.';
+    if (tier === 1) {
+      CSSH = Math.round(46 * (LABELS.length + 1.2));
+      cv.style.height = CSSH + 'px';
+      H = Math.round(CSSH * DPR); cv.height = H;
+      var c2 = cv.getContext('2d');
+      c2.fillStyle = '#0b1020'; c2.fillRect(0, 0, W, H);
+      for (var i = 0; i < LABELS.length; i++)
+        S.fallback2D(c2, LABELS[i], { x: 16 * DPR, y: (46 + i * 46) * DPR,
+          size: 28 * DPR, color: '#e8ecf7', outlineWidth: 2 * DPR });
+    } else {
+      cv.remove();
+      var ul = document.createElement('ul');
+      for (var j = 0; j < LABELS.length; j++) {
+        var li = document.createElement('li'); li.textContent = LABELS[j]; ul.appendChild(li);
+      }
+      altEl.parentNode.insertBefore(ul, altEl.nextSibling);
+    }
+    document.getElementById('bMeasure').disabled = true;
+    document.getElementById('bP3').disabled = true;
+    // The hook exists at EVERY tier. A test that can only see the page when the
+    // GPU path works cannot tell a clean degradation from a silent failure.
+    window.SDFTextDemo = {
+      ready: false, frame: function () {}, renderer: null,
+      measureEdges: function () { return []; }, measureExtras: function () { return null; },
+      renderTable: function () { return ''; },
+      info: { tier: tier, dpr: DPR, width: W, height: H, floatOK: false,
+              p3Settable: false, p3Display: false, reduced: reduced },
+      alt: function () { return altEl.textContent; }
+    };
+    return;
+  }
+
+  var gl = cv.getContext('webgl2', { antialias: false, alpha: false, depth: false,
+                                     preserveDrawingBuffer: true });
+  var floatOK = !!gl.getExtension('EXT_color_buffer_float');
+  var p3Want = false;
+  var p3Settable = false;
+  try {
+    if ('drawingBufferColorSpace' in gl) { gl.drawingBufferColorSpace = 'display-p3';
+      p3Settable = gl.drawingBufferColorSpace === 'display-p3'; gl.drawingBufferColorSpace = 'srgb'; }
+  } catch (e) { p3Settable = false; }
+  var p3Display = typeof matchMedia === 'function' && matchMedia('(color-gamut: p3)').matches;
+
+  tiersEl.innerHTML =
+    badge('tier', '2 - WebGL2') +
+    badge('device pixel ratio', String(DPR)) +
+    badge('buffer', W + '×' + H + ' = ' + (W * H).toLocaleString('en-ZA') + ' px') +
+    badge('RGBA16F target', floatOK ? 'yes' : 'no - direct sRGB path') +
+    badge('P3 buffer settable', p3Settable ? 'yes' : 'no') +
+    badge('P3 display', p3Display ? 'yes' : 'no');
+
+  /* ---------------- small GL helpers -------------------------------- */
+
+  function sh(type, src) {
+    var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  function prog(vs, fs) {
+    var p = gl.createProgram();
+    gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+  }
+  var FULLSCREEN_VS =
+    '#version 300 es\nin vec2 p;out vec2 uv;void main(){uv=p*0.5+0.5;gl_Position=vec4(p,0.,1.);}';
+  var triBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, triBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  var triVAO = gl.createVertexArray();
+  gl.bindVertexArray(triVAO);
+  gl.bindBuffer(gl.ARRAY_BUFFER, triBuf);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.bindVertexArray(null);
+  function fullscreen(p) { gl.useProgram(p); gl.bindVertexArray(triVAO);
+    gl.drawArrays(gl.TRIANGLES, 0, 3); gl.bindVertexArray(null); }
+
+  /* ---------------- background: linear HDR, deterministic ----------- */
+  // No Math.random, no Date.now anywhere: the busy band is a hash of the
+  // fragment coordinate, so the same frame is byte-identical every run.
+  var BG = prog(FULLSCREEN_VS,
+    '#version 300 es\nprecision highp float;in vec2 uv;uniform float uBand;out vec4 o;' +
+    // A deterministic hash of the cell index: no Math.random, no Date.now, so the
+    // same frame is byte-identical on every run and in every engine.
+    'float h21(vec2 p){p=fract(p*vec2(127.1,311.7));return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}' +
+    'void main(){' +
+    '  float y=1.0-uv.y;' +
+    '  vec3 sky=mix(vec3(0.010,0.016,0.045),vec3(0.05,0.09,0.22),pow(y,1.5));' +
+    '  if(uv.y>uBand){' +
+         // the busy band the halo has to stay legible over
+    '    vec2 g=floor(uv*vec2(34.0,74.0));' +
+    '    float n=h21(g), m=h21(g+11.0);' +
+    '    sky+=mix(vec3(0.03,0.22,0.42),vec3(0.42,0.08,0.26),n)*(0.30+0.70*m);' +
+    '  }' +
+    '  o=vec4(sky,1.0);}');
+  var uBand = gl.getUniformLocation(BG, 'uBand');
+
+  /* ---------------- resolve: ACES -> encode -> dither ---------------- */
+
+  var RESOLVE = prog(FULLSCREEN_VS,
+    '#version 300 es\nprecision highp float;in vec2 uv;uniform sampler2D uSrc;' +
+    'uniform int uMode;uniform float uLevels;out vec4 o;\n' +
+    S.DITHER_GLSL +
+    'const mat3 SRGB_TO_P3=mat3(0.8224621,0.0331941,0.0170827,0.1775380,0.9668058,0.0723974,0.0,0.0,0.9105199);\n' +
+    'vec3 aces(vec3 x){const float a=2.51,b=0.03,c=2.43,d=0.59,e=0.14;' +
+    ' return clamp((x*(a*x+b))/(x*(c*x+d)+e),0.0,1.0);}\n' +
+    'float enc1(float c){c=clamp(c,0.0,1.0);return c<=0.0031308?12.92*c:1.055*pow(c,1.0/2.4)-0.055;}\n' +
+    'void main(){vec3 lin=texture(uSrc,uv).rgb;lin=aces(lin);' +
+    ' if(uMode==2) lin=SRGB_TO_P3*lin;' +
+    ' vec3 e=vec3(enc1(lin.r),enc1(lin.g),enc1(lin.b));' +
+    ' o=vec4(sdfDither(e,gl_FragCoord.xy,uLevels),1.0);}');
+  var uSrc = gl.getUniformLocation(RESOLVE, 'uSrc');
+  var uRMode = gl.getUniformLocation(RESOLVE, 'uMode');
+  var uLevels = gl.getUniformLocation(RESOLVE, 'uLevels');
+
+  /* ---------------- HDR target -------------------------------------- */
+
+  var fbo = null, fboTex = null;
+  function makeTarget(w, h) {
+    if (!floatOK) return;
+    if (fbo) { gl.deleteFramebuffer(fbo); gl.deleteTexture(fboTex); }
+    fboTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, fboTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fboTex, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+      gl.deleteFramebuffer(fbo); fbo = null; floatOK = false;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+  makeTarget(W, H);
+
+  var R = S.createRenderer(gl, { mode: floatOK ? 'linear' : 'srgb' });
+
+  /* ---------------- controls ---------------------------------------- */
+
+  var C = {};
+  ['Size', 'Out', 'Halo', 'Tilt', 'Thick'].forEach(function (k) {
+    C[k] = document.getElementById('c' + k);
+    C[k].addEventListener('input', function () { sync(); if (still) frame(0); });
+  });
+  function sync() {
+    document.getElementById('oSize').textContent = C.Size.value + ' px';
+    document.getElementById('oOut').textContent = (C.Out.value / 10).toFixed(1) + ' px';
+    document.getElementById('oHalo').textContent = (C.Halo.value / 10).toFixed(1) + ' px';
+    document.getElementById('oTilt').textContent = C.Tilt.value + '°';
+    document.getElementById('oThick').textContent = (C.Thick.value / 10).toFixed(1) + ' px';
+  }
+  sync();
+  document.getElementById('bP3').addEventListener('click', function () {
+    p3Want = !p3Want;
+    try { gl.drawingBufferColorSpace = p3Want ? 'display-p3' : 'srgb'; } catch (e) {}
+    this.textContent = p3Want ? 'Display-P3 encode: on' : 'Toggle Display-P3 encode';
+    if (still) frame(0);
+  });
+  document.getElementById('bStill').addEventListener('click', function () {
+    still = !still;
+    this.textContent = still ? 'Motion: off (still frame)' : 'Toggle motion';
+    if (still) frame(0); else requestAnimationFrame(loop);
+  });
+
+  /* ---------------- the scene --------------------------------------- */
+
+  var LADDER = [8, 14, 22, 34];
+
+  function frame(t) {
+    var big = +C.Size.value * DPR;
+    var ow = (+C.Out.value / 10) * DPR;
+    var hw = (+C.Halo.value / 10) * DPR;
+    var th = (+C.Thick.value / 10) * DPR;
+    var tilt = +C.Tilt.value;
+    var zoom = still ? 1 : 1 + 0.45 * (0.5 - 0.5 * Math.cos(t / 1400));
+    var bandPx = 168 * DPR;                       // busy band, from the top
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, floatOK ? fbo : null);
+    gl.viewport(0, 0, W, H);
+    gl.disable(gl.BLEND);
+    gl.useProgram(BG); gl.uniform1f(uBand, 1 - bandPx / H); fullscreen(BG);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   // premultiplied
+    R.resetText();
+    var mode = floatOK ? 'linear' : (p3Want ? 'p3' : 'srgb');
+    var ortho = S.mat.ortho(W, H);
+    var pad = 14 * DPR, lab = 17 * DPR, y;
+
+    // 1 - over the busy band: the same label without and with a halo
+    y = 56 * DPR;
+    R.draw('ARS 12.4 · plain', { x: pad, y: y, size: lab, color: '#ffffff',
+      mvp: ortho, mode: mode, thicken: th });
+    y = 104 * DPR;
+    R.draw('ARS 12.4 · halo', { x: pad, y: y, size: lab, color: '#ffffff',
+      haloWidth: hw > 0 ? hw : 2.4 * DPR, haloColor: '#000000', haloAlpha: 0.9,
+      outlineWidth: ow, outlineColor: '#000000', mvp: ortho, mode: mode, thicken: th });
+    y = 148 * DPR;
+    R.draw('no drop shadow, no second draw', { x: pad, y: y, size: 11 * DPR,
+      color: '#c9d3ee', haloWidth: 1.8 * DPR, haloColor: '#000000', haloAlpha: 0.9,
+      mvp: ortho, mode: mode });
+
+    // 2 - the scale ladder: one string, four sizes, one field
+    y = bandPx + 26 * DPR;
+    for (var i = 0; i < LADDER.length; i++) {
+      var sz = LADDER[i] * DPR;
+      y += sz;
+      R.draw(LADDER[i] + ' px  MCI ·8.5m', { x: pad, y: y, size: sz,
+        color: '#49d7f2', mvp: ortho, mode: mode, outlineWidth: ow, thicken: th });
+      y += sz * 0.45;
+    }
+
+    // 3 - one large label, zooming about its own centre when motion is on
+    y += 30 * DPR;
+    R.draw('£8.5m', { x: W / 2, y: y + big * 0.78, size: big * zoom, align: 'center',
+      color: '#37e08b', outlineWidth: ow, outlineColor: '#06240f',
+      haloWidth: hw, haloColor: '#000000', mvp: ortho, mode: mode, thicken: th });
+
+    // 4 - a real perspective camera, the label on a plane turned about Y.
+    // The projection divide happens in the vertex stage, so the field is read at
+    // a different rate across the glyph and the shader's gradient tracks it: the
+    // near edge and the far edge get the same one-pixel edge, which is the whole
+    // point of solving the edge in the shader instead of magnifying a bitmap.
+    var proj = S.mat.perspective(50 * Math.PI / 180, W / H, 0.1, 100);
+    var view = S.mat.translate(0, -0.88, -2.6);
+    var rot = S.mat.rotateY(tilt * Math.PI / 180);
+    var k = 1.72 / W;
+    var toWorld = S.mat.multiply(S.mat.scale(k, -k, k), S.mat.translate(-W * 0.5, 0, 0));
+    var mvp3 = S.mat.multiply(S.mat.multiply(proj, S.mat.multiply(view, rot)), toWorld);
+    R.draw('BRE 2-1 WHU', { x: W * 0.5, y: 0, size: 46 * DPR, align: 'center',
+      color: '#ff5ea8', outlineWidth: ow > 0 ? ow : 1.6 * DPR, outlineColor: '#25030f',
+      mvp: mvp3, mode: mode, thicken: th });
+
+    if (floatOK) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, W, H);
+      gl.disable(gl.BLEND);
+      gl.useProgram(RESOLVE);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, fboTex);
+      gl.uniform1i(uSrc, 0);
+      gl.uniform1i(uRMode, p3Want ? 2 : 1);
+      gl.uniform1f(uLevels, 255.0);
+      fullscreen(RESOLVE);
+    }
+
+    altEl.textContent = 'The canvas reads: ' + R.textContent() + '. Rendered at '
+      + W + ' by ' + H + ' device pixels, ' + C.Tilt.value
+      + ' degrees of Y inclination on the last label'
+      + (still ? ', as a still frame.' : ', zooming.');
+  }
+
+  function loop(t) { if (still) return; frame(t); requestAnimationFrame(loop); }
+
+  /* ---------------- the measurement --------------------------------- */
+  // Renders one glyph white on black into an 8-bit target, reads the pixels back
+  // and reports how wide its edge is, in device px. A signed distance field holds
+  // that width near constant at any scale because the shader solves the edge
+  // analytically; a bitmap's grows with magnification, which IS the blur.
+
+  var mFBO = null, mTex = null, mW = 0, mH = 0;
+  function measureTarget(w, h) {
+    if (mFBO && w === mW && h === mH) return;
+    if (mFBO) { gl.deleteFramebuffer(mFBO); gl.deleteTexture(mTex); }
+    mW = w; mH = h;
+    mTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, mTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    mFBO = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, mFBO);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, mTex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  // The baseline: the same glyph rasterised once by the 2D canvas at the SAME em
+  // as the distance field, then magnified with bilinear filtering. That is what a
+  // conventional bitmap glyph atlas does.
+  var bmProg = null, bmTex = {}, bmVAO = null, bmBuf = null, bmU = {}, bmCur = 'I';
+  function bitmapBaseline(glyph) {
+    bmCur = glyph;
+    if (!bmTex[glyph]) {
+      var em = S.font.em, c = document.createElement('canvas');
+      c.width = em * 2; c.height = em * 2;
+      var x = c.getContext('2d');
+      x.clearRect(0, 0, c.width, c.height);
+      x.font = 'bold ' + em + 'px "Liberation Sans", system-ui, sans-serif';
+      x.textBaseline = 'alphabetic'; x.fillStyle = '#fff';
+      x.fillText(glyph, em * 0.5, em * 1.2);
+      bmTex[glyph] = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, bmTex[glyph]);
+      gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+    if (bmProg) return;
+    bmProg = prog(
+      '#version 300 es\nin vec2 aPos;in vec2 aUV;uniform mat4 uMVP;out vec2 vUV;' +
+      'void main(){vUV=aUV;gl_Position=uMVP*vec4(aPos,0.,1.);}',
+      '#version 300 es\nprecision highp float;in vec2 vUV;uniform sampler2D uT;out vec4 o;' +
+      'void main(){float a=texture(uT,vUV).a;o=vec4(a,a,a,a);}');
+    bmU.mvp = gl.getUniformLocation(bmProg, 'uMVP');
+    bmU.t = gl.getUniformLocation(bmProg, 'uT');
+    bmBuf = gl.createBuffer(); bmVAO = gl.createVertexArray();
+    gl.bindVertexArray(bmVAO); gl.bindBuffer(gl.ARRAY_BUFFER, bmBuf);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 16, 0);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 16, 8);
+    gl.bindVertexArray(null);
+  }
+
+  function drawBitmap(size, mvp, glyph) {
+    bitmapBaseline(glyph || 'I');
+    var em = S.font.em, s = size / em;
+    var x0 = 0, y0 = -em * 1.2 * s, x1 = em * 2 * s, y1 = y0 + em * 2 * s;
+    var v = new Float32Array([
+      x0, y0, 0, 0, x1, y0, 1, 0, x0, y1, 0, 1,
+      x0, y1, 0, 1, x1, y0, 1, 0, x1, y1, 1, 1]);
+    gl.bindVertexArray(bmVAO); gl.bindBuffer(gl.ARRAY_BUFFER, bmBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, v, gl.DYNAMIC_DRAW);
+    gl.useProgram(bmProg);
+    gl.uniformMatrix4fv(bmU.mvp, false, mvp);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bmTex[bmCur]);
+    gl.uniform1i(bmU.t, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.bindVertexArray(null);
+  }
+
+  // Edge width of the first rising edge on one scanline, in device px.
+  //
+  // A 10%-to-90% threshold pair is sub-pixel-PHASE dependent: the same one-pixel
+  // edge reads 0.8 px or 1.6 px depending on where the pixel centres happen to
+  // fall, so it cannot separate a sharp edge from a soft one. The estimator used
+  // here is the equivalent width of the coverage derivative,
+  //     W = (sum d)^2 / sum(d^2)   over the rising samples.
+  // For a box-filtered edge of width W sampled at unit spacing that returns W, it
+  // is flat in phase, and it saturates at 1.0 for any edge sharper than the
+  // sampling - which is the honest answer, since no readback can resolve an edge
+  // narrower than one pixel. The 10-90 figure is kept as a second column.
+  function edgeWidthRow(px, w, row) {
+    var i, v = new Float64Array(w);
+    for (i = 0; i < w; i++) v[i] = px[(row * w + i) * 4] / 255;
+    var peak = 0, pk = 0;
+    for (i = 0; i < w; i++) if (v[i] > peak) { peak = v[i]; pk = i; }
+    if (peak < 0.35) return null;
+    var s1 = 0, s2 = 0, d;
+    for (i = 1; i <= pk; i++) { d = v[i] - v[i - 1]; if (d > 0) { s1 += d; s2 += d * d; } }
+    if (s2 <= 0 || s1 <= 0) return null;
+    var lo = 0.1 * peak, hi = 0.9 * peak, a = null, b = null;
+    for (i = 1; i <= pk; i++) {
+      if (a === null && v[i - 1] < lo && v[i] >= lo) a = (i - 1) + (lo - v[i - 1]) / (v[i] - v[i - 1]);
+      if (b === null && v[i - 1] < hi && v[i] >= hi) b = (i - 1) + (hi - v[i - 1]) / (v[i] - v[i - 1]);
+    }
+    return { width: (s1 * s1) / s2, t1090: (a !== null && b !== null && b > a) ? b - a : null };
+  }
+
+  // Averaged over the scanlines through the glyph's middle third.
+  function edgeWidth(px, w, h) {
+    var lit = [], r, i, run;
+    for (r = 0; r < h; r++) {
+      run = 0;
+      for (i = 0; i < w; i++) if (px[(r * w + i) * 4] > 128) run++;
+      if (run > 0) lit.push({ r: r, run: run });
+    }
+    if (!lit.length) return null;
+    var mx = 0;
+    for (i = 0; i < lit.length; i++) if (lit[i].run > mx) mx = lit[i].run;
+    var keep = lit.filter(function (x) { return x.run >= mx * 0.8; });
+    if (!keep.length) return null;
+    var a = Math.floor(keep.length / 3), b = Math.ceil(keep.length * 2 / 3);
+    if (b <= a) { a = 0; b = keep.length; }
+    var accW = 0, accT = 0, nT = 0, n = 0, e;
+    for (i = a; i < b; i++) {
+      e = edgeWidthRow(px, w, keep[i].r);
+      if (e) { accW += e.width; n++; if (e.t1090 !== null) { accT += e.t1090; nT++; } }
+    }
+    if (!n) return null;
+    return { width: accW / n, t1090: nT ? accT / nT : null, rows: n };
+  }
+
+  function totalInk(px, w, h) {
+    var s = 0, i;
+    for (i = 0; i < w * h; i++) s += px[i * 4];
+    return s / 255;
+  }
+
+  // Cut of a sharp 90 degree corner, in device px: the distance from the ideal
+  // corner, where the two straight edges extrapolate to meet, out to the rendered
+  // 50% contour along the inward diagonal. Zero is a perfect corner. This is the
+  // single-channel field's one real limit, so it is measured rather than asserted.
+  // Readback space has row 0 at the BOTTOM, so for the glyph L the outer
+  // bottom-left corner is at low column and low row, with the ink up and right.
+  function cornerCut(px, w, h) {
+    function at(c, r) {
+      if (c < 0 || r < 0 || c >= w || r >= h) return 0;
+      return px[(r * w + c) * 4] / 255;
+    }
+    function bil(c, r) {
+      var c0 = Math.floor(c), r0 = Math.floor(r), fc = c - c0, fr = r - r0;
+      return at(c0, r0) * (1 - fc) * (1 - fr) + at(c0 + 1, r0) * fc * (1 - fr)
+           + at(c0, r0 + 1) * (1 - fc) * fr + at(c0 + 1, r0 + 1) * fc * fr;
+    }
+    var r, c, i, rows = [], run;
+    for (r = 0; r < h; r++) {
+      run = 0;
+      for (c = 0; c < w; c++) if (at(c, r) > 0.5) run++;
+      if (run > 0) rows.push(r);
+    }
+    if (rows.length < 12) return null;
+    var rMin = rows[0], rMax = rows[rows.length - 1], hh = rMax - rMin;
+    var xs = [];
+    for (r = rMin + Math.round(hh * 0.55); r < rMin + Math.round(hh * 0.9); r++) {
+      for (c = 1; c < w; c++) if (at(c - 1, r) < 0.5 && at(c, r) >= 0.5) {
+        xs.push((c - 1) + (0.5 - at(c - 1, r)) / (at(c, r) - at(c - 1, r))); break; }
+    }
+    var cMin = w, cMax = -1, probe = rMin + Math.max(1, Math.round(hh * 0.04));
+    for (c = 0; c < w; c++) if (at(c, probe) > 0.5) { if (c < cMin) cMin = c; if (c > cMax) cMax = c; }
+    if (cMax <= cMin) return null;
+    var ys = [];
+    for (c = cMin + Math.round((cMax - cMin) * 0.55); c < cMin + Math.round((cMax - cMin) * 0.9); c++) {
+      for (r = 1; r < h; r++) if (at(c, r - 1) < 0.5 && at(c, r) >= 0.5) {
+        ys.push((r - 1) + (0.5 - at(c, r - 1)) / (at(c, r) - at(c, r - 1))); break; }
+    }
+    if (xs.length < 3 || ys.length < 3) return null;
+    function mean(a) { var s = 0, k; for (k = 0; k < a.length; k++) s += a[k]; return s / a.length; }
+    var cL = mean(xs), rB = mean(ys), k2 = Math.SQRT1_2, t, prev = bil(cL, rB), cur;
+    if (prev >= 0.5) return 0;
+    for (t = 0.05; t < 40; t += 0.05) {
+      cur = bil(cL + t * k2, rB + t * k2);
+      if (cur >= 0.5) return (t - 0.05) + 0.05 * (0.5 - prev) / (cur - prev);
+      prev = cur;
+    }
+    return null;
+  }
+
+  function runOne(size, tiltDeg, useBitmap, glyph, subX) {
+    glyph = glyph || 'I'; subX = subX || 0;
+    var w = Math.min(Math.max(Math.ceil(size * 3), 48), 1024);
+    var h = Math.min(Math.max(Math.ceil(size * 2.4), 40), 1024);
+    measureTarget(w, h);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, mFBO);
+    gl.viewport(0, 0, w, h);
+    gl.disable(gl.BLEND);
+    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    var mvp = S.mat.ortho(w, h), baseY = h * 0.78;
+    if (tiltDeg > 0) {
+      var proj = S.mat.perspective(50 * Math.PI / 180, w / h, 0.1, 100);
+      var view = S.mat.translate(0, 0, -2.2);
+      var rot = S.mat.rotateY(tiltDeg * Math.PI / 180);
+      var k = 1.6 / w;
+      var toWorld = S.mat.multiply(S.mat.scale(k, -k, k),
+                                   S.mat.translate(-w * 0.34, -baseY, 0));
+      mvp = S.mat.multiply(S.mat.multiply(proj, S.mat.multiply(view, rot)), toWorld);
+    }
+    var x = Math.round(size * 0.35) + subX, y = Math.round(baseY);
+    if (useBitmap) drawBitmap(size, S.mat.multiply(mvp, S.mat.translate(x, y, 0)), glyph);
+    else R.draw(glyph, { x: x, y: y, size: size, color: '#ffffff', mvp: mvp, mode: 'srgb' });
+    var px = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return { px: px, w: w, h: h };
+  }
+
+  function edgeOf(size, tilt, bmp) {
+    var f = runOne(size, tilt, bmp);
+    return f ? edgeWidth(f.px, f.w, f.h) : null;
+  }
+
+  // Coefficient of variation of total ink across eight sub-pixel offsets: how
+  // much the glyph's weight wobbles as it slides by fractions of a pixel. At 8 px
+  // neither path can have an edge softer than the sampling, so this, not edge
+  // width, is what separates them there.
+  function subPixelCV(size, bmp) {
+    var v = [], i, f, n = 8;
+    for (i = 0; i < n; i++) {
+      f = runOne(size, 0, bmp, 'I', i / n);
+      if (!f) return null;
+      v.push(totalInk(f.px, f.w, f.h));
+    }
+    var m = 0; for (i = 0; i < n; i++) m += v[i]; m /= n;
+    if (m <= 0) return null;
+    var s = 0; for (i = 0; i < n; i++) s += (v[i] - m) * (v[i] - m);
+    return { cv: Math.sqrt(s / n) / m, ink: m };
+  }
+
+  function cornerOf(size, bmp) {
+    var f = runOne(size, 0, bmp, 'L');
+    return f ? cornerCut(f.px, f.w, f.h) : null;
+  }
+
+  function measureEdges() {
+    var rows = [], i, a, b;
+    var cases = [[8, 0], [16, 0], [64, 0], [256, 0], [64, 60], [256, 60]];
+    for (i = 0; i < cases.length; i++) {
+      a = edgeOf(cases[i][0], cases[i][1], false);
+      b = edgeOf(cases[i][0], cases[i][1], true);
+      rows.push({
+        label: cases[i][0] + ' px' + (cases[i][1] ? ', ' + cases[i][1] + '° Y' : ', face on'),
+        size: cases[i][0], tilt: cases[i][1],
+        sdf: a ? a.width : null, bmp: b ? b.width : null,
+        sdf1090: a ? a.t1090 : null, bmp1090: b ? b.t1090 : null });
+    }
+    return rows;
+  }
+
+  function measureExtras() {
+    return {
+      s8: subPixelCV(8, false), b8: subPixelCV(8, true),
+      s16: subPixelCV(16, false), b16: subPixelCV(16, true),
+      corner64sdf: cornerOf(64, false), corner64bmp: cornerOf(64, true),
+      corner256sdf: cornerOf(256, false), corner256bmp: cornerOf(256, true),
+      em: S.font.em, texelAt64: 64 / S.font.em, texelAt256: 256 / S.font.em };
+  }
+
+  function renderTable(rows, extras) {
+    var h = '<table><thead><tr><th>Render</th><th>SDF edge</th><th>Bitmap edge</th>'
+      + '<th>Bitmap / SDF</th><th>SDF 10-90</th></tr></thead><tbody>';
+    var i, r, ratio;
+    for (i = 0; i < rows.length; i++) {
+      r = rows[i];
+      ratio = (r.sdf && r.bmp) ? (r.bmp / r.sdf) : null;
+      h += '<tr><td>' + r.label + '</td><td>' + (r.sdf === null ? '-' : r.sdf.toFixed(2))
+        + '</td><td>' + (r.bmp === null ? '-' : r.bmp.toFixed(2)) + '</td><td class="'
+        + (ratio && ratio > 1.5 ? 'ok' : '') + '">'
+        + (ratio === null ? '-' : ratio.toFixed(2) + '×') + '</td><td>'
+        + (r.sdf1090 === null ? '-' : r.sdf1090.toFixed(2)) + '</td></tr>';
+    }
+    h += '</tbody></table>';
+    var sdfs = rows.filter(function (x) { return x.sdf; }).map(function (x) { return x.sdf; });
+    if (sdfs.length) {
+      var mn = Math.min.apply(null, sdfs), mx = Math.max.apply(null, sdfs);
+      h += '<p class="note">Edge width in device px, as the equivalent width of the coverage'
+        + ' derivative. The field holds ' + mn.toFixed(2) + ' to ' + mx.toFixed(2)
+        + ' px across a 32-fold change of scale and a 60 degree inclination; the bitmap'
+        + ' baseline, rasterised at the same em, grows with magnification. At 8 px both read'
+        + ' about one pixel, because neither can be softer than the sampling: at that size'
+        + ' the bitmap’s failure is wobble, not blur, which the next figure measures.</p>';
+    }
+    if (extras) {
+      h += '<table><thead><tr><th>Figure</th><th>SDF</th><th>Bitmap</th></tr></thead><tbody>';
+      var pct = function (v) { return (v === null || v === undefined) ? '-' : (v * 100).toFixed(2) + '%'; };
+      var pxs = function (v) { return (v === null || v === undefined) ? '-' : v.toFixed(2) + ' px'; };
+      var cvv = function (o) { return o ? pct(o.cv) : '-'; };
+      var ink = function (o) { return o ? o.ink.toFixed(1) : '-'; };
+      h += '<tr><td>Ink wobble over 8 sub-pixel offsets, 8 px</td><td>' + cvv(extras.s8)
+        + '</td><td>' + cvv(extras.b8) + '</td></tr>'
+        + '<tr><td>Mean ink, 8 px (px\u00b2 of coverage)</td><td>' + ink(extras.s8)
+        + '</td><td>' + ink(extras.b8) + '</td></tr>'
+        + '<tr><td>Ink wobble over 8 sub-pixel offsets, 16 px</td><td>' + cvv(extras.s16)
+        + '</td><td>' + cvv(extras.b16) + '</td></tr>'
+        + '<tr><td>Mean ink, 16 px (px\u00b2 of coverage)</td><td>' + ink(extras.s16)
+        + '</td><td>' + ink(extras.b16) + '</td></tr>'
+        + '<tr><td>Sharp corner cut, L at 64 px</td><td>' + pxs(extras.corner64sdf)
+        + '</td><td>' + pxs(extras.corner64bmp) + '</td></tr>'
+        + '<tr><td>Sharp corner cut, L at 256 px</td><td>' + pxs(extras.corner256sdf)
+        + '</td><td>' + pxs(extras.corner256bmp) + '</td></tr></tbody></table>'
+        + '<p class="note">The corner cut is this single-channel field’s one real limit:'
+        + ' bilinear reconstruction cannot represent the crease in the distance function where'
+        + ' two edges meet, so a 90 degree corner is cut by a fraction of one atlas texel -'
+        + ' and one atlas texel is ' + extras.texelAt64.toFixed(2) + ' device px at 64 px and '
+        + extras.texelAt256.toFixed(2) + ' at 256 px. A multi-channel field would remove it, at'
+        + ' the cost of needing the glyph outline as vector segments. At the sizes this app'
+        + ' draws labels the cut is under a pixel.</p>';
+    }
+    document.getElementById('edges').innerHTML = h;
+    return h;
+  }
+
+  document.getElementById('bMeasure').addEventListener('click', function () {
+    this.disabled = true; this.textContent = 'Measuring…';
+    renderTable(measureEdges(), measureExtras());
+    this.disabled = false; this.textContent = 'Run the measurement again';
+    if (still) frame(0);
+  });
+  // documented hook, so a test drives the real page rather than a copy of it
+  window.SDFTextDemo = {
+    frame: frame, measureEdges: measureEdges, measureExtras: measureExtras,
+    renderTable: renderTable,
+    info: { tier: tier, dpr: DPR, width: W, height: H, floatOK: floatOK,
+            p3Settable: p3Settable, p3Display: p3Display, reduced: reduced },
+    alt: function () { return altEl.textContent; },
+    renderer: R
+  };
+
+  R.ready.then(function () {
+    if (still) frame(0); else requestAnimationFrame(loop);
+    window.SDFTextDemo.ready = true;
+  }, function (e) {
+    tiersEl.innerHTML += '<p class="note bad">Atlas failed to decode: ' + e.message
+      + '. Falling back to the system font.</p>';
+    window.SDFTextDemo.ready = false;
+  });
+})();
+</script>
+</body>
+</html>

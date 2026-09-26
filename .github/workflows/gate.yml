@@ -1,12 +1,42 @@
 # FPL Mission Control — QA gate (fpl/ only; the fitness app at the repo root has its own harness)
-# CLAUDE.md K1: every push runs qa/; red blocks merge. Every step fails the job on a non-zero exit,
-# and the final step fails the job if the literal "FAIL" appears anywhere in the combined suite log.
 #
-# Browser note: the CI runner has no /opt/pw-browsers, so Playwright's Chromium is installed here
-# before the browser suites. qa/harness.cjs launch() must fall back to Playwright's default browser
-# when /opt/pw-browsers/chromium does not exist (CONTRACT.md §8; ERRORS.md E-027 note).
-# WebKit is installed alongside it for qa/webkit.js, the Safari-engine acceptance suite: the manager
-# reads this app on an iPhone, so the Part G gates and the storage paths are measured on both engines.
+# CLAUDE.md K1: every push runs qa/; red blocks merge. Every step fails the job on a non-zero
+# exit, and the final step fails the job if the literal "FAIL" appears anywhere in the combined
+# suite log.
+#
+# THE STEP ORDER HERE IS THE SAME LIST, IN THE SAME ORDER, AS fpl/qa/run.sh. A suite in one
+# runner and not the other is how a red lands on main. `bash qa/run.sh --dry-run` prints run.sh's
+# list from its own call sites; read it next to this file. The groups are:
+#
+#   0-4  tdz(sources) · esbuild · build · tdz(built app)
+#   A    cheap and deterministic  privacy · no_frozen · visual
+#   B    data                     validate_live · waiver_log · prices · verify.sh · pull_guard
+#   C    engine and render        unit_engine · components          (node, no browser)
+#   D    browser                  smoke · smoke_wk · realistic · buttons · webkit · browser.py
+#   E    million-iteration        mc_full · mc_all
+#
+# Cheapest and most deterministic first: measured on the dev machine 26 September 2026, group A
+# is 291 ms and group B's first three are 240 ms, against 8.8 s for verify.sh and 12.6 s for
+# pull_guard (which stands up a real HTTP server). The browser INSTALL step also sits after
+# group C on purpose — a red in groups A to C then arrives before the runner spends a couple of
+# minutes downloading three browsers.
+#
+# Browser note: the CI runner has no /opt/pw-browsers, so the browsers are installed here,
+# before group D, and never by a suite.
+#   · qa/harness.cjs (smoke, smoke_wk, realistic, buttons) prefers /opt/pw-browsers/chromium and
+#     falls back to Playwright's own install when that path is absent (CONTRACT.md §8; E-027).
+#   · qa/webkit.js launches playwright.webkit directly — the manager reads this app on an iPhone,
+#     so the Part G gates and the storage paths are measured on both engines.
+#   · qa/browser.py is Python Playwright and does NOT fall back: it requires the literal path
+#     /opt/pw-browsers/chromium and prints a named FAIL when it is missing. The install step
+#     below creates that path on the runner with the same `chromium` symlink the dev sandbox
+#     has. Consequence worth knowing: once it exists, harness.cjs prefers it too, so the
+#     Chromium suites on CI drive that binary rather than Playwright's default cache. Both are
+#     the build that Playwright 1.63.0 ships, so this is the same browser by another path.
+#
+# Python needs its own setup step (actions/setup-node does not provide one) and its own
+# Playwright package — the Node package in fpl/node_modules is a different install and Python
+# cannot import it.
 name: fpl-gate
 
 on:
@@ -39,14 +69,25 @@ jobs:
           cache: npm
           cache-dependency-path: fpl/package-lock.json
 
+      # qa/browser.py is Python. No pip cache: nothing in fpl/ pins Playwright for Python yet,
+      # so there is no dependency file to key a cache on (see the note in the report — a
+      # qa/requirements.txt would be the right home for it, and that file is not mine to add).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Install (npm ci)
         run: npm ci 2>&1 | tee -a "$GATE_LOG"
+
+      # ---------------------------------------------------------------- 0-4
 
       - name: TDZ check (self-test + sources)
         run: node qa/tdz_check.cjs --self-test 2>&1 | tee -a "$GATE_LOG" && node qa/tdz_check.cjs src/engine.js src/ui.jsx 2>&1 | tee -a "$GATE_LOG"
 
+      # Same flags as run.sh's esbuild gate, which adds --jsx=automatic and pins the version by
+      # refusing to fetch one. Only the outfile differs: this one writes a real file.
       - name: esbuild syntax gate (real bundle)
-        run: npx esbuild app/FPL_Mission_Control.jsx --bundle --loader:.jsx=jsx --outfile=/tmp/mc.js 2>&1 | tee -a "$GATE_LOG"
+        run: npx --no-install esbuild app/FPL_Mission_Control.jsx --bundle --loader:.jsx=jsx --jsx=automatic --outfile=/tmp/mc.js 2>&1 | tee -a "$GATE_LOG"
 
       - name: build (build.cjs -> app/ + dist/)
         run: node build.cjs 2>&1 | tee -a "$GATE_LOG"
@@ -54,14 +95,25 @@ jobs:
       - name: TDZ check (freshly built app)
         run: node qa/tdz_check.cjs app/FPL_Mission_Control.jsx 2>&1 | tee -a "$GATE_LOG"
 
+      # ---------------------------------------------------------------- A · cheap + deterministic
+
       - name: privacy (rival managers' names are never committed)
         run: node qa/privacy.cjs 2>&1 | tee -a "$GATE_LOG"
 
       - name: no_frozen (no live-sourced field asserted against a literal)
         run: node qa/no_frozen.cjs 2>&1 | tee -a "$GATE_LOG"
 
-      - name: pull_guard (the pull keeps the last good feed)
-        run: node qa/pull_guard.cjs 2>&1 | tee -a "$GATE_LOG"
+      # A missing suite is named, not a MODULE_NOT_FOUND stack. It is still a red: a suite this
+      # file runs and the repository does not hold is a hole, and silence about it is worse.
+      - name: visual (contrast and layout assertions)
+        run: |
+          test -f qa/visual.cjs || { echo "FAIL visual.cjs — qa/visual.cjs does not exist (suite not written)" 2>&1 | tee -a "$GATE_LOG"; exit 1; }
+          node qa/visual.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      # ---------------------------------------------------------------- B · data
+
+      - name: validate_live (snapshot shape)
+        run: node data/validate_live.cjs 2>&1 | tee -a "$GATE_LOG"
 
       - name: waiver_log (the waiver model reproduces the league's own log)
         run: node qa/waiver_log.cjs 2>&1 | tee -a "$GATE_LOG"
@@ -72,16 +124,44 @@ jobs:
       - name: verify.sh (live reconciliation + invariants)
         run: bash qa/verify.sh 2>&1 | tee -a "$GATE_LOG"
 
-      - name: validate_live (snapshot shape)
-        run: node data/validate_live.cjs 2>&1 | tee -a "$GATE_LOG"
+      - name: pull_guard (the pull keeps the last good feed)
+        run: node qa/pull_guard.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      # ---------------------------------------------------------------- C · engine and render
 
       - name: unit_engine
         run: node qa/unit_engine.cjs 2>&1 | tee -a "$GATE_LOG"
 
-      - name: Install Playwright Chromium and WebKit (runner has no /opt/pw-browsers)
+      # react-dom/server, no browser — which is why it runs before the browser install.
+      - name: components (render output)
+        run: node qa/components.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      # ---------------------------------------------------------------- browsers for group D
+
+      - name: Install Playwright browsers (the runner has no /opt/pw-browsers)
         run: |
+          set -euo pipefail
+          # Node suites: Chromium for harness.cjs, WebKit for qa/webkit.js.
           npx playwright install --with-deps chromium 2>&1 | tee -a "$GATE_LOG"
           npx playwright install --with-deps webkit 2>&1 | tee -a "$GATE_LOG"
+          # Python suite: pin the package to the same version package.json pins for the Node
+          # suites, so both drive the same browser build rather than two revisions.
+          PW_VER="$(node -p "require('./package.json').devDependencies.playwright")"
+          echo "pinning Playwright for Python to $PW_VER (package.json)" 2>&1 | tee -a "$GATE_LOG"
+          python3 -m pip install --disable-pip-version-check "playwright==$PW_VER" 2>&1 | tee -a "$GATE_LOG"
+          # qa/browser.py requires the literal path /opt/pw-browsers/chromium and never installs
+          # anything itself. Reproduce the dev sandbox's layout: the browsers under
+          # /opt/pw-browsers, plus a `chromium` symlink to the executable.
+          sudo mkdir -p /opt/pw-browsers
+          sudo chown "$(id -u):$(id -g)" /opt/pw-browsers
+          PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers python3 -m playwright install chromium 2>&1 | tee -a "$GATE_LOG"
+          CHROME="$(PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers python3 -c 'from playwright.sync_api import sync_playwright as s; p = s().start(); print(p.chromium.executable_path); p.stop()')"
+          test -x "$CHROME" || { echo "FAIL playwright-install — Python Playwright reports $CHROME, which is not executable" 2>&1 | tee -a "$GATE_LOG"; exit 1; }
+          ln -sfn "$CHROME" /opt/pw-browsers/chromium
+          ls -l /opt/pw-browsers/chromium 2>&1 | tee -a "$GATE_LOG"
+          /opt/pw-browsers/chromium --version 2>&1 | tee -a "$GATE_LOG"
+
+      # ---------------------------------------------------------------- D · browser suites
 
       - name: smoke
         run: node qa/smoke.cjs 2>&1 | tee -a "$GATE_LOG"
@@ -92,20 +172,37 @@ jobs:
       - name: realistic
         run: node qa/realistic.cjs 2>&1 | tee -a "$GATE_LOG"
 
-      - name: components (render output)
-        run: node qa/components.cjs 2>&1 | tee -a "$GATE_LOG"
-
       - name: buttons
         run: node qa/buttons.cjs 2>&1 | tee -a "$GATE_LOG"
 
       - name: webkit (Safari-engine acceptance)
         run: node qa/webkit.js 2>&1 | tee -a "$GATE_LOG"
 
+      # E5 phone render, 390x844 in light and dark. Python, so its exit code is captured and
+      # reported explicitly; a missing interpreter or a missing Playwright is a named FAIL and
+      # never a silent skip. qa/browser.py takes no arguments.
+      - name: browser.py (E5 phone render, 390x844 light and dark)
+        run: |
+          test -f qa/browser.py || { echo "FAIL browser.py — qa/browser.py does not exist (suite not written)" 2>&1 | tee -a "$GATE_LOG"; exit 1; }
+          command -v python3 >/dev/null || { echo "FAIL browser.py — no python3 on PATH" 2>&1 | tee -a "$GATE_LOG"; exit 1; }
+          python3 -c 'import sys; print("interpreter python3 " + sys.version.split()[0])' 2>&1 | tee -a "$GATE_LOG"
+          python3 -c 'import playwright.sync_api' || { echo "FAIL browser.py — Playwright for Python is not importable; the install step above did not take" 2>&1 | tee -a "$GATE_LOG"; exit 1; }
+          set +e
+          python3 qa/browser.py 2>&1 | tee -a "$GATE_LOG"
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "browser.py exit $rc" 2>&1 | tee -a "$GATE_LOG"
+          exit "$rc"
+
+      # ---------------------------------------------------------------- E · million-iteration
+
       - name: mc_full 3000
         run: node --stack-size=4000 qa/mc_full.cjs 3000 2>&1 | tee -a "$GATE_LOG"
 
       - name: mc_all
         run: node qa/mc_all.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      # ---------------------------------------------------------------- verdict
 
       - name: No "FAIL" in the combined log
         if: always()
