@@ -5,7 +5,7 @@ const {webkit}=require('playwright');const path=require('path');const fs=require
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const R=[];const T=(n,ok,d)=>R.push({name:n,ok:!!ok,detail:d});
 (async()=>{const iso=process.argv[2]||'2026-09-12';
-const b=await webkit.launch();const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2});
+const b=await webkit.launch();const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
 await ctx.route(u=>!(u.protocol==='file:'||u.protocol==='data:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
 await ctx.addInitScript(iso=>{const R=Date;const fixed=new R(iso+'T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;
   const store={};window.__cs=store;window.storage={async get(k){if(!(k in store))throw new Error('nf');return{key:k,value:store[k]};},async set(k,v){store[k]=String(v);return{key:k,value:v};},async delete(k){delete store[k];return{key:k}},async list(){return{keys:Object.keys(store)}}};},iso);
@@ -14,6 +14,8 @@ const file=fs.existsSync(path.resolve(__dirname,'ComebackBlueprint.html'))?path.
 await p.goto('file://'+file,{waitUntil:'load'});await wait(1200);
 T('webkit boot: DB + switchView defined',await p.evaluate(()=>typeof DB==='object'&&typeof switchView==='function'));
 T('webkit boot: Day-1 CTA',/Start today.*Legs A/.test(await p.evaluate(()=>document.querySelector('.cta')?.textContent||'')));
+T('webkit dates: Johannesburg zone, dateAdd/todayISO stay on the local day',await p.evaluate(()=>dateAdd(START_ISO,0)===START_ISO&&dateAdd(START_ISO,7)==='2026-09-19'&&todayISO()==='2026-09-12'&&weekStartISO(1)===START_ISO));
+T('webkit copy: run-era copy retired on Lift/Numbers/footer',await p.evaluate(()=>{switchView('lift');const l=document.getElementById('view-lift').innerText;switchView('numbers');const n=document.getElementById('view-numbers').innerText;switchView('guide');const g=document.getElementById('view-guide').innerText;return /six lifting days/.test(l)&&!/Post-race|4 lifting days/.test(l)&&/Maintenance week/.test(n)&&!/Race Block|Race Time Predictor|Goal 10K/.test(n)&&/Pure Muscle · FFMI 25 · Day 1 Sat 12 Sep 2026/.test(g)&&!/Strength \+ Speed/.test(g);}));
 for(const v of ['home','lift','run','roadmap','fuel','numbers','track','guide']){await p.evaluate(n=>switchView(n),v);await wait(150);
   T('webkit view: '+v,await p.evaluate(n=>{const e=document.getElementById('view-'+n);return e&&e.offsetParent!==null&&e.innerHTML.length>500;},v));}
 // Storage path 1: real input → DB.save → localStorage + IndexedDB mirror + account mirror (window.storage mock).

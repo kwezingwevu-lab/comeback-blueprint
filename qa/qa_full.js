@@ -257,5 +257,61 @@ const d5=await tt('2027-01-05');T('time: Jan = Posterior specialization block',/
 {const q=await page(b,'2026-10-23',()=>{localStorage.clear();localStorage.setItem('cb2_pure',JSON.stringify(true));});
  const d=await q.evaluate(()=>({deload:isDeloadWeek(),dow:DOW[new Date().getDay()],title:document.body.innerText.includes('Rest Day — Deload Week'),cta:document.querySelector('.cta')?.textContent||''}));
  T('rest: deload-week Friday = full rest',d.deload&&d.dow==='Fri'&&d.title&&/Deload week rest day/.test(d.cta),JSON.stringify(d));await q.close();}
+
+// ===== W. Pure-muscle copy retired, Johannesburg-zone dates, date-aware calendar, focus-aware time estimate (11 Sep 2026) =====
+{const q=await page(b,'2026-09-12',()=>{localStorage.clear();localStorage.setItem('cb2_pure',JSON.stringify(true));});
+ const d=await q.evaluate(()=>({tz:Intl.DateTimeFormat().resolvedOptions().timeZone,a0:dateAdd(START_ISO,0),a7:dateAdd(START_ISO,7),ws:weekStartISO(1),wr:weekRangeLabel(1),il:isoLocal(new Date(2026,8,12,1,30)),nd:normDate('12 September 2026'),today:todayISO()}));
+ T('dates: suite runs in Africa/Johannesburg',d.tz==='Africa/Johannesburg',d.tz);
+ T('dates: dateAdd/weekStart stay on the local day (was one day early in SAST)',d.a0==='2026-09-12'&&d.a7==='2026-09-19'&&d.ws==='2026-09-12'&&/12 Sep/.test(d.wr)&&d.today==='2026-09-12',JSON.stringify(d));
+ T('dates: isoLocal at 01:30 local + normDate free text give the local day',d.il==='2026-09-12'&&d.nd==='2026-09-12',JSON.stringify(d));
+ await q.evaluate(()=>switchView('lift'));await wait(300);
+ const l=await q.evaluate(()=>({t:document.getElementById('view-lift').innerText,h:document.getElementById('view-lift').innerHTML,ph:liftPhase}));
+ T('lift: six-day pure-muscle copy, fallback labelled, no run-era copy',l.ph==='hyper'&&/six lifting days a week/.test(l.t)&&/Fallback \(4-day\)/.test(l.t)&&/Pure muscle \(from Day 1, Sat 12 Sep\)/.test(l.t)&&!/Post-race|4 lifting days|Running is trimmed|after 24 Sep/.test(l.t),l.t.slice(0,300));
+ await q.evaluate(()=>{document.querySelector('#liftPhaseSeg button[data-ph="build"]').click();});await wait(300);
+ const lb=await q.evaluate(()=>document.getElementById('view-lift').innerText);
+ T('lift: fallback note is honest (four sessions, a floor not the plan) and mentions no running',/Fallback week \(4-day\)/.test(lb)&&/a floor, not the plan/.test(lb)&&!/running|runs/i.test(lb.split('Commercial Gym')[0]),lb.slice(0,400));
+ await q.evaluate(()=>{document.querySelector('#liftPhaseSeg button[data-ph="hyper"]').click();});await wait(200);
+ await q.evaluate(()=>switchView('home'));await wait(300);
+ const hm=await q.evaluate(()=>document.getElementById('view-home').innerText);
+ T('home: how-week note says active-recovery Friday, not "1 full rest"',/active-recovery Friday \(full rest only in deload weeks\)/.test(hm)&&!/1 full rest/.test(hm)&&!/lives in its own tab/.test(hm));
+ await q.evaluate(()=>switchView('numbers'));await wait(300);
+ const n=await q.evaluate(()=>({t:document.getElementById('view-numbers').innerText,btns:[...document.querySelectorAll('#phaseSeg button')].map(x=>x.textContent),g10:!!document.getElementById('pGoal10k'),pred:!!document.getElementById('predBtn'),note:document.getElementById('calNote').innerText}));
+ T('numbers: phase toggle is Pure muscle / Maintenance week only; predictor and Goal-10K field gone',n.btns.join('|')==='Pure muscle|Maintenance week'&&!n.g10&&!n.pred&&!/Race Block|Race Time Predictor|Goal 10K|race paces/.test(n.t)&&/FFMI target/.test(n.t),JSON.stringify(n.btns)+n.t.slice(0,160));
+ T('numbers: macro note is pure-muscle, no running',/Pure-muscle growth/.test(n.note)&&!/running twice|Post-race/.test(n.note),n.note);
+ await q.evaluate(()=>{document.querySelector('#phaseSeg button[data-ph="race"]').click();});await wait(200);
+ const nr=await q.evaluate(()=>({note:document.getElementById('calNote').innerText,gain:document.getElementById('gainOut').innerText}));
+ T('numbers: Maintenance week note + gain card copy retired',/Maintenance week:/.test(nr.note)&&/Maintenance week holds weight/.test(nr.gain)&&!/Race Block|Post-Race/.test(nr.gain),nr.gain.slice(0,200));
+ await q.evaluate(()=>{document.querySelector('#phaseSeg button[data-ph="hyper"]').click();document.getElementById('pWeight').value='88.5';document.getElementById('saveProfile').click();});await wait(300);
+ T('numbers: profile save still works without the 10K field',await q.evaluate(()=>DB.profile.weight===88.5&&!!document.getElementById('rCal').textContent.match(/\d/)));
+ await q.evaluate(()=>switchView('guide'));await wait(300);
+ const g=await q.evaluate(()=>({t:document.getElementById('view-guide').innerText,h:document.getElementById('view-guide').innerHTML}));
+ T('guide: interference card rewritten, six-day split, footer re-anchored to Day 1',/Why Running Is Retired \(the interference effect\)/.test(g.t)&&/six-day split/.test(g.t)&&/Pure Muscle · FFMI 25 · Day 1 Sat 12 Sep 2026/.test(g.t)&&/Add load gradually/.test(g.t)&&!/Four lifting days, two runs|Running Is Trimmed|Strength \+ Speed|Built for 24 September|Build running volume/.test(g.t),g.t.slice(-300));
+ T('guide: region card explains the deliberate lower-back band',/held in the gold band on purpose/.test(g.h));
+ await q.evaluate(()=>switchView('fuel'));await wait(300);
+ const f=await q.evaluate(()=>document.getElementById('view-fuel').innerHTML);
+ T('fuel: beta-alanine reason is lifting-only',/15–25-rep calf work/.test(f)&&!/Tuesday track work|600 m rep/.test(f));
+ const te=await q.evaluate(()=>{const on=focusLB;focusLB=true;const a=sessionTimeEstimate('legsB').full;focusLB=false;const b2=sessionTimeEstimate('legsB').full;focusLB=on;const sets=GYM.legsB.ex.reduce((n,e)=>n+fxSets(e),0);return {a,b2,sets};});
+ T('time estimate honours the Legs & Back focus (+sets → longer session)',te.a>te.b2&&te.a-te.b2>=8,JSON.stringify(te));
+ const cal=await q.evaluate(()=>({n:RACES_12M.filter(r=>r.iso).length,ok:RACES_12M.filter(r=>r.iso).every(r=>r.iso.slice(0,7)===r.ym&&/^\d{4}-\d{2}-\d{2}$/.test(r.iso)),pk:evKm(RACES_12M.find(r=>r.st==='weekly'))}));
+ T('calendar: 27 dated entries carry an iso that matches their month; nearest parkrun is ~3 km',cal.n===27&&cal.ok&&cal.pk===3,JSON.stringify(cal));
+ T('W: no errors',q.__errs.length===0,q.__errs.join('|'));await q.close();}
+{const q=await page(b,'2026-09-11',()=>{localStorage.clear();localStorage.setItem('cb2_pure',JSON.stringify(true));});
+ await q.evaluate(()=>switchView('run'));await wait(300);
+ const r=await q.evaluate(()=>document.getElementById('view-run').innerText);
+ T('calendar (11 Sep): past event hidden, Deadly Dozen shows "in 9 days", Warrior "in 8 days", Golden Harvest parkrun block',!/Hope In Motion/.test(r)&&/Deadly Dozen[\s\S]{0,400}in 9 days/.test(r)&&/Warrior #2[\s\S]{0,300}in 8 days/.test(r)&&/Golden Harvest/.test(r)&&/32 parkruns/.test(r),r.slice(0,200));
+ T('calendar (11 Sep): anchors box is computed, date-sorted (Warrior 19 Sep before Deadly Dozen 20 Sep) with computed distances',/Built for your goal, not for runners:\s*Warrior #2 — Taroko Trail Park \(Sat 19 Sep 2026, ~19 km\) · Deadly Dozen Fitness Race — Johannesburg \(Sun 20 Sep 2026, ~15 km\)/.test(r)&&new RegExp('HYROX Johannesburg \\(Fri–Sun 27–29 Nov 2026, ~'+await q.evaluate(()=>evKm(RACES_12M.find(x=>/HYROX Johannesburg$/.test(x.name))))+' km\\)').test(r)&&/calendar of races within 30 km/.test(r),r.slice(0,600));
+ await q.evaluate(()=>{document.querySelector('#radiusSeg button[data-r="15"]').click();});await wait(300);
+ const r15=await q.evaluate(()=>document.getElementById('view-run').innerText);
+ T('calendar: fallback text follows the chosen radius',/No published event within 15 km yet/.test(r15)&&!/~25 km yet/.test(r15));
+ await q.evaluate(()=>{document.querySelector('#radiusSeg button[data-r="30"]').click();});await wait(200);
+ T('run: no errors',q.__errs.length===0,q.__errs.join('|'));await q.close();}
+{const q=await page(b,'2026-09-21',()=>{localStorage.clear();localStorage.setItem('cb2_pure',JSON.stringify(true));});
+ await q.evaluate(()=>switchView('run'));await wait(300);
+ const r=await q.evaluate(()=>document.getElementById('view-run').innerText);
+ T('calendar (21 Sep): the Deadly Dozen has dropped off the month and the anchors box',!/Deadly Dozen Fitness Race — Johannesburg/.test(r)&&/Built for your goal, not for runners:\s*Warrior|Built for your goal, not for runners:\s*(?!Deadly)/.test(r)&&/HYROX/.test(r),r.slice(0,400));
+ await q.close();}
+{const q=await page(b,'2026-09-12',()=>{localStorage.clear();localStorage.setItem('cb2_pure',JSON.stringify(true));const R=Date;const fixed=new R('2026-09-12T01:30:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;});
+ const e=await q.evaluate(()=>({t:todayISO(),started:planStarted(),cta:document.querySelector('.cta')?.textContent||''}));
+ T('dates: at 01:30 on Day 1 the app already knows it is Day 1 (was "yesterday" via UTC)',e.t==='2026-09-12'&&e.started&&/Legs A/.test(e.cta),JSON.stringify(e));await q.close();}
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));})();
