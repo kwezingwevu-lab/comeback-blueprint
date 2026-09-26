@@ -566,6 +566,23 @@ details.tested summary{cursor:pointer;font-weight:700;color:var(--text-2);min-he
 .chk{position:relative}.chk::before{content:"";position:absolute;inset:-8px}
 /* card-header icons (2026-09-26): ICON svgs carry no size of their own */
 .card-t .ic svg{width:20px;height:20px;flex:none}
+/* accessibility + layout pass (2026-09-26): measured contrast, 44 px targets, readable captions, wrapping toasts */
+:root{--text-3:#8A96B0}
+.cell::placeholder{opacity:1}
+.cell{min-height:44px}
+nav.tabs .tab{min-height:44px;padding:4px 0!important}
+nav.tabs .tab span{font-size:10.5px}
+.wd .wdl,.set-grid th,.rm-wn small,.macro .ml,.lm .lml,.sb-d small{font-size:10.5px}
+.cd-lab small{font-size:9.5px;letter-spacing:.4px;display:block;max-width:64px;margin:3px auto 0;line-height:1.15;text-align:center}
+.seg button,.track-tabs button{min-height:44px}
+.track-tabs{overflow-x:visible}.track-tabs button{flex:1 1 0;min-width:0;padding:9px 2px}
+#bulkSeg{gap:2px}#bulkSeg button{padding:9px 3px;min-width:0}
+.hw-tog{padding:12px 0;margin:-6px 16px 6px}
+.log-row .del{min-width:44px;min-height:44px;display:grid;place-items:center}
+.mini{min-height:44px}
+#restTimer button{min-height:44px}#restEnd{width:44px}
+#toast{bottom:calc(108px + env(safe-area-inset-bottom));white-space:normal;width:max-content;max-width:calc(100vw - 32px);border-radius:16px;text-align:left;line-height:1.35}
+#restTimer.show ~ #toast{bottom:calc(150px + env(safe-area-inset-bottom))}
 </style>
 </head>
 <body>
@@ -603,8 +620,8 @@ details.tested summary{cursor:pointer;font-weight:700;color:var(--text-2);min-he
   <section class="view" id="view-fuel"></section>
   <section class="view" id="view-guide"></section>
 </main>
-<div id="restTimer"><button id="restEnd" aria-label="End rest">✕</button><div class="rt-mid"><span class="rt-lab">REST</span><b id="restTime">1:30</b></div><button id="restPlus">+15s</button></div>
-<div id="toast"></div>
+<div id="restTimer" role="timer" aria-label="Rest timer"><button id="restEnd" aria-label="End rest">✕</button><div class="rt-mid"><span class="rt-lab">REST</span><b id="restTime">1:30</b></div><button id="restPlus" aria-label="Add 15 seconds">+15s</button></div>
+<div id="toast" role="status" aria-live="polite"></div>
 <script>/* APP LOGIC LOADED SEPARATELY BELOW */</script>
 </body>
 </html>
