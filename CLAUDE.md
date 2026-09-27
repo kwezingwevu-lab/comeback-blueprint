@@ -116,14 +116,13 @@ Never edit `dist/` directly. Never use `re.sub` with replacements containing `\u
 
 ## 9. Backlog (candidates, in rough value order)
 
-- Retire the run-era copy still shipping in the Lift view: the intro says "4 lifting days a week" and the Pure Muscle note says "Post-race growth (after 24 Sep)"; the footer says "Strength + Speed · Built for 24 September 2026". All three contradict the pure-muscle mission and Day 1 = 12 Sep (seen in the WebKit screenshots, 11 Sep 2026).
-- Hosted PWA (Netlify/GitHub Pages) with a service worker so the app installs to the home screen and works offline; keep the file-based version working.
-- e1RM progression charts per exercise on Track; PR badges in the Weekly Review.
-- Auto-progression: when a set hits the top of its rep range at RIR 0, suggest next session's load.
-- DEXA import (paste the lean/fat numbers; overrides the tape estimate).
-- Calendar auto-refresh helper: a script that re-scrapes RaceSpace/Peak Timing and diffs `RACES_12M` for the human to approve.
-- Peak-week countdown notifications via the Shortcut route.
-- A "coach export": weekly summary as text for a real coach or physio.
+Shipped from the earlier list (do not rebuild): run-era copy retired; hosted PWA + service worker; e1RM charts and PR badges; auto-progression; DEXA import; calendar refresh helper; peak-week and check-day reminders (via the .ics file); coach export. Full register with decisions and deferrals: `IMPROVEMENTS.md`.
+
+- Three open decisions for the user (band rate 0.42 vs 0.47; the +6 cm route vs the +5 cm brake; automatic Mini-Cut I). Apply only what the user chooses; surface the numbers each time.
+- Body Lab per-muscle growth from the user's own tape readings (chest, arm, thigh), replacing the model once several weeks of tapes exist.
+- New-PR badge on Home and a shareable weekly summary card.
+- Monthly calendar re-check: run `tools/calendar_refresh.js --geocode` and put the report in front of the user; it never edits the app.
+- Real-iPhone timing of Body Lab and the .ics import (the user reports; tune only on evidence).
 
 ## 10. Sibling project: FPL Mission Control (fpl/)
 
