@@ -11,10 +11,12 @@
  *   Ported from the v111 kit (/home/claude/app/engine.js) on 2026-09-27. v111 is v109 plus additive
  *   deltas only: `opts.fixedK` (backtests reuse the live exponents), the calibration hook `CAL`
  *   (empty when the data has no `model` block, so the reference maths is unchanged), `claimsMC`,
- *   `priceRisk` and `priceStress`. The only edits made in the port are this header and the renaming
- *   of loop variables in two places — fitRates' polish pass and bestXI's formation sum — where the
- *   kit re-used a `let` name across `for` headers inside one function, which qa/tdz_check.cjs reads
- *   as a same-scope use before declaration. Renames only; no expression changed.
+ *   `priceRisk` and `priceStress`. Everything below this header is the kit's engine.js byte for byte.
+ *   The port at first renamed loop counters in two places (fitRates' polish pass, bestXI's formation
+ *   sum) to get past qa/tdz_check.cjs, which then charged a counter reused across two for-headers to
+ *   the enclosing block (E-109); the checker was corrected the same day to scope a for-header
+ *   declaration to its loop, and the renames were reverted on 2026-09-27 so a diff against the kit
+ *   shows this header and nothing else.
  *
  * THE RULE
  *   Its maths must not drift from reference/v109/app/engine.js without a parity number. qa/parity.cjs
@@ -97,7 +99,7 @@ function create(DATA, opts) {
   function matchOdds0(lh, la) { let h = 0, d = 0, a = 0; for (let i = 0; i < 10; i++) for (let j = 0; j < 10; j++) { const p = poisPmf(i, lh) * poisPmf(j, la); if (i > j) h += p; else if (i === j) d += p; else a += p; } const s = h + d + a; return { h: h / s, d: d / s, a: a / s }; }
   function devig(h, d, a) { const ih = 1 / h, id = 1 / d, ia = 1 / a, s = ih + id + ia; return { h: ih / s, d: id / s, a: ia / s, margin: s - 1 }; }
   function fitRates(t) { let best = null; for (let lh = 0.3; lh <= 3.61; lh += 0.05) for (let la = 0.3; la <= 3.61; la += 0.05) { const o = matchOdds0(lh, la), e = Math.pow(o.h - t.h, 2) + Math.pow(o.d - t.d, 2) + Math.pow(o.a - t.a, 2); if (!best || e < best.e) best = { lh, la, e }; }
-    /* polish on a finer grid around the coarse answer */ const c = best; for (let ph = c.lh - 0.05; ph <= c.lh + 0.05; ph += 0.01) for (let pa = c.la - 0.05; pa <= c.la + 0.05; pa += 0.01) { const o = matchOdds0(ph, pa), e = Math.pow(o.h - t.h, 2) + Math.pow(o.d - t.d, 2) + Math.pow(o.a - t.a, 2); if (e < best.e) best = { lh: ph, la: pa, e }; } return best; }
+    /* polish on a finer grid around the coarse answer */ const c = best; for (let lh = c.lh - 0.05; lh <= c.lh + 0.05; lh += 0.01) for (let la = c.la - 0.05; la <= c.la + 0.05; la += 0.01) { const o = matchOdds0(lh, la), e = Math.pow(o.h - t.h, 2) + Math.pow(o.d - t.d, 2) + Math.pow(o.a - t.a, 2); if (e < best.e) best = { lh, la, e }; } return best; }
   const mk5 = (DATA.intel && DATA.intel.market5) || {}, MK0 = { 5: JSON.parse(JSON.stringify(mk5)) }, ODDS = {};
   Object.keys((DATA.intel && DATA.intel.odds) || {}).forEach((g) => { DATA.intel.odds[g].forEach((r) => { const f = (fxByTeamGw[r[0]] || {})[g]; if (!f || !f.some((x) => x.o === r[1] && x.ha === "H")) return;
     const fair = devig(r[2], r[3], r[4]), fit = fitRates(fair); MK0[g] = MK0[g] || {}; MK0[g][r[0]] = { xg: fit.lh, from: "odds" }; MK0[g][r[1]] = { xg: fit.la, from: "odds" }; (ODDS[g] = ODDS[g] || []).push({ h: r[0], a: r[1], odds: [r[2], r[3], r[4]], fair, lh: fit.lh, la: fit.la }); }); });
@@ -193,7 +195,7 @@ function create(DATA, opts) {
     o = o || {}; const val = o.val || ((p) => ep(p, gw));
     const s = squad.map((p) => ({ p, v: val(p) })); const by = (k) => s.filter((x) => x.p.p === k).sort((a, b) => b.v - a.v);
     const G = by(1), D = by(2), M = by(3), F = by(4); if (!G.length) return null; let bestF = null;
-    FORMATIONS.forEach(([d, m, f]) => { if (D.length < d || M.length < m || F.length < f) return; let t = G[0].v; for (let i = 0; i < d; i++) t += D[i].v; for (let j = 0; j < m; j++) t += M[j].v; for (let k = 0; k < f; k++) t += F[k].v; if (!bestF || t > bestF.t) bestF = { d, m, f, t }; });
+    FORMATIONS.forEach(([d, m, f]) => { if (D.length < d || M.length < m || F.length < f) return; let t = G[0].v; for (let i = 0; i < d; i++) t += D[i].v; for (let i = 0; i < m; i++) t += M[i].v; for (let i = 0; i < f; i++) t += F[i].v; if (!bestF || t > bestF.t) bestF = { d, m, f, t }; });
     if (!bestF) return null;
     const xi = [G[0]].concat(D.slice(0, bestF.d), M.slice(0, bestF.m), F.slice(0, bestF.f));
     const bench = D.slice(bestF.d).concat(M.slice(bestF.m), F.slice(bestF.f)).sort((a, b) => b.v - a.v);
