@@ -662,27 +662,55 @@ async function main() {
   }
 
   // ---- 28 · the written claims are audited against the draft API, and the shortfalls are shown
+  // E-126. "A gain" is measured by the engine that ranks the claims — src/mc_engine.js, expected points from the next
+  // gameweek to the Draft horizon read from league.drafts (v110 law §1.2: "Draft plans to GW20") — and no longer by
+  // src/engine.js draftEV, whose xp5 is the five-gameweek horizon that law replaced. draftEV's verdict is still
+  // computed and printed, so the two engines' disagreement is visible, never silent. Two guards are ADDED: the
+  // written list must be the claims sheet itself, line for line (buildClaimSheet on the plan's pairs with fitOnly, so
+  // no flagged player is lodged as a first choice or a backup), and the block, the plan and the baked data must share one content hash,
+  // so a stale block goes red instead of being audited as if it were current. Status "a" on every incoming player
+  // and the on-screen shortfall notes are unchanged.
   {
     const claims = (WEEKLY.draft && WEEKLY.draft.claims) || [];
     const draftFresh = FRESH ? new Map(FRESH.draft.elements.map((e) => [Number(e.code), e])) : null;
+    const MCD = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "mc_data.json"), "utf8"));
+    const PLANF = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "plan.json"), "utf8"));
+    const MM = require(path.join(ROOT, "src", "mc_engine.js")).create(MCD);
+    const AN = require(path.join(ROOT, "src", "mc_analysis.js"));
+    const dNext = MCD.gw.next, dHorizon = MM.CFG.draftEnd;
+    const pOf = (code) => { const c = ctx.byCode[code]; return c ? MM.P[c.id] : null; };
     const bad = [];
     const notes = [];
+    const disagree = [];
     claims.forEach((c) => {
       const out = E.draftEl(c.out, ctx), inn = E.draftEl(c.in, ctx);
       const outLive = draftFresh && draftFresh.get(Number(c.out)) ? draftFresh.get(Number(c.out)) : out.draft;
       const inLive = draftFresh && draftFresh.get(Number(c.in)) ? draftFresh.get(Number(c.in)) : inn.draft;
       const outEv = E.draftEV(out, ctx), inEv = E.draftEV(inn, ctx);
       const forced = String(outLive.status) !== "a" || outEv.starts_last3 === 0;
-      const gain = inEv.ev - outEv.ev;
-      if (!forced && gain <= 0) bad.push(out.web_name + "→" + inn.web_name + " is neither forced nor a gain (" + gain.toFixed(2) + ")");
+      const po = pOf(c.out), pi = pOf(c.in);
+      const gain = po && pi ? MM.epRange(pi, dNext, dHorizon) - MM.epRange(po, dNext, dHorizon) : NaN;
+      if (!po || !pi) bad.push("code " + (po ? c.in : c.out) + " is not in the baked block");
+      else if (!forced && !(gain > 0)) bad.push(out.web_name + "→" + inn.web_name + " is neither forced nor a gain to GW" + dHorizon + " (" + gain.toFixed(2) + ")");
+      if (!forced && inEv.ev - outEv.ev <= 0) disagree.push(out.web_name + "→" + inn.web_name + " " + (inEv.ev - outEv.ev).toFixed(2));
       if (String(inLive.status) !== "a") bad.push(inn.web_name + " is status " + inLive.status + " in the draft API");
       if (inEv.starts_last3 < 3) notes.push(inn.web_name + " has " + inEv.starts_last3 + " of 3 starts");
     });
+    let exportHash = null;
+    try { exportHash = require(path.join(ROOT, "pipeline", "export.js")).buildInput(MCD, MM).hash; } catch (e) { exportHash = null; }
+    const oneHash = !!WEEKLY.hash && WEEKLY.hash === PLANF.hash && PLANF.hash === exportHash;
+    if (!oneHash) bad.push("the weekly block (" + WEEKLY.hash + "), the plan (" + PLANF.hash + ") and the baked data (" + exportHash + ") do not share one content hash");
+    else {
+      const codeOf = (id) => Number((ctx.els[id] || {}).code);
+      const sheet = AN.buildClaimSheet(MM, MCD, PLANF.draft.pairs, { fitOnly: true }).sheet.map((q) => codeOf(q.drop) + ">" + codeOf(q.add));
+      const written = claims.map((c) => Number(c.out) + ">" + Number(c.in));
+      if (JSON.stringify(sheet) !== JSON.stringify(written)) bad.push("the written claims are not the claims sheet line for line (" + written.length + " written, " + sheet.length + " on the sheet)");
+    }
     // A shortfall that is real must be on screen, not hidden (Isidor: no free-agent forward has three starts).
     const shownIssues = ui.ok ? notes.filter((n) => { const who = n.split(" has ")[0]; return new RegExp(who.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\s\\S]{0,160}of 3 starts").test(ui.draftText); }) : [];
     assert("draft-claims-are-valid-against-the-draft-api",
       claims.length >= 1 && !bad.length && shownIssues.length === notes.length,   // the block's own length (E-084, E-094)
-      claims.length + " written claims checked against the " + (draftFresh ? "live draft API" : "snapshot (offline)") + "; shortfalls named on screen: " + (notes.join("; ") || "none") + (bad.length ? " — invalid: " + bad.join("; ") : "") + (shownIssues.length !== notes.length ? " — a shortfall is not shown in the waivers panel" : ""));
+      claims.length + " written claims checked against the " + (draftFresh ? "live draft API" : "snapshot (offline)") + ", gains to GW" + dHorizon + " by src/mc_engine.js, the sheet line for line and one content hash" + "; src/engine.js draftEV (five gameweeks) disagrees on " + disagree.length + (disagree.length ? " (" + disagree.join(", ") + ")" : "") + "; shortfalls named on screen: " + (notes.join("; ") || "none") + (bad.length ? " — invalid: " + bad.join("; ") : "") + (shownIssues.length !== notes.length ? " — a shortfall is not shown in the waivers panel" : ""));
   }
 
   // ---- 29 · C5 watchlist rule: KEEP only with three starts of three
@@ -809,16 +837,31 @@ async function main() {
         (bad.length ? " — " + bad.join("; ") : "") : "the page did not open: " + dui.why);
   }
 
-  // ---- 36 · and without a league id it says the pool is unknown instead of guessing
+  // ---- 36 · without a league id it says the pool is unknown instead of guessing; with one, it lists the league's
+  // own free agents and says nothing about an unknown pool. E-125: this used to assume the shipped snapshot had no
+  // league. Which branch runs is read from state/kwezi.json, the file where the manager supplies the id — never
+  // from a remembered fact — and each branch asserts both what must be on screen and what must not.
   {
+    const supplied = STATE.draft && Number.isInteger(STATE.draft.league_id) ? STATE.draft.league_id : null;
     const honest = /cannot be listed without the draft league id/.test(ui.draftText);
     const poolNote = /unknown until a draft league id is saved/.test(ui.poolText);
     const claims = E.draftWaivers(STATE, ctx);
-    assert("draft-tab-admits-the-pool-is-unknown-without-a-league-id",
-      ui.ok && honest && poolNote && !ctx.draft.hasPool && claims.length > 0 && claims.every((c2) => c2.pool === "assumed"),
-      ui.ok ? "waivers panel carries the honest notice: " + honest + "; free-agent panel: " +
-        JSON.stringify(ui.poolText.replace(/\s+/g, " ").trim().slice(0, 90)) + "; all " + claims.length +
-        " engine claims labelled assumed" : "the page did not open: " + ui.why);
+    if (supplied === null) {
+      assert("draft-tab-admits-the-pool-is-unknown-without-a-league-id",
+        ui.ok && honest && poolNote && !ctx.draft.hasPool && claims.length > 0 && claims.every((c2) => c2.pool === "assumed"),
+        ui.ok ? "no league supplied; waivers panel carries the honest notice: " + honest + "; free-agent panel: " +
+          JSON.stringify(ui.poolText.replace(/\s+/g, " ").trim().slice(0, 90)) + "; all " + claims.length +
+          " engine claims labelled assumed" : "the page did not open: " + ui.why);
+    } else {
+      const shown = /Unclaimed and available\s*(\d+)/.exec(ui.poolText.replace(/\s+/g, " "));
+      const fa = (LIVE.draft.freeAgents || []).length;
+      assert("draft-tab-admits-the-pool-is-unknown-without-a-league-id",
+        ui.ok && !honest && !poolNote && ctx.draft.hasPool && LIVE.draft.league_id === supplied && !!shown && Number(shown[1]) === fa &&
+          claims.length > 0 && claims.every((c2) => c2.pool === "api"),
+        ui.ok ? "league " + supplied + " supplied in state/kwezi.json; the free-agent panel lists " + (shown ? shown[1] : "none") + " against the snapshot's " + fa +
+          "; no unknown-pool notice on screen: " + (!honest && !poolNote) + "; all " + claims.length + " engine claims labelled api: " +
+          claims.every((c2) => c2.pool === "api") : "the page did not open: " + ui.why);
+    }
   }
 
   const c = H.counts();

@@ -240,6 +240,20 @@ try {
   STATE_LEAGUE.draft.league_input = "1";
   CTX_LEAGUE = ctxOf(liveL, STATE_LEAGUE);
 } catch (e) { CTX_LEAGUE = null; }
+// E-125: the shipped snapshot carries the manager's own league once he supplies it in state/kwezi.json, so the
+// no-league Draft path is built explicitly — the fetcher's own emptyDraftLeague() shape, the state's league and entry
+// ids cleared — and rendered as a TabDraft variant, instead of being assumed of the snapshot.
+let CTX_NO_LEAGUE = null, STATE_NO_LEAGUE = null;
+try {
+  const liveN = clone(LIVE);
+  liveN.draft = Object.assign({}, liveN.draft, require(path.join(ROOT, "data", "draft_league.cjs")).emptyDraftLeague(), { league_id: null });
+  STATE_NO_LEAGUE = clone(baseState);
+  STATE_NO_LEAGUE.draft.league_id = null; STATE_NO_LEAGUE.draft.entry_id = null; STATE_NO_LEAGUE.draft.league_input = null;
+  CTX_NO_LEAGUE = ctxOf(liveN, STATE_NO_LEAGUE);
+} catch (e) { CTX_NO_LEAGUE = null; }
+assert("components-a-no-league-context-builds-from-the-shipped-snapshot",
+  !!(CTX_NO_LEAGUE && CTX_NO_LEAGUE.ok && CTX_NO_LEAGUE.draft && !CTX_NO_LEAGUE.draft.hasPool),
+  CTX_NO_LEAGUE ? "hasPool " + (CTX_NO_LEAGUE.draft && CTX_NO_LEAGUE.draft.hasPool) : "could not build");
 assert("components-a-league-loaded-context-builds-from-the-recorded-fixtures",
   !!(CTX_LEAGUE && CTX_LEAGUE.ok && CTX_LEAGUE.draft && CTX_LEAGUE.draft.hasPool),
   CTX_LEAGUE ? "hasPool " + (CTX_LEAGUE.draft && CTX_LEAGUE.draft.hasPool) : "fixtures unavailable");
@@ -335,7 +349,8 @@ const FIX = {
   TabRivals: { props: { ctx: CTX, ui: uiFor("rivals", true), on: ON, plan: PLAN, simLeague: 0, onSimLeague: noop, onConfirm: noop }, text: [] },
   TabDraft: {
     props: { ctx: CTX, ui: uiFor("draft", true), on: ON, state: baseState, onLeague: noop }, text: [],
-    variants: CTX_LEAGUE ? [{ ctx: CTX_LEAGUE, ui: uiFor("draft", true), on: ON, state: STATE_LEAGUE, onLeague: noop }] : []
+    variants: (CTX_LEAGUE ? [{ ctx: CTX_LEAGUE, ui: uiFor("draft", true), on: ON, state: STATE_LEAGUE, onLeague: noop }] : [])
+      .concat(CTX_NO_LEAGUE ? [{ ctx: CTX_NO_LEAGUE, ui: uiFor("draft", true), on: ON, state: STATE_NO_LEAGUE, onLeague: noop }] : [])
   },
   TabChips: { props: { ctx: CTX, ui: uiFor("chips", true), on: ON, plan: PLAN, onConfirm: noop }, text: [],
     fuzz: { ctx: CTX, ui: uiFor("chips", false), on: ON, plan: PLAN, onConfirm: noop } },

@@ -62,7 +62,11 @@ function mcHorizon(M, DATA, opts) {
 function buildClaimSheet(M, DATA, pairs, opts) {
   opts = opts || {};
   const H = mcHorizon(M, DATA, opts), next = H.next, dEnd = H.dEnd, P = M.P;
-  const list = (pairs || []).slice();
+  let list = (pairs || []).slice(), held = [];
+  /* opts.fitOnly (v110, data/weekly.js and data/pre.json): no flagged player is lodged, first choice or backup —
+     CLAUDE.md D2 sends any flag back for re-evaluation, and qa/smoke_wk.cjs holds every incoming player to status "a".
+     Off by default, so the parity-proven sheet (B7) is byte for byte the reference's. */
+  if (opts.fitOnly) { const cp = claimablePairs(M, list); list = cp.pairs; held = cp.held; }
   /* like for like (Part N2, spec §7.3): a pair the game would reject never reaches the sheet */
   list.forEach(function (q) {
     const a = P[q.add], d = P[q.drop];
@@ -77,7 +81,7 @@ function buildClaimSheet(M, DATA, pairs, opts) {
   const usedBackup = new Set(), backups = [];
   prim.forEach(function (q) {
     const drop = P[q.drop];
-    const alt = M.waiverPool().filter(function (p) { return p.p === drop.p && !primAdds.has(p.id) && !wanted.has(p.id) && !usedBackup.has(p.id); })
+    const alt = M.waiverPool().filter(function (p) { return p.p === drop.p && !primAdds.has(p.id) && !wanted.has(p.id) && !usedBackup.has(p.id) && (!opts.fitOnly || p.st === "a"); })
       .map(function (p) { return { id: p.id, v: val(p.id) }; }).sort(function (a, b) { return b.v - a.v; })[0];
     if (alt && alt.v - val(q.drop) > MC_BACKUP_MIN_GAIN) { backups.push({ add: alt.id, drop: q.drop, gain: alt.v - val(q.drop), of: q.add }); usedBackup.add(alt.id); }
   });
@@ -104,7 +108,7 @@ function buildClaimSheet(M, DATA, pairs, opts) {
   const out = {
     game: "draft", sheet: sheet, strategy: useA ? "firsts" : "paired", altValue: useA ? rB.value : rA.value,
     sim: r.sim.mine.map(function (x) { return { round: x.round, add: x.add, drop: x.drop, ok: x.ok, why: x.why || null }; }),
-    landed: landed, lost: lost, valueNow: value(roster), valueStress: r.value, valueAll: valueAll, allFirst: valueAll,
+    landed: landed, lost: lost, valueNow: value(roster), valueStress: r.value, valueAll: valueAll, allFirst: valueAll, held: held,
     rivals: Object.fromEntries(Object.entries(RL).map(function (kv) { return [kv[0], kv[1].slice(0, 3).map(function (c) { return c.add; })]; }))
   };
   /* the additive v111 delta: the same claims under four orderings, each rival active as often as the league log
@@ -225,6 +229,23 @@ function greedyTransfers(M, DATA, opts) {
     value: tr.value, baseValue: M.squadValue(cs.squad, H.next, H.cEnd, true), bank: tr.bank };
 }
 
+/* ─────────────── the pairs the app will lodge ─────────────── */
+/* The Draft solve (PLAN.draft.pairs) maximises the roster's expected points, and a flagged player's chance is already
+   inside those points. The app still never lodges a claim for a flagged player: CLAUDE.md D2 says any flag sends the
+   recommendation touching that player back for re-evaluation first, and qa/smoke_wk.cjs holds every written claim's
+   incoming player to status "a". So the pairs are filtered before the sheet is built — by data/weekly.js and
+   data/pre.json alike, through this one function, so the two sheets cannot differ — and what was left out is
+   returned with its flag, for the interface to name. buildClaimSheet itself is untouched (parity B7). */
+function claimablePairs(M, pairs) {
+  const P = M.P, keep = [], held = [];
+  (pairs || []).forEach(function (q) {
+    const a = P[q.add];
+    if (a && a.st === "a") keep.push(q);
+    else held.push({ add: q.add, drop: q.drop, status: a ? a.st : null, chance: a ? a.cop : null });
+  });
+  return { game: "draft", pairs: keep, held: held };
+}
+
 /* ─────────────── B5 · claimability ─────────────── */
 function claimability(M, DATA) {
   const processed = !!DATA.draft.waiversProcessed, pool = M.waiverPool();
@@ -237,7 +258,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     mcHorizon: mcHorizon, buildClaimSheet: buildClaimSheet, findTrades: findTrades, tradeGroups: tradeGroups,
     classicReviewSummary: classicReviewSummary, draftReviewSummary: draftReviewSummary, reviewSummary: reviewSummary,
-    classicGameweekSim: classicGameweekSim, headToHead: headToHead, greedyTransfers: greedyTransfers, claimability: claimability,
+    classicGameweekSim: classicGameweekSim, headToHead: headToHead, greedyTransfers: greedyTransfers, claimability: claimability, claimablePairs: claimablePairs,
     MC_SIM_DRAWS: MC_SIM_DRAWS, MC_SIM_SEED: MC_SIM_SEED, MC_H2H_DRAWS: MC_H2H_DRAWS, MC_H2H_SEED: MC_H2H_SEED,
     MC_CLAIM_RUNS: MC_CLAIM_RUNS, MC_CLAIM_SEED: MC_CLAIM_SEED, MC_PILOT_RUNS: MC_PILOT_RUNS, MC_PILOT_SEED: MC_PILOT_SEED,
     MC_RIVAL_TOP: MC_RIVAL_TOP, MC_BACKUP_MIN_GAIN: MC_BACKUP_MIN_GAIN, MC_TRADE: MC_TRADE, MC_REVIEW_WEEKS: MC_REVIEW_WEEKS, MC_REVIEW_FLAGS: MC_REVIEW_FLAGS

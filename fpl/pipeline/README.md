@@ -85,7 +85,22 @@ bounds and never reach the interface (§7.1). Writes: `data/plan.json`, with no 
 the replay disagrees with the solver's figures, with every disagreeing week printed. Proved by
 `qa/plan_legality.cjs`.
 
-## 7. Build — `node build.cjs` (`npm run build`)
+## 7. Weekly block — `node pipeline/weekly.cjs --version N` (`npm run weekly -- --version N`)
+
+Writes `data/weekly.js`, the decisions block the app reads (CONTRACT §4), from the plan instead of by hand:
+the first planned week's fifteen, captain, vice and chip; the chip weeks of the whole plan; the timing
+scenarios; the fallback without the chip; and the Draft claims sheet in lodging order. The fallback is the
+optimiser's no-wildcard week when it passes every hard rule the app enforces on a written fallback (the
+Konsa rule, two incoming per club, fit and starting buys, captain and vice in the app's eleven, a bank that
+is not negative), and the app's own C2 protocol otherwise, with the reason written beside it. The claims
+sheet is built with `fitOnly`, so no flagged player is lodged, and the held-back pair is named. Refuses
+(exit 3) when the plan's hash is not the export hash of the block, records that hash in the output, and
+keeps the replaced plan as `superseded`. Exits 4, having written the file, when any decision breaks one of
+the app's rules, printing each one by name. Proved by `qa/smoke_wk.cjs` (check 28 compares the written
+claims with the sheet line for line and requires one content hash across the block, the plan and the data),
+`qa/unit_engine.cjs` and `qa/verify.sh`.
+
+## 8. Build — `node build.cjs` (`npm run build`)
 
 Assembles `src/engine.js` and `src/ui.jsx` with the bracketed data blocks into the single file
 `app/FPL_Mission_Control.jsx` and the standalone `dist/index.html`. As this file is written the assembler

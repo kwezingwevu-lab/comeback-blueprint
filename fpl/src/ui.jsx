@@ -1291,6 +1291,9 @@ function TabDraft(props) {
               );
             }) : <div className="dim">No claim clears the bar: nothing in the free agents beats what you have.</div>}
             <div className="dim">Claimed from the league's own free agents. <Tier k="T0" /> ownership · <Tier k="model" /> five-week xP</div>
+            {checked.some(function (c) { return c.issues.length; }) ? (
+              <div className="note">Written claims to re-check: {checked.filter(function (c) { return c.issues.length; }).map(function (c) { return c.inName + " for " + c.outName + " (" + c.issues.join("; ") + ")"; }).join(" · ")}.</div>
+            ) : null}
             <Reveal id="df-written" label="The written claims, checked" open={!!ui.reveals["df-written"]} onToggle={on.rev}>
               {checked.map(function (c) {
                 return <div key={c.key}>{c.priority}. {c.outName} to {c.inName}, {one(c.gain)}{c.issues.length ? " — " + c.issues.join("; ") : " — valid"}</div>;

@@ -1,3 +1,3 @@
-now Time limit reached. (HiGHS Status 13: Time limit reached) 240.0 s · gap 0.03326542624783503 · total 897.9 · wc week 6
-later Time limit reached. (HiGHS Status 13: Time limit reached) 240.0 s · gap 0.01789715795525515 · total 893.54 · wc week 9
-never Optimization terminated successfully. (HiGHS Status 7: Optimal) 165.2 s · gap 0.003995326035866865 · total 892.26 · wc week None
+now Time limit reached. (HiGHS Status 13: Time limit reached) 240.0 s · gap 0.09244671808765006 · total 894.83 · wc week 6
+later Time limit reached. (HiGHS Status 13: Time limit reached) 240.1 s · gap 0.07426202593608779 · total 891.87 · wc week 12
+never Time limit reached. (HiGHS Status 13: Time limit reached) 240.0 s · gap 0.019239742703909286 · total 891.42 · wc week None

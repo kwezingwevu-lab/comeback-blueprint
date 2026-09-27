@@ -2829,7 +2829,21 @@ if (!LIVE) {
   const L100 = DF.withLeague(LIVE, 100, {});
   const L1_CTX = E.buildCtx(L1, LSTATE, LIVE.fetched_at);
   const L100_CTX = E.buildCtx(L100, LSTATE, LIVE.fetched_at);
-  const NO_LEAGUE_CTX = E.buildCtx(LIVE, LSTATE, LIVE.fetched_at);
+  // E-125: "without a league" is constructed, never assumed of the shipped snapshot — which carries the manager's own
+  // league since he supplied it in state/kwezi.json. The league half is emptied with the fetcher's own
+  // emptyDraftLeague() (the exact shape data/fetch_live.cjs writes when no id is known) and the state's league and
+  // entry ids are cleared, so this is the no-league path whatever the snapshot holds.
+  const NO_LEAGUE_LIVE = (function () {
+    const L = JSON.parse(JSON.stringify(LIVE));
+    L.draft = Object.assign({}, L.draft, require(path.join(ROOT, "data", "draft_league.cjs")).emptyDraftLeague(), { league_id: null });
+    return L;
+  })();
+  const NO_LEAGUE_STATE = (function () {
+    const s = JSON.parse(JSON.stringify(LSTATE || {}));
+    s.draft = Object.assign({}, s.draft || {}, { league_id: null, entry_id: null, league_input: null });
+    return s;
+  })();
+  const NO_LEAGUE_CTX = E.buildCtx(NO_LEAGUE_LIVE, NO_LEAGUE_STATE, LIVE.fetched_at);
 
   check("DRAFT-league-input-reads-an-address-an-id-and-an-entry", function () {
     const cases = [
@@ -3078,7 +3092,7 @@ if (!LIVE) {
     return {
       ok: api.source === "api" && api.complete && api.codes.length === 15 &&
         JSON.stringify(api.codes) === JSON.stringify(mine) &&
-        saved.source === "saved" && saved.codes.length === (LSTATE.draft.roster || []).length,
+        saved.source === "saved" && saved.codes.length === (NO_LEAGUE_STATE.draft.roster || []).length,
       detail: "with a league: " + api.codes.length + " codes from the API (" + api.note + "); without one: " +
         saved.codes.length + " from the saved state (" + saved.note + ")"
     };

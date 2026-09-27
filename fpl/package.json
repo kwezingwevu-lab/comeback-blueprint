@@ -8,6 +8,7 @@
     "bake": "node pipeline/bake.js",
     "calibrate": "node pipeline/calibrate.js",
     "export": "node pipeline/export.js",
+    "weekly": "node pipeline/weekly.cjs",
     "solve": "python3 pipeline/solve.py",
     "plan": "node pipeline/plan.cjs",
     "build": "node build.cjs",

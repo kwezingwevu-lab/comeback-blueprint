@@ -515,19 +515,30 @@ else
   fi
 fi
 
-# I15 · the draft-league block is in the shipped snapshot, and carries no invented league id
+# I15 · the draft-league block is in the shipped snapshot and carries exactly the league the manager supplied in
+# state/kwezi.json: none while he has supplied none (every league field empty), his once he has (the league present
+# and his own entry found in it by the entry id he supplied). Never an invented one (E-125: this used to require
+# null outright — a photograph of the day the id was unknown).
 draft_out="$(MC_ROOT="$ROOT" node -e '
 const fs=require("fs"), path=require("path");
 const L=JSON.parse(fs.readFileSync(path.join(process.env.MC_ROOT,"data","live.json"),"utf8"));
+let S=null; try { S=JSON.parse(fs.readFileSync(path.join(process.env.MC_ROOT,"state","kwezi.json"),"utf8")).draft||null; } catch (e) { S=null; }
+const want = S && Number.isInteger(S.league_id) ? S.league_id : null;
 const keys=["league","entries","ownership","rosters","freeAgents","matches","standings","picks","me","unjoined","unmappedOwners","counts"];
 const missing=keys.filter(k=>!(k in L.draft));
 const empty = L.draft.league===null && L.draft.entries.length===0 && L.draft.ownership.length===0 &&
   Object.keys(L.draft.rosters).length===0 && L.draft.freeAgents.length===0 && L.draft.matches.length===0 &&
   Object.keys(L.draft.picks).length===0 && L.draft.me===null;
 if (missing.length) { console.log("missing draft-league fields: "+missing.join(",")); process.exit(1); }
-if (L.draft.league_id!==null) { console.log("the shipped snapshot carries draft league id "+L.draft.league_id+" — Kwezi\u2019s is unknown and must not be invented"); process.exit(1); }
-if (!empty) { console.log("league_id is null but the league fields are not empty"); process.exit(1); }
-console.log("all "+keys.length+" draft-league fields present, league_id null, every one empty");
+if (L.draft.league_id!==want) { console.log("the shipped snapshot carries draft league id "+L.draft.league_id+" but state/kwezi.json supplies "+want+" — a league id is never invented"); process.exit(1); }
+if (want===null) {
+  if (!empty) { console.log("league_id is null but the league fields are not empty"); process.exit(1); }
+  console.log("all "+keys.length+" draft-league fields present, league_id null as the state has none, every one empty");
+} else {
+  const mine = L.draft.me && S && L.draft.me.entryId===S.entry_id && L.draft.entries.some(e=>e.leagueEntryId===L.draft.me.leagueEntryId);
+  if (L.draft.league===null || !L.draft.entries.length || !mine) { console.log("league "+want+" is supplied but the snapshot does not carry it with the manager\u2019s own entry "+(S&&S.entry_id)); process.exit(1); }
+  console.log("all "+keys.length+" draft-league fields present, league "+want+" as state/kwezi.json supplies, "+L.draft.entries.length+" entries, his entry "+S.entry_id+" found");
+}
 ' 2>&1)"
 if [ $? -eq 0 ]; then ok "draft-league-block-present-and-uninvented" "$draft_out"
 else bad "draft-league-block-present-and-uninvented" "$draft_out"; fi

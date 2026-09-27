@@ -1,121 +1,103 @@
-// WEEKLY STRATEGY ENGINE — decisions only (CONTRACT §4). The engine recomputes every
-// number live; nothing here is a model output. Classic entries are FPL element ids;
-// draft entries are player "code"s (draft ids differ from classic for 64 of 667 players
-// on this snapshot — join on code, never on id).
-// Written 26 September 2026 against data/live.json fetched 2026-09-26T10:49:45Z
-// (five finished gameweeks, GW6 deadline 2026-10-10T10:00:00Z, 335 hours away).
-// Every figure in the comments below came out of src/engine.js on that snapshot and is
-// reproducible: buildCtx(LIVE, state/kwezi.json, now) then the named function.
+// WEEKLY STRATEGY ENGINE — decisions only (CONTRACT §4). WRITTEN BY pipeline/weekly.cjs — do not edit by hand;
+// change the inputs and re-run it after pipeline/plan.cjs. Classic entries are FPL element ids; Draft entries are
+// player codes (join on code, never on id). The figures in the comments and the why lines are the plan's own at
+// the moment of writing; the app's engines recompute every figure it shows.
+// Plan cef80183f9a5a2ae (data/solver_out.json plan), block baked 2026-09-27T16:18:56.398Z, live snapshot 2026-09-27T16:24:04Z.
 const WEEKLY = {
-  version: 89, gw: 6, written: "2026-09-26", source: "src/engine.js on data/live.json fetched 2026-09-26T10:49:45Z",
+  version: 110, gw: 6, written: "2026-09-27", hash: "cef80183f9a5a2ae",
+  source: "pipeline/plan.cjs on data/mc_data.json baked 2026-09-27T16:18:56.398Z (export hash cef80183f9a5a2ae); data/live.json fetched 2026-09-27T16:24:04Z",
 
-  // The v87/v88 plan of record recommended Wildcard 1 in GW4. It was NOT played:
-  // history.chips is [] on 26 September 2026 and all four chips of both sets remain.
-  // He made one transfer all season, in GW5 (João Pedro out, Calvert-Lewin in), and
-  // carries four free transfers into GW6. That plan is recorded here rather than
-  // deleted, so the history is not quietly rewritten.
+  // The plan this block replaces, recorded rather than deleted (v89 rule). `previous` carries the one before it.
   superseded: {
-    version: 88, gw: 4, plan: "wildcard",
-    what: "Play Wildcard 1 in GW4 with Tzolakis, Raya, Calafiori, Ajayi, Tarkowski, Bogle, Mendy, Janelt, Saka, Scott, Rogers, Barnes, João Pedro, Haaland, Barry; captain João Pedro.",
-    outcome: "Never played. He kept his fifteen, captained Haaland and scored 71 against a field average of 69.",
-    measured: "state/kwezi.json ledger, GW4 chip row: the fifteen of record scored 96 across all fifteen and 102 as its best legal eleven in hindsight with João Pedro captained, against the 71 he played. The regret is an upper bound because a squad that was never played has no played eleven.",
-    evidence: "history.chips === [] · history.current[].event_transfers === [0,0,0,0,1]"
+    "version": 89,
+    "gw": 6,
+    "plan": "wildcard",
+    "what": "Play Wildcard 1 in GW6 with Haaland, Groß, De Cuyper, Bogle, Gvardiol, Guéhi, Schade, Janelt, Tarkowski, Tzolakis, Cunha, Tavernier, A.Becker, Emersonn, Isak; captain Groß, vice Schade.",
+    "outcome": "Superseded on 2026-09-27, before the GW6 deadline, by the v110 solved plan; never played.",
+    "measured": "src/mc_engine.js squadValue, each fifteen held unchanged from GW6 to GW19 with its best eleven and captain every week: v89's 805.4 Classic expected points against v110's 856.1 (the v110 plan's own total, with its later transfers and chips, is 902.96).",
+    "evidence": "data/plan.json hash cef80183f9a5a2ae · v89 was written 2026-09-26 from src/engine.js on data/live.json fetched 2026-09-26T10:49:45Z",
+    "previous": {
+      "version": 88,
+      "gw": 4,
+      "plan": "wildcard",
+      "what": "Play Wildcard 1 in GW4 with Tzolakis, Raya, Calafiori, Ajayi, Tarkowski, Bogle, Mendy, Janelt, Saka, Scott, Rogers, Barnes, João Pedro, Haaland, Barry; captain João Pedro.",
+      "outcome": "Never played. He kept his fifteen, captained Haaland and scored 71 against a field average of 69.",
+      "measured": "state/kwezi.json ledger, GW4 chip row: the fifteen of record scored 96 across all fifteen and 102 as its best legal eleven in hindsight with João Pedro captained, against the 71 he played. The regret is an upper bound because a squad that was never played has no played eleven.",
+      "evidence": "history.chips === [] · history.current[].event_transfers === [0,0,0,0,1]"
+    }
   },
 
   classic: {
     plan: "wildcard",                                   // "wildcard" | "transfers" | "hold"
-    // wildcardOptions(ctx, {written}).locked — the rule-pure solve with the one convergent
-    // player the manager already owns locked in. Cost £98.8m of a £99.5m selling value, £0.7m
-    // left, objective 230.86 against the pure solve's 225.11: keeping Haaland is worth +5.75
-    // over five gameweeks and spends £7.8m more. Haaland, Groß, De Cuyper, Bogle, Gvardiol,
-    // Guéhi, Schade, Janelt, Tarkowski, Tzolakis, Cunha, Tavernier, A.Becker, Emersonn, Isak.
-    wildcard15: [411, 124, 115, 330, 391, 388, 94, 98, 229, 572, 428, 68, 350, 316, 379],
-    // Rule C1.6 keeps anyone at or above 60% rival ownership out of the solver. Haaland is
-    // 100% rival-owned across the six winnable leagues, so he is out of the rule-pure solve
-    // and is declared here as the one explicit lock — the only exemption the solver takes.
+    // data/plan.json weeks[0].squad: Gabriel, Saka, Janelt, Groß, Thomas, Tarkowski, Branthwaite, Barry, Leno, Stach, Haaland, Mbeumo, Hall, Gonzalo, Tzolakis.
+    // Buys Janelt, Groß, Thomas, Tarkowski, Branthwaite, Barry, Leno, Stach, Mbeumo, Hall, Gonzalo, Tzolakis; sells Diop, Shaw, Rogers, Brobbey, Semenyo, Verbruggen, van Ewijk, Kinsky, Szoboszlai, Hughes, Calvert-Lewin, Konsa.
+    wildcard15: [4, 12, 98, 124, 173, 229, 230, 249, 250, 335, 411, 427, 449, 569, 572],
+    // Rule C1.6's only exemption, declared (smoke_wk reads it): the fifteen's players at or over the 60% rival-ownership
+    // gate. The plan keeps them because they maximise expected points (v110 §1.2).
     locks: [411],
-    // The cost of the fifteen above, in tenths, at the moment this block was written:
-    // £98.8m of a £99.5m selling value on the 26 September snapshot. Recorded so the
-    // Plan tab's "the written plan quotes …" line can be read out of the plan instead of
-    // typed into the markup (ERRORS.md E-088).
-    wildcard15_cost_written: 988,
-    captain: 124, vice: 94,                             // Groß (BHA), Schade (BRE) — bestXI 3-4-3
-    // Without the chip: the C2 weekly protocol, three of his four free transfers, no hit.
-    // Four players are forced sells and only three swaps are searched (C2 caps k at 3), so
-    // the highest-xP forced sell — Semenyo — stays for another week.
+    // The fifteen's cost at today's prices, recorded so the Plan tab reads it out of the block (E-088).
+    wildcard15_cost_written: 995,
+    captain: 12, vice: 4,                            // Saka, Gabriel — the plan's own armband for GW6
+    // Without the chip: src/engine.js transferProtocol (CLAUDE.md C2), because the optimiser's no-wildcard week sells Shaw, protected by the Konsa rule; 5 moves, 1 hit, confidence HIGH.
     fallback: {
-      moves: [{ out: 175, in: 115 }, { out: 212, in: 127 }, { out: 552, in: 316 }],
-      captain: 411, vice: 12                            // Haaland, Saka — bestXI of the post-move fifteen
+      moves: [{out: 212, in: 127}, {out: 175, in: 330}, {out: 552, in: 316}, {out: 31, in: 115}, {out: 368, in: 94}],
+      captain: 94, vice: 411                            // Schade, Haaland
     },
     chip: "wildcard",
     notes: [
-      "Four forced sells, three slots: van Ewijk (d 75%), Hughes (0 starts in 3) and Brobbey (d 75%) go; Semenyo (d 75%) stays because he has the highest five-week xP of the four.",
-      "Haaland is 100% rival-owned across the six winnable leagues, over the 60% convergence gate, so rule C1.6 keeps him out of the rule-pure solve. He is locked into the written fifteen instead, which is worth +5.75 over five gameweeks and spends £7.8m more of the bank. The rule protects mini-league rank against the field; the points say the opposite. Both answers are priced side by side.",
-      "The captain is Groß on the chip path, not Haaland: on the wildcard fifteen his EV_cap is the highest in the eleven. On the fallback path, where Groß is not owned, Haaland captains.",
-      "wildcardOptions prices the rule-pure solve, the same solve with Haaland locked in, and the written fifteen under one objective; the Plan tab shows all three."
+      "The plan is the optimiser's (pipeline/solve.py, HiGHS), proved within 0.49% of the best possible: 902.96 Classic expected points from GW6 to GW19, 0 hits.",
+      "Chips in the plan: WC GW6, BB GW7, TC GW8 on Haaland; the best free-hit week is GW14 at +4.12, not taken.",
+      "Free transfers come from the replayed ledger (data/plan.json replay), never the solver's own variables: 4 into GW6, 4 after it, because a wildcard week keeps the count.",
+      "Haaland is at or over the 60% rival-ownership gate and kept on purpose; the rule-pure search on the Plan tab prices the difference."
     ],
-    // C3 runs the solve under both fixture models and ships only what is equal-or-better
-    // under both. It is NOT equal-or-better here: four players differ and the goals model
-    // scores its own answer higher (247.79 against 242.30 for the xG answer). That is the
-    // v74 lesson, and it is why the numbers below are quoted with the disagreement attached.
     why: [
-      "wildcardTiming: the five-gameweek deficit of the current fifteen against the best fifteen is 82.2 points against a trigger of 20, and 143.9 cumulative to the GW19 expiry of chip set one, after allowing for repair at one free transfer a week.",
-      "chipSolver assigns Wildcard 1 to set one, GW6, at 143.9 points, and confirms no double and no blank anywhere on the fixture list — every club has exactly one fixture in every remaining gameweek, so there is nothing for a Bench Boost, a Triple Captain or a Free Hit to aim at yet.",
-      "Fourteen of fifteen change. The deficit is driven by four flagged players and a bench worth 0.9 to 7.5 five-week xP, and the two fixture models disagree on four of the fifteen, so the fifteen is a model answer and not a forecast.",
-      "There is no deadline pressure: 335 hours to GW6, an international break. Flags on Semenyo, Brobbey, van Ewijk and João Pedro will be re-read after the pressers, and three of the four repairs are free either way."
+      "Timing (data/plan.json timing): wildcard now 902.96, later (GW7) 897.74, never 891.42 Classic expected points to GW19.",
+      "Without the wildcard the best plan found is 891.42, so the chip is worth 11.54 over the window.",
+      "The app's own timing model (src/engine.js wildcardTiming) puts the five-gameweek deficit of the current fifteen at 64.0 and the break-even for waiting at 136.4 by GW19."
     ]
   },
 
   draft: {
-    // draftWaivers(state, ctx) on this snapshot: six claims, every one a forced replacement,
-    // ordered by descending gain (C5). The free-agent pool CANNOT be seen without the draft
-    // league id, which is still unknown, so each claim's `in` is the engine's best available
-    // replacement over the WHOLE player list and every row is marked pool "assumed" in the
-    // data as well as in the copy. Expect the top names to be owned in a seven-team league;
-    // supply the league id and the list is re-derived from the real element-status pool.
-    pool: "assumed",
-    pool_note: "No draft league id. The outs are sourced — they are the six players on the saved roster with no starts in the last three or a status that is not 'a'. The ins are the engine's best replacement by five-week xP × P(start) over every player, because the pool is unknown.",
+    // buildClaimSheet (src/mc_analysis.js) on the solved roster's pairs, with the Monte Carlo orderings — the same call
+    // data/pre.json makes. Lodge in exactly this order: every first choice, then the backups — the ordering that lands more value under the league's own processing (strategy "firsts").
+    // Monte Carlo over 1500 runs, mean Draft value by ordering: all first choices, then backups 640.6; each backup under its first choice 641.2; highest expected gain first 633.5; likeliest to land first 633.5.
+    pool: "api",
+    pool_note: "League 46148: the ins are free agents in the league's own feed, and the waiver model reproduces the league's claim log (qa/waiver_log.cjs). 12 claims, 5 of them backups. Held back because the player is flagged (re-check after the pressers): Mainoo for Janelt (status d, 75%).",
     claims: [
-      { out: 221466, in: 465730, why: "Senesi has no starts in the last 3; De Cuyper is the best available defender by EV (+20.2), pool assumed" },
-      { out: 108413, in: 513418, why: "Hughes has no starts in the last 3; Schade is the best available midfielder by EV (+19.7), pool assumed" },
-      { out: 482973, in: 223094, why: "Igor Jesus has no starts in the last 3; Haaland is the best available forward by EV (+18.8), pool assumed — almost certainly owned in a seven-team league" },
-      { out: 204480, in: 60307, why: "Rice is status d; Groß is the best available midfielder left by EV (+18.5), pool assumed" },
-      { out: 153682, in: 141746, why: "Wilson (assumed to be the Leeds midfielder, code 153682) is status i; B.Fernandes is next by EV (+18.2), pool assumed" },
-      { out: 212319, in: 219168, why: "Richarlison is status u; Isak is the best available forward left by EV (+16.5), pool assumed — almost certainly owned" }
+      { out: 83299, in: 483067, why: "Silva for Dunk (DEF), first choice: +35.3 Draft expected points to GW20, lands in 48% of 1500 simulated waiver runs, stress test: taken first" },
+      { out: 437505, in: 444102, why: "Evanilson for Isidor (FWD), first choice: +21.8 Draft expected points to GW20, lands in 86% of 1500 simulated waiver runs, stress test: lands" },
+      { out: 455084, in: 200834, why: "Mukiele for Davis (DEF), first choice: +15.6 Draft expected points to GW20, lands in 12% of 1500 simulated waiver runs, stress test: taken first" },
+      { out: 540324, in: 484420, why: "E.Le Fée for Belloumi (MID), first choice: +14.0 Draft expected points to GW20, lands in 17% of 1500 simulated waiver runs, stress test: taken first" },
+      { out: 226182, in: 463981, why: "Hill for Bogle (DEF), first choice: +13.0 Draft expected points to GW20, lands in 31% of 1500 simulated waiver runs, stress test: taken first" },
+      { out: 482973, in: 169432, why: "McBurnie for Igor Jesus (FWD), first choice: +11.7 Draft expected points to GW20, lands in 74% of 1500 simulated waiver runs, stress test: lands" },
+      { out: 577725, in: 430871, why: "Cunha for King (MID), first choice: +6.6 Draft expected points to GW20, lands in 18% of 1500 simulated waiver runs, stress test: taken first" },
+      { out: 83299, in: 513086, why: "Schuster for Dunk (DEF), backup for Silva: +24.9 Draft expected points to GW20, lands in 29% of 1500 simulated waiver runs, stress test: lands" },
+      { out: 437505, in: 613221, why: "Fernandez-Pardo for Isidor (FWD), backup for Evanilson: +8.8 Draft expected points to GW20, lands in 13% of 1500 simulated waiver runs, stress test: not reached" },
+      { out: 455084, in: 220627, why: "Justin for Davis (DEF), backup for Mukiele: +11.0 Draft expected points to GW20, lands in 64% of 1500 simulated waiver runs, stress test: lands" },
+      { out: 540324, in: 195546, why: "Buendía for Belloumi (MID), backup for E.Le Fée: +10.7 Draft expected points to GW20, lands in 71% of 1500 simulated waiver runs, stress test: lands" },
+      { out: 226182, in: 461102, why: "Thomas for Bogle (DEF), backup for Hill: +5.6 Draft expected points to GW20, lands in 69% of 1500 simulated waiver runs, stress test: lands" }
     ],
-    // draftXI on the post-claim twelve: 3-5-2, Verbruggen · De Cuyper, Guéhi, Truffert ·
-    // Groß, Schade, B.Fernandes, Mbeumo, Gibbs-White · Isak, Haaland. Three of the fifteen
-    // roster slots are still unknown (state/kwezi.json draft.roster_note).
+    // The best eleven of the roster the stress test leaves (src/mc_engine.js bestXI for GW6): 4-5-1, Tzolakis, Murillo, Thomas, Schuster, Guéhi, Buendía, Scott, Xhaka, Janelt, King, N.Jackson.
     xi: {
-      formation: "3-5-2",
-      gk: 489639,
-      def: [465730, 209036, 494521],
-      mid: [60307, 513418, 141746, 446008, 222531],
-      fwd: [219168, 223094]
+      formation: "4-5-1",
+      gk: 473284,
+      def: [575476, 461102, 513086, 209036],
+      mid: [195546, 503139, 84450, 204580, 577725],
+      fwd: [517052]
     },
-    // Empty on purpose: the manager's 44-name watchlist has never been available to this
-    // build. The rule stands (on the list only if he started the last three); populate it
-    // from the draft app and watchlistAudit scores it.
     watchlist: []
   },
 
   chips: {
     set1_expires_gw: 19,
-    // chipSolver's joint answer over both sets on this snapshot.
-    planned: [{ set: 1, chip: "WC", gw: 6 }],
-    note: "No double and no blank is confirmed anywhere on the fixture list, so Bench Boost, Triple Captain and Free Hit are unassigned in both sets."
+    planned: [{set: 1, chip: "WC", gw: 6},{set: 1, chip: "BB", gw: 7},{set: 1, chip: "TC", gw: 8}],
+    note: "Chips from data/plan.json: WC GW6, BB GW7, TC GW8. The free hit is held; its best week is GW14."
   },
 
-  // tournament(live) on this snapshot: nine models, four walk-forward transitions.
-  // player_xg leads on both metrics (ρ 0.3054, calibrated MAE 2.24) and has won three of
-  // the four transitions, but its trailing hold-out is one gameweek against the two the
-  // gate wants, so promotionGate says no and nothing it produces drives a recommendation.
-  // GW6 scores the fifth transition and decides it.
+  // tournament(live) on data/live.json: notes only; the engine recomputes them every render.
   tournament: { leader: "player_xg", transitions: 4, promote_at_gw: 6 },
 
-  // wildcardTiming(ctx) — notes only; the engine recomputes them every render.
-  // `breakeven_double_gw17` is null because the fixture list still carries no double
-  // gameweek to price (chipSolver: doubles 0, blanks 0). `breakeven_later_value` is the
-  // value a later window would have to be worth for waiting to break even.
-  timing: { now_vs_later: { by_gw19: 144, by_gw38: 144, breakeven_double_gw17: null, breakeven_later_value: 144 } }
+  // wildcardTiming(ctx) — the app engine's note; `solved` is the optimiser's (data/plan.json timing).
+  timing: { now_vs_later: { by_gw19: 136, by_gw38: 136, breakeven_double_gw17: null, breakeven_later_value: 136 },
+    solved: { now: 902.96, later: 897.74, later_gw: 7, never: 891.42 } }
 };

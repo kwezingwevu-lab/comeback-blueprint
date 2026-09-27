@@ -135,11 +135,21 @@ ok("draft keys", ["game","events","scoring","squad","elements","league_id"].ever
 // draft league id is supplied — so the app takes one code path either way.
 const LEAGUE_KEYS = ["league","entries","ownership","rosters","freeAgents","matches","standings","picks","me","unjoined","unmappedOwners","counts"];
 ok("draft league keys all present", LEAGUE_KEYS.every((k) => k in L.draft), LEAGUE_KEYS.filter((k) => !(k in L.draft)).join(",") || "");
-// The shipped snapshot must carry no league id — Kwezi's is unknown and inventing one is a
-// ledger offence. Any other file may legitimately carry a real league, so it is only checked
-// for shape.
+// The shipped snapshot carries exactly the league the manager supplied in state/kwezi.json — null
+// while he has supplied none, his league once he has — and never one invented here (E-125: this
+// used to assert null outright, a photograph of the day the id was unknown). When a league is
+// present, his own entry must be found in it by the entry id he supplied. Any other file may
+// legitimately carry another league, so it is only checked for shape.
 const SHIPPED = path.resolve(file) === path.resolve(path.join(__dirname, "live.json"));
-if (SHIPPED) ok("draft league_id null in the shipped snapshot", L.draft.league_id === null, String(L.draft.league_id));
+if (SHIPPED) {
+  let saved = null;
+  try { saved = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "state", "kwezi.json"), "utf8")).draft || null; } catch (e) { saved = null; }
+  const want = saved && Number.isInteger(saved.league_id) ? saved.league_id : null;
+  ok("draft league_id in the shipped snapshot is the one state/kwezi.json supplies", L.draft.league_id === want, String(L.draft.league_id) + " vs state " + String(want));
+  if (want !== null) ok("the manager's own entry is found in the shipped league by the entry id he supplied",
+    !!L.draft.me && saved && L.draft.me.entryId === saved.entry_id && L.draft.entries.some((e) => e.leagueEntryId === L.draft.me.leagueEntryId),
+    JSON.stringify(L.draft.me) + " vs state entry " + (saved ? saved.entry_id : "none"));
+}
 else ok("draft league_id is null or a positive integer", L.draft.league_id === null || (Number.isInteger(L.draft.league_id) && L.draft.league_id > 0), String(L.draft.league_id));
 if (L.draft.league_id === null) {
   // frozen-ok: zero is emptiness, not a count. This asserts the shape the snapshot carries when

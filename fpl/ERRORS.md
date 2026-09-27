@@ -1306,3 +1306,58 @@ number once; it never supplies one (CLAUDE.md Part N; spec §6 forbids screensho
 TEST: `qa/prices.cjs` 12/12 — the fifteen against the reference's recorded numbers, a synthetic buy after a rise
 where the transfer log must win over the start price, the half-rise arithmetic at every boundary, and each of the
 four arithmetic rules broken in turn (the price paid ignored leaves 3 of 15 wrong).
+
+### E-125 · v110 · the live validator pinned the Draft league id to null after the manager had supplied it (E-084's class)
+CAUSE: `data/validate_live.cjs` asserted "draft league_id null in the shipped snapshot" because, when it was
+written, the manager's league id was unknown and inventing one would have been a ledger offence. On 27 Sep the
+Draft ground truth landed (commit ade4ca4: `state/kwezi.json` gained league 46148 and entry 279275), but
+`data/live.json` was not re-fetched, and the check kept passing on a snapshot that no longer agreed with the state
+it was supposed to reflect. It could not see the disagreement because it compared the snapshot with a remembered
+fact rather than with the file that holds the fact.
+CAUGHT: 27 Sep 2026, the refresh: `npm run fetch` read the saved league from the state and wrote it into the
+snapshot (8 teams, 547 free agents, the manager's entry found by entry id), and the validator went red 86/87 on
+the first honest snapshot since the league was supplied.
+RULE: a check on a value the manager supplies reads it from where he supplied it. The shipped snapshot's league id
+must equal `state/kwezi.json` `draft.league_id` (null while there is none), and when a league is present the
+manager's own entry must be found in it by the entry id he supplied. Nothing is invented and nothing is pinned.
+TEST: `node data/validate_live.cjs` 88/88 on today's snapshot; the 26 Sep snapshot (league_id null) now goes red
+on both new checks (85/87: "null vs state 46148", "null vs state entry 279275").
+THE SAME PHOTOGRAPH IN FOUR MORE PLACES, found by running the suites on the first snapshot with the league in it:
+`qa/verify.sh` I15 required `league_id === null` (now: equal to the state's, the league present and his entry found
+when there is one, every field empty when there is none); `qa/unit_engine.cjs` built its "without a league" context
+from the shipped snapshot (two reds: hasPool true "without a league"), now built explicitly from the fetcher's own
+`emptyDraftLeague()` with the state's ids cleared; `qa/smoke_wk.cjs` check 36 rendered the shipped app and demanded
+the "pool unknown" notice (now it branches on the state: without a league the notice and assumed claims, with one
+the league's own free-agent count on screen, no unknown-pool notice and every engine claim labelled api); and
+`qa/components.cjs` rendered TabDraft's no-league branch only because the shipped snapshot happened to have no
+league (`rev-df-eng` missing, 132/133), now a constructed no-league variant renders it every time. After the fixes:
+verify 33/33, unit_engine 266/266, smoke_wk 37/37, components 135/135. A no-league path that only exists because
+of today's data is untested the day the data changes; every suite now builds the case it means to test.
+
+### E-126 · v110 · the Draft claims check measured gains over five gameweeks while the law plans the Draft game to GW20, and a flagged player reached the claims sheet
+CAUSE: two things surfaced together when `pipeline/weekly.cjs` first wrote the v110 claims sheet into the weekly
+block. (1) `qa/smoke_wk.cjs` check 28 accepted a written claim only if it was forced or a gain under
+`src/engine.js` `draftEV`, whose EV is xp5 × P(start) — five gameweeks (CLAUDE.md C5). v110 law §1.2 fixes the
+Draft objective to the re-draft, GW20, read from `league.drafts` (§7.12), and the claims sheet (§5 B7, parity 13/13
+lines against golden) ranks claims to that horizon. On 26 Sep's block the five-week view called seven of thirteen
+sheet lines "no gain" — Hill for Bogle −8.91, Mainoo for Janelt −11.28 — every one a positive gain to GW20 under the
+engine that ranks them. The check was measuring the wrong horizon, and would have failed every sheet the spec asks
+for. (2) The Draft solve's pairs included Mainoo (status d, 75%), and the sheet's backup search could pick him again
+once removed as a first choice: nothing between the solver and the page applied CLAUDE.md D2 ("any flag → the
+recommendation touching that player is re-evaluated before anything else"), which check 28 enforces as status "a".
+CAUGHT: 27 Sep 2026, the first dry run of `pipeline/weekly.cjs` on the 26 Sep block and plan (hash
+d812652812be50a7): eight conflicts printed, seven of them the horizon, one the flag.
+RULE: a check on a decision uses the horizon the law gives that decision. Check 28 now measures the gain with
+`src/mc_engine.js` from the next gameweek to the Draft horizon, still requires every incoming player to be status
+"a", still names every shortfall on screen, and prints the five-week engine's disagreements rather than hiding them.
+It gained two guards the old check never had: the written claims must be the claims sheet line for line, and the
+weekly block, the plan and the baked data must share one content hash, so a stale block is red instead of audited.
+Flags are handled before the sheet is built: `buildClaimSheet(…, { fitOnly: true })` holds a flagged player back as
+first choice and as backup and returns him in `held` with his status; the default path is unchanged, so parity stays
+51/51. `data/weekly.js` and `data/pre.json` make the same call, so the two sheets cannot differ. The fallback path gets
+the same discipline: the optimiser's no-wildcard week is written only when it passes every hard rule the app
+enforces on a written fallback (the Konsa rule, two incoming per club, buys fit and starting, captain and vice in the
+app's eleven, bank not negative), otherwise the app's rule-bound C2 protocol is written and the block says why.
+TEST: `node qa/smoke_wk.cjs` check 28 on the written block; `node qa/parity.cjs` 51/51 with fitOnly added; the 26 Sep
+dry run: twelve claims, Mainoo held back ("d 75%"), zero conflicts, and the fallback switched to the C2 protocol
+because the optimiser's no-wildcard week sold Shaw, whom the Konsa rule protects.

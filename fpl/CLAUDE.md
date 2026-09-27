@@ -452,6 +452,13 @@ point: a rule in a prompt that no function names is a rule nobody applies.
     gone" if its drop has left the roster;
   - **nobody moves to the bottom** after a success;
   - a failed claim is consumed and not retried.
+- **Lodging order.** The claims sheet is built from the Draft solve's pairs (`buildClaimSheet`): each first
+  choice ranked by its gain to the Draft horizon, each backup lodged for the same drop, and the order that lands
+  the most value under the league's own processing kept — the deterministic stress test decides, the Monte Carlo
+  orderings are reported beside it. Lodge exactly the written order.
+- **Flags before claims.** No flagged player is lodged, as a first choice or a backup: the sheet is built with
+  `fitOnly`, the held-back pair is named with its status, and it is re-checked after the Thursday pressers (D2).
+  The gain that justifies a claim is measured to the Draft horizon, never over five gameweeks (E-126).
 - **Re-draft.** Read `league.drafts` from `/api/league/{id}/details`. The unfinished draft's `event`
   is the first gameweek of the new rosters, so the Draft horizon is that gameweek minus one. On this
   league it is event 21, so the horizon is GW20 — read, not assumed (§7.12).

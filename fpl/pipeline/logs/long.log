@@ -1,1 +1,1 @@
-long plan Optimization terminated successfully. (HiGHS Status 7: Optimal) 300.9 s · gap 0.00996010219573766 · total 903.96 · obj 677.51
+long plan Optimization terminated successfully. (HiGHS Status 7: Optimal) 156.1 s · gap 0.009999874953855653 · total 897.08 · obj 672.09 · /home/user/comeback-blueprint/fpl/data/solver_long.json
