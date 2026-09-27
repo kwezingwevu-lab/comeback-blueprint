@@ -1,1 +1,4 @@
 feeds/
+
+# Python bytecode from the solver runs
+__pycache__/

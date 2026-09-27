@@ -1,0 +1,551 @@
+{
+ "snapshot": "2026-09-26T11:33:36.451Z",
+ "note": "Expected points for every player, gameweeks 6–20, are in solver_in.json (tolerance 0.01). Solver totals are time-limited: compare within the stated gap.",
+ "calib": {
+  "ka": 1.5,
+  "kd": 2,
+  "rmse": 0.1685,
+  "anchors": 42,
+  "weeks": [
+   5,
+   6,
+   7
+  ]
+ },
+ "ratings": {
+  "ARS": {
+   "att": 1.2199,
+   "def": 0.5723
+  },
+  "AVL": {
+   "att": 0.8189,
+   "def": 1.2014
+  },
+  "BOU": {
+   "att": 1.0025,
+   "def": 0.9446
+  },
+  "BRE": {
+   "att": 1.121,
+   "def": 0.9478
+  },
+  "BHA": {
+   "att": 1.1718,
+   "def": 1.0419
+  },
+  "CHE": {
+   "att": 1.2085,
+   "def": 1.0536
+  },
+  "COV": {
+   "att": 0.7113,
+   "def": 1.2657
+  },
+  "CRY": {
+   "att": 0.8881,
+   "def": 1.1678
+  },
+  "EVE": {
+   "att": 0.9115,
+   "def": 0.8569
+  },
+  "FUL": {
+   "att": 0.8509,
+   "def": 1.175
+  },
+  "HUL": {
+   "att": 0.7504,
+   "def": 1.1703
+  },
+  "IPS": {
+   "att": 0.9091,
+   "def": 1.3169
+  },
+  "LEE": {
+   "att": 0.9451,
+   "def": 0.9397
+  },
+  "LIV": {
+   "att": 1.2671,
+   "def": 0.8168
+  },
+  "MCI": {
+   "att": 1.5872,
+   "def": 0.8278
+  },
+  "MUN": {
+   "att": 1.3181,
+   "def": 1.0491
+  },
+  "NEW": {
+   "att": 0.932,
+   "def": 1.1037
+  },
+  "NFO": {
+   "att": 0.9475,
+   "def": 0.8193
+  },
+  "TOT": {
+   "att": 0.8216,
+   "def": 1.0425
+  },
+  "SUN": {
+   "att": 1.0352,
+   "def": 1.0269
+  }
+ },
+ "odds": {
+  "6": [
+   {
+    "h": "ARS",
+    "a": "LEE",
+    "lh": 2.14,
+    "la": 0.74
+   },
+   {
+    "h": "HUL",
+    "a": "EVE",
+    "lh": 0.95,
+    "la": 1.33
+   },
+   {
+    "h": "AVL",
+    "a": "BRE",
+    "lh": 1.25,
+    "la": 1.26
+   },
+   {
+    "h": "CHE",
+    "a": "BOU",
+    "lh": 1.82,
+    "la": 1.13
+   },
+   {
+    "h": "SUN",
+    "a": "BHA",
+    "lh": 1.14,
+    "la": 1.22
+   },
+   {
+    "h": "IPS",
+    "a": "FUL",
+    "lh": 1.2,
+    "la": 1.25
+   },
+   {
+    "h": "MUN",
+    "a": "TOT",
+    "lh": 1.83,
+    "la": 1.03
+   },
+   {
+    "h": "CRY",
+    "a": "NFO",
+    "lh": 1.1,
+    "la": 1.1
+   },
+   {
+    "h": "LIV",
+    "a": "MCI",
+    "lh": 1.28,
+    "la": 1.5
+   },
+   {
+    "h": "COV",
+    "a": "NEW",
+    "lh": 1.12,
+    "la": 1.48
+   }
+  ],
+  "7": [
+   {
+    "h": "EVE",
+    "a": "CHE",
+    "lh": 1.14,
+    "la": 1.43
+   },
+   {
+    "h": "BRE",
+    "a": "LIV",
+    "lh": 1.41,
+    "la": 1.48
+   },
+   {
+    "h": "FUL",
+    "a": "HUL",
+    "lh": 1.86,
+    "la": 0.87
+   }
+  ]
+ },
+ "backtest": {
+  "weeks": [
+   3,
+   4,
+   5
+  ],
+  "rho": 0.158,
+  "rhoNaive": 0.098,
+  "starts": 660,
+  "brier": 0.131,
+  "brierNaive": 0.148,
+  "goalsLogLik": -92.4,
+  "goalsLogLikNaive": -92.4,
+  "byPos": {
+   "1": {
+    "n": 60,
+    "ratio": 1.234,
+    "lo": 1.016,
+    "hi": 1.424
+   },
+   "2": {
+    "n": 255,
+    "ratio": 1.152,
+    "lo": 1.049,
+    "hi": 1.253
+   },
+   "3": {
+    "n": 284,
+    "ratio": 1.097,
+    "lo": 1.014,
+    "hi": 1.185
+   },
+   "4": {
+    "n": 61,
+    "ratio": 1.001,
+    "lo": 0.818,
+    "hi": 1.216
+   }
+  },
+  "corrections": {
+   "1": 1.117,
+   "2": 1.076,
+   "3": 1.048,
+   "4": 1
+  }
+ },
+ "classic": {
+  "total": 311,
+  "ftNext": 4,
+  "bank": 1.6,
+  "budget": 99.5,
+  "recon": [
+   {
+    "gw": 1,
+    "reported": 58,
+    "rebuilt": 58
+   },
+   {
+    "gw": 2,
+    "reported": 70,
+    "rebuilt": 70
+   },
+   {
+    "gw": 3,
+    "reported": 50,
+    "rebuilt": 50
+   },
+   {
+    "gw": 4,
+    "reported": 71,
+    "rebuilt": 71
+   },
+   {
+    "gw": 5,
+    "reported": 62,
+    "rebuilt": 62
+   }
+  ],
+  "sim6": {
+   "p10": 36,
+   "p50": 51,
+   "p90": 71
+  },
+  "plan": {
+   "total": 900.54,
+   "gap": 0.0096,
+   "chips": [
+    {
+     "gw": 6,
+     "chip": "wildcard",
+     "captain": "Saka"
+    },
+    {
+     "gw": 7,
+     "chip": "bboost",
+     "captain": "Haaland"
+    },
+    {
+     "gw": 8,
+     "chip": "3xc",
+     "captain": "Haaland"
+    }
+   ],
+   "gw6": {
+    "captain": "Saka",
+    "in": [
+     "Raya",
+     "Tavernier",
+     "Groß",
+     "Tarkowski",
+     "Mykolenko",
+     "Barry",
+     "Stach",
+     "Mbeumo",
+     "Hall",
+     "Murillo",
+     "Gonzalo",
+     "Affengruber"
+    ],
+    "out": [
+     "Diop",
+     "Gabriel",
+     "Shaw",
+     "Rogers",
+     "Brobbey",
+     "Semenyo",
+     "Verbruggen",
+     "van Ewijk",
+     "Szoboszlai",
+     "Hughes",
+     "Calvert-Lewin",
+     "Konsa"
+    ],
+    "bank": 0.5
+   }
+  },
+  "timing": {
+   "now": 900.54,
+   "later": 895.99,
+   "laterGap": 0.01,
+   "laterWildcardGw": 7,
+   "never": 899.13,
+   "neverGap": 0.0029
+  },
+  "freeHit": [
+   {
+    "gw": 10,
+    "gain": 4.86
+   },
+   {
+    "gw": 18,
+    "gain": 4.55
+   },
+   {
+    "gw": 11,
+    "gain": 4.29
+   }
+  ]
+ },
+ "draft": {
+  "horizonEnd": 20,
+  "waiverOrder": [
+   "Sizobona Phambili FC",
+   "Yoh-Nited",
+   "Unique Stars",
+   "Thabz Appeal",
+   "Isak at this game",
+   "Saka Potatoes",
+   "Penderentials FC",
+   "Muggles & Wizards"
+  ],
+  "activity": {
+   "Muggles & Wizards": {
+    "runs": 4,
+    "active": 3,
+    "claims": 5,
+    "won": 0,
+    "free": 2
+   },
+   "Sizobona Phambili FC": {
+    "runs": 4,
+    "active": 4,
+    "claims": 10,
+    "won": 7,
+    "free": 1
+   },
+   "Isak at this game": {
+    "runs": 4,
+    "active": 3,
+    "claims": 5,
+    "won": 4,
+    "free": 3
+   },
+   "Saka Potatoes": {
+    "runs": 4,
+    "active": 4,
+    "claims": 18,
+    "won": 8,
+    "free": 7
+   },
+   "Yoh-Nited": {
+    "runs": 4,
+    "active": 1,
+    "claims": 6,
+    "won": 5,
+    "free": 11
+   },
+   "Penderentials FC": {
+    "runs": 4,
+    "active": 4,
+    "claims": 11,
+    "won": 5,
+    "free": 6
+   },
+   "Thabz Appeal": {
+    "runs": 4,
+    "active": 4,
+    "claims": 11,
+    "won": 6,
+    "free": 6
+   },
+   "Unique Stars": {
+    "runs": 4,
+    "active": 3,
+    "claims": 8,
+    "won": 4,
+    "free": 6
+   }
+  },
+  "h2h6": {
+   "opp": "Isak at this game",
+   "win": 0.553,
+   "draw": 0.029
+  },
+  "solvedRoster": {
+   "value": 667.43,
+   "base": 595.04,
+   "pairs": [
+    "Silva for Dunk",
+    "Mukiele for Davis",
+    "Hill for Bogle",
+    "E.Le Fée for Belloumi",
+    "Cunha for King",
+    "Mainoo for Janelt",
+    "Evanilson for Isidor",
+    "McBurnie for Igor Jesus"
+   ]
+  },
+  "claims": {
+   "strategy": "each backup under its first choice",
+   "valueNow": 595,
+   "mean": 642.9,
+   "p10": 632.3,
+   "p90": 653.5,
+   "worst": 637.2,
+   "ceiling": 667.4,
+   "orderings": [
+    {
+     "name": "all first choices, then backups",
+     "mean": 642
+    },
+    {
+     "name": "each backup under its first choice",
+     "mean": 642.9
+    },
+    {
+     "name": "highest expected gain first",
+     "mean": 641
+    },
+    {
+     "name": "likeliest to land first",
+     "mean": 633.8
+    }
+   ],
+   "sheet": [
+    {
+     "kind": "first",
+     "add": "Silva",
+     "drop": "Dunk",
+     "gain": 36.5,
+     "land": 0.497
+    },
+    {
+     "kind": "backup",
+     "add": "Schuster",
+     "drop": "Dunk",
+     "gain": 26.6,
+     "land": 0.503
+    },
+    {
+     "kind": "first",
+     "add": "Evanilson",
+     "drop": "Isidor",
+     "gain": 21.8,
+     "land": 0.725
+    },
+    {
+     "kind": "backup",
+     "add": "Fernandez-Pardo",
+     "drop": "Isidor",
+     "gain": 8.8,
+     "land": 0.273
+    },
+    {
+     "kind": "first",
+     "add": "Mukiele",
+     "drop": "Davis",
+     "gain": 15.9,
+     "land": 0.043
+    },
+    {
+     "kind": "backup",
+     "add": "Justin",
+     "drop": "Davis",
+     "gain": 11,
+     "land": 0.744
+    },
+    {
+     "kind": "first",
+     "add": "E.Le Fée",
+     "drop": "Belloumi",
+     "gain": 14.4,
+     "land": 0.07
+    },
+    {
+     "kind": "backup",
+     "add": "Buendía",
+     "drop": "Belloumi",
+     "gain": 10.6,
+     "land": 0.81
+    },
+    {
+     "kind": "first",
+     "add": "Hill",
+     "drop": "Bogle",
+     "gain": 12.7,
+     "land": 0.192
+    },
+    {
+     "kind": "backup",
+     "add": "Thomas",
+     "drop": "Bogle",
+     "gain": 6.3,
+     "land": 0.808
+    },
+    {
+     "kind": "first",
+     "add": "McBurnie",
+     "drop": "Igor Jesus",
+     "gain": 11.6,
+     "land": 0.697
+    },
+    {
+     "kind": "first",
+     "add": "Cunha",
+     "drop": "King",
+     "gain": 6.6,
+     "land": 0.138
+    },
+    {
+     "kind": "first",
+     "add": "Mainoo",
+     "drop": "Janelt",
+     "gain": 1.8,
+     "land": 0.551
+    }
+   ]
+  },
+  "waiverLogReplication": "74 of 74 claim results in d_tx.json, gameweeks 2–5"
+ }
+}

@@ -46,7 +46,9 @@ const ok = (name, cond, detail) => {
    data; the rule is about rivals. Anything else in reference/ is a rival feed and is scrubbed. */
 const OWN_ENTRY_FEEDS = new Set([
   "reference/v109/live/entry.json",
-  "reference/v109/live/dentry.json"
+  "reference/v109/live/dentry.json",
+  "reference/v111/live/entry.json",     // the same two files in the v111 kit tree (added 27 Sep 2026)
+  "reference/v111/live/dentry.json"
 ]);
 
 /* Directories that never hold committed data. node_modules is vendored; reference/v110 is the
