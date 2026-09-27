@@ -1,6 +1,10 @@
 # CHANGELOG.md — what has shipped (newest first)
 
 ## 2026-09-27 (week 3)
+- New-PR badge on Home (every all-time best from the last 7 days, gain over the previous best, tap to open it in Track).
+- Week card: the Weekly Review draws the week as a 1080×1350 image (sessions, weight + rate, waist, PRs, 28-day weight line, verdict, lean model) and shares or saves it.
+- Body Lab follows the user's own arm, chest and thigh tapes once a group has two readings 21+ days apart (girth ÷ 2π, model fat change removed); the rest stays on the model; the card says which.
+- Gates: Chromium 299/299 · PWA 16/16 · WebKit 29/29 · calendar helper 8/8.
 - Independent review of everything since the unzip; eight defects confirmed with reproductions and fixed:
   - home progression now uses the home prescription (10–20, 12–20, 15–25), not the gym range;
   - bodyweight sets logged with reps only now get Next cards, Track lines, PRs and stall checks (load = weigh-in nearest that day + added kg; labels read "12×BW");

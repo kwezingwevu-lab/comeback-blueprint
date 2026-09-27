@@ -68,7 +68,7 @@ Never edit `dist/` directly. Never use `re.sub` with replacements containing `\u
 - Storage: `DB` (profile, sessions, weight, measure, lifts, sleep, rhr, steps), `DB.save()` → `persist()` per key + `cloudQueue()` → IndexedDB mirror (`idbSave`) + Claude account mirror when `cloudOK()`; `idbBoot()`/`cloudBoot()` restore on empty; `backupJSON()`/`applyRestoreText()`; `shareBackup()` (Web Share → iCloud Drive/Google Drive), `downloadBackup()`; keys listed in the `BACKUP_KEYS` array inside `backupJSON` — add every new key there.
 - Watch import: `importHealthText()` accepts Shortcut lines (`date,weight|sleep|rhr|steps,value`), Garmin CSV (auto-detected header), or JSON.
 - Progression and history: `e1rm()` (singles = load), `E1RM_MAXREPS` (10), `exKey()/splitKey()/exLabel()` (history keyed "id@gym|home"), `loggedExKeys()`, `exHistory(key)`, `prEvents()`, `isStalled()` (3 non-deload exposures, rep-PR escape, RPE≤7 = under-effort), `deloadWks()`, `progFor(e,beforeISO,loc)` (add load / reps / hold / missed-rep back-off / stall reset).
-- Visuals: `lineChart()` + `monoPath()` + `chartScrub()` (data-pts on every chart); Body Lab `BL`, `BL_FS` (shader), `blSeries()`, `blShape()`, `blDraw(fine)`, `blMount()`, `bodyLabHTML()`, test hook `blProbe()`; `cb2_blmode`.
+- Visuals: `lineChart()` + `monoPath()` + `chartScrub()` (data-pts on every chart); Body Lab `BL`, `BL_FS` (shader), `blSeries()`, `blShape()`, `blDraw(fine)`, `blMount()`, `bodyLabHTML()`, `blTapes()`/`blTapeNote()` (uniform `uMV` = arms/chest/legs scales), `prBadgeHTML()`, `weekCardCanvas()`/`openWeekCard()`, test hook `blProbe()`; `cb2_blmode`.
 - Platform: `pwaInit()`, `pwaStatus()`, `routeFromHash()` (`#view`, `#import=`), wake lock (`wakeOn`), `beep()`, voice cue (`say`, `cb2_voice`), `phoneCapsRender()`, `icsText()`/`downloadICS()`, coach pack (`coachText`, `askClaudeText`).
 - Events: every `RACES_12M` entry carries `src` (shown under the chip); `tools/calendar_refresh.js` makes the approval report.
 
@@ -116,11 +116,9 @@ Never edit `dist/` directly. Never use `re.sub` with replacements containing `\u
 
 ## 9. Backlog (candidates, in rough value order)
 
-Shipped from the earlier list (do not rebuild): run-era copy retired; hosted PWA + service worker; e1RM charts and PR badges; auto-progression; DEXA import; calendar refresh helper; peak-week and check-day reminders (via the .ics file); coach export. Full register with decisions and deferrals: `IMPROVEMENTS.md`.
+Shipped (do not rebuild): PR badge, week card, tape-driven Body Lab; run-era copy retired; hosted PWA + service worker; e1RM charts and PR badges; auto-progression; DEXA import; calendar refresh helper; peak-week and check-day reminders (via the .ics file); coach export. Full register with decisions and deferrals: `IMPROVEMENTS.md`.
 
 - Three open decisions for the user (band rate 0.42 vs 0.47; the +6 cm route vs the +5 cm brake; automatic Mini-Cut I). Apply only what the user chooses; surface the numbers each time.
-- Body Lab per-muscle growth from the user's own tape readings (chest, arm, thigh), replacing the model once several weeks of tapes exist.
-- New-PR badge on Home and a shareable weekly summary card.
 - Monthly calendar re-check: run `tools/calendar_refresh.js --geocode` and put the report in front of the user; it never edits the app.
 - Real-iPhone timing of Body Lab and the .ics import (the user reports; tune only on evidence).
 

@@ -662,6 +662,7 @@ function renderHome(){
   </div>
   ${started?`<div class="compbar"><div class="compcard lift"><div class="cc-top"><span class="cc-l">Lifts this week</span><span class="cc-v">${comp.lifts}/6</span></div><div class="dots">${liftDots}</div></div><div class="compcard run"><div class="cc-top"><span class="cc-l">Weigh-ins this week</span><span class="cc-v">${wiCount}/3</span></div><div class="dots">${runDots}</div></div></div>`:""}
   
+  ${prBadgeHTML()}
   ${quickLogHTML()}
   ${milestoneCardHTML()}
   <div class="eyebrow">${started?"Today — "+todayDow:"First Session — "+fsDow+" "+fmtDM(START_ISO)}</div>
@@ -1682,7 +1683,7 @@ function weeklyReviewHTML(){
     <div class="dose"><div class="dn">Gain rate</div><div class="dv">${r.rate==null?"\u2014":(r.rate>=0?"+":"")+f(r.rate,2)}<small>kg/wk \u00b7 target +${f(r.target,2)}</small></div></div>
     <div class="dose"><div class="dn">PRs / stalls</div><div class="dv">${r.prs}/${r.stalls}<small>all-time bests / 3-session stalls</small></div></div>
   </div>
-  <div class="verdict ${r.cls}" style="margin-top:10px"><b>Verdict:</b> ${r.verdict}</div>${(()=>{const ws=weekStartISO(r.wk),prw=prEvents(ws).filter(x=>x.date<dateAdd(ws,7));return prw.length?`<div class="calc-note" id="reviewPRs" style="margin-top:8px"><b>All-time bests this week:</b> ${prw.map(x=>exLabel(x.key)+" "+Math.round(x.e)+" kg").join(" · ")}</div>`:"";})()}</div>`;
+  <div class="verdict ${r.cls}" style="margin-top:10px"><b>Verdict:</b> ${r.verdict}</div>${(()=>{const ws=weekStartISO(r.wk),prw=prEvents(ws).filter(x=>x.date<dateAdd(ws,7));return prw.length?`<div class="calc-note" id="reviewPRs" style="margin-top:8px"><b>All-time bests this week:</b> ${prw.map(x=>exLabel(x.key)+" "+Math.round(x.e)+" kg").join(" · ")}</div>`:"";})()}<button class="btn btn-ghost wk-btn" id="wkCardBtn" onclick="openWeekCard()">Share this week as an image</button></div>`;
 }
 function currentBlock(){const w=roadmapWeekNow();
   if(w<=16)return {name:"Base block",span:"weeks 1\u201316",i:w,n:16,focus:"Every muscle twice a week. The muscle-memory window \u2014 the fastest gains of the whole arc happen here."};
@@ -2047,6 +2048,52 @@ function awakeRowRender(){const el=document.getElementById("awakeRow");if(!el)re
 function onViewChange(n){_curView=n;if(n!=="roadmap"&&typeof BL!=="undefined")BL.play=false;if(n==="lift"){awakeRowRender();wakeOn();}else if(_wl)wakeOff();}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&_curView==="lift")wakeOn();});
 function restTick(){_restLeft=Math.max(0,Math.ceil((_restEnd-nowMs())/1000));renderRest();if(_restLeft<=0){clearInterval(_restInt);_restInt=null;beep();if(_voiceOn)say("Rest over. Next set.");if(navigator.vibrate){try{navigator.vibrate([120,60,120]);}catch(e){}}setTimeout(()=>{const b=document.getElementById("restTimer");if(b&&_restLeft<=0)b.classList.remove("show");},2200);}}
+/* ===== PR BADGE + WEEK CARD (2026-09-27) =====
+   Home shows every all-time best from the last seven days (tap one to open its line in Track). The Weekly Review
+   draws this week as a 1080×1350 image from the log itself — sessions, weight, waist, PRs, a 28-day weight line
+   and the verdict — then shares it through the share sheet or saves it. Nothing on it is typed by hand. */
+var TROPHY_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>';
+function prDelta(key,date){const h=exHistory(key),i=h.findIndex(x=>x.date===date&&x.pr);if(i<1)return null;return h[i].e-Math.max(...h.slice(0,i).map(x=>x.e));}
+function prBadgeHTML(){if(!planStarted())return "";const prs=prEvents(dateAdd(todayISO(),-6));if(!prs.length)return "";
+  return `<div class="pr-badge" id="prBadge" role="status"><div class="prb-ic">${TROPHY_SVG}</div><div class="prb-t"><b>${prs.length===1?"New PR this week":prs.length+" new PRs this week"}</b>${prs.slice(0,3).map(x=>{const d=prDelta(x.key,x.date),dy=DOW[new Date(x.date+"T12:00:00").getDay()];return `<button class="prb-row" data-exkey="${x.key}" aria-label="Open ${exLabel(x.key)} in Track"><span>${exLabel(x.key)}</span><em><i class="prb-v">${Math.round(x.e)} kg ${x.top.r>E1RM_MAXREPS?"index":"e1RM"}</i>${d!=null&&d>0.05?`<i class="prb-d">+${d.toFixed(1)} kg</i>`:""}<i class="prb-s">${topTxt(x.top)} · ${dy} ${fmtShort(x.date)}</i></em></button>`;}).join("")}${prs.length>3?`<small>+${prs.length-3} more on the Track PR board</small>`:""}</div></div>`;}
+document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest(".prb-row[data-exkey]");if(!b)return;curEx=b.dataset.exkey;persist("cb2_curex",curEx);switchView("track");const t=document.querySelector('.track-tabs button[data-tp="lifts"]');if(t)t.click();});
+function cvWrap(g,t,x,y,maxW,lh,maxLines){const w=String(t).split(/\s+/);let line="",n=0;for(let i=0;i<w.length;i++){const test=line?line+" "+w[i]:w[i];if(g.measureText(test).width>maxW&&line){if(n===maxLines-1){while(line.length&&g.measureText(line+"…").width>maxW)line=line.slice(0,-1);g.fillText(line+"…",x,y+n*lh);return n+1;}g.fillText(line,x,y+n*lh);n++;line=w[i];}else line=test;}if(line){g.fillText(line,x,y+n*lh);n++;}return n;}
+function cvRR(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+function cvFit(g,t,maxW){let s=String(t);while(s.length>1&&g.measureText(s).width>maxW)s=s.slice(0,-2)+"…";return s;}
+function weekCardCanvas(){const r=weeklyReview(),ws=weekStartISO(r.wk),we=dateAdd(ws,7),W=1080,H=1350,P=72,c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d");
+  const F=(wt,px,f)=>wt+" "+px+"px "+(f==="m"?"'IBM Plex Mono',ui-monospace,Menlo,monospace":f==="d"?"'Space Grotesk',-apple-system,system-ui,sans-serif":"Manrope,-apple-system,system-ui,sans-serif");
+  let gr=g.createLinearGradient(0,0,0,H);gr.addColorStop(0,"#0F1320");gr.addColorStop(1,"#06080D");g.fillStyle=gr;g.fillRect(0,0,W,H);
+  const glow=(x,y,rad,col)=>{const q=g.createRadialGradient(x,y,0,x,y,rad);q.addColorStop(0,col);q.addColorStop(1,"rgba(0,0,0,0)");g.fillStyle=q;g.fillRect(0,0,W,H);};glow(W*0.86,110,640,"rgba(255,197,61,0.20)");glow(60,H-60,560,"rgba(63,216,200,0.10)");
+  g.strokeStyle="rgba(255,255,255,0.03)";g.lineWidth=1;for(let x=0;x<=W;x+=60){g.beginPath();g.moveTo(x+0.5,0);g.lineTo(x+0.5,H);g.stroke();}for(let y=0;y<=H;y+=60){g.beginPath();g.moveTo(0,y+0.5);g.lineTo(W,y+0.5);g.stroke();}
+  g.textBaseline="alphabetic";g.fillStyle="#FFC53D";g.font=F(600,26,"m");g.fillText("THE COMEBACK BLUEPRINT",P,104);
+  g.fillStyle="#F3F5FA";g.font=F(700,138,"d");g.fillText("Week "+r.wk,P,246);
+  g.fillStyle="#A9B3C7";g.font=F(500,34,"b");g.fillText(fmtDMY(ws)+" – "+fmtDMY(dateAdd(we,-1))+(r.wk<planWeek()?" · final":" · so far"),P,300);
+  const T=[["Sessions",r.lifts+"/6",r.wi+" weigh-in"+(r.wi===1?"":"s")],["Weight",r.avgNow!=null?r.avgNow.toFixed(1)+" kg":"—",r.rate!=null?(r.rate>=0?"+":"")+r.rate.toFixed(2)+" kg/wk · target +"+r.target.toFixed(2):"week average"],["Waist",r.waistD!=null?(r.waistD>=0?"+":"")+r.waistD.toFixed(1)+" cm":"—","since the first tape"],["PRs",String(r.prs),"all-time bests"]];
+  const tw=(W-P*2-24)/2,th=172;T.forEach((t,i)=>{const x=P+(i%2)*(tw+24),y=340+Math.floor(i/2)*(th+24);cvRR(g,x,y,tw,th,26);g.fillStyle="rgba(255,255,255,0.045)";g.fill();g.strokeStyle=i===3&&r.prs?"rgba(255,197,61,0.55)":"rgba(255,255,255,0.10)";g.lineWidth=2;g.stroke();
+    g.fillStyle="#8A96B0";g.font=F(600,24,"m");g.fillText(t[0].toUpperCase(),x+30,y+50);g.fillStyle=i===3&&r.prs?"#FFC53D":"#F3F5FA";g.font=F(700,66,"d");g.fillText(cvFit(g,t[1],tw-60),x+30,y+122);g.fillStyle="#8A96B0";g.font=F(500,24,"b");g.fillText(cvFit(g,t[2],tw-60),x+30,y+154);});
+  let y=340+2*(th+24)+34;
+  const pts=[...DB.weight].filter(x=>+x.v>0&&x.date<we&&x.date>=dateAdd(we,-28)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  g.fillStyle="#8A96B0";g.font=F(600,24,"m");g.fillText("BODYWEIGHT · LAST 28 DAYS",P,y);if(pts.length){g.textAlign="right";g.fillStyle="#F3F5FA";g.font=F(700,28,"m");g.fillText((+pts[pts.length-1].v).toFixed(1)+" kg · "+pts.length+" weigh-in"+(pts.length===1?"":"s"),W-P,y);g.textAlign="left";}y+=20;const ch=180,cw=W-P*2;cvRR(g,P,y,cw,ch,22);g.fillStyle="rgba(255,255,255,0.03)";g.fill();
+  if(pts.length>=2){const vs=pts.map(x=>+x.v),lo=Math.min(...vs)-0.3,hi=Math.max(...vs)+0.3,d0=pts[0].date,span=Math.max(1,dayDiff(d0,pts[pts.length-1].date));
+    const XY=pts.map(x=>[P+24+(cw-48)*dayDiff(d0,x.date)/span,y+22+(ch-50)*(1-(+x.v-lo)/(hi-lo))]);let path=null;try{path=new Path2D(monoPath(XY));}catch(e){}
+    if(path){const fill=new Path2D(monoPath(XY)+" L"+XY[XY.length-1][0].toFixed(1)+" "+(y+ch-8)+" L"+XY[0][0].toFixed(1)+" "+(y+ch-8)+" Z");const fg=g.createLinearGradient(0,y,0,y+ch);fg.addColorStop(0,"rgba(255,197,61,0.30)");fg.addColorStop(1,"rgba(255,197,61,0)");g.fillStyle=fg;g.fill(fill);g.strokeStyle="#FFC53D";g.lineWidth=5;g.lineCap="round";g.lineJoin="round";g.stroke(path);}
+    const L=XY[XY.length-1];g.fillStyle="rgba(255,197,61,0.25)";g.beginPath();g.arc(L[0],L[1],18,0,Math.PI*2);g.fill();g.fillStyle="#FFC53D";g.beginPath();g.arc(L[0],L[1],9,0,Math.PI*2);g.fill();}
+  else{g.fillStyle="#8A96B0";g.font=F(500,28,"b");g.fillText("Two weigh-ins and the line starts.",P+30,y+ch/2+10);}
+  y+=ch+58;const prw=prEvents(ws).filter(x=>x.date<we).slice(0,3);g.fillStyle="#8A96B0";g.font=F(600,24,"m");g.fillText(prw.length?"ALL-TIME BESTS THIS WEEK":"ALL-TIME BESTS",P,y);y+=46;
+  if(prw.length)prw.forEach(x=>{g.fillStyle="#FFC53D";g.font=F(700,30,"m");g.textAlign="right";g.fillText(Math.round(x.e)+" kg",W-P,y);g.textAlign="left";g.fillStyle="#F3F5FA";g.font=F(600,30,"b");g.fillText(cvFit(g,exLabel(x.key)+" · "+topTxt(x.top),W-P*2-190),P,y);y+=46;});
+  else{g.fillStyle="#A9B3C7";g.font=F(500,28,"b");g.fillText("None this week — beat last week's reps.",P,y);y+=46;}
+  y+=18;g.fillStyle="#F3F5FA";g.font=F(600,31,"b");cvWrap(g,r.verdict,P,y,W-P*2,42,Math.max(1,Math.min(3,Math.floor((H-110-y)/42))));
+  g.strokeStyle="rgba(255,255,255,0.10)";g.lineWidth=2;g.beginPath();g.moveTo(P,H-92);g.lineTo(W-P,H-92);g.stroke();const cc=compute();
+  g.fillStyle="#8A96B0";g.font=F(500,22,"m");g.fillText(cvFit(g,"Lean ≈ "+cc.leanNow.toFixed(1)+" kg (model) · FFMI-25 ceiling "+cc.ceilLean.toFixed(1)+" kg · natural",W-P*2),P,H-52);return c;}
+function dataURLFile(url,name){const b=atob(url.split(",")[1]),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return new File([a],name,{type:"image/png"});}
+function openWeekCard(){const r=weeklyReview();let url;try{url=weekCardCanvas().toDataURL("image/png");}catch(e){toast("Couldn’t draw the card in this browser");return;}
+  const name="ComebackBlueprint-week-"+r.wk+".png",opener=document.activeElement;let m=document.getElementById("wkModal");if(m)m.remove();m=document.createElement("div");m.id="wkModal";m.className="wk-modal";m.setAttribute("role","dialog");m.setAttribute("aria-modal","true");m.setAttribute("aria-label","Week "+r.wk+" card");
+  m.innerHTML=`<div class="wk-sheet"><img id="wkImg" src="${url}" alt="Week ${r.wk}: ${r.lifts} of 6 sessions, ${r.prs} all-time bests. ${escHTML(r.verdict)}"><div class="wk-actions"><button class="btn btn-gold" id="wkShare">Share</button><button class="btn" id="wkSave">Save image</button><button class="btn" id="wkClose">Close</button></div></div>`;
+  document.body.appendChild(m);const close=()=>{m.remove();document.removeEventListener("keydown",esc);try{opener&&opener.focus&&opener.focus();}catch(_){}};const esc=e=>{if(e.key==="Escape")close();};document.addEventListener("keydown",esc);
+  const save=()=>{try{const a=document.createElement("a");a.href=URL.createObjectURL(dataURLFile(url,name));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{try{URL.revokeObjectURL(a.href);a.remove();}catch(_){}},2000);toast("Card saved — find it in Files or Downloads",true);}catch(e){toast("Couldn’t save the image here");}};
+  m.addEventListener("click",e=>{if(e.target===m)close();});document.getElementById("wkClose").addEventListener("click",close);document.getElementById("wkSave").addEventListener("click",save);
+  document.getElementById("wkShare").addEventListener("click",()=>{const f=dataURLFile(url,name);try{if(navigator.canShare&&navigator.canShare({files:[f]})&&navigator.share){navigator.share({files:[f],title:"Week "+r.wk}).then(()=>toast("Shared ✓",true)).catch(e=>{if(!e||e.name!=="AbortError")save();});return;}}catch(e){}save();});
+  const sb=document.getElementById("wkShare");if(sb)sb.focus();}
 /* ===== BODY LAB (2026-09-26): 3D + time. A real-time WebGL render of the plan's body, week by week =====
    Signed-distance anatomy (smooth-blended ellipsoids and tapered limbs) ray-marched on the phone's GPU: wrap-lit satin
    material, crease shading that deepens as body fat drops, ambient occlusion, a soft contact shadow, ACES tone mapping
@@ -2058,45 +2105,45 @@ function restTick(){_restLeft=Math.max(0,Math.ceil((_restEnd-nowMs())/1000));ren
 var BL={cv:null,gl:null,pr:null,u:{},yaw:0.55,pitch:0.1,zoom:1,wk:null,mode:"form",play:false,raf:0,moving:0,drag:null,ok:null,why:"",ser:null,serK:"",heat:[0,0,0,0,0,0,0],lost:false,frames:0,ms:0,q:1};
 var BL_REG=["quads","hamstrings","glutes","calves","lower back","mid back","upper back"];
 var BL_FS=`precision highp float;
-uniform vec2 uR;uniform float uYaw,uPit,uZoom,uM,uFat,uWaist,uDef,uMode,uM0,uFat0,uWaist0;uniform float uH[7];
+uniform vec2 uR;uniform vec3 uMV;uniform float uYaw,uPit,uZoom,uFat,uWaist,uDef,uMode,uM0,uFat0,uWaist0;uniform float uH[7];
 float sdE(vec3 p,vec3 r){float k0=length(p/r),k1=length(p/(r*r));return k0*(k0-1.0)/max(k1,1e-5);}
 float sdRC(vec3 p,vec3 a,vec3 b,float r1,float r2){vec3 ba=b-a;float l2=dot(ba,ba),rr=r1-r2,a2=l2-rr*rr,il2=1.0/l2;vec3 pa=p-a;float y=dot(pa,ba),z=y-l2;vec3 xv=pa*l2-ba*y;float x2=dot(xv,xv),y2=y*y*l2,z2=z*z*l2,k=sign(rr)*rr*rr*x2;
  if(sign(z)*a2*z2>k)return sqrt(x2+z2)*il2-r2;if(sign(y)*a2*y2<k)return sqrt(x2+y2)*il2-r1;return (sqrt(x2*a2*il2)+y*rr)*il2-r1;}
 float smin(float a,float b,float k){float h=clamp(0.5+0.5*(b-a)/k,0.0,1.0);return mix(b,a,h)-k*h*(1.0-h);}
 vec4 D;float HM;
 void U(float d,float id,float k,float gr){if(d<HM){HM=d;D.y=id;}float h=clamp(0.5+0.5*(d-D.x)/k,0.0,1.0),s=mix(d,D.x,h)-k*h*(1.0-h);D.z+=max(min(D.x,d)-s,0.0);D.w=mix(gr,D.w,h);D.x=s;}
-vec4 body(vec3 p,float m,float fat,float waist){
- vec3 q=vec3(abs(p.x),p.y,p.z);D=vec4(1e3,0.0,0.0,0.0);HM=1e3;float k=0.022+fat*1.6,mr=m;
+vec4 body(vec3 p,vec3 M,float fat,float waist){
+ vec3 q=vec3(abs(p.x),p.y,p.z);D=vec4(1e3,0.0,0.0,0.0);HM=1e3;float k=0.022+fat*1.6;
  U(sdE(p-vec3(0.0,1.64,0.012),vec3(0.077,0.104,0.091)),0.0,0.01,0.0);
  U(sdE(p-vec3(0.0,1.572,0.03),vec3(0.058,0.05,0.066)),0.0,0.03,0.0);
- U(sdRC(p,vec3(0.0,1.46,-0.008),vec3(0.0,1.57,0.004),0.06*mr,0.05),0.0,0.03,(m-uM0)*0.0600);
- U(sdRC(q,vec3(0.0,1.525,-0.035),vec3(0.155,1.455,-0.035),0.046*mr,0.03*mr),7.0,0.04,(m-uM0)*0.0380);
- U(sdE(p-vec3(0.0,1.3,-0.004),vec3(0.158*mr,0.17,0.1)),0.0,k,(m-uM0)*0.1580);
- U(sdE(p-vec3(0.0,1.345,-0.07),vec3(0.125*mr,0.1,0.042*mr)),7.0,k,(m-uM0)*0.0835);
- U(sdE(q-vec3(0.1,1.235,-0.045),vec3(0.082*mr,0.135,0.058*mr)),6.0,k,(m-uM0)*0.0700);
- U(sdE(q-vec3(0.078,1.336,0.066),vec3(0.092*mr,0.052*mr,0.03*mr)),0.0,k,(m-uM0)*0.0580);
- U(sdRC(q,vec3(0.0,1.445,-0.012),vec3(0.175,1.432,-0.012),0.052*mr,0.048*mr),0.0,k,(m-uM0)*0.0500);
- U(sdE(q-vec3(0.205,1.415,0.0),vec3(0.062*mr,0.068*mr,0.064*mr)),0.0,k,(m-uM0)*0.0647);
+ U(sdRC(p,vec3(0.0,1.46,-0.008),vec3(0.0,1.57,0.004),0.06*M.y,0.05),0.0,0.03,(M.y-uM0)*0.0600);
+ U(sdRC(q,vec3(0.0,1.525,-0.035),vec3(0.155,1.455,-0.035),0.046*M.y,0.03*M.y),7.0,0.04,(M.y-uM0)*0.0380);
+ U(sdE(p-vec3(0.0,1.3,-0.004),vec3(0.158*M.y,0.17,0.1)),0.0,k,(M.y-uM0)*0.1580);
+ U(sdE(p-vec3(0.0,1.345,-0.07),vec3(0.125*M.y,0.1,0.042*M.y)),7.0,k,(M.y-uM0)*0.0835);
+ U(sdE(q-vec3(0.1,1.235,-0.045),vec3(0.082*M.y,0.135,0.058*M.y)),6.0,k,(M.y-uM0)*0.0700);
+ U(sdE(q-vec3(0.078,1.336,0.066),vec3(0.092*M.y,0.052*M.y,0.03*M.y)),0.0,k,(M.y-uM0)*0.0580);
+ U(sdRC(q,vec3(0.0,1.445,-0.012),vec3(0.175,1.432,-0.012),0.052*M.y,0.048*M.y),0.0,k,(M.y-uM0)*0.0500);
+ U(sdE(q-vec3(0.205,1.415,0.0),vec3(0.062*M.y,0.068*M.y,0.064*M.y)),0.0,k,(M.y-uM0)*0.0647);
  U(sdE(p-vec3(0.0,1.08,0.0),vec3(0.122+waist,0.16,0.082+waist*1.1)),0.0,k*1.3,0.0);
  U(sdE(q-vec3(0.045,1.13,0.058),vec3(0.042,0.085,0.022+waist*0.5)),0.0,0.03,0.0);
- U(sdRC(q,vec3(0.036,0.985,-0.07),vec3(0.042,1.2,-0.078),0.03*mr,0.024*mr),5.0,k,(m-uM0)*0.0270);
+ U(sdRC(q,vec3(0.036,0.985,-0.07),vec3(0.042,1.2,-0.078),0.03*M.y,0.024*M.y),5.0,k,(M.y-uM0)*0.0270);
  U(sdE(p-vec3(0.0,0.93,0.0),vec3(0.152+waist*0.6,0.1,0.098+waist*0.4)),0.0,k,0.0);
- U(sdE(q-vec3(0.075,0.9,-0.063),vec3(0.079*mr,0.085*mr,0.068*mr)),3.0,k,(m-uM0)*0.0773);
- U(sdRC(q,vec3(0.203,1.382,-0.004),vec3(0.236,1.118,0.0),0.047*mr,0.035*mr),0.0,k,(m-uM0)*0.0410);
- U(sdE(q-vec3(0.217,1.255,0.023),vec3(0.034*mr,0.072,0.034*mr)),0.0,k,(m-uM0)*0.0340);
- U(sdE(q-vec3(0.225,1.275,-0.03),vec3(0.035*mr,0.082,0.036*mr)),0.0,k,(m-uM0)*0.0355);
- U(sdRC(q,vec3(0.238,1.09,0.0),vec3(0.262,0.852,0.022),0.038*mr,0.025),0.0,k,(m-uM0)*0.0380);
+ U(sdE(q-vec3(0.075,0.9,-0.063),vec3(0.079*M.z,0.085*M.z,0.068*M.z)),3.0,k,(M.z-uM0)*0.0773);
+ U(sdRC(q,vec3(0.203,1.382,-0.004),vec3(0.236,1.118,0.0),0.047*M.x,0.035*M.x),0.0,k,(M.x-uM0)*0.0410);
+ U(sdE(q-vec3(0.217,1.255,0.023),vec3(0.034*M.x,0.072,0.034*M.x)),0.0,k,(M.x-uM0)*0.0340);
+ U(sdE(q-vec3(0.225,1.275,-0.03),vec3(0.035*M.x,0.082,0.036*M.x)),0.0,k,(M.x-uM0)*0.0355);
+ U(sdRC(q,vec3(0.238,1.09,0.0),vec3(0.262,0.852,0.022),0.038*M.x,0.025),0.0,k,(M.x-uM0)*0.0380);
  U(sdE(q-vec3(0.268,0.785,0.026),vec3(0.024,0.066,0.038)),0.0,0.02,0.0);
- U(sdRC(q,vec3(0.09,0.905,0.0),vec3(0.1,0.5,0.004),0.084*mr,0.054),0.0,k,(m-uM0)*0.0840);
- U(sdE(q-vec3(0.1,0.705,0.036),vec3(0.067*mr,0.17,0.058*mr)),1.0,k,(m-uM0)*0.0625);
- U(sdE(q-vec3(0.071,0.565,0.036),vec3(0.04*mr,0.06,0.04*mr)),1.0,k,(m-uM0)*0.0400);
- U(sdE(q-vec3(0.095,0.7,-0.042),vec3(0.06*mr,0.17,0.05*mr)),2.0,k,(m-uM0)*0.0550);
+ U(sdRC(q,vec3(0.09,0.905,0.0),vec3(0.1,0.5,0.004),0.084*M.z,0.054),0.0,k,(M.z-uM0)*0.0840);
+ U(sdE(q-vec3(0.1,0.705,0.036),vec3(0.067*M.z,0.17,0.058*M.z)),1.0,k,(M.z-uM0)*0.0625);
+ U(sdE(q-vec3(0.071,0.565,0.036),vec3(0.04*M.z,0.06,0.04*M.z)),1.0,k,(M.z-uM0)*0.0400);
+ U(sdE(q-vec3(0.095,0.7,-0.042),vec3(0.06*M.z,0.17,0.05*M.z)),2.0,k,(M.z-uM0)*0.0550);
  U(sdE(q-vec3(0.1,0.49,0.012),vec3(0.049,0.05,0.049)),0.0,0.03,0.0);
  U(sdRC(q,vec3(0.1,0.47,0.006),vec3(0.1,0.085,-0.004),0.05,0.031),0.0,k,0.0);
- U(sdE(q-vec3(0.1,0.36,-0.036),vec3(0.05*mr,0.092,0.047*mr)),4.0,k,(m-uM0)*0.0485);
+ U(sdE(q-vec3(0.1,0.36,-0.036),vec3(0.05*M.z,0.092,0.047*M.z)),4.0,k,(M.z-uM0)*0.0485);
  U(sdE(q-vec3(0.1,0.036,0.045),vec3(0.044,0.035,0.105)),0.0,0.03,0.0);
  D.x-=fat;return D;}
-float mapD(vec3 p){return body(p,uM,uFat,uWaist).x;}
+float mapD(vec3 p){return body(p,uMV,uFat,uWaist).x;}
 vec3 nrm(vec3 p){vec2 e=vec2(0.0007,-0.0007);return normalize(e.xyy*mapD(p+e.xyy)+e.yyx*mapD(p+e.yyx)+e.yxy*mapD(p+e.yxy)+e.xxx*mapD(p+e.xxx));}
 float ao(vec3 p,vec3 n){float o=0.0,s=1.0;for(int i=1;i<6;i++){float h=0.012*float(i);o+=(h-mapD(p+n*h))*s;s*=0.72;}return clamp(1.0-3.2*o,0.0,1.0);}
 float shadow(vec3 ro,vec3 rd){float r=1.0,t=0.02;for(int i=0;i<28;i++){float h=mapD(ro+rd*t);r=min(r,10.0*h/t);t+=clamp(h,0.012,0.12);if(r<0.002||t>1.9)break;}return clamp(r,0.0,1.0);}
@@ -2115,7 +2162,7 @@ void main(){
  if(tF>max(tN,0.0)){for(int i=0;i<96;i++){vec3 p=ro+rd*t;float d=mapD(p);if(d<0.0006*t){hit=true;break;}t+=d*0.92;if(t>tF)break;}}
  if(tg<1e2&&(!hit||tg<t)){vec3 gp=ro+rd*tg;float r=length(gp.xz);float sh=r<0.75?shadow(gp+vec3(0.0,0.002,0.0),L):1.0;float occ=r<0.6?clamp(0.35+0.65*smoothstep(0.0,0.42,mapD(gp+vec3(0.0,0.05,0.0))),0.0,1.0):1.0;
   vec3 fl=vec3(0.012,0.014,0.022)*(0.3+0.7*sh)*occ;fl+=vec3(1.0,0.7,0.25)*0.018*exp(-5.0*r*r)*(0.4+0.6*sh);float fade=smoothstep(2.4,0.6,r);col=mix(bg,fl,fade*0.92);}
- if(hit){vec3 p=ro+rd*t;B=body(p,uM,uFat,uWaist);vec3 n=nrm(p);float a=ao(p,n);float crease=clamp(B.z*55.0,0.0,1.0)*uDef;
+ if(hit){vec3 p=ro+rd*t;B=body(p,uMV,uFat,uWaist);vec3 n=nrm(p);float a=ao(p,n);float crease=clamp(B.z*55.0,0.0,1.0)*uDef;
   vec3 base=vec3(0.11,0.12,0.145);float id=B.y,hvv=hv(id);
   if(uMode>0.5&&uMode<1.5){base=id>0.5?pow(heat(hvv),vec3(2.2)):vec3(0.07,0.075,0.09);}
   if(uMode>1.5){float g=clamp(B.w/0.003,0.0,1.0);base=g<0.5?mix(vec3(0.07,0.075,0.09),vec3(0.02,0.42,0.16),g*2.0):mix(vec3(0.02,0.42,0.16),vec3(0.95,0.55,0.05),g*2.0-1.0);}
@@ -2127,11 +2174,24 @@ void main(){
  col=aces(col*1.6);col=pow(col,vec3(0.4545));col+=(fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)-0.5)/255.0;
  gl_FragColor=vec4(col,1.0);}`;
 var BL_VS="attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}";
-function blSeries(){const k=[bulkMode,marchKey,DB.profile.weight,DB.profile.bf,DB.profile.height,DB.weight.length,dayOneWeight()].join("|");if(BL.ser&&BL.serK===k)return BL.ser;
+function blSeries(){const k=[bulkMode,marchKey,DB.profile.weight,DB.profile.bf,DB.profile.height,DB.weight.length,dayOneWeight(),DB.measure.length,DB.measure.reduce((t,x)=>t+(+x.arm||0)+(+x.chest||0)+(+x.thigh||0),0)].join("|");if(BL.ser&&BL.serK===k)return BL.ser;
   const rm=buildRoadmap(),h=(parseFloat(DB.profile.height)||177)/100,ceil=compute().ceilLean,bf0=parseFloat(DB.profile.bf)||18,lean0=dayOneWeight()*(1-bf0/100);let lean=lean0,prevBw=dayOneWeight();
   const out=rm.map(w=>{const pre=w.start<MILESTONE_ISO,grow=w.type==="regain"||w.type==="bulk";if(grow){const rem=ceil-lean,inc=(pre&&bulkMode==="aggr"?0.6:0.35)/4.345*Math.max(0.15,Math.min(1,rem/4));lean=Math.min(ceil,lean+Math.max(0,Math.min(inc,w.bw-prevBw)));}
     else if(w.bw<prevBw)lean=Math.max(lean0,lean-0.25*(prevBw-w.bw));prevBw=w.bw;const bf=Math.max(3,(w.bw-lean)/w.bw*100);return {wk:w.wk,start:w.start,phase:w.phase,type:w.type,bw:w.bw,lean,bf,ffmi:lean/(h*h)+6.1*(1.8-h)};});
-  BL.ser={rows:out,lean0,bf0,bw0:dayOneWeight()};BL.serK=k;return BL.ser;}
+  /* Arms, chest and thighs follow the user's own tape once a group has two readings three weeks apart. A girth change
+     ÷ 2π is a change in radius; the model's fat thickening over the same dates is taken out first; what is left,
+     divided by that group's radius in the figure, is its muscle scale. Before the first reading the model rules;
+     after the last one the model's trend carries it on from where the tape left it. */
+  const TP=blTapes(),fatOf=bf=>Math.max(0,bf-10)*0.0007,rowAt=d=>out[Math.max(0,Math.min(out.length-1,wkOfISO(d)-1))];
+  out.forEach(r=>{r.m=Math.sqrt(r.lean/lean0);r.ma=r.mt=r.ml=r.m;});
+  Object.entries(TP).forEach(([g,o])=>{const f=o.pts[0],l=o.pts[o.pts.length-1],girth=d=>{if(d<=f.d)return f.v;if(d>=l.d)return l.v;for(let i=1;i<o.pts.length;i++){const p0=o.pts[i-1],p1=o.pts[i];if(d<=p1.d)return p0.v+(p1.v-p0.v)*dayDiff(p0.d,d)/Math.max(1,dayDiff(p0.d,p1.d));}return l.v;};
+    const base=rowAt(f.d).m,atT=d=>{const dr=(girth(d)-f.v)/100/(2*Math.PI),df=fatOf(rowAt(d).bf)-fatOf(rowAt(f.d).bf);return Math.max(0.85,Math.min(1.4,base+(dr-df)/o.R));},sl=atT(l.d),ml=rowAt(l.d).m;
+    out.forEach(r=>{const d=dateAdd(r.start,6);if(d<f.d)return;r[g]=d<=l.d?atT(d):Math.max(0.85,Math.min(1.4,sl*r.m/ml));});});
+  BL.ser={rows:out,lean0,bf0,bw0:dayOneWeight(),tapes:TP};BL.serK=k;return BL.ser;}
+function blTapes(){const G={ma:{k:"arm",R:0.047,label:"arms"},mt:{k:"chest",R:0.158,label:"chest"},ml:{k:"thigh",R:0.084,label:"thighs"}},out={};
+  Object.entries(G).forEach(([g,o])=>{const a=DB.measure.filter(x=>+x[o.k]>0).map(x=>({d:x.date,v:+x[o.k]})).sort((x,y)=>x.d.localeCompare(y.d));if(a.length>=2&&dayDiff(a[0].d,a[a.length-1].d)>=21)out[g]=Object.assign({},o,{pts:a});});return out;}
+function blTapeNote(){const T=blSeries().tapes||{},on=Object.values(T);if(!on.length)return "Log arm, chest and thigh tapes in Track: once a group has two readings three weeks apart, those muscles follow your own measurements instead of the model.";
+  const L=on.map(o=>o.label),names=L.length>1?L.slice(0,-1).join(", ")+" and "+L[L.length-1]:L[0];return names.charAt(0).toUpperCase()+names.slice(1)+(L.length>1?" follow":" follows")+" your tape ("+on.map(o=>o.pts.length+" "+o.k+" readings since "+fmtShort(o.pts[0].d)).join("; ")+"), with the model’s fat change taken out first. The rest follows the model.";}
 function blShape(lean,bf,lean0){return {m:Math.sqrt(lean/lean0),fat:Math.max(0,bf-10)*0.0007,waist:Math.max(0,bf-10)*0.0021,def:Math.max(0,Math.min(1,(24-bf)/12))};}
 function blHeat(){try{const wk=planWeek(),ws=weekStartISO(wk),we=dateAdd(ws,7),done=regionDone(ws,we),tgt=regionSets();return BL_REG.map(r=>tgt[r]?Math.min(1,(done[r]||0)/tgt[r]):0);}catch(e){return [0,0,0,0,0,0,0];}}
 function blInitGL(){if(BL.gl&&!BL.lost)return true;const cv=BL.cv;let gl=null;try{const o={antialias:false,alpha:false,depth:false,stencil:false,premultipliedAlpha:false,preserveDrawingBuffer:false,powerPreference:"high-performance"};gl=cv.getContext("webgl",o)||cv.getContext("experimental-webgl",o);}catch(e){}
@@ -2139,14 +2199,14 @@ function blInitGL(){if(BL.gl&&!BL.lost)return true;const cv=BL.cv;let gl=null;tr
   const sh=(t,s)=>{const x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(x);if(!gl.getShaderParameter(x,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(x)||"shader");return x;};
   try{const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,BL_VS));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,BL_FS));gl.bindAttribLocation(pr,0,"a");gl.linkProgram(pr);if(!gl.getProgramParameter(pr,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(pr)||"link");
     const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);gl.useProgram(pr);
-    BL.u={};["uR","uYaw","uPit","uZoom","uM","uFat","uWaist","uDef","uMode","uM0","uFat0","uWaist0","uH"].forEach(n=>BL.u[n]=gl.getUniformLocation(pr,n==="uH"?"uH[0]":n));BL.gl=gl;BL.pr=pr;BL.ok=true;BL.lost=false;return true;}
+    BL.u={};["uR","uYaw","uPit","uZoom","uMV","uFat","uWaist","uDef","uMode","uM0","uFat0","uWaist0","uH"].forEach(n=>BL.u[n]=gl.getUniformLocation(pr,n==="uH"?"uH[0]":n));BL.gl=gl;BL.pr=pr;BL.ok=true;BL.lost=false;return true;}
   catch(e){BL.ok=false;BL.why="The 3D view could not start on this GPU ("+String(e.message||e).slice(0,60)+"). Every number below still works.";return false;}}
 function blSize(fine){const cv=BL.cv;if(!cv)return;const w=Math.max(200,cv.clientWidth||340),h=Math.max(240,cv.clientHeight||420),dpr=Math.min(window.devicePixelRatio||1,3),s=fine?Math.min(dpr,Math.sqrt(2.4e6/(w*h))):Math.max(0.5,Math.min(dpr,1.5)*BL.q);const W=Math.round(w*s),H=Math.round(h*s);if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}}
 function blRow(){const S=blSeries(),R=S.rows,x=Math.max(1,Math.min(R.length,BL.wk||roadmapWeekNow()))-1,i=Math.floor(x),f=x-i,a=R[i],b=R[Math.min(R.length-1,i+1)];if(!f)return a;
-  const L=(k)=>a[k]+(b[k]-a[k])*f;return Object.assign({},a,{bw:L("bw"),lean:L("lean"),bf:L("bf"),ffmi:L("ffmi")});}
+  const L=(k)=>a[k]+(b[k]-a[k])*f;return Object.assign({},a,{bw:L("bw"),lean:L("lean"),bf:L("bf"),ffmi:L("ffmi"),ma:L("ma"),mt:L("mt"),ml:L("ml")});}
 function blDraw(fine){if(!BL.cv||!blInitGL())return false;const gl=BL.gl,u=BL.u,S=blSeries(),r=blRow(),s=blShape(r.lean,r.bf,S.lean0),s0=blShape(S.lean0,S.bf0,S.lean0);blSize(fine);
   const t0=performance.now();gl.viewport(0,0,BL.cv.width,BL.cv.height);gl.uniform2f(u.uR,BL.cv.width,BL.cv.height);gl.uniform1f(u.uYaw,BL.yaw);gl.uniform1f(u.uPit,BL.pitch);gl.uniform1f(u.uZoom,BL.zoom);
-  gl.uniform1f(u.uM,s.m);gl.uniform1f(u.uFat,s.fat);gl.uniform1f(u.uWaist,s.waist);gl.uniform1f(u.uDef,s.def);gl.uniform1f(u.uM0,s0.m);gl.uniform1f(u.uFat0,s0.fat);gl.uniform1f(u.uWaist0,s0.waist);
+  gl.uniform3f(u.uMV,r.ma!=null?r.ma:s.m,r.mt!=null?r.mt:s.m,r.ml!=null?r.ml:s.m);gl.uniform1f(u.uFat,s.fat);gl.uniform1f(u.uWaist,s.waist);gl.uniform1f(u.uDef,s.def);gl.uniform1f(u.uM0,s0.m);gl.uniform1f(u.uFat0,s0.fat);gl.uniform1f(u.uWaist0,s0.waist);
   gl.uniform1f(u.uMode,BL.mode==="heat"?1:BL.mode==="growth"?2:0);gl.uniform1fv(u.uH,new Float32Array(BL.heat));gl.drawArrays(gl.TRIANGLES,0,3);BL.frames++;
     return true;}
 function blKick(){BL.moving=performance.now();if(!BL.raf)BL.raf=requestAnimationFrame(blTick);}
@@ -2168,6 +2228,7 @@ function bodyLabHTML(){setTimeout(()=>safeStep("blMount",blMount),0);const r=blR
   <div class="seg bl-modes" id="blModes" role="radiogroup" aria-label="What the colours show">${[["form","Form"],["heat","Training heat"],["growth","Growth"]].map(([k,l])=>`<button data-bl="${k}" role="radio" aria-checked="${BL.mode===k}"${BL.mode===k?" class=on":""}>${l}</button>`).join("")}</div>${legend}
   <div class="bl-time"><button class="bl-play" id="blPlay" aria-pressed="false">▶ Play the plan</button><input type="range" id="blWk" min="1" max="104" step="1" value="${r.wk}" aria-label="Plan week"><div class="bl-wklab" id="blWkLab"></div></div>
   <div class="bl-stats"><div><span>Scale</span><b id="blBw">–</b><small>kg</small></div><div><span>Lean</span><b id="blLean">–</b><small>kg</small></div><div><span>Body fat</span><b id="blBf">–</b><small>%</small></div><div><span>FFMI</span><b id="blFfmi">–</b><small>norm.</small></div></div>
+  <div class="calc-note" id="blTapeNote" style="margin-top:8px">${blTapeNote()}</div>
   <div class="calc-note" style="margin-top:8px">Still a model and an illustration, not a scan: muscle girth scales with the square root of lean mass, fat thickens the waist first, and muscle separations sharpen as body fat drops. Your logged weigh-ins and tape readings live in Track.</div></div>`;}
 function blMount(){const st=document.getElementById("blStage");if(!st||st.dataset.bound)return;st.dataset.bound="1";if(BL.wk==null)BL.wk=roadmapWeekNow();
   if(!BL.cv){const cv=document.createElement("canvas");cv.className="bl-cv";cv.id="blCanvas";cv.setAttribute("role","img");cv.tabIndex=0;BL.cv=cv;

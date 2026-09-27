@@ -555,5 +555,21 @@ for(const [iso,title,brief] of [['2026-11-12','Pull B — Strength','Today: Pull
  T('Body Lab binds once when the Roadmap renders twice (one tap = one toggle)',(!r.ok||r.play===true)&&r.bound==='1',JSON.stringify(r));
  const k=await p.evaluate(()=>{blSeries();const k1=BL.serK;DB.weight=[{date:'2026-09-12',v:90}];const k2=(blSeries(),BL.serK);return k1!==k2;});
  T('Body Lab series refreshes when the Day-1 weigh-in changes',k);await done(p);}
+// --- AY. PR badge, week card, Body Lab from tapes (27 Sep 2026)
+{const S=(d,w)=>SS(d,'legsA',{ga1:sets(3,8,w)});const p=await pg(b,'2026-10-08',{cb2_sessions:[S('2026-09-26',80),S('2026-10-03',85)],cb2_weight:[{date:'2026-09-20',v:88},{date:'2026-10-04',v:88.6}],cb2_measure:[{date:'2026-09-12',waist:86,arm:37,chest:104,thigh:60},{date:'2026-10-07',waist:86.2,arm:38,chest:104.2,thigh:60.2}]});
+ const bd=await p.evaluate(()=>({t:document.getElementById('prBadge')?.innerText||''}));
+ T('Home PR badge lists the new best with its gain',/New PR this week/.test(bd.t)&&/\+\d+\.\d kg/.test(bd.t),bd.t);
+ await p.evaluate(()=>document.querySelector('.prb-row').click());await wait(400);
+ T('tapping a PR opens that lift in Track',await p.evaluate(()=>document.getElementById('exSel')?.value==='ga1@gym'));
+ const c=await p.evaluate(()=>{const cv=weekCardCanvas(),d=cv.getContext('2d').getImageData(540,200,1,1).data;return {w:cv.width,h:cv.height,px:d[0]+d[1]+d[2]};});
+ T('week card draws at 1080×1350',c.w===1080&&c.h===1350&&c.px>0,JSON.stringify(c));
+ await p.evaluate(()=>{window.__sh=null;navigator.canShare=()=>true;navigator.share=o=>{window.__sh=o.files[0];return Promise.resolve();};switchView('home');document.getElementById('wkCardBtn').click();});await wait(300);
+ await p.evaluate(()=>document.getElementById('wkShare').click());await wait(300);
+ const s=await p.evaluate(()=>({n:window.__sh&&window.__sh.name,t:window.__sh&&window.__sh.type}));
+ T('week card shares a PNG through the share sheet',/ComebackBlueprint-week-\d+\.png/.test(s.n||'')&&s.t==='image/png',JSON.stringify(s));
+ await p.keyboard.press('Escape');T('Escape closes the card',await p.evaluate(()=>!document.getElementById('wkModal')));
+ const t=await p.evaluate(()=>{const r=blSeries().rows[3];return {ma:r.ma,m:r.m,note:blTapeNote()};});
+ T('Body Lab arms follow the tape (+1 cm arm lifts the arm scale above the model)',t.ma>t.m&&/^Arms, chest and thighs follow your tape/.test(t.note),JSON.stringify(t));
+ T('AY: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));})();
