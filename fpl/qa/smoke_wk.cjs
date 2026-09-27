@@ -603,8 +603,8 @@ async function main() {
     const wrong = ex ? ctx.els[ex.id] : null;
     const exOk = !!ex && E.draftEl(ex.code, ctx).classic.id !== ex.id;
     assert("draft-claims-join-on-code-not-id",
-      claims.length === 6 && !bad.length && exOk,
-      claims.length + " claims, all twelve codes resolve in both tables; worked example " + (ex ? ex.web_name + " draft id " + ex.id + " vs classic id " + ctx.byCode[ex.code].id + " (keying on the draft id would give " + (wrong ? wrong.web_name : "nobody") + ")" : "none") + (bad.length ? " — " + bad.join("; ") : ""));
+      claims.length >= 1 && !bad.length && exOk,   // the written block's own length, never a typed count (E-084, E-094)
+      claims.length + " claims, all " + (2 * claims.length) + " codes resolve in both tables; worked example " + (ex ? ex.web_name + " draft id " + ex.id + " vs classic id " + ctx.byCode[ex.code].id + " (keying on the draft id would give " + (wrong ? wrong.web_name : "nobody") + ")" : "none") + (bad.length ? " — " + bad.join("; ") : ""));
   }
 
   // ---- 26 · and the size of that mismatch reconciles against the live API, not a frozen number
@@ -681,8 +681,8 @@ async function main() {
     // A shortfall that is real must be on screen, not hidden (Isidor: no free-agent forward has three starts).
     const shownIssues = ui.ok ? notes.filter((n) => { const who = n.split(" has ")[0]; return new RegExp(who.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\s\\S]{0,160}of 3 starts").test(ui.draftText); }) : [];
     assert("draft-claims-are-valid-against-the-draft-api",
-      claims.length === 6 && !bad.length && shownIssues.length === notes.length,
-      "six written claims checked against the " + (draftFresh ? "live draft API" : "snapshot (offline)") + "; shortfalls named on screen: " + (notes.join("; ") || "none") + (bad.length ? " — invalid: " + bad.join("; ") : "") + (shownIssues.length !== notes.length ? " — a shortfall is not shown in the waivers panel" : ""));
+      claims.length >= 1 && !bad.length && shownIssues.length === notes.length,   // the block's own length (E-084, E-094)
+      claims.length + " written claims checked against the " + (draftFresh ? "live draft API" : "snapshot (offline)") + "; shortfalls named on screen: " + (notes.join("; ") || "none") + (bad.length ? " — invalid: " + bad.join("; ") : "") + (shownIssues.length !== notes.length ? " — a shortfall is not shown in the waivers panel" : ""));
   }
 
   // ---- 29 · C5 watchlist rule: KEEP only with three starts of three

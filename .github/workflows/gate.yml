@@ -138,7 +138,7 @@ jobs:
       - name: plan_legality (every week of the shipped plan obeys the rules; the ledger replayed, never the solver's fields — E3, C1-C3, C5)
         run: node qa/plan_legality.cjs --plan=data/plan.json 2>&1 | tee -a "$GATE_LOG"
 
-      - name: plan_legality reference (the reference input re-solved by the ported optimiser against the C acceptance in golden.json; five reproduction checks red by E-106 until the acceptance carries the spec's tolerance — C1, C2, C4, C5)
+      - name: plan_legality reference (the reference input re-solved by the ported optimiser against the C acceptance in golden.json; the spec's tolerance plus an objective at least the recorded incumbent's, E-106 — C1, C2, C4, C5)
         run: node qa/plan_legality.cjs --plan=data/plan_reference.json --data=reference/v109/app/data.json --golden=reference/v109/app/golden.json 2>&1 | tee -a "$GATE_LOG"
 
       - name: verify.sh (live reconciliation + invariants)

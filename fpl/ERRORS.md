@@ -1275,3 +1275,19 @@ TEST: this session's measurement — `node build.cjs` on HEAD (a17a5dc) changes 
 on the rebuilt app shows the E-099 `return;` and the `font-size:11px` rule. The pre-build comparison is not yet
 written; until it lands, the rebuilt `app/` and `dist/` ship with this wave's commits and the rule is held by the
 commit discipline above, which is a weaker guard than a check and is named as such.
+
+### E-110 · v110 · a suite typed the number of Draft claims (six) where it should read the block's own length (recurrence of E-084's class, after E-094 and E-106)
+CAUSE: `qa/smoke_wk.cjs` checked the written Draft claims with `claims.length === 6` in two places and wrote "all
+twelve codes" into a detail line. Six was how many claims the v89 block happened to carry; the v110 claim sheet lodges
+thirteen, every one with a backup under its first choice. The first honest refresh would have turned two checks red
+for writing better advice, and the detail line would have printed a wrong count while green.
+CAUGHT: 27 Sep 2026, reading the suite before writing the v110 weekly block, alongside the E-106 correction.
+RULE: a suite reads counts of decisions from the thing it checks. The E-084 test applies to every literal in a check:
+could the next honest run change this number? If yes, derive it (`claims.length >= 1`, `2 * claims.length` codes) and
+let the content checks (every code resolves on both sides, every claim valid against the live Draft API) carry the
+weight. E-106 closes on the same day: `qa/plan_legality.cjs`'s acceptance is the spec's (total within 2%, wildcard and
+triple-captain weeks and captains, one bench boost, no hits, gap under 3%, timing within 2%, Draft pairs) plus an
+objective at least the recorded incumbent's, read from `reference/v109/app/solver_out.json`.
+TEST: `node qa/plan_legality.cjs --plan=data/plan_reference.json --data=reference/v109/app/data.json
+--golden=reference/v109/app/golden.json` 55/55, six new mutations each red on its named check; the smoke suite's two
+claim checks read the block's own length and its detail prints the derived code count.
