@@ -6,7 +6,10 @@
   "scripts": {
     "fetch": "node data/fetch_live.cjs",
     "bake": "node pipeline/bake.js",
+    "calibrate": "node pipeline/calibrate.js",
     "export": "node pipeline/export.js",
+    "solve": "python3 pipeline/solve.py",
+    "plan": "node pipeline/plan.cjs",
     "build": "node build.cjs",
     "tdz": "node qa/tdz_check.cjs app/FPL_Mission_Control.jsx",
     "verify": "bash qa/verify.sh",

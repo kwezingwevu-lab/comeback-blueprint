@@ -1103,3 +1103,154 @@ Written first and run red (2/3, `Cannot find module pipeline/export.js`). File-l
 for byte and each 31/36: three-decimal rounding cut to two names `$.players[0].ep[1] ref 4.088 got 4.09`; the hash
 cut to 15 hex is red with the payload path-equal; `did` dropped from the player row names
 `$.players[0].did missing from the export`.
+
+### E-108 · v110 · the Draft horizon was assumed to end at GW18 while the league re-drafts at GW21
+CAUSE: the v107–v109 kit planned the Draft roster to a typed horizon of GW18. The league's own settings,
+`/api/league/{id}/details` → `league.drafts`, carry an unfinished draft whose `event` is 21: the new rosters start
+in GW21, so the last gameweek the current roster plays is GW20. Two gameweeks of expected points were left out of
+every Draft valuation, and a plan that stops at the wrong week does not fail — it looks finished. A number the feed
+carries was typed instead of read, which is E-084's class applied to a league setting rather than to a date.
+CAUGHT: in the v109 build outside this repository (v110 spec §7.12); the spec's ground truth lists the re-draft on
+5 Jan 2027, effective GW21, so the Draft plans to GW20. In the repository it is closed with the port:
+`pipeline/bake.js` reads `league.drafts` into `draft.league.drafts[]` and `redraft` (the unfinished one), the
+engine's `CFG.draftEnd` and the export's `dEnd` are `redraft.fromGw − 1`, and CLAUDE.md Part N2 carries the rule
+without the number.
+RULE: the Draft horizon is read from `league.drafts`, never typed. The unfinished draft's `event` is the first
+gameweek of the new rosters; the horizon is that gameweek minus one. No file in the repository states the horizon as
+a number, and no test compares it to one.
+TEST: `qa/bake.cjs` A7 §7.12 — three checks: the reference bake's `redraft.fromGw` is the unfinished draft's `event`
+read from `d_details.json`, with one `drafts[]` row per draft; the repository block's redraft is its own unfinished
+draft and its horizon starts after the next gameweek; and the mutation — the unfinished draft moved one gameweek
+later in a copy of the feed moves the block's horizon with it (read, not typed). `qa/export_hash.cjs` — `dEnd` is
+`redraft.fromGw − 1` on the reference export and on the export of the committed block.
+
+### E-109 · v110 · the TDZ checker read a loop variable reused across two for-headers as a same-scope TDZ (recurrence of E-013's class)
+CAUSE: `collectDecls` in `qa/tdz_check.cjs` gave every `const`/`let` the scope of the nearest enclosing brace. A
+declaration in a for-header — `for (let i = 0; …)`, `for (const x of …)` — sits inside parentheses, not braces, so it
+was attributed to the function body around it, and a second loop in the same function that reused the name read as
+"i read before its let declaration": the first loop's use of its own variable, charged against the second loop's
+declaration. JavaScript scopes a for-header declaration to its loop; two loops are two bindings, and no TDZ exists.
+CAUGHT: 27 September 2026, porting the v111 kit engine to `src/mc_engine.js`. `node qa/tdz_check.cjs
+/home/claude/app/engine.js` reported four findings on clean code — `lh` and `la` in `fitRates` (the coarse grid and
+the polish grid, lines 69–70) and `i` twice in the formation loop (line 166) — and the port renamed the polish loop's
+counters to `ph`/`pa` and the formation loop's to `j`/`k` to get past the gate. A gate that is satisfied by a rename
+has checked the rename, not the code (E-013: false positives for a session; E-075: the same class on a comment).
+RULE: a for-header declaration is scoped to its loop. `forHeaderOf` in `qa/tdz_check.cjs` recognises a declaration
+whose keyword follows `for (` or `for await (`, opens its scope at the header's parenthesis, and records the loop's
+range (header and body, braced or a single statement); the same-scope scan skips a read that sits inside a loop whose
+own header binds that name. Nothing else moved: a header that reads a const declared after the loop is still a
+finding, as is a plain read before a declaration beside two loops, and the nested-body and dynamic passes are
+untouched.
+TEST: `node qa/tdz_check.cjs --self-test` 10/10 — four new control files: the kit's shape (a counter reused across
+two for-headers, braced and unbraced, and a nested pair reusing two names) is clean; a const declared after a loop
+that used the same name is clean; a for-header that reads a const declared after the loop is still found; a plain
+same-scope read beside two loops is still found. The checker as it stood before the fix reports 4 findings on the
+first two of those files. `node qa/tdz_check.cjs /home/claude/app/engine.js` (the kit, unrenamed) now reads TDZ
+CLEAN; `src/engine.js`, `src/ui.jsx`, `src/mc_engine.js`, `src/mc_analysis.js` and `app/FPL_Mission_Control.jsx`
+stay CLEAN; a control file with a genuine same-scope TDZ still fails with two findings (static and dynamic).
+
+### E-102 · v110 · the free-transfer count showed lower than real after a wildcard week
+CAUSE: the optimiser's free-transfer variables are upper bounds, not a ledger. In `classic()` the row
+`used[t] <= ft[t]` and the carry rows `ft[t+1] <= ft[t] - used[t] + 1` and `ft[t+1] <= ft[t] + 5·wc[t]` let the
+solver pick ANY `ft` at or below the true count wherever a lower value costs nothing — and after a wildcard week,
+where nothing is spent, it often does. Read off the solution, the count after the wildcard came out one or two
+below what the game would show; the plan's moves were legal, the number beside them was not (spec §7.1).
+CAUGHT: v110, porting the optimiser. The reference's own `classic()` already rebuilds `ftBefore`, `used`, `hits`
+and `bank` after the solve, and the port keeps that; the port then adds a second, independent replay outside the
+solver so the interface never depends on a solver field at all.
+RULE: replay the ledger from the rules of the game (CLAUDE.md Part N1; v110 §4 Classic) and display only the
+replay. `pipeline/plan.cjs` recomputes, week by week from `data/mc_data.json`'s own state: free transfers before
+the week (one added per ordinary week; a wildcard or free-hit week keeps the count exactly as it was, nothing
+spent and nothing added; cap `1 + max_extra_free_transfers` as `rules.maxFt` carries it; floor 1), transfers used
+= |in|, hits = 4 × max(0, used − free) and only once every free transfer is used, and the bank from selling prices
+for the original fifteen and purchase prices for anyone bought inside the window. It writes the result as
+`replay` in `data/plan.json`, which is the block the interface reads (§6); the solver's `ftBefore`, `used`, `hits`
+and `bank` stay in the file for comparison only. If the replay disagrees with the solver's fields anywhere,
+`plan.cjs` prints the gameweek and both values and exits 2, so the stage goes red rather than shipping a number
+the rules do not give.
+TEST: `qa/plan_legality.cjs` — its own third replay of the same rules must agree with the solver's fields on every
+week ("free transfers" and "hits" in the per-week checks) and with `plan.json`'s replay block week for week ("the
+plan's replay block agrees with this suite's own replay of the rules"). On the reference plan: 14 weeks, 14 rules
+each, 49/49. Mutation-proven twice: a solver `hits` moved by one goes red on 'hits'; and a copy of `plan.cjs` in
+which a wildcard week ADDS a free transfer (E-099's mutant) exits 2 naming GW7, GW8 and GW9 (`ftBefore: replay 5
+· solver 4`), and the file it wrote is refused by the suite at 48/49 with `agrees is false`.
+
+### E-103 · v110 · a background solve died silently
+CAUSE: a full solve takes about ten minutes and was started as a background job from a shell call; the job is
+killed when the call that started it ends, and a run that wrote its output only at the end left nothing behind
+(spec §7.2). The reference's `solve.py` already saves after every stage; what was missing in the port was the
+proof that it does, and a launcher that survives the shell.
+CAUGHT: v110, porting the optimiser. The v111 kit's own `solve.log` shows every stage line, which is the record
+§7.2 asks for; the port keeps that and adds an observed check.
+RULE: start a full run detached — `setsid nohup python3 pipeline/solve.py 240 > solve.log 2>&1 &` — and write the
+output as soon as each stage finishes. `pipeline/solve.py` dumps `data/solver_out.json` after the plan, after the
+no-wildcard plan, after the free-hit pricing, after each Draft roster and after the optional sensitivity, each
+write to a temporary file moved into place so a reader never sees a half-written stage; `chip_timing()` writes the
+timing file after each of now, later and never. `done: true` lands only at the end, and `pipeline/plan.cjs`
+refuses (exit 3) a file without it, so a partial run is inspectable but never shipped.
+TEST: `qa/solver_smoke.sh` watches the output path while a 30-second solve runs and asserts the file appeared
+BEFORE the run ended, carrying the plan stage and no `done` flag: on the dev machine it was first seen 22.6 s
+before the end with keys `at,hash,plan` (and 14.6 s before the end on the 20-second run that found no incumbent, the
+file still carrying the failed plan stage). The stage lines are echoed into the gate log as the run log §7.2 names.
+`qa/plan_legality.cjs` refuses a plan whose source lacks `done` through `plan.cjs`'s exit 3 (proved: a copy of the
+reference output with `done` removed is refused and nothing is written).
+
+### E-104 · v110 · the all-binary optimiser stalled at a 24.6% gap
+CAUSE: the first formulation made every decision binary — squad membership, the eleven, the captain, the triple
+captain, the bench boost, buy and sell — and HiGHS could not close the bound: 24.6% after the full time limit
+(spec §7.9). A plan with a gap that wide is a guess with a solver attached.
+CAUGHT: v109, outside this repository; recorded here with the port so the formulation is never "tidied" back.
+RULE: only squad membership is integer. Given a whole-number squad, the eleven, the armband and the buy/sell
+flows form a totally unimodular constraint system, so the linear relaxation is integral and the optimum comes out
+whole on its own; the models in `pipeline/solve.py` (class Model, classic, one_week_best, draft) are byte for
+byte `reference/v109/app/solve.py`'s and carry the comment at the line that does it. On the reference input the
+proof closes at gap 0.01297 in 240 s. The gap is checked, never assumed: a committed plan must carry `gap` under
+0.03, and the 30-second smoke skips that check by an explicit flag and says so, because a short solve is asked to
+be legal, not to prove its gap.
+TEST: `qa/plan_legality.cjs` — "the plan is proven close to the best possible (gap under 0.03, §7.9)" on the
+committed plan, and "C2 the proven gap is the one golden records" on the reference plan (0.012967284891281062,
+equal to `golden.classic.plan.gap`); and "pipeline/solve.py's model functions … are byte-identical to
+reference/v109/app/solve.py's", which went red (48/49) when one byte of `classic()`'s signature was changed and
+green again after a sha1-verified restore. `qa/solver_smoke.sh` runs the same formulation in 30 s and reports the
+gap it saw beside the SKIP line.
+
+### E-105 · v110 · the solver sold Haaland on the wildcard and bought him back
+CAUSE: nothing in the first model forbade selling a player in one week and buying him back later in the window.
+Prices move and the plan is one the manager is meant to follow; a sell-then-rebuy is a move nobody makes, and it
+also lets the model bank a phantom free transfer by churning (spec §7.10).
+CAUGHT: v109, reading the wildcard change list against the later weeks; carried into this repository as a rule
+the plan must pass every time it is built.
+RULE: no rebuy inside the window. `classic(no_rebuy=True)` adds `SO[i,t1] + BI[i,t2] <= 1` for every player and
+every t1 < t2 in the detailed window, and the legality suite checks the shipped plan independently: a player who
+appears in any week's `out` may not appear in a later week's `in`.
+TEST: `qa/plan_legality.cjs` — "no rebuy" in every week's checks on `data/plan.json` (and on
+`data/plan_reference.json` until the solve stage lands). Mutation-proven on a copy of the reference plan: Gabriel,
+sold in GW6, bought back in GW7 for Thomas goes red on 'no rebuy: bought back after being sold inside the window:
+Gabriel', and the same break trips the bank and the free-transfer replay downstream (39/49).
+
+
+### E-106 · v110 · the golden acceptance held a re-solve to a time-limited incumbent's bench-boost week, fifteen, total and gap
+CAUSE: `golden.classic.plan` was recorded from a 240-second solve that stopped on the clock at a 1.3% gap (HiGHS
+status 13), and the acceptance in `qa/plan_legality.cjs` compared a fresh solve to that file exactly: its chip weeks
+and captains, its GW6 fifteen, its total to 0.05 and its gap to 1e-6. The spec says the solve is time-limited and
+asks for tolerance (§5 C acceptance: total 878 ± 2%, wildcard GW6, triple captain GW7, no hits). On an idle core
+the same model on the same input proves optimal within 0.5% (status 7) in 265.5 s: objective 661.74 against the
+incumbent's 658.74, total 882.72 against 878.28 (+0.51%), the bench boost in GW9 with Haaland where the incumbent
+boosts in GW10 with Saka, Affengruber and Janelt where it holds Diop and Stach. The 240-second run on this machine
+gave 874.35 at a 1.65% gap and the same GW9 bench boost. An exact match of a recorded incumbent is a property of
+that file, not of the optimiser, and a proven solve that beats the incumbent cannot reproduce it.
+CAUGHT: v110 solve stage, 27 Sep 2026, running the C acceptance on the reference input twice (240 s, then 480 s
+as the retry allows). Both inside 2% on the total, both with the wildcard and triple-captain weeks and captains,
+both without hits, both reproducing the Draft roster exactly; both red on the same five checks (44/49).
+RULE: a re-solve is accepted at the spec's tolerance — total within 2%, the wildcard and triple-captain weeks and
+captains, no hits, the Draft roster — and its gap is required to be under 3%, never equal to another run's. Exact
+reproduction of a recorded output (its fifteen, its bench-boost week, its total to 0.05, its gap) is proved by
+running that output through `pipeline/plan.cjs`, not by re-solving; `reference/v109` is read-only, so the recorded
+incumbent stays what it is and the acceptance carries the tolerance.
+TEST: `node qa/plan_legality.cjs --plan=data/plan_reference.json --data=reference/v109/app/data.json
+--golden=reference/v109/app/golden.json` on the proven re-solve: 44/49, red on 'C1 the chip weeks and their
+captains', 'C1 the first week's squad', 'C1 the hit count … reproduce the golden total' (882.74 vs 878.28), 'C2 the
+proven gap is the one golden records' (0.004996 vs 0.012967) and 'C4 wildcard timing' (now 882.72 vs 878.28); green
+on every legality rule, the replay, the gap under 0.03 and the Draft roster. The step stays red in `qa/run.sh` and
+`gate.yml` until the acceptance encodes the rule above; `pipeline/logs/ref_solve.log` and
+`pipeline/logs/ref_solve_480.log` carry the two runs stage by stage.

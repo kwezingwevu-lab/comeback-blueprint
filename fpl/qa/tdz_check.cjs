@@ -9,7 +9,10 @@
  *                literals and regex literals are blanked (line numbers kept) before any
  *                identifier is looked at. A reference inside a nested *function* body is not
  *                flagged here: a hoisted function may legally close over a const declared
- *                later, as long as it is called later.
+ *                later, as long as it is called later. A declaration in a for-header —
+ *                for (let i …), for (const x of …) — is scoped to its loop, not to the block
+ *                around it, so a loop variable reused across two loops in one function is
+ *                two bindings and never a TDZ (E-109: four findings on clean code).
  *   2. STATIC, NESTED BODY  — the case check 1 deliberately lets through, caught narrowly: a
  *                function expression bound to a const/let reads a const declared later in the
  *                same scope AND is called by name, in that same scope, before the declaration.
@@ -22,8 +25,8 @@
  *                initialization" is a finding; any other throw is ignored.
  *
  * Usage:  node qa/tdz_check.cjs <file> [<file> …]      (default: src/engine.js)
- *         node qa/tdz_check.cjs --self-test            (six control files: three must be found,
- *                                                       three must stay clean)
+ *         node qa/tdz_check.cjs --self-test            (ten control files: five must be found,
+ *                                                       five must stay clean)
  * Output: "TDZ CLEAN <file> (…what actually ran…)" per file and "TDZ CLEAN" overall, or the
  *         offending identifiers with line numbers. Exit 1 on any finding.
  * A file that does not exist is skipped with a message (exit 0) — app/FPL_Mission_Control.jsx
@@ -296,6 +299,62 @@ function conciseArrowRanges(code) {
   return out;
 }
 
+// A for-header declaration — for (let i = …; …; …), for (const x of …), for await (const x of …) —
+// is scoped to its LOOP: header and body, and nothing else. Attributing it to the enclosing
+// block read two loops that reuse a counter as "i read before its let declaration" (E-109,
+// four findings on the clean kit engine). Returns {open, end} — the header's "(" and the
+// index just past the loop statement — or null when the declaration is not a for-header's.
+function forHeaderOf(code, declStart) {
+  let j = declStart - 1;
+  while (j >= 0 && /\s/.test(code[j])) j--;
+  if (j < 0 || code[j] !== "(") return null;
+  const open = j;
+  let e = j - 1;
+  while (e >= 0 && /\s/.test(code[e])) e--;
+  let w = e;
+  while (w >= 0 && /[A-Za-z0-9_$]/.test(code[w])) w--;
+  let word = code.slice(w + 1, e + 1);
+  if (word === "await") {
+    e = w; while (e >= 0 && /\s/.test(code[e])) e--;
+    w = e; while (w >= 0 && /[A-Za-z0-9_$]/.test(code[w])) w--;
+    word = code.slice(w + 1, e + 1);
+  }
+  if (word !== "for") return null;
+  // the header's matching ")"
+  let d = 0, k = open;
+  for (; k < code.length; k++) {
+    if (code[k] === "(") d++;
+    else if (code[k] === ")") { d--; if (d === 0) break; }
+  }
+  if (k >= code.length) return null;
+  let b = k + 1;
+  while (b < code.length && /\s/.test(code[b])) b++;
+  if (code[b] === "{") {
+    // braced body: to its matching "}"
+    d = 0;
+    for (k = b; k < code.length; k++) {
+      if (code[k] === "{") d++;
+      else if (code[k] === "}") { d--; if (d === 0) return { open: open, end: k + 1 }; }
+    }
+    return { open: open, end: code.length };
+  }
+  // unbraced body: one statement — to the first ";" at depth 0, or to the "}" that closes a
+  // braced inner statement (for (…) for (…) { … }), or up to (not including) the "}" that
+  // closes the enclosing block.
+  d = 0;
+  for (k = b; k < code.length; k++) {
+    const c = code[k];
+    if (c === "(" || c === "[" || c === "{") d++;
+    else if (c === ")" || c === "]" || c === "}") {
+      if (d === 0) return { open: open, end: k };
+      d--;
+      if (d === 0 && c === "}") return { open: open, end: k + 1 };
+    }
+    else if (c === ";" && d === 0) return { open: open, end: k + 1 };
+  }
+  return { open: open, end: code.length };
+}
+
 // Every const/let declaration in the file, with the scope it belongs to. Both the
 // same-scope scan (3a) and the nested-body scan (3b) read this one list.
 function collectDecls(code, map) {
@@ -336,7 +395,12 @@ function collectDecls(code, map) {
         j--;
       }
     }
-    out.push({ kw: kw, names: names, declStart: declStart, listStart: listStart, listEnd: listEnd, fn: fn, scopeStart: scopeStart });
+    // A for-header declaration is scoped to its loop (E-109): its scope opens at the header's
+    // "(", so nothing in the enclosing block sits "before" it, and its loop range is kept so
+    // the loop's own reads are never charged to a later declaration of the same name outside.
+    const hdr = forHeaderOf(code, declStart);
+    if (hdr) scopeStart = hdr.open + 1;
+    out.push({ kw: kw, names: names, declStart: declStart, listStart: listStart, listEnd: listEnd, fn: fn, scopeStart: scopeStart, loop: hdr });
   }
   return out;
 }
@@ -377,7 +441,14 @@ function staticScan(src) {
   const concise = conciseArrowRanges(code);
   const params = paramRanges(code);
   const findings = [];
-  collectDecls(code, map).forEach(function (d) {
+  const decls = collectDecls(code, map);
+  // The loops whose headers bind each name: a read of that name inside one of them resolves
+  // to the loop's own binding, never to a declaration outside it (E-109).
+  const loops = decls.filter(function (d) { return d.loop; });
+  const inOwnLoop = function (name, at, d) {
+    return loops.some(function (l) { return l !== d && l.names.indexOf(name) >= 0 && at >= l.loop.open && at < l.loop.end; });
+  };
+  decls.forEach(function (d) {
     const kw = d.kw, declStart = d.declStart, fn = d.fn, scopeStart = d.scopeStart;
     d.names.forEach(function (name) {
       const useRe = new RegExp("[A-Za-z0-9_$.]?\\b" + name.replace(/\$/g, "\\$") + "\\b", "g");
@@ -394,6 +465,7 @@ function staticScan(src) {
         // A reference inside a nested function body is legal (called later).
         if (map.fnAt[at] !== fn) continue;
         if (inRanges(params, at)) continue;                              // a parameter of that name, not a read
+        if (inOwnLoop(name, at, d)) continue;                            // a loop's own variable, inside that loop (E-109)
         if (concise.some(function (r) { return at >= r[0] && at < r[1] && !(declStart >= r[0] && declStart < r[1]); })) continue;
         // A reference inside a nested block that is not a function still resolves outward → TDZ.
         findings.push({
@@ -726,6 +798,29 @@ const SELF_CASES = [
     name: "a parameter of the same name shadows the outer const",
     src: 'function boot(){ const read = function(CONF){ return CONF.k; }; const v = read({ k: 2 }); const CONF = { k: 1 }; return v + CONF.k; }\nmodule.exports = { boot: boot };\n',
     expect: false
+  },
+  {
+    // E-109: the kit engine's shape — a counter reused across two for-headers in one function,
+    // braced and unbraced bodies, and a nested pair reusing two names. Four findings on clean code.
+    name: "a loop variable reused across two for-headers in one function is clean (E-109)",
+    src: 'function sum(a){ let t = 0; for (let i = 0; i < a.length; i++) t += a[i]; for (let i = 0; i < a.length; i++) { t -= a[i]; }\n' +
+         '  for (let lh = 0; lh < 2; lh++) for (let la = 0; la < 2; la++) { t += lh * la; } for (let lh = 0; lh < 1; lh++) for (let la = 0; la < 1; la++) t += lh + la; return t; }\nmodule.exports = { sum: sum };\n',
+    expect: false
+  },
+  {
+    name: "a const declared after a loop that used the same name for its own variable is clean (E-109)",
+    src: 'function f(a){ let t = 0; for (const p of a) t += p; const p = 2; return t + p; }\nmodule.exports = { f: f };\n',
+    expect: false
+  },
+  {
+    name: "a for-header that reads a const declared after the loop is still a finding (E-109 did not blind the scan)",
+    src: 'function f(){ let t = 0; for (let i = 0; i < LIM; i++) t += i; const LIM = 2; return t + LIM; }\nmodule.exports = { f: f };\n',
+    expect: true
+  },
+  {
+    name: "a plain same-scope read before the declaration beside two loops is still a finding",
+    src: 'function f(a){ let t = 0; for (let i = 0; i < 2; i++) t += i; const v = CONF.k; for (let i = 0; i < 2; i++) t += i; const CONF = { k: 1 }; return t + v; }\nmodule.exports = { f: f };\n',
+    expect: true
   }
 ];
 
