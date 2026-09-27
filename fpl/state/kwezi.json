@@ -1,6 +1,6 @@
 {
-  "version": 89,
-  "exported_at": "2026-09-26T11:20:00Z",
+  "version": 110,
+  "exported_at": "2026-09-27T04:19:32Z",
   "entry": 3546875,
   "squad": [
     {
@@ -77,25 +77,28 @@
     512550
   ],
   "draft": {
-    "league_id": null,
-    "entry_id": null,
+    "league_id": 46148,
+    "entry_id": 279275,
     "roster": [
+      83299,
+      84450,
+      204580,
       209036,
-      446008,
-      222531,
-      204480,
+      226182,
+      437505,
+      455084,
+      473284,
       482973,
+      489639,
+      503139,
       517052,
-      212319,
-      108413,
-      221466,
-      153682,
-      494521,
-      489639
+      540324,
+      575476,
+      577725
     ],
     "watchlist": [],
-    "roster_complete": false,
-    "roster_note": "12 of 15 known (Guéhi, Mbeumo, Gibbs-White, Rice, Igor Jesus, N.Jackson, Richarlison, Hughes, Senesi, Wilson, Truffert, Verbruggen). Three bench slots are unknown: the second goalkeeper, one defender and one further outfield player (by squad shape 2-5-5-3: 1 GKP, 2 DEF/MID/FWD short). Wilson is assumed to be the Leeds midfielder (code 153682); Brentford and Coventry also have a Wilson. Supply the draft league URL and the roster is read from the API."
+    "roster_complete": true,
+    "roster_note": "All 15 read from the public Draft API, never guessed: pipeline/feeds/d_status.json element_status rows whose owner is entry 279275 (Yoh-Nited, league 46148 Champions League Draft Pool B, verified against d_details.json league_entries and dentry.json league_set), feeds pulled 26 Sep 2026 and baked into data/mc_data.json draft.rosters on 27 Sep 2026. Stored as Opta codes (draft element id → dbootstrap.json code), the one key shared by both id spaces (E-063); the same fifteen come back when the block's classic ids are mapped through bootstrap.json. Replaces the twelve guessed codes of v89."
   },
   "ui": {
     "mode": "simple",
