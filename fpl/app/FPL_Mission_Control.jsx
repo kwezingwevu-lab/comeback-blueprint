@@ -2475,7 +2475,9 @@ function ftAvailable(history, currentEvent, chips) {
     rows.forEach(function (r) {
       if (r.event < 2 || r.event > cur) return;
       var freeUsed = Math.max(0, r.t - Math.floor(r.cost / HIT_COST));
-      if (chipWeeks[r.event] || freeUsed > FT_CAP) { ft = Math.min(FT_CAP, ft + 1); return; }
+      // E-099: a wildcard or free-hit week keeps the count exactly as it was — nothing spent, nothing
+      // added (v110 §4, Part N1). The +1 arrives with the next ordinary week, as it always does.
+      if (chipWeeks[r.event] || freeUsed > FT_CAP) return;
       ft = Math.min(FT_CAP, Math.max(0, ft - freeUsed) + 1);
     });
     return clamp(ft, 1, FT_CAP);
@@ -5767,7 +5769,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 .reveal-w{margin-top:2px}
 .sec-b p{margin:0 0 8px}
 .sec-b p:last-child{margin-bottom:0}
-@media (max-width:380px){ .tabi{min-width:37px;font-size:10px;padding:4px 0} .wrap{padding:0 10px} }
+@media (max-width:380px){ .tabi{min-width:37px;font-size:11px;padding:4px 0} .wrap{padding:0 10px} }
 `;
 
 /* ------------------------------------------------------------------ storage adapter

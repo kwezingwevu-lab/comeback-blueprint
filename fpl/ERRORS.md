@@ -1254,3 +1254,24 @@ proven gap is the one golden records' (0.004996 vs 0.012967) and 'C4 wildcard ti
 on every legality rule, the replay, the gap under 0.03 and the Draft roster. The step stays red in `qa/run.sh` and
 `gate.yml` until the acceptance encodes the rule above; `pipeline/logs/ref_solve.log` and
 `pipeline/logs/ref_solve_480.log` carry the two runs stage by stage.
+
+### E-107 · v110 · two source fixes were committed while the shipped page still carried the defects they fixed
+CAUSE: commits 3e1838b (E-099, `ftAvailable` in `src/engine.js`) and 1935890 (E-100, the 11px tab label in `src/ui.jsx`)
+changed the sources and not the build outputs. The last commit that wrote `app/FPL_Mission_Control.jsx` was 4f0606a
+(26 Sep), so at HEAD the assembled app and `dist/index.html` still added a free transfer on a wildcard week and still
+set `.tabi` to 10px under the narrow media query — the two defects the commit messages said were closed. Nothing
+reported it, because the gate builds at step 3 and verify.sh's I8, the content comparison of the app against the
+sources, runs at step 17: by then the build has replaced the stale file, and I8 reads the regeneration, not the
+commit. A check that runs after the thing it checks has been rebuilt cannot fail on a stale commit.
+CAUGHT: 27 Sep 2026, the adversarial review's single gate run. `git status` after step 3 showed
+`app/FPL_Mission_Control.jsx`, `dist/index.html` and `dist/sw.js` modified — 7 insertions, 9 deletions: the two
+source edits and the service worker's content-hash cache key — on a tree that had been clean apart from the solve
+stage's files. `git log -1 -- app/FPL_Mission_Control.jsx` named 4f0606a.
+RULE: a commit that changes `src/`, `data/weekly.js`, `data/live.json` or `build.cjs` carries the rebuilt `app/` and
+`dist/` in the same commit, and its proving number is measured on that build (CLAUDE.md H3: bump → build → suites →
+commit). The gate must be able to see a stale commit: the committed app is compared with a fresh build BEFORE the
+build step overwrites it, as a step ahead of step 3 in `qa/run.sh` and `gate.yml`, or I8 moves ahead of the build.
+TEST: this session's measurement — `node build.cjs` on HEAD (a17a5dc) changes three tracked files, and `git diff`
+on the rebuilt app shows the E-099 `return;` and the `font-size:11px` rule. The pre-build comparison is not yet
+written; until it lands, the rebuilt `app/` and `dist/` ship with this wave's commits and the rule is held by the
+commit discipline above, which is a weaker guard than a check and is named as such.
