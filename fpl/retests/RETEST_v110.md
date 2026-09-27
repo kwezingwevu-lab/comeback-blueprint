@@ -334,6 +334,197 @@ it — mc_all's 135 property invariants over a million iterations, and unit_engi
 **not** had a line-by-line review from me. That review is the first item after this, and saying so
 is more useful than implying it was reviewed.
 
+
+### B1–B5, B7–B9 and E2 · the v111 engine as a Node module, with parity proved
+
+`src/mc_engine.js` is the kit's engine byte for byte below a 32-line header (`tail -n +33` is `cmp`-equal to
+`reference/v111/app/engine.js`). Two loop-variable renames were made at first to quiet `qa/tdz_check.cjs`; E-109
+showed the checker, not the code, was wrong, and once the checker was fixed the renames were reverted (bd927a7). `src/mc_analysis.js` carries the pure logic
+the kit kept inside its interface: the claims sheet, trades, the two reviews, the gameweek simulation, the
+head-to-head, the greedy transfers and the claimability labels, each a function of (engine, data, options)
+returning plain objects labelled with their game.
+
+`qa/parity.cjs` **51/51** in 3.6 s on `reference/v109/app/data.json`: calibration ka 1.5 / kd 2 / 42 anchors /
+weeks 5–7 exact and rmse within 9.1e-6; forty ratings within 4.8e-5; thirteen priced fixtures within 8.9e-16 on
+goals and 0.121 percentage points on the round trip; **8,430 expected-points assertions** (562 players ×
+gameweeks 6–20) with a maximum error of 5.0e-4 against `solver_in.json`; the four greedy transfers move for
+move; the claims sheet line for line against the reference interface required in-process (13 lines, strategy
+firsts, 577.6 / 619.8 / 616.8 / 645.8 within 0.034); the head-to-head 0.5188 / 0.0309 against 0.519 / 0.031; the
+Classic simulation 37 / 52 / 71 exactly; both reviews JSON-equal to the reference engine's. Seven in-suite
+mutations and three file-level ones (a home advantage of 1.10 → rmse and 1,057 ep cells red; the backup floor
+at 30 → 8 lines against 13; the position check removed → 53 cross-position trades) each go red.
+
+### A2, A4–A7 · the bake, and the Draft ground truth
+
+`pipeline/bake.js` is the kit's bake with arguments; the INTEL research moved to `pipeline/intel.js`, where eight
+undated entries received the date their own sources carry. `qa/bake.cjs` **42/42**: baking the reference feeds
+with the reference INTEL and its clock reproduces `reference/v109/app/data.json` **path for path with zero
+excluded paths**; reconciliation 5 of 5 on both the reference and the 26 September bake, with a feed-level
+mutation (the official total moved by one) proving the block reports a mismatch rather than copying the
+reported figure; four free transfers into gameweek 6 against `golden.classic.ftNext`, and the ledger rule on
+synthetic weeks — a wildcard week keeps the count; the transfer log equal to the reference's; the Draft
+horizon read from `league.drafts` (event 21 → gameweek 20), proved by a feed with the draft moved to 22.
+`state/kwezi.json` now names league 46148 and entry 279275 and carries the real fifteen by Opta code: of the
+twelve codes guessed in v89 only four were on the roster.
+
+### A8 · the solver input with a content hash
+
+`pipeline/export.js` reproduces `reference/v109/app/solver_in.json` at **dde282bdf39bd757**, path for path apart
+from the two clock fields. `qa/export_hash.cjs` **36/36**: the hash is stable under a re-bake that changes
+asOf, delta, intel notes and 1,156 ownership and transfer-pressure fields, and moves under a price, a flag, a
+start override or a fixture's home side. The repo's own export first hashed to f80b43568c47e325 against the
+kit's d812652812be50a7 with 7,271 differing expected-points cells — every one of them the kit's calibration
+factors, which the repo did not carry. Porting `pipeline/backtest.js` and `pipeline/calibrate.js` closed it: the
+factors are identical (1.117 / 1.076 / 1.048 / 1.000) and the hash is **d812652812be50a7**, so the plan solved
+and proved on 26 September is a solution of exactly this input.
+
+### qa/visual.cjs · the missing gate step
+
+Step 7 of the gate ran a suite that did not exist. It exists now: `audit_contrast` reads the 21 tokens from
+`src/ui.jsx` through the same reader `build.cjs` uses and measures every foreground on every surface the markup
+puts it on (the --mute fix reproduces as 5.4636 / 5.0243 / 4.5422; the old value as 4.1538 / 3.8198 / 3.4533);
+`audit_layout` holds the Part G floors, the 11 px type floor across every rule and media query, the tab rule,
+and zero hex literals in markup. It found one real defect on the current source — `.tabi` at 10 px under
+380 px (E-100) — which is fixed; **42/42**, and three mutations go red.
+
+### E-099 · the engine added a free transfer on a wildcard week
+
+`ftAvailable()` in `src/engine.js` added one free transfer on a chip week; the rule (Part N1) is that the count
+is kept. Invisible on this season's data because no chip has been played; the bake's ledger disagreed on
+synthetic weeks and the unit test that pinned the old behaviour (E-045's "so 3") encoded the wrong rule. Both
+corrected; `qa/unit_engine.cjs` 266/266.
+
+### C1–C6 and E3 · the optimiser, the ledger replay and the plan legality suite
+
+`pipeline/solve.py`, `solve_long.py` and `solve_later.py` are the reference's programmes byte for byte in their
+model regions, with arguments for paths. `pipeline/plan.cjs` keeps the best of identical solves under the
+content-hash guard (E-101: a plan solved on other data exits 3 with nothing written), folds the timing file
+with "now" := the kept plan, re-prices the free-hit weeks against the kept plan, and REPLAYS the ledger from
+the rules of the game — free transfers, hits and bank week by week, a wildcard week keeping the count — so
+the interface never reads the solver's own free-transfer variables (§6; E-102). `qa/plan_legality.cjs`
+**49/49** on the reference plan as first recorded (the recorded solver output run through `plan.cjs`): fourteen
+rules on each of fourteen weeks, plus the C acceptance read from golden — total **878.28 = golden to the cent**, gap 0.012967 equal, wildcard GW6 with Saka, Triple Captain
+GW7 on Haaland, Bench Boost GW10, no hits; the GW6 fifteen name for name; the timing 878.28 / 876.8 (GW10) /
+869.4 exact; the Draft roster 645.77 from 577.57 with the eight golden pairs. The replay agrees with the
+solver's fields on all fourteen weeks and the reference ledger confirms the rule in data (GW6 wildcard keeps
+4; GW7 uses 2 → 3; then 4; then the cap). Five mutations go red at the named week (a rebuy 39/49; the replay
+disagreeing exits 2 naming GW7/8/9). `qa/solver_smoke.sh` **7/7** in 55 s: a 30-second solve returns a legal
+plan — measured, not chosen: HiGHS finds its first incumbent on this model (8,091 variables, 883 integer,
+11,787 rows) at 21.5 s on this machine, so the spec's 20 s returns no plan at all and the header says so.
+
+### Calibration proved, and the checker that had forced two renames
+
+`qa/calibration.cjs` **24/24**: the ported stage reproduces the kit's model block — four factors exactly and
+89 backtest leaves with zero paths over 1e-9 — on a copy of the committed block, and the committed block's
+own model equals the fixture; the corrections never feed their own evidence (calibrating twice equals once,
+and the mutant with both defences removed differs); two on-disk mutations of the backtest (the shrink at
+full ratio, the last week dropped) go red naming the moved factors. The export hash of the committed block
+is **d812652812be50a7**, the artifact's. E-109: `qa/tdz_check.cjs` attributed a `for (let x …)` header to the
+enclosing block, so a loop variable reused across two loops read as a same-scope TDZ — four findings on the
+untouched kit engine; the checker now scopes a for-header declaration to its loop, its self-test is 10/10
+with the new case, the unrenamed kit reads CLEAN and a genuine TDZ still fails. E-108 records the Draft
+horizon rule (§7.12) with its three checks.
+
+### The solve stage · data/plan.json and the reference acceptance
+
+On 26 September the export of the calibrated block hashed to **d812652812be50a7**, the artifact's own, so the kit's three
+solver files were copied byte for byte (cmp equal; 19,732 / 15,693 / 5,430 bytes; instants 26 Sep 17:26,
+17:35 and 17:51 UTC) rather than re-solved: a plan proved on identical input is a plan for this input, which
+is what the content hash exists to say. `pipeline/plan.cjs` kept the long solve (objective 677.51, gap
+0.00996), folded the timing file with now := the kept plan, and replayed the ledger: **data/plan.json** —
+903.96 expected points to gameweek 19, wildcard GW6 (Saka, vice Gabriel), bench boost GW7 and triple captain
+GW8 on Haaland, no hits, the replay agreeing with the solver's fields on all fourteen weeks, legality
+**39/39**; timing 903.96 / 897.47 (GW7) / 892.26, every case proved by the kit; Draft 667.23 from 596.17.
+
+The reference acceptance was run for real, twice, each solve detached on an idle core and waited on by pid:
+240 s reached 874.35 at a 1.65% gap; 480 s **proved optimal within 0.5% at 265.5 s** — 882.72, objective
+661.74, wildcard GW6 with Saka, triple captain GW7 on Haaland, no hits, the Draft roster 645.77 from 577.57
+with the eight golden pairs. That is inside the spec's 2% of golden's 878.28 — and it is a **better plan
+than golden's**: golden records a 240 s incumbent (objective 658.74, gap 1.3%) whose bench boost sits in
+GW10; the proven optimum puts it in GW9. `qa/plan_legality.cjs`'s acceptance had compared a re-solve to that
+incumbent exactly (chip weeks, first fifteen, total to 0.05, gap to 1e-6, timing now to 0.05), so the better
+proven solve failed five checks (44/49). That is E-084's class in an acceptance test — a time-limited
+incumbent photographed as truth — logged as **E-106** and corrected to what the spec actually asks (f9d73c1): total within 2%, wildcard GW6,
+triple captain GW7 with Haaland, one bench boost, no hits, gap under 3%, timing within 2%, the Draft pairs, and
+an objective at least the recorded incumbent's — **55/55**, with six new mutations (the triple captain moved, a
+second bench boost, an objective a point under the incumbent's, a hit, a gap over 0.03, a later total 3% off),
+each red on its named check. Exact reproduction of golden stays available where it belongs: the recorded
+solver output run through plan.cjs, which proves the fold and the replay rather than the solver's clock.
+
+### What the first full gate run found, and the two commits it asked for (E-107)
+
+The adversarial review ran the gate once on the port wave: 26 of 29 steps green, the three reds explained (E-106,
+and Isak's new flag twice). It also found that commits for E-099 (`ftAvailable` on a wildcard week) and E-100 (the
+10 px tab label) had changed the sources but not the shipped page: `app/FPL_Mission_Control.jsx` had last been
+written on 26 September, so the page still carried both defects, and nothing could see it because the gate
+rebuilds at step 3 and the source-equality check reads the rebuild. The page was rebuilt and committed (b4674d7;
+`node build.cjs` reproduces the tree byte for byte, unit_engine 266/266, visual 42/42), and E-107 records the rule:
+a commit that changes a source carries its rebuilt `app/` and `dist/`, until a pre-build comparison exists.
+
+### E-106 closed, and a count typed into a test (E-110)
+
+`qa/smoke_wk.cjs` pinned the Draft claims at six, the length of the v89 block, in two checks and one detail line.
+The v110 sheet lodges twelve or thirteen, so the first honest refresh would have gone red for giving better advice.
+Both checks now read the block's own length and the detail derives its code count (f9d73c1). E-111 records spec
+§7.13, the stale screenshot selling prices, held by `qa/prices.cjs` 12/12 (a835c6e).
+
+### The refresh on 27 September, and the weekly block written from the plan (905ab36)
+
+**Feeds.** `pipeline/pull.sh` fetched 53 feeds at 16:18 UTC; the bake, the calibration (factors unchanged at
+1.117 / 1.076 / 1.048 / 1) and the export moved the hash from d812652812be50a7 to **cef80183f9a5a2ae**. Two players
+changed since the 26 September bake: Isak flagged d, 75%, foot injury; Zepa down £0.1m. `pipeline/intel.js` was
+left as it stood: the one new fact is the official flag itself, and there was no dated report to set against it.
+
+**Solve**, detached on an idle machine, the main chain and the long solve on separate cores:
+
+| Stage | Result |
+|---|---|
+| Main plan (240 s limit) | optimal within 0.49% at 237.1 s · **902.96** Classic expected points to GW19 · objective 677.14 |
+| No wildcard (168 s) | 890.66 at a 6.8% gap on the clock |
+| Long solve (600 s limit) | optimal within 1% at 156.1 s · 897.08 · objective 672.09, so not kept |
+| Timing: later | wildcard in GW7, optimal within 1% at 240.1 s · **897.74** |
+| Timing: never | 891.42 at a 1.9% gap on the clock |
+| Draft roster | 667.23 from 596.17; with the manager ahead taking his modelled picks, 650.98 |
+
+`pipeline/plan.cjs` kept the main plan and replayed the ledger (agrees on all 14 weeks): **wildcard GW6, captain
+Saka, vice Gabriel; bench boost GW7 and triple captain GW8, both on Haaland; no hits**; twelve changes on the
+wildcard. `qa/plan_legality.cjs --plan=data/plan.json` **39/39**. Playing the wildcard now beats holding it to
+GW7 by 5.22 and never playing it by 11.54 (the better of the two no-wildcard bounds is quoted).
+
+**The Draft league reaches the snapshot (E-125).** `state/kwezi.json` had carried league 46148 since the morning,
+but `data/live.json` had not been re-fetched, and five checks asserted that the shipped snapshot had no league —
+a photograph of the day the id was unknown: `data/validate_live.cjs`, `qa/verify.sh` I15, the unit suite's
+no-league context, smoke_wk check 36 and the components suite's no-league render. Each now reads the league from
+the state and builds the no-league case explicitly; the 26 September snapshot goes red on the new validator checks
+(85/87), and the fixed suites read 88/88, 33/33, 266/266, 37/37 and 135/135.
+
+**`pipeline/weekly.cjs` (stage 7).** The weekly block is no longer typed. It is written from the plan: the fifteen,
+the armband, the chips, the timing lines, the fallback and the Draft claims sheet, with the plan's hash, and the
+v89 plan kept as `superseded` (its fifteen held to GW19 is worth 805.4 Classic expected points by the ported engine,
+v110's 856.1). Three rule conflicts surfaced on the first dry run and each is resolved in the open (E-126):
+
+- The optimiser's no-wildcard week sells Shaw, whom the Konsa rule protects, so the written fallback is the app's
+  own C2 protocol and the block says why.
+- Mainoo is flagged (d, 75%) in both games' feeds, and the Draft solve paired him with Janelt; `buildClaimSheet`
+  gained an opt-in `fitOnly` (default path unchanged, parity 51/51), so he is held back as a first choice and as a
+  backup and named with his status.
+- smoke_wk check 28 judged claims over five gameweeks, where law §1.2 plans the Draft game to GW20; it now measures
+  to the horizon, prints the five-week engine's disagreement (six of twelve today), and gains two guards —
+  the written claims equal the sheet line for line, and the block, the plan and the data share one hash — both
+  mutation-proved (a swap and a foreign hash each give 36/37).
+
+The sheet lodges **twelve claims, every first choice and then the backups**: Silva for Dunk, Evanilson for Isidor,
+Mukiele for Davis, Le Fée for Belloumi, Hill for Bogle, McBurnie for Igor Jesus, Cunha for King; then Schuster,
+Fernandez-Pardo, Justin, Buendía and Thomas. Under the league's own processing it is worth 637.7 in the stress test
+and a mean of 640.6 (p10 626.5, p90 652.9) over 1,500 simulated runs, against 596.2 today. The four orderings
+differ by at most 7.7 and the two best by 0.6, inside the simulation's noise, so the deterministic stress test
+decides, as the port does.
+
+The suites on the final data: tdz clean, privacy 25/25, no_frozen 6/6, validate_live 88/88, parity 51/51, bake
+42/42, export_hash 36/36, calibration 24/24, waiver_log 13/13 (74/74 claims), prices 12/12, pull_guard 22/22,
+plan_legality 39/39 and 55/55, verify 33/33, unit_engine 266/266, smoke 60/60, smoke_wk 37/37, components 135/135,
+realistic 8/8, buttons 10/10, webkit 34/34.
+
 ---
 
 ## 4. What has not been done yet
