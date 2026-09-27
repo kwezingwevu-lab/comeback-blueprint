@@ -59,7 +59,21 @@ Open it in Safari → Share → **Add to Home Screen**. It launches like an app.
 
 **Option B — keep it private (GitHub Pro).** GitHub Pages on a private repository needs the Pro plan (paid). Same Settings → Pages steps; the site is still reachable by anyone with the link, but the source repository stays private.
 
-Either way, once the app is on your Home Screen, your data lives in Safari's storage for that site plus the app's IndexedDB vault. Back up weekly with the app's own **Save backup to iCloud Drive / Google Drive** button; restore anywhere with the Data card's Restore picker.
+Either way, once the app is on your Home Screen, your data lives in that app's own storage plus its IndexedDB vault. Back up weekly with the app's own **Save backup to iCloud Drive / Google Drive** button; restore anywhere with the Data card's Restore picker.
+
+**Two facts about iPhone storage that decide where you log (checked against WebKit's own documentation, 26 Sep 2026):**
+- The Home Screen app and a Safari tab do **not** share storage. Anything logged in the Safari tab stays there. If you started in Safari: Backup in Safari, open the Home Screen app, Restore. (The app's Data card shows "This phone, checked live" and prompts for this.)
+- Safari clears a site's saved data after seven days of Safari use without a visit to it; the Home Screen app is exempt. Log in the Home Screen app.
+
+**Offline:** served from GitHub Pages, the app installs a service worker the first time it opens, then works with no signal (the gym basement included). A new build is picked up the next time you open it online; the app says "Updated to the latest build".
+
+**Straight to a tab:** add `#lift`, `#track`, `#roadmap`, `#fuel` or `#home` to the address to open that tab directly.
+
+## Part 7 — Watch data, reminders and the 3D view
+
+- **Watch data.** The paste route in the Data card works everywhere. There is also a one-tap link: an Apple Shortcut can open `…/ComebackBlueprint.html#import=2026-09-27,weight,88.4|2026-09-27,sleep,7.3` (lines joined with `|`, URL-encoded) and the app logs them once and clears the link. Be aware that iOS opens Shortcut links in **Safari**, not in the Home Screen app, and the two keep separate storage (above). If you log in the Home Screen app, keep using the paste route; the link is for people who run the app in Safari.
+- **Reminders.** Roadmap → **Put the plan in your calendar** → Download. Open the file from the download prompt or Files and choose Add All. It adds deloads, photo-and-tape days, re-tests, bloodwork, phase changes, peak week, the 5–7 March check weekend and daily 04:30 and 20:00 supplement reminders, each with an alert. A web app cannot schedule its own notifications on iPhone; the Calendar can. Not yet tried on a real iPhone — tell Claude if the import sheet does not appear.
+- **Body Lab (3D).** Roadmap → top card. Drag to turn, double-tap to zoom, scrub or play the 104 weeks. It uses the phone's GPU only while something changes. Not yet timed on a real iPhone — say if it stutters.
 
 ---
 

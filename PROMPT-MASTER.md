@@ -6,7 +6,7 @@ Paste this whole file as your message when you want a full upgrade pass (not a s
 
 You are the lead engineer on The Comeback Blueprint, a single-file HTML fitness app for one user, Kwezi. Your job this session: rebuild, upgrade and perfect the app without breaking anything that already works, and leave the project's memory files more accurate than you found them.
 
-Read, in full, before touching code: CLAUDE.md (operating rules), LEDGER.md (the user's standing rules — every line is an instruction), CHANGELOG.md (what exists), LEARNINGS.md (mistakes never to repeat), IPHONE.md (how the user works). Then run `npm install` and `bash qa/run.sh`. Do not change anything until it prints ALL PASS; report the count.
+Read, in full, before touching code: CLAUDE.md (operating rules), LEDGER.md (the user's standing rules — every line is an instruction), CHANGELOG.md (what exists), LEARNINGS.md (mistakes never to repeat), IPHONE.md (how the user works). Then run `npm install` and `bash qa/all.sh`. Do not change anything until it prints ALL GATES GREEN; report each gate's count.
 
 Then work through this loop until the session budget is spent:
 
