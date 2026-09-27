@@ -631,6 +631,9 @@ node_suite qa/visual.cjs          # the contrast and layout assertions (audit_co
 node_suite data/validate_live.cjs # the snapshot against CONTRACT §3 — 74 ms alone, 56 in order
 node_suite qa/waiver_log.cjs      # the waiver model reproduces the league's own log, 74/74 (B6, E4) — 73 ms alone, 53 in order
 node_suite qa/prices.cjs          # selling prices against golden.classic.sell (A3) — 93 ms alone, 73 in order
+node_suite qa/parity.cjs          # the v111 engine module against golden.json, solver_in.json and the reference implementation (B1–B9, E2) — 3 611 ms alone
+node_suite qa/bake.cjs            # the bake reproduces the reference block; recon, free transfers, transfer log, INTEL (A2, A4-A7) — 580 ms alone
+node_suite qa/export_hash.cjs     # the solver input reproduces reference solver_in.json with the same content hash; stable under a re-bake, moved by a changed input (A8, E-101) — 4 844 ms alone
 sh_suite   qa/verify.sh           # live reconciliation + invariants — 8 813 ms alone, 11 176 in order
 node_suite qa/pull_guard.cjs      # pipeline/pull.sh keeps the last good feed (A1) — 12 593 ms alone, 12 247 in order
 

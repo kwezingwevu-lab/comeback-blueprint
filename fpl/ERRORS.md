@@ -993,3 +993,113 @@ retyped in a suite. Registering an eleventh challenger is then one line in the e
 TEST: `qa/mc_full.cjs` 246/246 at 114,013 assertions and `qa/mc_all.cjs`'s I95, both reading the registry; and
 `qa/no_frozen.cjs` 6/6, which is the machine-checked form of the rule. Mutation-proven by reverting one registry
 read to a literal and confirming the check goes red again.
+
+### E-096 · v110 · cross-position Draft trades were proposed
+CAUSE: the trade search paired every player on my roster with every player on a rival's and scored
+the swap on expected points alone. Nothing checked that the two men played the same position, so a
+midfielder for a forward could top the list. A Draft squad must stay 2/5/5/3 (v110 §4, CLAUDE.md
+Part N2), so the game refuses such a swap — the proposal was advice that could not be followed, and
+the same hole sat in front of the claims sheet, which took solved pairs on trust.
+CAUGHT: in the v109 build outside this repository, by reading the Trades panel against the rules
+(spec §7.3). In the repository it is closed before it can occur: the check lands with the port.
+RULE: position for position, everywhere a swap is proposed. `findTrades` in `src/mc_analysis.js`
+skips any pair whose positions differ, and `buildClaimSheet` refuses a cross-position pair by name
+rather than lodging it, because a claim the game will reject is worse than no claim — it burns the
+slot in the processing order.
+TEST: `qa/parity.cjs` E-096 — every trade is position for position and never takes from my own
+roster; every claim on the sheet swaps like for like; the trade list equals the reference
+implementation's pair for pair (23 trades); and a cross-position pair fed to the sheet throws an
+error naming both players. Mutation-proven: with the position check removed from the trade search
+the list grows from 23 to 53 pairs and two checks go red (49/51).
+
+### E-097 · v110 · players dropped this week were labelled "sign now"
+CAUSE: the "how to get him" label read only the player's ownership status. `a` meant available, so
+it said "sign now" — but before the waiver run settles, every unowned player is a claim, whatever his
+status says, and a player marked `l` (dropped since the last run) stays a claim even after it. A
+label that ignores the phase tells the manager to do something the game will not let him do until
+Friday noon.
+CAUGHT: in the v109 build outside this repository, on the Free Agents table (spec §7.4). In the
+repository it is closed with the port.
+RULE: the label is phase-aware. `howToGet` in `src/mc_engine.js` returns "waiver" for every unowned
+player while `/api/game` reports `waivers_processed == false`, and "waiver" for status `l` after
+that; only an `a` player after the run is "free". `claimability` in `src/mc_analysis.js` names the
+phase ("claims" or "free") beside every label so the interface cannot show one without the other.
+TEST: `qa/parity.cjs` B5 — all 442 players in the reference pool are "waiver" before the run; on a
+copy of the data with the run settled and one player set to `l`, the `a` player is "free" and the
+`l` player is "waiver"; the reference engine agrees on every label. Mutation-proven: a phase-blind
+label (`l` → "waiver", everything else → "free") calls 442 claimable players "free" and the check
+goes red.
+
+### E-099 · v110 · a wildcard week was assumed to add a free transfer
+CAUSE: `ftAvailable` in `src/engine.js` replays the ledger with `if (chipWeeks[r.event] ...) { ft = Math.min(FT_CAP, ft + 1) }`:
+a wildcard or free-hit week spends nothing, which E-045 fixed, but the week's arrival still lands, so the count
+after a chip week reads one higher than the game's. The rule is that the count is kept exactly as it was — nothing
+spent, nothing added (Fantasy Football Scout, 20 Jul 2026; v110 §4 Classic, §6, CLAUDE.md Part N1). The same
+`+ 1` sits on the rows-array inference path (`freeUsed > FT_CAP`). No chip has been played on this snapshot, so no
+screen has yet shown the wrong number, which is why it sat unnoticed: the defect is in the code, and only a
+history with a chip in it can surface it.
+CAUGHT: v110, porting the bake. The v111 kit's ledger keeps the count (`ft = chip ? ft : ...`), the A5 unit test
+was written against that rule on synthetic weeks, and the "wildcard adds one" mutant the test refuses is exactly
+what the engine's replay does. The bake's own `ftNext` matches `golden.classic.ftNext` either way, because the
+manager has played no chip; on a chipped history the two would disagree by one.
+RULE: on a wildcard or free-hit week the free-transfer count is carried forward unchanged. The cap is
+`1 + game_settings.max_extra_free_transfers`, read from bootstrap and never typed. The ledger the bake ships is
+`ftLedger()` in `pipeline/bake.js`, exported so the suite runs the code the bake runs; `ftAvailable()` in
+`src/engine.js` still adds one on a chip week and is outside this item's files — it takes the same rule, and its
+E-045 tests ("the object and the rows array agree on a chip week") must then agree on the kept count, not on the
+added one.
+TEST: `qa/bake.cjs` A5 — `ftNext` equals `golden.classic.ftNext` with `ftSure` true; the block's value is what the
+exported `ftLedger` returns on its own weeks; five rule checks on synthetic histories (a wildcard week keeps the
+count, a free-hit week likewise, an ordinary week adds one, the cap is 1 + max_extra_free_transfers, a hit week
+leaves 1); and the mutation check that a ledger where the wildcard week adds one disagrees with `ftLedger` on the
+wildcard history while agreeing on the plain one. Suite 42/42.
+
+### E-100 · v110 · a 10px tab label shipped under the 11px type floor, inside a media query no gate could reach
+CAUSE: `src/ui.jsx` carries `@media (max-width:380px){ .tabi{min-width:37px;font-size:10px;padding:4px 0} … }`,
+written to keep seven tabs on one row on a 375px phone (the iPhone SE and mini class). The type floor is E-023's
+rule (11px, CLAUDE.md Part G) and it is measured by `qa/smoke.cjs` (E023-type-floor) and `qa/webkit.js`
+(G-type-floor) at a 390x844 viewport, where a max-width:380px rule never applies. The only narrower width either
+suite visits is 360px, for the horizontal-scroll check, after the floor has already been measured; `qa/browser.py`
+renders at 390 and 320 and measures overflow, not type. So the rule sat in the shipped file with every suite
+green. A floor measured in one viewport is a statement about that viewport: E-084's class, applied to a width
+instead of a date or a count.
+CAUGHT: 27 September 2026, by the first run of `qa/visual.cjs` audit_layout, which reads every font-size in every
+rule of every media query out of the stylesheet instead of measuring one rendering of it.
+RULE: the type floor is a property of the stylesheet, not of a viewport. Every `font-size`, the size in every
+`font` shorthand and every `fontSize` prop in markup, in every rule inside every media query, is at least 11px,
+held by a static scan that needs no browser. The browser measurement stays as the check that the rendered page
+agrees with the stylesheet, never as the only check.
+TEST: `qa/visual.cjs` — "11px type floor in every rule, every media query and every markup fontSize (33
+declarations)". It is RED on this tree, naming `.tabi @media (max-width:380px): font-size 10px = 10px`, and it is
+left red because the fix belongs in `src/ui.jsx`, which the suite's author was not to edit. The fix is one number:
+at 11px the seven tabs still fit, since the same suite computes 7×37 + 6×4 + 16 = 299px against the 360px width
+the browser suites use. Proven on a copy of the source with the rule raised to 11px: the check passes and the
+suite reads 42/42; on the source as it stands, 41/42.
+
+### E-101 · v110 · the solved plan was dropped after a harmless re-bake
+CAUSE: the kit's build guard once compared the plan's solve time with the block's `asOf`, so any bake after the
+solve read as "solved on different data". A re-pull moves fields no optimiser reads — transfer counts, ownership,
+price pressure, league ranks, the intel notes, the delta block and the clock itself — and the guard threw away a
+plan that was still the optimal plan for the block being shipped. It is E-093's fault in the solver's clothes: a
+clock says when, never what. The port measured the boundary rather than describing it: on the 26 Sep feeds the
+kit's data.json and this repository's bake differ in 1,156 player-level fields (`tin`, `tout`, `press`, `own`),
+the league ranks, `asOf` and `delta`, and the solver input hashes the same for both once the one real input
+difference — the kit's `model.calib` block, which `CAL` applies to every points component — is removed.
+CAUGHT: v110 spec §7.7, the kit's own record, confirmed while porting `app/export.js`: the reference solver input's
+hash recomputes from its own payload with the clock fields left out, which is only true of a content hash.
+RULE: the guard is a content hash. `pipeline/export.js` writes `hash` = the first 16 hex characters of the sha1 of
+the JSON of the solver payload {next, gws, cEnd, dEnd, classic, draft, players}, exactly as the kit computes it,
+and the two clock fields `at` and `dataAsOf` sit outside it. A solved plan ships only when its hash equals
+`buildInput(DATA, M).hash` on the block being shipped. A re-bake that changes no input keeps the hash; a price, a
+status or flag, a start override, a fixture, a calibration block or a squad change drops it. No stage compares
+clocks to decide whether a plan is current, and the shipped `data/solver_in.json` must be the export of the
+committed `data/mc_data.json`, so a re-bake that changes an input is followed by `npm run export` or the gate says so.
+TEST: `qa/export_hash.cjs` 36/36 in 5.2 s — the export reproduces `reference/v109/app/solver_in.json` path for
+path with the same hash (`dde282bdf39bd757`, from the ported engine and from the reference engine run in the same
+process); the hash recomputes from the file's own payload; it is kept under a changed asOf, delta, intel.notes and
+every player's transfer counts, ownership and price pressure, and moved by one price (0.1), one status, one start
+override's probability and one fixture's home side; the shipped input is the export of the committed block.
+Written first and run red (2/3, `Cannot find module pipeline/export.js`). File-level mutations, each restored byte
+for byte and each 31/36: three-decimal rounding cut to two names `$.players[0].ep[1] ref 4.088 got 4.09`; the hash
+cut to 15 hex is red with the payload path-equal; `did` dropped from the player row names
+`$.players[0].did missing from the export`.

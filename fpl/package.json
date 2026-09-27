@@ -5,6 +5,8 @@
   "description": "FPL Mission Control — single-file React app for Kwezi's FPL season. Factory + QA suites.",
   "scripts": {
     "fetch": "node data/fetch_live.cjs",
+    "bake": "node pipeline/bake.js",
+    "export": "node pipeline/export.js",
     "build": "node build.cjs",
     "tdz": "node qa/tdz_check.cjs app/FPL_Mission_Control.jsx",
     "verify": "bash qa/verify.sh",
