@@ -421,6 +421,8 @@ node_suite_arg() {
   if node "$@" "$file" "$sarg" 2>&1; then end_step 0; else end_step "$?" "suite exited non-zero"; fi
 }
 
+node_suite_args() { local file="$1"; shift; if [ "$DRY" -eq 1 ]; then dry "node" "$file $*" "$file"; return 0; fi; begin_step "${file#qa/} $*"; if [ ! -f "$file" ]; then end_step_missing "$file does not exist yet (suite not written)"; return 0; fi; if node "$file" "$@" 2>&1; then end_step 0; else end_step "$?" "suite exited non-zero"; fi; }   # node_suite_args <file> <script-args…> — several arguments for the suite itself, no node flags
+
 # sh_suite <file> — same treatment for the bash suites.
 sh_suite() {
   local file="$1"
@@ -634,8 +636,12 @@ node_suite qa/prices.cjs          # selling prices against golden.classic.sell (
 node_suite qa/parity.cjs          # the v111 engine module against golden.json, solver_in.json and the reference implementation (B1–B9, E2) — 3 611 ms alone
 node_suite qa/bake.cjs            # the bake reproduces the reference block; recon, free transfers, transfer log, INTEL (A2, A4-A7) — 580 ms alone
 node_suite qa/export_hash.cjs     # the solver input reproduces reference solver_in.json with the same content hash; stable under a re-bake, moved by a changed input (A8, E-101) — 4 844 ms alone
+node_suite qa/calibration.cjs     # the calibration stage reproduces the kit's model block on a copy of the block; the backtest is uncalibrated and idempotent; the committed block carries it (A9) — 4 006 ms alone
+node_suite_arg qa/plan_legality.cjs --plan=data/plan.json   # every week of the shipped plan obeys the rules; the ledger replayed, never the solver's fields (E3, C1–C3, C5, §7.1 §7.9 §7.10) — 469 ms alone; a missing plan file is a FAIL, not a skip; golden is not run here because its numbers were recorded on the reference data
+node_suite_args qa/plan_legality.cjs --plan=data/plan_reference.json --data=reference/v109/app/data.json --golden=reference/v109/app/golden.json   # the reference input re-solved by the ported optimiser (proven optimal within 0.5%) against the C acceptance in golden.json; five golden reproduction checks are red by E-106 (44/49) until the acceptance carries the spec's tolerance — 406 ms alone
 sh_suite   qa/verify.sh           # live reconciliation + invariants — 8 813 ms alone, 11 176 in order
 node_suite qa/pull_guard.cjs      # pipeline/pull.sh keeps the last good feed (A1) — 12 593 ms alone, 12 247 in order
+sh_suite   qa/solver_smoke.sh     # a 30-second solve → plan.cjs → legality shape checks (gap skipped by name); the full optimiser never runs here (E6, C6, §7.2) — 54 839 ms alone, last in the group because it is the dearest
 
 # ---------------------------------------------------------------- C. engine and render (no browser)
 

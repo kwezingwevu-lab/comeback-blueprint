@@ -1,0 +1,7 @@
+plan Optimization terminated successfully. (HiGHS Status 7: Optimal) 265.5 s · gap 0.004996438753942901 · total 882.72
+no-wildcard 178.4 s · gap 0.004999071942350601 · total 872.0
+free hit [(6, 2.62), (7, 2.26), (8, 3.8), (9, 4.34), (10, 4.33), (11, 2.95), (12, 2.91), (13, 1.83), (14, 3.34), (15, 2.46), (16, 2.71), (17, 1.38), (18, 3.13), (19, 3.58)]
+draft 0.0 s · value 645.77 base 577.57 [('Silva', 'Dunk'), ('Mukiele', 'Davis'), ('Hill', 'Bogle'), ('E.Le Fée', 'Belloumi'), ('Cunha', 'King'), ('Mainoo', 'Janelt'), ('Evanilson', 'Isidor'), ('McBurnie', 'Igor Jesus')]
+draft if taken 630.23 [('Hill', 'Dunk'), ('Schuster', 'Davis'), ('Justin', 'Bogle'), ('Cunha', 'Belloumi'), ('Mainoo', 'King'), ('Evanilson', 'Isidor'), ('McBurnie', 'Igor Jesus')]
+done in 444.8 s · /tmp/claude-0/-home-user-comeback-blueprint/8f4af8d8-1eb6-54a0-8ea3-bc1fd9937384/scratchpad/ref_out_480.json
+exit 0

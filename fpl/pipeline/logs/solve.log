@@ -1,0 +1,7 @@
+plan Time limit reached. (HiGHS Status 13: Time limit reached) 240.0 s · gap 0.06008719328191616 · total 900.06
+no-wildcard 168.0 s · gap 0.005013132150922921 · total 890.63
+free hit [(6, 3.17), (7, 2.35), (8, 4.14), (9, 2.81), (10, 3.96), (11, 3.89), (12, 3.98), (13, 8.75), (14, 3.96), (15, 3.48), (16, 2.65), (17, 1.63), (18, 3.49), (19, 3.83)]
+draft 0.0 s · value 667.23 base 596.17 [('Silva', 'Dunk'), ('Mukiele', 'Davis'), ('Hill', 'Bogle'), ('E.Le Fée', 'Belloumi'), ('Cunha', 'King'), ('Mainoo', 'Janelt'), ('Evanilson', 'Isidor'), ('McBurnie', 'Igor Jesus')]
+draft if taken 650.98 [('Hill', 'Dunk'), ('Schuster', 'Davis'), ('Justin', 'Bogle'), ('Cunha', 'Belloumi'), ('Mainoo', 'King'), ('Evanilson', 'Isidor'), ('McBurnie', 'Igor Jesus')]
+undecayed 896.33
+done in 553.8 s

@@ -130,11 +130,33 @@ jobs:
       - name: export_hash (the solver input reproduces the reference's with the same content hash; stable under a re-bake, moved by a changed input — A8)
         run: node qa/export_hash.cjs 2>&1 | tee -a "$GATE_LOG"
 
+      - name: calibration (the calibration stage reproduces the kit's model block; the backtest is uncalibrated and idempotent; the committed block carries it — A9)
+        run: node qa/calibration.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      # E3. The suite itself fails loudly when the plan file is absent (a FAIL line and exit 1): a gate that runs
+      # without a plan proves nothing. data/plan_reference.json is the reference solve through pipeline/plan.cjs.
+      - name: plan_legality (every week of the shipped plan obeys the rules; the ledger replayed, never the solver's fields — E3, C1-C3, C5)
+        run: node qa/plan_legality.cjs --plan=data/plan.json 2>&1 | tee -a "$GATE_LOG"
+
+      - name: plan_legality reference (the reference input re-solved by the ported optimiser against the C acceptance in golden.json; five reproduction checks red by E-106 until the acceptance carries the spec's tolerance — C1, C2, C4, C5)
+        run: node qa/plan_legality.cjs --plan=data/plan_reference.json --data=reference/v109/app/data.json --golden=reference/v109/app/golden.json 2>&1 | tee -a "$GATE_LOG"
+
       - name: verify.sh (live reconciliation + invariants)
         run: bash qa/verify.sh 2>&1 | tee -a "$GATE_LOG"
 
       - name: pull_guard (the pull keeps the last good feed)
         run: node qa/pull_guard.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      # E6. The optimiser's Python dependencies (scipy>=1.11 for scipy.optimize.milp on HiGHS, numpy), pinned in
+      # pipeline/requirements.txt. An install step like npm ci, not a suite: run.sh --dry-run does not list it.
+      - name: pip install -r pipeline/requirements.txt (the optimiser's dependencies, for the solver smoke)
+        run: python3 -m pip install --disable-pip-version-check -r pipeline/requirements.txt 2>&1 | tee -a "$GATE_LOG"
+
+      # A 30-second solve through pipeline/solve.py, pipeline/plan.cjs and the legality shape checks (the gap check
+      # skipped by an explicit flag, and the script says so). The full optimiser never runs on push; data/plan.json
+      # is written only by the solve stage on an idle machine. About 55 s on the dev machine.
+      - name: solver_smoke (a 30-second solve must return a legal plan; the full optimiser never runs on push — E6, C6)
+        run: bash qa/solver_smoke.sh 2>&1 | tee -a "$GATE_LOG"
 
       # ---------------------------------------------------------------- C · engine and render
 
