@@ -49,3 +49,11 @@ See CLAUDE.md §6 for the numbered list. Additions:
 - 2026-09-27: A harness that answers every non-file: request must let blob: URLs through; otherwise object-URL images fail to decode in tests only, and the failure looks like an app bug.
 - 2026-09-27: Puppeteer's page.focus() throws on SVG elements ("Cannot focus non-HTMLElement") and the throw ended the whole suite. Focus through the page (element.focus()) and keep every test step null-safe.
 - 2026-09-27: A fixed-width readout line must be measured at its worst case across every point: the roadmap's longest reading was 367 px in a 316 px line until the week number moved out.
+- 2026-09-27 (visual audit): A CSS anchor that starts mid-rule can sit inside a selector list. ".field select{…}" was really ".field input,.field select{…}", so the new select chevron landed on every number and date field. Print the whole rule, selector list included, before replacing it.
+- 2026-09-27: I removed a CSS rule as "dead" that was the audit's own fix (fuel-10, the divider after slow protein). Before deleting a rule written for a finding, re-read the finding and measure the element.
+- 2026-09-27: Scroll preservation must measure the same element before and after. The handler measured the clicked button and restored the segment around it, 5 px apart.
+- 2026-09-27: getBoundingClientRect includes transforms, so a card's entrance animation moves everything for 300 ms after a re-render. In-place re-renders (same view) now skip the entrance fade; tests that measure positions wait out a view's own arrival fade.
+- 2026-09-27: A fixed sleep after an async save is a flake waiting to happen: the photo save took ~1.0–1.1 s headless and the 900 ms sleep started failing with no app change. Poll for the save's own visible result (its toast).
+- 2026-09-27: Second time for the innerText/text-transform gotcha: uppercasing the "on now" chip broke a regex that expected lowercase. Before adding text-transform to a label, grep the tests for its text.
+- 2026-09-27: A batch that edits two files wrote the first, then crashed on the second (a missing argument). Build every file's new content first and write them all at the end.
+- 2026-09-27: iOS Safari zooms the page when a field under 16 px takes focus. Every input, select and textarea is now 16 px or more, checked in both engines; any new field must follow.

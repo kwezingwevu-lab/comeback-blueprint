@@ -45,7 +45,7 @@ T('webkit readout: a tap on the roadmap chart prints date, weight and phase',/^\
 // Progress photos (27 Sep): a photo picked through the file chooser is stored as a JPEG Blob in IndexedDB and decodes on screen.
 {const img=path.resolve(__dirname,'shots/webkit-photo-src.jpg');fs.mkdirSync(path.dirname(img),{recursive:true});await p.screenshot({path:img,type:'jpeg'});
  await p.evaluate(()=>{switchView('track');document.querySelector('.track-tabs button[data-tp="measure"]').click();});await wait(300);
- const [fc]=await Promise.all([p.waitForEvent('filechooser',{timeout:5000}),p.click('[data-ph="front"]')]);await fc.setFiles(img);await wait(1200);
+ const [fc]=await Promise.all([p.waitForEvent('filechooser',{timeout:5000}),p.click('[data-ph="front"]')]);await fc.setFiles(img);for(let i=0;i<80;i++){await wait(100);if(await p.evaluate(()=>/^Saved · /.test(document.getElementById('toast').innerText)))break;}await wait(300);
  const ph=await p.evaluate(async()=>{const a=await phAll();const im=document.querySelector('#phBody .ph-cmp img');return {n:a.length,type:a[0]&&a[0].blob.type,ok:!!(im&&im.complete&&im.naturalWidth>0)};});
  T('webkit photos: picked photo stored as a JPEG in IndexedDB and shown',ph.n===1&&ph.type==='image/jpeg'&&ph.ok,JSON.stringify(ph));}
 await p.evaluate(()=>switchView('home'));await wait(300);
@@ -56,6 +56,10 @@ T('webkit tech: rest timer finishes from wall-clock time after the phone was awa
 T('webkit tech: weekly check-in text for Claude builds',await p.evaluate(()=>/Weekly check-in from The Comeback Blueprint/.test(coachText())&&/Use only the numbers above/.test(coachText())));
 T('webkit tech: Track Lifts and Regions panes render (7 regions)',await p.evaluate(async()=>{switchView('track');await new Promise(r=>setTimeout(r,150));return document.querySelectorAll('#tp-regions .rg').length===7&&!!document.getElementById('tp-lifts');}));
 T('webkit tech: no manifest or service worker on file:// (install layer is http-only)',await p.evaluate(()=>!document.querySelector('link[rel=manifest]')&&!window.__swReg));
+// Safari zooms the page when a field under 16 px takes focus; every field in the app must be 16 px or more, and selects draw their own chevron.
+{const z=await p.evaluate(()=>{const small=[];for(const v of [...document.querySelectorAll('.tab[data-view]')].map(x=>x.dataset.view)){switchView(v);if(v==='track')document.querySelectorAll('[data-tp]').forEach(x=>x.click());document.querySelectorAll('#view-'+v+' input,#view-'+v+' select,#view-'+v+' textarea').forEach(e=>{if(/file|checkbox|radio|range|hidden/.test(e.type))return;const f=parseFloat(getComputedStyle(e).fontSize);if(f<16)small.push(v+':'+(e.id||e.tagName)+':'+f);});}
+  const s=document.querySelector('select.sel'),i=document.getElementById('wVal');return {small,sel:s&&getComputedStyle(s).backgroundImage.slice(0,20),app:s&&(getComputedStyle(s).webkitAppearance||getComputedStyle(s).appearance),inp:getComputedStyle(i).backgroundImage};});
+ T('webkit iPhone: no field under 16 px (no focus zoom); selects draw the chevron, number fields do not',z.small.length===0&&/svg/.test(z.sel||'')&&z.app==='none'&&z.inp==='none',JSON.stringify(z));}
 T('webkit: no page/console errors',errs.length===0,errs.join('|').slice(0,300));
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+String(x.detail||'').replace(/\s+/g,' ').slice(0,400)).join('\n')||'WEBKIT ALL PASS');console.log('WEBKIT RESULT:',pass+'/'+R.length);process.exit(pass===R.length?0:1);})().catch(e=>{console.error('WEBKIT CRASH:',e.message);process.exit(2);});

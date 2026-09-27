@@ -2,7 +2,7 @@
 
 Every session adds to this list, builds everything on it that can be verified, and says plainly why the rest waits. "Shipped" means a named check in the QA suites proves it; nothing is marked shipped on the strength of reading the code.
 
-Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then a 64-finding adversarial review round fixed and proven (section R), then a visual round (section V, 14 items) and on 27 Sep the chart readout and progress photos (V15, V16, formerly K13 and K4); 12 queued with the reason; 6 not possible from a web app, with the honest alternative.
+Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then a 64-finding adversarial review round fixed and proven (section R), then a visual round (section V, 14 items) and on 27 Sep the chart readout and progress photos (V15, V16, formerly K13 and K4), then a visual audit (section U, 87 confirmed findings, all fixed); 14 queued with the reason; 6 not possible from a web app, with the honest alternative.
 
 ## A. Correctness and coherence (every tab tells the same story)
 
@@ -136,6 +136,19 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then 
 | V16 | Progress photos on the phone: front/side/back, first-vs-latest compare, Undo, space used, save to Files or iCloud | Shipped 27 Sep · Z photos ×2, WebKit photos |
 | V14 | Harness: one-line FAILs, null-safe UI steps, 390 px probe, WebKit shot helper | Shipped · mutation run 255/261 with 6 named FAILs |
 
+## U. Visual audit (27 Sep): 94 reported, 87 reproduced by a second agent, all fixed
+
+| # | Area | Findings | Status |
+|---|---|---|---|
+| U1 | Tokens, header, toast over the rest timer, timer controls | 4 | Shipped · AA tokens, AA header, screenshot |
+| U2 | Home: backup warning colour, Brief nudges, milestone weekend, strip, Jump In, placeholders | 20 | Shipped · AA home, AA milestone weekend |
+| U3 | Lift: opens on today, home chips vs rows, Add/Remove with Undo, Extras RIR, deload top set, copy | 19 | Shipped · AA lift ×2, AA lift home |
+| U4 | Roadmap, ETA, Numbers, Guide, engine: FFMI 25 band, tags, signed numbers, Mini-Cut I after the check | 21 | Shipped · AA cut mode, AA engine, AA roadmap and Guide |
+| U5 | Fuel: plan numbers from the plan, live mode name, sized advice, one protein figure, one beta-alanine and citrulline protocol, lifter copy, tiles, divider | 13 | Shipped · AB fuel, AB fuel cut, dose check, AB events live (divider) |
+| U6 | Events: name line, date order, past-month copy, "just outside", placement rule, keep your place (and live chips, which the verifier called cosmetic; done anyway) | 4 | Shipped · AB events, AB events live, AB fuel/events |
+| U7 | Track: region bars that never filled below 60% (--bad), selects, date width, neck note, Tests title, backup buttons, band label | 6 | Shipped · AB track, screenshot |
+| U8 | iPhone-only: fields under 16 px (focus zoom), sticky hover, desktop spinners; SA spelling | critic | Shipped · AB iPhone, WebKit iPhone, AB copy |
+
 ## K. Queued (not built yet) — what each needs
 
 | # | Item | Why it waits |
@@ -151,6 +164,8 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then 
 | K10 | Dark/light theme switch | App is dark-only by design; low value for the effort |
 | K11 | Home Screen reminders at 04:30 and 20:00 | Web push on iPhone needs a push server; the Shortcuts app can do it today (see IPHONE.md) |
 | K12 | Split the 380 KB single file into modules | Only if the file becomes hard to edit; single-file is a feature for the phone |
+| K15 | Start Mini-Cut I one week earlier (W27, 13 Mar) instead of W28 (20 Mar) | Your call, not mine: today the two weeks after the check weekend run at Maximum, then the cut. Starting a week earlier trims ~0.3 kg of fat gain and costs a week of building. Say which and it is a one-line change |
+| K16 | A second audit pass over states the first one did not open | The critic listed them: charts and photos with months of data, the Data card on the published https page without the Claude account mirror, the installed app's safe areas, every Weekly Review verdict, the views after March, the specialisation blocks, and 375 px phones. Worth one more round once there is real data to render |
 | K14 | Check the visual round on your iPhone | The sandbox WebKit is Playwright’s build, not iOS Safari; open the published app on the phone and report anything that looks off |
 
 ## L. Not possible from a web app (and the honest alternative)
