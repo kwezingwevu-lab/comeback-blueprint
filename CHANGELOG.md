@@ -1,5 +1,19 @@
 # CHANGELOG.md — what has shipped (newest first)
 
+## 2026-09-27 (week 3)
+- Independent review of everything since the unzip; eight defects confirmed with reproductions and fixed:
+  - home progression now uses the home prescription (10–20, 12–20, 15–25), not the gym range;
+  - bodyweight sets logged with reps only now get Next cards, Track lines, PRs and stall checks (load = weigh-in nearest that day + added kg; labels read "12×BW");
+  - Aggressive rules (first-set load trigger, extra set, tags, brake label) end at the March milestone (`aggrLive()`);
+  - back-off and stall reset stay on the kit's grid, never "drop" to the same load, and say so when one step is more than 10%;
+  - the calendar file now escapes semicolons (RFC 5545);
+  - Body Lab binds once per render, refreshes when the Day-1 weigh-in changes, recovers from GPU context loss, and adapts resolution from real frame time.
+- Weight chart's target band now counts in the y-scale.
+- Test harness: first-load marker moved from sessionStorage to window.name (Chromium can drop sessionStorage across a file:// reload, which re-seeded pages mid-test and caused the intermittent restore failure).
+- Live calendar diff (27 Sep): no disagreements; nothing new to add inside 30 km (reasons in IMPROVEMENTS.md).
+- Docs: IPHONE.md storage facts, offline, Shortcut caveat, reminders, Body Lab; IMPROVEMENTS.md register; prompts use `bash qa/all.sh`.
+- Gates: Chromium 292/292 · PWA 16/16 · WebKit 29/29 · calendar helper 8/8.
+
 ## 2026-09-26 (week 3)
 - **Body Lab · 3D + time (Roadmap).** Real-time WebGL render of the plan's body: signed-distance anatomy (28 smooth-blended primitives), three-point lighting, wrap-lit satin material, crease shading that sharpens as body fat drops, ambient occlusion, soft contact shadow, ACES tone mapping, dithering. Time is the fourth axis: scrub or play weeks 1–104; weight from `buildRoadmap()`, lean from the stated lean-gain model (flat in cuts, capped at the FFMI-25 ceiling), fat = weight − lean, muscle girth ∝ √(lean ÷ Day-1 lean). Modes: Form, Training heat (this week's legs-and-back sets vs plan), Growth (analytic mm of muscle depth added, fat held equal). Renders on demand only; low resolution while moving, full device resolution (≤2.4 MP) at rest; context-loss safe; one persistent canvas; plain-text fallback without WebGL.
 - **Chart engine.** Monotone cubic curves, gradient fill on single-series charts, haloed latest value with unit, hairline strokes at any zoom, touch/pointer scrub readout, screen-reader summary; distinct y ticks; day-first dates ("14 Sep") on any locale.

@@ -264,7 +264,8 @@ async function pg(b,iso,seed,opt){opt=opt||{};const ctx=await b.createBrowserCon
   p.__errs=[];p.__dialogs=[];p.on('pageerror',e=>p.__errs.push(e.message));p.on('console',m=>{if(m.type()==='error')p.__errs.push(m.text());});p.on('dialog',d=>{p.__dialogs.push(d.message());d.accept();});
   await p.evaluateOnNewDocument((iso,hh)=>{const R=Date;const fixed=new R(iso+'T'+hh+':00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;},iso,opt.time||'09:00');
   await p.evaluateOnNewDocument(STORAGE);
-  await p.evaluateOnNewDocument(s=>{if(sessionStorage.getItem('__qs'))return;sessionStorage.setItem('__qs','1');localStorage.clear();localStorage.setItem('cb2_pure','true');if(s)for(const k in s)localStorage.setItem(k,JSON.stringify(s[k]));},seed||null);
+  // first-load marker in window.name: Chromium can drop sessionStorage across a file:// reload, which re-seeded pages mid-test
+  await p.evaluateOnNewDocument(s=>{if(window.name==='__qs')return;window.name='__qs';localStorage.clear();localStorage.setItem('cb2_pure','true');if(s)for(const k in s)localStorage.setItem(k,JSON.stringify(s[k]));},seed||null);
   await p.setViewport({width:390,height:844,deviceScaleFactor:1});
   await p.goto('file://'+path.resolve('ComebackBlueprint.html')+(opt.hash||''),{waitUntil:'networkidle0'});await wait(900);return p;}
 const done=async p=>{await p.__ctx.close();};
@@ -299,7 +300,7 @@ for(const [iso,key] of [['2026-09-26','legsA'],['2026-09-27','pushA'],['2026-09-
  T('Y: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
 {const st=[['2026-09-05',82],['2026-09-12',82],['2026-09-16',82],['2026-09-19',82]].map(([d,w])=>SS(d,'legsA',{ga1:sets(4,6,w)}));
  st[0].entries.ga1=sets(4,7,82);const p=await pg(b,'2026-09-26',{cb2_sessions:st});await p.click('.tab[data-view="lift"]');await wait(400);
- T('prog: three sessions without a new best → ~10% reset suggestion',await p.evaluate(()=>/No new best in three sessions — drop to 72\.5 kg/.test(document.querySelector('[data-prog="ga1"]')?.innerText||'')),await p.evaluate(()=>document.querySelector('[data-prog="ga1"]')?.innerText));await done(p);}
+ T('prog: three sessions without a new best → ~10% reset suggestion',await p.evaluate(()=>/No new best in three sessions — drop to 75 kg/.test(document.querySelector('[data-prog="ga1"]')?.innerText||'')),await p.evaluate(()=>document.querySelector('[data-prog="ga1"]')?.innerText));await done(p);}
 // --- Z. Add set / Remove set
 {const p=await pg(b,'2026-09-26');await p.click('.tab[data-view="lift"]');await wait(400);const rows=()=>p.evaluate(()=>document.querySelectorAll('#liftBody input[data-ex="ga2"][data-f="r"]').length);
  const r0=await rows();await p.click('[data-add="ga2"]');await wait(300);const r1=await rows();T('sets: Add set adds exactly one row',r1===r0+1,r0+'→'+r1);
@@ -526,5 +527,33 @@ for(const [iso,title,brief] of [['2026-11-12','Pull B — Strength','Today: Pull
  await p.evaluate(()=>document.querySelector('.track-tabs button[data-tp="measure"]').click());await wait(400);
  T('charts: two-series charts get no area fill (it would bury the second line)',await p.evaluate(()=>{const sv=[...document.querySelectorAll('#view-track .chart-svg')].find(s=>/cm/.test(s.getAttribute('data-pts')||''));return !!sv&&sv.querySelectorAll('linearGradient').length===0;}));
  T('AW-2: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+// --- AX. review fixes (27 Sep 2026)
+{const p=await pg(b,'2026-09-27',{cb2_loc:'home',cb2_sessions:[SS('2026-09-20','pushA',{pa1:[{r:'10',w:'15'},{r:'9',w:'15'},{r:'9',w:'15'}]},'home')]});await p.click('.tab[data-view="lift"]');await wait(400);
+ const c=await p.evaluate(()=>document.querySelector('[data-prog="pa1"]')?.innerText||'');
+ T('home progression follows the home prescription (10–20), not the gym 5–8',/add a rep to each set \(aim 11\/10\/10\)/.test(c)&&/range 10–20/.test(c),c);await done(p);}
+{const p=await pg(b,'2026-09-27',{cb2_sessions:[SS('2026-09-13','pushA',{pa3:sets(3,10,0)}),SS('2026-09-20','pushA',{pa3:sets(3,12,0)})]});await p.click('.tab[data-view="lift"]');await wait(400);
+ const c=await p.evaluate(()=>document.querySelector('[data-prog="pa3"]')?.innerText||'');
+ T('bodyweight sets logged with reps only drive the Next card (no "0 kg" wording)',c.length>0&&!/\b0 kg/.test(c)&&/bodyweight/.test(c),c);
+ await p.click('.tab[data-view="track"]');await wait(300);await p.evaluate(()=>document.querySelector('.track-tabs button[data-tp="lifts"]').click());await wait(400);
+ const t=await p.evaluate(()=>({opts:[...document.querySelectorAll('#exSel option')].map(o=>o.value),top:document.querySelector('.ex-stats small')?.innerText||'',pr:prEvents().length,note:document.getElementById('e1rmNote')?.innerText||''}));
+ T('bodyweight lifts get a Track line, a PR and "12×BW" labels',t.opts.includes('pa3@gym')&&/12×BW/.test(t.top)&&t.pr===1&&/weigh-in nearest that day/.test(t.note),JSON.stringify(t));
+ T('AX-1: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+{const p=await pg(b,'2027-06-10',{cb2_bulk:'aggr',cb2_sessions:[SS('2027-06-06','pushA',{pa1:[{r:'8',w:'60'},{r:'6',w:'60'},{r:'6',w:'60'}]})]});
+ const r=await p.evaluate(()=>({live:aggrLive(),p:progFor(exObj('pa1'),'2027-06-11','gym')}));
+ T('after the March milestone the Aggressive first-set load trigger is off',r.live===false&&r.p.kind!=='up',JSON.stringify(r));await done(p);}
+{const p=await pg(b,'2026-09-27');const r=await p.evaluate(()=>{const H=(d,r,w)=>({dateISO:d,day:'pushA',loc:'gym',id:'z'+d+w,entries:{}});
+  const run=(id,day,sets,loc)=>{DB.sessions=[{id:'z1',dateISO:'2026-09-20',day,loc:loc||'gym',entries:{[id]:sets}}];return progFor(exObj(id),'2026-09-27',loc||'gym');};
+  const bo=run('pa4','pushA',[{r:'7',w:'12'},{r:'7',w:'12'},{r:'6',w:'12'}]);
+  DB.sessions=['2026-08-30','2026-09-06','2026-09-13','2026-09-20'].map((d,i)=>({id:'s'+i,dateISO:d,day:'pushA',loc:'gym',entries:{pa1:[{r:'6',w:'20'},{r:'6',w:'20'},{r:'6',w:'20'}]}}));const bar=progFor(exObj('pa1'),'2026-09-27','gym');
+  DB.sessions=['2026-08-30','2026-09-06','2026-09-13','2026-09-20'].map((d,i)=>({id:'s'+i,dateISO:d,day:'pushA',loc:'gym',entries:{pa4:[{r:'9',w:'22'},{r:'9',w:'22'},{r:'9',w:'22'}]}}));const db=progFor(exObj('pa4'),'2026-09-27','gym');
+  return {bo,bar,db,ics:icsEsc('a;b,c')};});
+ T('back-off on a 12 kg dumbbell: one 2 kg step, and the copy says it is more than 10%',r.bo.kind==='reset'&&r.bo.w===10&&/smallest the kit allows/.test(r.bo.why),JSON.stringify(r.bo));
+ T('stall on an empty 20 kg bar never "drops to 20 kg"; a 22 kg dumbbell resets to 20 (9%), not 18',r.bar.kind==='harder'&&/cannot drop further/.test(r.bar.text)&&r.db.kind==='reset'&&r.db.w===20,JSON.stringify({bar:r.bar,db:r.db}));
+ T('calendar file escapes ; and , (RFC 5545)',r.ics==='a'+String.fromCharCode(92)+';b'+String.fromCharCode(92)+',c',r.ics);await done(p);}
+{const p=await pg(b,'2026-10-10');await p.evaluate(()=>{switchView('roadmap');switchView('roadmap');});await wait(1500);
+ await p.evaluate(()=>document.getElementById('blPlay').click());await wait(300);const r=await p.evaluate(()=>({play:BL.play,ok:BL.ok,bound:document.getElementById('blStage').dataset.bound}));await p.evaluate(()=>{BL.play=false;});
+ T('Body Lab binds once when the Roadmap renders twice (one tap = one toggle)',(!r.ok||r.play===true)&&r.bound==='1',JSON.stringify(r));
+ const k=await p.evaluate(()=>{blSeries();const k1=BL.serK;DB.weight=[{date:'2026-09-12',v:90}];const k2=(blSeries(),BL.serK);return k1!==k2;});
+ T('Body Lab series refreshes when the Day-1 weigh-in changes',k);await done(p);}
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));})();

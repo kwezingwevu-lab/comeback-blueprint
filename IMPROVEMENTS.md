@@ -12,6 +12,8 @@ Kept current by every session. Status: **done** (shipped and tested), **your cal
 
 ## Done — 26 to 27 Sep 2026
 
+**Independent review (27 Sep)** — 8 confirmed defects fixed with regression tests: home rep range, bodyweight-only sets, Aggressive rules after March, back-off/reset grid and cap, .ics semicolon escape, Body Lab double-binding, stale series cache, context-loss recovery; plus the weight chart band and a test-harness re-seeding flake.
+
 **Visuals**
 - Body Lab · 3D + time on the Roadmap: real-time WebGL body, three-point lighting, ambient occlusion, soft contact shadow, crease shading tied to body fat, ACES tone mapping; scrub or play weeks 1–104; Form / Training heat / Growth (analytic millimetres of muscle depth). Renders on demand, low resolution while moving, full resolution at rest, context-loss safe, text fallback without WebGL.
 - Charts: monotone curves, single-series gradient fill, latest value labelled, crisp at any zoom, touch-scrub readout, screen-reader summaries, distinct y ticks, day-first dates.
