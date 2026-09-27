@@ -1291,3 +1291,18 @@ objective at least the recorded incumbent's, read from `reference/v109/app/solve
 TEST: `node qa/plan_legality.cjs --plan=data/plan_reference.json --data=reference/v109/app/data.json
 --golden=reference/v109/app/golden.json` 55/55, six new mutations each red on its named check; the smoke suite's two
 claim checks read the block's own length and its detail prints the derived code count.
+
+### E-111 · v110 · selling prices read off a Transfers screenshot went stale within days (spec §7.13)
+CAUSE: the selling prices that fund a wildcard were taken from a screenshot of the manager's Transfers page. A
+screenshot is a photograph of one moment: prices move after every deadline, and the half-of-any-rise rule means a
+rise changes what a player sells for, so the numbers were wrong within days while still looking exact to the tenth.
+CAUGHT: v108–v109, outside this repository, as the v110 spec records it (§7.13); logged with the port so the
+screenshot never returns as a source. In this repository the v89 Draft path had the same habit for rosters
+(CLAUDE.md: the Draft API "replaces screenshot ingestion").
+RULE: compute the selling price from the rule of the game on every bake: the price paid plus half of any rise,
+rounded down to £0.1m, a fall taken in full; the price paid is `now_cost − cost_change_start` for the original
+fifteen and `element_in_cost` from `/api/entry/{id}/transfers/` for anyone bought since. A screenshot may confirm a
+number once; it never supplies one (CLAUDE.md Part N; spec §6 forbids screenshot selling prices for display).
+TEST: `qa/prices.cjs` 12/12 — the fifteen against the reference's recorded numbers, a synthetic buy after a rise
+where the transfer log must win over the start price, the half-rise arithmetic at every boundary, and each of the
+four arithmetic rules broken in turn (the price paid ignored leaves 3 of 15 wrong).
