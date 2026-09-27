@@ -658,7 +658,10 @@ check("FT-the-object-and-the-rows-array-agree-on-a-chip-week", function () {
     chips: [{ name: "wildcard", event: 2 }]
   };
   const a = E.ftAvailable(h, 3), b = E.ftAvailable(h.current, 3), c = E.ftAvailable(h.current, 3, h.chips);
-  return { ok: a === 3 && b === 3 && c === 3, detail: "object " + a + " · rows array " + b + " · rows array with chips " + c + " (a chip week consumes no free transfer, so 3)" };
+  // E-099: this row once expected 3, which had the wildcard week ADDING a free transfer. The rule of the game
+  // (v110 §4, Part N1) is that a wildcard or free-hit week keeps the count exactly: 1 into GW2, still 1 after
+  // the wildcard, then +1 with GW3 for GW4 — so 2. The three shapes must agree on that.
+  return { ok: a === 2 && b === 2 && c === 2, detail: "object " + a + " · rows array " + b + " · rows array with chips " + c + " (a chip week keeps the count, so 2)" };
 });
 check("FT-the-two-shapes-agree-over-two-hundred-generated-histories", function () {
   let seed = 4242;

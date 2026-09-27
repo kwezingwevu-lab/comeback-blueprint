@@ -2466,7 +2466,9 @@ function ftAvailable(history, currentEvent, chips) {
     rows.forEach(function (r) {
       if (r.event < 2 || r.event > cur) return;
       var freeUsed = Math.max(0, r.t - Math.floor(r.cost / HIT_COST));
-      if (chipWeeks[r.event] || freeUsed > FT_CAP) { ft = Math.min(FT_CAP, ft + 1); return; }
+      // E-099: a wildcard or free-hit week keeps the count exactly as it was — nothing spent, nothing
+      // added (v110 §4, Part N1). The +1 arrives with the next ordinary week, as it always does.
+      if (chipWeeks[r.event] || freeUsed > FT_CAP) return;
       ft = Math.min(FT_CAP, Math.max(0, ft - freeUsed) + 1);
     });
     return clamp(ft, 1, FT_CAP);
