@@ -153,7 +153,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 .reveal-w{margin-top:2px}
 .sec-b p{margin:0 0 8px}
 .sec-b p:last-child{margin-bottom:0}
-@media (max-width:380px){ .tabi{min-width:37px;font-size:10px;padding:4px 0} .wrap{padding:0 10px} }
+@media (max-width:380px){ .tabi{min-width:37px;font-size:11px;padding:4px 0} .wrap{padding:0 10px} }
 `;
 
 /* ------------------------------------------------------------------ storage adapter
