@@ -45,3 +45,7 @@ See CLAUDE.md §6 for the numbered list. Additions:
 - 2026-09-26: A test that clicks an element the broken build no longer renders throws, and the throw ends the whole suite (every later result lost). UI actions in tests must be null-safe so a broken feature is a named FAIL.
 - 2026-09-26: A mutation run whose anchor did not match (a literal em dash where the build holds a \u escape) mutates nothing and "passes"; assert every mutation applied (count == 1) before reading a mutation run.
 - 2026-09-26: Bigger delete targets raise the odds of a stray tap. When a target grows, check what the tap does; deletes now offer Undo.
+- 2026-09-27: WebKit (the Playwright build, file:// page) refused a Blob value in IndexedDB: the put failed with a null error, while an ArrayBuffer stored fine. Store raw bytes plus the MIME type and rebuild the Blob on read.
+- 2026-09-27: A harness that answers every non-file: request must let blob: URLs through; otherwise object-URL images fail to decode in tests only, and the failure looks like an app bug.
+- 2026-09-27: Puppeteer's page.focus() throws on SVG elements ("Cannot focus non-HTMLElement") and the throw ended the whole suite. Focus through the page (element.focus()) and keep every test step null-safe.
+- 2026-09-27: A fixed-width readout line must be measured at its worst case across every point: the roadmap's longest reading was 367 px in a 316 px line until the week number moved out.

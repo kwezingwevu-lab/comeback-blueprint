@@ -3,7 +3,7 @@ const MOCK=(iso)=>{const R=Date;const fixed=new R(iso+'T09:00:00+02:00').getTime
 const STORAGE=()=>{const store={};window.__cs=store;window.storage={async get(k){if(!(k in store))throw new Error('nf');return{key:k,value:store[k]};},async set(k,v){store[k]=String(v);return{key:k,value:v};},async delete(k){delete store[k];return{key:k}},async list(){return{keys:Object.keys(store)}}};};
 const R=[];const T=(name,ok,detail)=>{R.push({name,ok:!!ok,detail});};
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
-const OFFLINE=async p=>{await p.setRequestInterception(true);p.on('request',r=>{const u=r.url();if(u.startsWith('file:')||u.startsWith('data:'))r.continue();else r.respond({status:200,contentType:'text/css',body:''});});};
+const OFFLINE=async p=>{await p.setRequestInterception(true);p.on('request',r=>{const u=r.url();if(u.startsWith('file:')||u.startsWith('data:')||u.startsWith('blob:'))r.continue();else r.respond({status:200,contentType:'text/css',body:''});});};
 async function page(b,iso,extra){const p=await b.newPage();await OFFLINE(p);p.__errs=[];p.on('pageerror',e=>p.__errs.push(e.message));p.on('console',m=>{if(m.type()==='error')p.__errs.push(m.text());});
   await p.evaluateOnNewDocument(MOCK,iso);await p.evaluateOnNewDocument(STORAGE);if(extra)await p.evaluateOnNewDocument(extra);
   await p.goto('file://'+path.resolve('ComebackBlueprint.html'),{waitUntil:'networkidle0'});await p.setViewport({width:390,height:844,deviceScaleFactor:1});await wait(900);return p;}
@@ -545,5 +545,34 @@ const nextT=async q=>q.evaluate(()=>[...document.querySelectorAll('#liftBody .ne
  const c1=await q.evaluate(()=>DB.measure.length);await q.evaluate(()=>(document.querySelector('#toast .undo')||{click(){}}).click());await wait(150);const c2=await q.evaluate(()=>({n:DB.measure.length,ls:JSON.parse(localStorage.getItem('cb2_measure')).length}));
  T('Z undo: deleting a weigh-in or a tape entry offers Undo, and Undo restores it on screen and in storage',a.n===1&&a.undo&&a.clickable==='auto'&&b2.n===2&&b2.ls===2&&b2.row&&/Restored/.test(b2.toast)&&c1===1&&c2.n===2&&c2.ls===2,JSON.stringify({a,b2,c1,c2}));
  await done(q);}
+// K13 (27 Sep 2026): touch a chart to read any point. Driven with the real mouse; keyboard via focus + arrow keys.
+{const q=await ctxPage('2026-09-26',{cb2_weight:[{date:'2026-09-12',v:88},{date:'2026-09-19',v:88.4},{date:'2026-09-25',v:88.8}]});await q.setViewport({width:390,height:844});await q.evaluate(()=>switchView('track'));await wait(250);
+ const at=(sel,pick)=>q.evaluate((sel,pick)=>{const s=document.querySelector(sel);s.scrollIntoView({block:'center'});const T=_tips[s.dataset.tip];const i=typeof pick==='string'?T.d.indexOf(pick):Math.round((T.x.length-1)*pick);const b=s.getBoundingClientRect(),k=b.width/s.viewBox.baseVal.width;return {x:b.left+T.x[i]*k,y:b.top+b.height/2};},sel,pick);
+ const read=sel=>q.evaluate(sel=>{const s=document.querySelector(sel);if(!s)return {r:'no chart'};return {r:document.getElementById(s.dataset.tip+'r').innerText.trim(),vis:s.querySelector('.ctip').getAttribute('visibility'),dots:s.querySelectorAll('.ctip-d circle').length};},sel);
+ const W='#wChart svg[data-tip]';const h0=await read(W);let p=await at(W,'19 Sep');await q.mouse.click(p.x,p.y);await wait(80);const a=await read(W);
+ await q.evaluate(sel=>{const e=document.querySelector(sel);if(e&&e.focus)e.focus();},W);await q.keyboard.press('ArrowLeft');await wait(50);const k=await read(W);
+ await q.evaluate(()=>document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true})));await wait(50);const c=await read(W);
+ T('Z readout: touching the weight chart reads that day, arrow keys step back a day, a tap elsewhere clears',/Touch the chart/.test(h0.r)&&h0.vis==='hidden'&&a.r==='19 Sep · 88.4 kg'&&a.vis==='visible'&&a.dots===1&&k.r==='12 Sep · 88.0 kg'&&/Touch the chart/.test(c.r)&&c.vis==='hidden',JSON.stringify({h0,a,k,c}));
+ await q.evaluate(()=>switchView('roadmap'));await wait(250);const RM='#rmChart svg[data-tip]';p=await at(RM,0.25);await q.mouse.click(p.x,p.y);await wait(80);const rm=await read(RM);
+ const E='#view-roadmap .card svg[data-tip]';p=await at(E,0.25);await q.mouse.click(p.x,p.y);await wait(80);const eta=await read(E);
+ const fits=await q.evaluate(()=>{let over=0;document.querySelectorAll('#view-roadmap svg[data-tip]').forEach(s=>{const T=_tips[s.dataset.tip],r=document.getElementById(s.dataset.tip+'r');for(let i=0;i<T.x.length;i++){tipAt(s,i);if(r.scrollWidth>r.clientWidth+1)over++;}tipClear(s);});return over;});
+ T('Z readout: the roadmap reads date, projected weight and phase; the ETA chart reads month and both lean-mass lines; no reading is cut off',/^\d{1,2} [A-Z][a-z]{2} ’\d\d · \d+\.\d kg · \S/.test(rm.r)&&rm.vis==='visible'&&/^[A-Z][a-z]{2} \d{4} · \d+\.\d kg lean · \d+\.\d kg lean$/.test(eta.r)&&eta.dots===2&&fits===0,JSON.stringify({rm,eta,fits}));
+ await q.evaluate(()=>{switchView('home');const t=document.querySelector('#view-home .tool');if(t&&!t.classList.contains('open'))t.querySelector('.tool-h').click();});await wait(200);const F='#view-home .tool svg[data-tip]';p=await at(F,8/30);await q.mouse.click(p.x,p.y);await wait(80);const ft=await read(F);
+ T('Z readout: the fast-track chart reads the week and both gains',/^Week 8 · \+\d\.\d kg · \+\d\.\d kg$/.test(ft.r)&&ft.dots===2,JSON.stringify(ft));
+ await done(q);}
+// K4 (27 Sep 2026): progress photos through the real file chooser; stored in IndexedDB as 1280 px JPEGs; Undo; survive a reload.
+{const q=await ctxPage('2026-09-27');const img=path.join(require('os').tmpdir(),'cb-photo-'+process.pid+'.jpg');
+ await q.setViewport({width:1000,height:1500,deviceScaleFactor:1});await q.screenshot({path:img,type:'jpeg'});await q.setViewport({width:390,height:844});
+ const open=()=>q.evaluate(()=>{switchView('track');document.querySelector('.track-tabs button[data-tp="measure"]').click();});await open();await wait(300);
+ const empty=await q.evaluate(()=>document.getElementById('phBody').innerText);
+ const pick=async(pose,date)=>{if(date)await q.evaluate(d=>{document.getElementById('meDate').value=d;},date);const [fc]=await Promise.all([q.waitForFileChooser({timeout:5000}),q.click('[data-ph="'+pose+'"]')]);await fc.accept([img]);await wait(900);};
+ await pick('front');await pick('side');await pick('front','2026-10-24');
+ const r=await q.evaluate(async()=>{const a=await phAll();return {n:a.length,ids:a.map(p=>p.id).join(),type:a[0].blob.type,long:Math.max(a[0].w,a[0].h),figs:document.querySelectorAll('#phBody .ph-cmp figure').length,caps:[...document.querySelectorAll('#phBody figcaption')].map(f=>f.innerText.replace(/\s+/g,' ')),rows:document.querySelectorAll('#phBody .log-row').length,foot:(document.querySelector('#phBody .ph-foot')||{innerText:''}).innerText,imgOk:[...document.querySelectorAll('#phBody .ph-cmp img')].every(i=>i.complete&&i.naturalWidth>0)};});
+ T('Z photos: picked through the file chooser, stored on the phone as 1280 px JPEGs; front compares first vs latest; list and storage line',/No photos yet/.test(empty)&&r.n===3&&r.ids==='2026-09-27-front,2026-09-27-side,2026-10-24-front'&&r.type==='image/jpeg'&&r.long===1280&&r.figs===2&&/^First 27 Sep/.test(r.caps[0])&&/^Latest 24 Oct/.test(r.caps[1])&&r.rows===3&&/3 photos · \d+ KB on this phone/.test(r.foot)&&/not in the JSON backup/.test(r.foot)&&r.imgOk,JSON.stringify(r));
+ await q.evaluate(()=>(document.querySelector('[data-phdel="2026-09-27-side"]')||{click(){}}).click());await wait(400);const d1=await q.evaluate(async()=>(await phAll()).length);
+ await q.evaluate(()=>(document.querySelector('#toast .undo')||{click(){}}).click());await wait(500);const d2=await q.evaluate(async()=>({n:(await phAll()).length,rows:document.querySelectorAll('#phBody .log-row').length}));
+ await q.reload({waitUntil:'networkidle0'});await wait(900);await open();await wait(700);const d3=await q.evaluate(async()=>({n:(await phAll()).length,rows:document.querySelectorAll('#phBody .log-row').length}));
+ T('Z photos: delete offers Undo, Undo restores it, and photos survive a reload',d1===2&&d2.n===3&&d2.rows===3&&d3.n===3&&d3.rows===3,JSON.stringify({d1,d2,d3}));
+ try{fs.unlinkSync(img);}catch(e){}await done(q);}
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+String(x.detail||'').replace(/\s+/g,' ').slice(0,400)).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));process.exit(pass===R.length?0:1);})().catch(e=>{console.error('QA CRASH:',e&&e.stack||e);process.exit(2);});

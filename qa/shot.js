@@ -7,11 +7,11 @@ const MOCK=(iso)=>{const R=Date;const fixed=new R(iso+'T09:00:00+02:00').getTime
 const STORAGE=()=>{const store={};window.__cs=store;window.storage={async get(k){if(!(k in store))throw new Error('nf');return{key:k,value:store[k]};},async set(k,v){store[k]=String(v);return{key:k,value:v};},async delete(k){delete store[k];return{key:k}},async list(){return{keys:Object.keys(store)}}};};
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{const b=await puppeteer.launch({headless:'new',args:['--no-sandbox','--disable-setuid-sandbox']});const p=await b.newPage();
-await p.setRequestInterception(true);p.on('request',r=>{const u=r.url();if(u.startsWith('file:')||u.startsWith('data:'))r.continue();else r.respond(fontReply(u)||{status:200,contentType:'text/css',body:''});});
+await p.setRequestInterception(true);p.on('request',r=>{const u=r.url();if(u.startsWith('file:')||u.startsWith('data:')||u.startsWith('blob:'))r.continue();else r.respond(fontReply(u)||{status:200,contentType:'text/css',body:''});});
 const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(m.type()==='error')errs.push(m.text());});
 await p.evaluateOnNewDocument(MOCK,iso);await p.evaluateOnNewDocument(STORAGE);await p.evaluateOnNewDocument(()=>{try{localStorage.clear();}catch(e){}});
 if(setup)await p.evaluateOnNewDocument(new Function(setup));
-const file=fs.existsSync(path.resolve(__dirname,'ComebackBlueprint.html'))?path.resolve(__dirname,'ComebackBlueprint.html'):path.resolve(__dirname,'../dist/ComebackBlueprint.html');
+const file=process.env.APP||(fs.existsSync(path.resolve(__dirname,'ComebackBlueprint.html'))?path.resolve(__dirname,'ComebackBlueprint.html'):path.resolve(__dirname,'../dist/ComebackBlueprint.html'));
 await p.goto('file://'+file,{waitUntil:'networkidle0'});await p.setViewport({width:390,height:844,deviceScaleFactor:+(process.env.DSF||2)});await wait(900);
 await p.evaluate(n=>switchView(n),view);await wait(400);
 // open every accordion so hidden copy is visible in the dump and the full-page shot

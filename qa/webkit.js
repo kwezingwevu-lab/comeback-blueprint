@@ -6,7 +6,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const R=[];const T=(n,ok,d)=>R.push({name:n,ok:!!ok,detail:d});
 (async()=>{const iso=process.argv[2]||'2026-09-12';
 const b=await webkit.launch();const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
-await ctx.route(u=>!(u.protocol==='file:'||u.protocol==='data:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
+await ctx.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
 await ctx.addInitScript(iso=>{const R=Date;const fixed=new R(iso+'T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;
   const store={};window.__cs=store;window.storage={async get(k){if(!(k in store))throw new Error('nf');return{key:k,value:store[k]};},async set(k,v){store[k]=String(v);return{key:k,value:v};},async delete(k){delete store[k];return{key:k}},async list(){return{keys:Object.keys(store)}}};},iso);
 const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(m.type()==='error')errs.push(m.text());});
@@ -38,6 +38,16 @@ T('webkit storage: delete offers Undo; Undo restores localStorage and the accoun
 // Visual: charts drawn at true scale, so Safari renders their labels at full size (the roadmap and gauge were ~4-5 px).
 const chartPx=await p.evaluate(async()=>{let min=99,where='';for(const v of ['roadmap','numbers']){switchView(v);await new Promise(r=>setTimeout(r,150));document.querySelectorAll('#view-'+v+' svg.chart-svg,#view-'+v+' svg.gauge-svg').forEach(s=>{const k=s.getBoundingClientRect().width/s.viewBox.baseVal.width;s.querySelectorAll('text').forEach(t=>{const f=parseFloat(getComputedStyle(t).fontSize)*k;if(f<min){min=f;where=v+':'+t.textContent;}});});}return {min:+min.toFixed(2),where};});
 T('webkit visual: roadmap, ETA and gauge labels render at 10.5 px or more at 390 px',chartPx.min>=10.5,JSON.stringify(chartPx));
+// Chart readout (27 Sep): a tap on the roadmap chart prints the date, projected weight and phase above it.
+const rd=await p.evaluate(async()=>{switchView('roadmap');await new Promise(r=>setTimeout(r,200));const s=document.querySelector('#rmChart svg[data-tip]');s.scrollIntoView({block:'center'});const b=s.getBoundingClientRect();return {x:b.left+b.width*0.3,y:b.top+b.height/2,id:s.dataset.tip};});
+await p.mouse.click(rd.x,rd.y);await wait(150);const rt=await p.evaluate(id=>(document.getElementById(id+'r')||{innerText:''}).innerText.trim(),rd.id);
+T('webkit readout: a tap on the roadmap chart prints date, weight and phase',/^\d{1,2} [A-Z][a-z]{2} ’\d\d · \d+\.\d kg · \S/.test(rt),rt);
+// Progress photos (27 Sep): a photo picked through the file chooser is stored as a JPEG Blob in IndexedDB and decodes on screen.
+{const img=path.resolve(__dirname,'shots/webkit-photo-src.jpg');fs.mkdirSync(path.dirname(img),{recursive:true});await p.screenshot({path:img,type:'jpeg'});
+ await p.evaluate(()=>{switchView('track');document.querySelector('.track-tabs button[data-tp="measure"]').click();});await wait(300);
+ const [fc]=await Promise.all([p.waitForEvent('filechooser',{timeout:5000}),p.click('[data-ph="front"]')]);await fc.setFiles(img);await wait(1200);
+ const ph=await p.evaluate(async()=>{const a=await phAll();const im=document.querySelector('#phBody .ph-cmp img');return {n:a.length,type:a[0]&&a[0].blob.type,ok:!!(im&&im.complete&&im.naturalWidth>0)};});
+ T('webkit photos: picked photo stored as a JPEG in IndexedDB and shown',ph.n===1&&ph.type==='image/jpeg'&&ph.ok,JSON.stringify(ph));}
 await p.evaluate(()=>switchView('home'));await wait(300);
 fs.mkdirSync(path.resolve(__dirname,'shots'),{recursive:true});await p.screenshot({path:path.resolve(__dirname,'shots/webkit-home-390.png'),fullPage:false});
 await p.evaluate(()=>switchView('lift'));await wait(300);await p.screenshot({path:path.resolve(__dirname,'shots/webkit-lift-390.png'),fullPage:false});

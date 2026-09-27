@@ -2,7 +2,7 @@
 
 Every session adds to this list, builds everything on it that can be verified, and says plainly why the rest waits. "Shipped" means a named check in the QA suites proves it; nothing is marked shipped on the strength of reading the code.
 
-Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then a 64-finding adversarial review round fixed and proven (section R), then a visual round (section V, 14 items); 14 queued with the reason; 6 not possible from a web app, with the honest alternative.
+Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then a 64-finding adversarial review round fixed and proven (section R), then a visual round (section V, 14 items) and on 27 Sep the chart readout and progress photos (V15, V16, formerly K13 and K4); 12 queued with the reason; 6 not possible from a web app, with the honest alternative.
 
 ## A. Correctness and coherence (every tab tells the same story)
 
@@ -132,6 +132,8 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then 
 | V11 | Weight target band, Lifts chart in kg, Tapes chart as change since the first tape | Shipped · screenshot, section X |
 | V12 | Fonts cached by the installed app for offline use; clean failure with no copy | Shipped · PWA no-network path only (sandbox cannot reach Google Fonts) |
 | V13 | Screenshot helpers render with the real typefaces (qa/fonts, qa/fontroute.js) | Shipped · probe reports Manrope and IBM Plex Mono loaded |
+| V15 | Touch a chart to read any point (weight, lifts, tapes, roadmap, ETA, fast track); arrow keys; no cut-off readings | Shipped 27 Sep · Z readout ×3, WebKit readout |
+| V16 | Progress photos on the phone: front/side/back, first-vs-latest compare, Undo, space used, save to Files or iCloud | Shipped 27 Sep · Z photos ×2, WebKit photos |
 | V14 | Harness: one-line FAILs, null-safe UI steps, 390 px probe, WebKit shot helper | Shipped · mutation run 255/261 with 6 named FAILs |
 
 ## K. Queued (not built yet) — what each needs
@@ -141,7 +143,6 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then 
 | K1 | Plate-accurate targets (round to the plates you own) | Needs your plate inventory once; 2.5 kg steps assume a full commercial rack |
 | K2 | Per-exercise stall detector with a named fix (swap, reset 10%, rep-range change) | Needs 3+ weeks of your logs to tune without false alarms |
 | K3 | Weekly volume auto-tuning per region (add a set where recovery allows) | Same: needs logged soreness or performance trend, not guesses |
-| K4 | Photo check-ins stored locally with the tapes | Photos are large for browser storage; needs the IndexedDB file store and a size budget |
 | K5 | Calendar helper: more sources (Webtickets, Howler, EntryNinja) | Those pages render with scripts; needs a browser-driven scraper and a test fixture for each |
 | K6 | Auto-add to the app from the helper's report | Deliberately not done: a human approves every event (standing rule) |
 | K7 | Check-day capture form for 5–7 March (weight, five tapes, photos, one screen) | Scheduled for a February session so it can be tested against real baseline data |
@@ -150,7 +151,6 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then 
 | K10 | Dark/light theme switch | App is dark-only by design; low value for the effort |
 | K11 | Home Screen reminders at 04:30 and 20:00 | Web push on iPhone needs a push server; the Shortcuts app can do it today (see IPHONE.md) |
 | K12 | Split the 380 KB single file into modules | Only if the file becomes hard to edit; single-file is a feature for the phone |
-| K13 | Tap a chart point to read its date and value | Needs touch handling plus a test that drives it; worth doing once real weigh-ins exist to read |
 | K14 | Check the visual round on your iPhone | The sandbox WebKit is Playwright’s build, not iOS Safari; open the published app on the phone and report anything that looks off |
 
 ## L. Not possible from a web app (and the honest alternative)

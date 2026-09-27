@@ -1,5 +1,12 @@
 # CHANGELOG.md — what has shipped (newest first)
 
+## 2026-09-27 — touch a chart to read it; progress photos on the phone
+Verified: Chromium 266/266 (5 new checks; 4 deliberate breakages of the build gave 4 named failures), PWA 10/10, WebKit 25/25 (2 new), calendar self-test pass.
+- Chart readout: touch or drag any chart (weight, lifts, tapes, roadmap, ETA, fast track) and the reading prints above it: the date and value, both lines where there are two, and on the roadmap the projected weight and phase. A tap elsewhere clears it; with a keyboard, the arrow keys step through the points. Every reading was measured against the line it sits on, so none is cut off at phone width.
+- Progress photos (Track → Tapes): Front, Side and Back open the camera or the photo library; each photo is shrunk to 1280 px and kept on the phone in its own store, apart from the data vault; the card compares your first and latest photo of each pose side by side, lists every photo with Undo on delete, shows the space used, and saves copies to Files or iCloud through the share sheet. Photos are not in the JSON backup (too large), and the card says so. After the first photo the app asks the browser to keep its storage.
+- Caught by the Safari-engine gate: WebKit refused to store an image Blob in IndexedDB, so photos are stored as raw bytes plus their type. The test harnesses now let the app's own blob: image URLs through (they had been answering them with empty CSS).
+- Helpers: shot.js, clip.js and wkshot.js accept APP=<file> like the others.
+
 ## 2026-09-26 (visual round) — charts at true scale, a text floor, finger-sized targets, undo
 Measured first, at 390 px (iPhone width) with two weeks of demo data: the Roadmap chart and the FFMI gauge were drawn 680 units wide and shrunk, so their labels rendered at 4–6 px; the ETA and fast-track labels were under 10 px; 110 buttons, toggles and set ticks were under 36 px tall. Verified: Chromium 261/261 (section Z, 7 new checks, each shown to fail against a broken build), PWA 10/10, WebKit 23/23 (2 new), calendar self-test pass. Screenshots at 3× in Chromium and WebKit with the real typefaces.
 - Charts: one drawing unit is one screen pixel at phone width (320); labels 11 px; monotone curves (no overshoot), round-number ticks, a gradient area, a pill with the latest value; labels that can sit on a line carry a halo; every chart is labelled for screen readers; dates read "12 Sep", not "09/12".
