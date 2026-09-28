@@ -1469,7 +1469,7 @@ function solvedPlanView(mc, now, setting) {
           : "Holding the chip is " + f1(T.now.total - T.never.total) + " behind, which is still inside the proof tolerance.",
         verdict: clear
           ? "GW" + gw + " beats every later week by " + f1(edge) + ", more than the tolerance of about " + tol + " points, so the week is settled."
-          : (proved(T.later) ? "GW" + gw + " is ahead of every later week in the proof as well, but only just" : "GW" + gw + " against " + lgw + " is " + sgn(edge) + ", inside the tolerance of about " + tol + " points") +
+          : (proved(T.later) ? "GW" + gw + " is ahead of every later week in the proof as well, but only just: " + sgn(edge) + " against " + lgw + ", inside the tolerance of about " + tol + " points" : "GW" + gw + " against " + lgw + " is " + sgn(edge) + ", inside the tolerance of about " + tol + " points") +
             ", so treat the two weeks as level on expected points." + (tips.length ? " What tips it to now: " + tips.join("; ") + "." : "")
       };
     }

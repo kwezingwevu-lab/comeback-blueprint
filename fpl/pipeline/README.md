@@ -72,7 +72,14 @@ unimodular and comes out whole on its own, which is what closes the proof (§7.9
 `solve_later.py` write `data/solver_timing.json` (wildcard now, later, never). Every stage writes its
 output as soon as it finishes, so a partial run is still usable. Start a full run detached — `setsid nohup
 python3 pipeline/solve.py > solve.log 2>&1 &` — because a background job dies with the shell call that
-started it (§7.2). Needs `pipeline/requirements.txt`. Proved by `qa/plan_legality.cjs` on what it produced.
+started it (§7.2).
+The 240 s limits are the kit's and they are short: on the 28 Sep input three stages stopped on the clock at 4% to 11%
+gaps, where the same problems prove within 0.4% in 250 to 470 s (E-129). So after the chain, look at the gap of
+every scenario; any above 1% is re-solved with `python3 pipeline/solve_scenario.py <now|later|never> 900 --gap 0.004`
+(one per core, nothing else running), and the full problem can be tightened with `python3 pipeline/solve_long.py 1500
+--gap 0.003`. `solve_scenario.py` folds its result into the timing file only when the objective is higher and the input
+hash matches. `plan.cjs` then certifies the kept plan's gap from the tightest bound any solve of the same problem
+proved (E-128), and `qa/plan_legality.cjs` holds the kept plan, "later" and "never" to the 3% ceiling. Needs `pipeline/requirements.txt`. Proved by `qa/plan_legality.cjs` on what it produced.
 
 ## 6. Plan — `node pipeline/plan.cjs`
 

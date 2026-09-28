@@ -2,10 +2,10 @@
 // change the inputs and re-run it after pipeline/plan.cjs. Classic entries are FPL element ids; Draft entries are
 // player codes (join on code, never on id). The figures in the comments and the why lines are the plan's own at
 // the moment of writing; the app's engines recompute every figure it shows.
-// Plan cef80183f9a5a2ae (data/solver_out.json plan), block baked 2026-09-27T16:18:56.398Z, live snapshot 2026-09-27T16:24:04Z.
+// Plan 681ecb778aa48846 (data/solver_long.json plan), block baked 2026-09-28T21:03:13.061Z, live snapshot 2026-09-28T21:03:09Z.
 const WEEKLY = {
-  version: 110, gw: 6, written: "2026-09-27", hash: "cef80183f9a5a2ae",
-  source: "pipeline/plan.cjs on data/mc_data.json baked 2026-09-27T16:18:56.398Z (export hash cef80183f9a5a2ae); data/live.json fetched 2026-09-27T16:24:04Z",
+  version: 110, gw: 6, written: "2026-09-28", hash: "681ecb778aa48846",
+  source: "pipeline/plan.cjs on data/mc_data.json baked 2026-09-28T21:03:13.061Z (export hash 681ecb778aa48846); data/live.json fetched 2026-09-28T21:03:09Z",
 
   // The plan this block replaces, recorded rather than deleted (v89 rule). `previous` carries the one before it.
   superseded: {
@@ -29,14 +29,14 @@ const WEEKLY = {
 
   classic: {
     plan: "wildcard",                                   // "wildcard" | "transfers" | "hold"
-    // data/plan.json weeks[0].squad: Gabriel, Saka, Janelt, Groß, Thomas, Tarkowski, Branthwaite, Barry, Leno, Stach, Haaland, Mbeumo, Hall, Gonzalo, Tzolakis.
-    // Buys Janelt, Groß, Thomas, Tarkowski, Branthwaite, Barry, Leno, Stach, Mbeumo, Hall, Gonzalo, Tzolakis; sells Diop, Shaw, Rogers, Brobbey, Semenyo, Verbruggen, van Ewijk, Kinsky, Szoboszlai, Hughes, Calvert-Lewin, Konsa.
-    wildcard15: [4, 12, 98, 124, 173, 229, 230, 249, 250, 335, 411, 427, 449, 569, 572],
+    // data/plan.json weeks[0].squad: Gabriel, Saka, Janelt, Groß, Thomas, Tarkowski, Mykolenko, Barry, Leno, Stach, Trafford, Haaland, Mbeumo, Hall, Gonzalo.
+    // Buys Janelt, Groß, Thomas, Tarkowski, Mykolenko, Barry, Leno, Stach, Trafford, Mbeumo, Hall, Gonzalo; sells Diop, Shaw, Rogers, Brobbey, Semenyo, Verbruggen, van Ewijk, Kinsky, Szoboszlai, Hughes, Calvert-Lewin, Konsa.
+    wildcard15: [4, 12, 98, 124, 173, 229, 233, 249, 250, 335, 385, 411, 427, 449, 569],
     // Rule C1.6's only exemption, declared (smoke_wk reads it): the fifteen's players at or over the 60% rival-ownership
     // gate. The plan keeps them because they maximise expected points (v110 §1.2).
     locks: [411],
     // The fifteen's cost at today's prices, recorded so the Plan tab reads it out of the block (E-088).
-    wildcard15_cost_written: 995,
+    wildcard15_cost_written: 990,
     captain: 12, vice: 4,                            // Saka, Gabriel — the plan's own armband for GW6
     // Without the chip: src/engine.js transferProtocol (CLAUDE.md C2), because the optimiser's no-wildcard week sells Shaw, protected by the Konsa rule; 5 moves, 1 hit, confidence HIGH.
     fallback: {
@@ -45,14 +45,14 @@ const WEEKLY = {
     },
     chip: "wildcard",
     notes: [
-      "The plan is the optimiser's (pipeline/solve.py, HiGHS), proved within 0.49% of the best possible: 902.96 Classic expected points from GW6 to GW19, 0 hits.",
-      "Chips in the plan: WC GW6, BB GW7, TC GW8 on Haaland; the best free-hit week is GW14 at +4.12, not taken.",
+      "The plan is the optimiser's (pipeline/solve.py, HiGHS), proved within 0.18% of the best possible: 903.39 Classic expected points from GW6 to GW19, 0 hits.",
+      "Chips in the plan: WC GW6, BB GW7, TC GW8 on Haaland; the best free-hit week is GW14 at +4.09, not taken.",
       "Free transfers come from the replayed ledger (data/plan.json replay), never the solver's own variables: 4 into GW6, 4 after it, because a wildcard week keeps the count.",
       "Haaland is at or over the 60% rival-ownership gate and kept on purpose; the rule-pure search on the Plan tab prices the difference."
     ],
     why: [
-      "Timing (data/plan.json timing): wildcard now 902.96, later (GW7) 897.74, never 891.42 Classic expected points to GW19.",
-      "Without the wildcard the best plan found is 891.42, so the chip is worth 11.54 over the window.",
+      "Timing (data/plan.json timing): wildcard now 903.39, later (GW7) 901.52, never 889.69 Classic expected points to GW19.",
+      "Without the wildcard the best plan found is 889.69, so the chip is worth 13.70 over the window.",
       "The app's own timing model (src/engine.js wildcardTiming) puts the five-gameweek deficit of the current fifteen at 64.0 and the break-even for waiting at 136.4 by GW19."
     ]
   },
@@ -99,5 +99,5 @@ const WEEKLY = {
 
   // wildcardTiming(ctx) — the app engine's note; `solved` is the optimiser's (data/plan.json timing).
   timing: { now_vs_later: { by_gw19: 136, by_gw38: 136, breakeven_double_gw17: null, breakeven_later_value: 136 },
-    solved: { now: 902.96, later: 897.74, later_gw: 7, never: 891.42 } }
+    solved: { now: 903.39, later: 901.52, later_gw: 7, never: 889.69 } }
 };
