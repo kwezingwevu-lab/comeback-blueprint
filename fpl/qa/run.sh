@@ -582,7 +582,11 @@ esbuild_gate() {
     return 1
   fi
   echo "compiling $target"
-  npx --no-install esbuild "$target" --bundle --loader:.jsx=jsx --jsx=automatic --outfile=/dev/null
+  # One warning class is silenced, by name, and nothing else: src/engine.js ends with the usual
+  # `if (typeof module !== "undefined" && module.exports) { module.exports = … }` tail that the Node suites use. In the
+  # assembled ES module that branch never runs (`module` is undefined there, and the guard says so), but esbuild flags the
+  # assignment as commonjs-variable-in-esm on every build. Every other warning still prints, and any error fails the step.
+  npx --no-install esbuild "$target" --bundle --loader:.jsx=jsx --jsx=automatic --log-override:commonjs-variable-in-esm=silent --outfile=/dev/null
 }
 step "esbuild syntax gate" esbuild_gate
 

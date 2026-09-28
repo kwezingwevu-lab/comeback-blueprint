@@ -85,10 +85,11 @@ jobs:
       - name: TDZ check (self-test + sources)
         run: node qa/tdz_check.cjs --self-test 2>&1 | tee -a "$GATE_LOG" && node qa/tdz_check.cjs src/engine.js src/ui.jsx 2>&1 | tee -a "$GATE_LOG"
 
-      # Same flags as run.sh's esbuild gate, which adds --jsx=automatic and pins the version by
-      # refusing to fetch one. Only the outfile differs: this one writes a real file.
+      # Same flags as run.sh's esbuild gate, which adds --jsx=automatic, silences the one named warning class explained
+      # there (the engine's guarded module.exports tail) and pins the version by refusing to fetch one. Only the outfile
+      # differs: this one writes a real file.
       - name: esbuild syntax gate (real bundle)
-        run: npx --no-install esbuild app/FPL_Mission_Control.jsx --bundle --loader:.jsx=jsx --jsx=automatic --outfile=/tmp/mc.js 2>&1 | tee -a "$GATE_LOG"
+        run: npx --no-install esbuild app/FPL_Mission_Control.jsx --bundle --loader:.jsx=jsx --jsx=automatic --log-override:commonjs-variable-in-esm=silent --outfile=/tmp/mc.js 2>&1 | tee -a "$GATE_LOG"
 
       - name: build (build.cjs -> app/ + dist/)
         run: node build.cjs 2>&1 | tee -a "$GATE_LOG"
@@ -212,7 +213,7 @@ jobs:
           CHROME="$(PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers python3 -c 'from playwright.sync_api import sync_playwright as s; p = s().start(); print(p.chromium.executable_path); p.stop()')"
           test -x "$CHROME" || { echo "FAIL playwright-install — Python Playwright reports $CHROME, which is not executable" 2>&1 | tee -a "$GATE_LOG"; exit 1; }
           ln -sfn "$CHROME" /opt/pw-browsers/chromium
-          ls -l /opt/pw-browsers/chromium 2>&1 | tee -a "$GATE_LOG"
+          echo "/opt/pw-browsers/chromium -> $(readlink /opt/pw-browsers/chromium)" 2>&1 | tee -a "$GATE_LOG"
           /opt/pw-browsers/chromium --version 2>&1 | tee -a "$GATE_LOG"
 
       # ---------------------------------------------------------------- D · browser suites
