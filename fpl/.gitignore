@@ -3,3 +3,6 @@
 # repository does not hold is an install that shows a blank tile. They are re-included here.
 # qa/shots/*.png stays ignored — those are screenshots, not artefacts.
 !dist/*.png
+
+# Python bytecode caches are build output of running the suites, never source (one was committed by accident in e42edb2).
+__pycache__/
