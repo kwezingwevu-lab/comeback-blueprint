@@ -1627,3 +1627,57 @@ recomputes the floor from the raw solver files the plan names and fails on a mis
 claim below the floor; its mutation (a gap of 0.00001) goes red. On the committed 27 Sep solver files the same plan
 (weeks identical) is certified at 0.2467% by the long solve's bound instead of 0.4851% (41/41 on the old and the new
 plan file); changing the long solve's `tau` in a copy makes `plan.cjs` fall back to the plan's own 0.4851% gap.
+
+### E-129 · v110 · the 240 s timing solves stopped at 4% to 11% gaps on a changed input, and the gate never looked at the scenarios' proofs
+CAUSE: `chip_timing(TL=240)` (the kit's setting) solves "now", "later" and "never" once each on a 240 s clock. On the
+27 Sep input they proved to 0.49% (main plan) and optimal in 165 s ("never"). One player's price moved (Barry £5.6m →
+£5.7m, which also moved the wildcard's £0.1m of headroom to nil) and two flags changed, and on the 28 Sep input the same
+stages stopped on the clock: main plan 4.4%, "now" 5.8%, "never" 11.3% (883.78 against 892.26 the day before). Clean
+re-solves on an otherwise idle machine proved the same problems within 0.4%: "now" in 247.5 s (900.83), "never" in
+426.4 s (889.69), and the full problem at 0.22% in 474.3 s (903.39). Nothing in the gate read a timing scenario's own
+gap: `plan_legality` held the kept plan to 3% and the timing block only for its shape, so a verdict built on an 11%
+"never" would have shipped, with the timing note saying nothing about it.
+CAUGHT: 28 Sep 2026, reading the solve logs during the second refresh, while a "now" incumbent at a 5.8% gap was
+about to become the kept plan (E-128). Contention could not be separated from the clock: I had run builds and suites
+beside the solves, but "later" ran through the same window and proved to 0.4% in 212.8 s, so the honest finding is
+that 240 s is too short for these problems on this input, not that the machine was busy.
+RULE: after `chip_timing`, any scenario above a 1% gap is re-solved with
+`python3 pipeline/solve_scenario.py <now|later|never> 900 --gap 0.004` (idle machine, one scenario per core) before
+`plan.cjs` runs; the script folds a result in only when its objective is higher and the input hash matches, and
+re-reads the timing file just before writing, so two scenarios may run side by side. Solves run on a machine with
+nothing else on it, and a suite is not started beside a time-limited solve.
+TEST: `qa/plan_legality.cjs` "timing: 'later' and 'never' are each proven within the 0.03 ceiling", through one function
+`timingProved` that the check and its mutation both call (the mutation, a "never" at an 11% gap, goes red); 43/43 on the
+committed plan, 59/59 on the reference plan.
+
+### E-130 · v110 · the calibration suite pinned the committed block's backtest to the kit's fixture to 1e-9, and the game revised its own data
+CAUSE: `qa/calibration.cjs` (E-084's class again) ran the ported stage on a copy of `data/mc_data.json` and compared the
+result with `qa/fixtures/v111_model.json`, the kit's output on the kit's own block, to 1e-9; and asserted the committed
+block's stored backtest equal to the same fixture. That was true only while the committed block was the kit's. The game
+revises finished matches' xG and other feeds after the fact: on the 28 Sep bake the four calibration factors were
+unchanged (1.117, 1.076, 1.048, 1) but 27 of the 89 backtest leaves had moved by about 1e-4 (goals log-likelihood
+−92.3523 → −92.3546, minutes Brier 0.130510 → 0.130509), so three checks went red on a correct refresh.
+CAUGHT: 28 Sep 2026, the second full gate run: calibration 22/25 on the refreshed tree, everything else green.
+RULE: a reproduction check runs on the input the fixture was made from. Every comparison with the fixture now uses the
+kit's saved block, `reference/v111/app/data.json`, which never changes; the committed block is held to consistency
+instead: its `model` must equal what the stage computes from that block (calib exactly, backtest within 1e-9, weeks the
+block's own finished gameweeks), which a re-bake that skipped the stage, or a model calibrated on other data, cannot pass.
+The drift against the fixture is printed as a NOTE, never asserted.
+TEST: `node qa/calibration.cjs` 25/25 (0 of 4 factors and 27 of 89 leaves differ from the fixture, printed); on a copy,
+corrupting the stored `points.all.rho` by 0.001 and changing a stored factor each turn the (b) check red on the named
+leaf.
+
+### E-131 · v110 · the timing verdict's "proved, but only just" branch omitted the tolerance the spec says to state
+CAUSE: spec §5 D2 says the timing verdict states the solver's tolerance and calls the choice clear only when the gap
+exceeds it. The copy has two "level" branches: one names the edge and the tolerance ("inside the tolerance of about N
+points"), and the other, taken when the wildcard-now plan is proved ahead of every later week in objective space,
+said "ahead of every later week in the proof as well, but only just" and then "treat the two weeks as level" with no
+tolerance. Yesterday's numbers took the first branch. The 28 Sep numbers (now 903.39, later 901.52, edge 1.9 against
+a tolerance of about 4; now's objective 677.53 above later's best possible 675.66) took the second, and the D2 check
+reported "the tolerance, about 4 points" missing.
+CAUGHT: 28 Sep 2026, the full gate: components 251/252.
+RULE: every branch of the verdict states the edge and the tolerance; the test reads the tolerance from the plan, not from
+the copy. The branch now reads "ahead of every later week in the proof as well, but only just: +1.9 against GW7, inside
+the tolerance of about 4 points".
+TEST: components D2 "the timing verdict says proved worse only on the objective proof and settled only beyond the
+tolerance", 252/252, which reaches this branch on the shipped plan.

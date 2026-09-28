@@ -299,12 +299,22 @@ if (OPT.skipGap) {
   ok("the plan is at least as good as keeping the wildcard", !PF.noWildcard || !PF.noWildcard.ok || PF.plan.total >= PF.noWildcard.total - WC_MARGIN, PF.plan.total + " vs " + (PF.noWildcard || {}).total);
 }
 
-/* the timing scenarios, when the plan carries them */
+/* the timing scenarios, when the plan carries them. One function decides whether they are proven, so the check and its
+   mutation run the same code (E-129). */
+const timingProved = (T) => !!T && !!T.later && !!T.never && typeof T.later.gap === "number" && T.later.gap < GAP_MAX && typeof T.never.gap === "number" && T.never.gap < GAP_MAX;
 if (PF.timing && PF.timing.now && PF.timing.later && PF.timing.never) {
   const T = PF.timing, wcOf = (r) => (r.weeks || []).filter((w) => w.chip === "wildcard").map((w) => w.gw);
   ok("timing: 'now' is the kept plan, 'later' plays the wildcard after the first week, 'never' plays none",
     T.now.total === PF.plan.total && T.now.obj === PF.plan.obj && wcOf(T.later).every((g) => g > PF.plan.weeks[0].gw) && wcOf(T.never).length === 0,
     "now " + T.now.total + "/" + PF.plan.total + " · later wildcard " + wcOf(T.later).join(",") + " · never wildcard " + wcOf(T.never).join(","));
+  /* E-129. The timing verdict compares three solves, so each must carry its own proof: a scenario stopped by the
+     240 s clock at 6% or 11% (the 28 Sep refresh: 5.8% and 11.3%, on problems that prove to 0.4% in 250 to 430 s) makes
+     the verdict a comparison of noise. The kept plan ('now') is held by the certified-gap check above; 'later' and 'never'
+     are held here to the same ceiling. */
+  if (!OPT.skipGap) {
+    ok("timing: 'later' and 'never' are each proven within the " + GAP_MAX + " ceiling (E-129) — later " + T.later.gap + ", never " + T.never.gap,
+      timingProved(T), "later " + T.later.gap + " · never " + T.never.gap + " — re-solve the loose one: python3 pipeline/solve_scenario.py <later|never> 900 --gap 0.004");
+  }
 }
 
 /* the Draft roster (C5), a separate game: nothing here touches a Classic number */
@@ -448,6 +458,11 @@ if (!OPT.noGolden && (OPT.golden || isReferencePlan)) {
     const bestB = raw.filter((p) => p.ok && typeof p.obj === "number" && typeof p.gap === "number" && JSON.stringify(p.params || null) === key).reduce((a, p) => Math.min(a, p.obj * (1 + p.gap)), Infinity);
     const floorGap = isFinite(bestB) ? bestB / PF.plan.obj - 1 : null;
     ok("mutation: a gap of 0.00001 no raw solve supports goes red on the E-128 check", floorGap !== null && c.plan.gap < floorGap - 1e-6, "floor " + (floorGap === null ? "none" : floorGap.toFixed(5)) + " vs claimed " + c.plan.gap);
+  }
+  /* 8c. E-129: a timing scenario stopped on its clock */
+  if (!OPT.skipGap && PF.timing && PF.timing.never) {
+    const c = clone(PF); c.timing.never.gap = 0.113;
+    ok("mutation: a 'never' scenario left at an 11% gap goes red on the E-129 timing check", timingProved(PF.timing) && !timingProved(c.timing), "real " + timingProved(PF.timing) + " · with never at " + c.timing.never.gap + ": " + timingProved(c.timing));
   }
   /* 9. the acceptance: total and chip weeks moved */
   if (GOLDEN) {

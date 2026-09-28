@@ -19,8 +19,16 @@
  *                 (its bootstrap draws from a seeded generator), so 1e-9 is the tolerance of summation order, not of
  *                 the model. The fixture is the kit's own output on the same block, computed by the reference
  *                 implementation; nothing here is typed.
- *   Committed     the block that ships, data/mc_data.json, carries that same model: its calib equals the fixture's
- *                 and its backtest is within 1e-9 of it. A re-bake that skipped the stage goes red here.
+ *   Committed     the block that ships, data/mc_data.json, carries the model the stage computes FROM THAT BLOCK: the
+ *                 stage's output on the committed data equals the committed model (calib exactly, backtest within
+ *                 1e-9), and its weeks are the block's own finished gameweeks. A re-bake that skipped the stage, or
+ *                 a model calibrated on other data, goes red here. The block is NOT compared with the kit's fixture:
+ *                 the game revises finished matches' xG and other feeds after the fact, so the committed block's
+ *                 backtest legitimately drifts from the kit's by about 1e-4 on every refresh (ERRORS.md E-130); that
+ *                 drift is printed as a NOTE, never asserted.
+ *   The fixture   is the kit's output on the KIT's block, reference/v111/app/data.json, which never changes. Every
+ *                 check that compares with the fixture runs on that block: the reproduction is proved on the input
+ *                 the fixture was made from, not on whatever the feeds say today.
  *   Uncalibrated  the backtest runs with opts.noCalib, so the corrections never feed their own evidence. Proved
  *                 three ways: the engine's CAL is empty under noCalib on a block that carries a model and equal to
  *                 model.calib without it; backtest.run on the block WITH its model gives the same factors and
@@ -113,13 +121,15 @@ function loadBacktest(dir, tag, edits) {
 
 const fixture = readJson(FIXTURE);
 const block = readJson(BLOCK);
+const KIT = path.join(ROOT, "reference", "v111", "app", "data.json");
+const kit = readJson(KIT);
 const F = fixture && fixture.model;
 
-ok("the fixture, the committed block, the stage and the engine are all present",
-  !!F && !!F.calib && !!F.backtest && !!block && !!block.gw && fs.existsSync(CALIBRATE) && fs.existsSync(BACKTEST) && fs.existsSync(ENGINE),
-  [!!F, !!block, fs.existsSync(CALIBRATE), fs.existsSync(BACKTEST), fs.existsSync(ENGINE)].join(","));
+ok("the fixture, the kit's block, the committed block, the stage and the engine are all present",
+  !!F && !!F.calib && !!F.backtest && !!block && !!block.gw && !!kit && !!kit.gw && fs.existsSync(CALIBRATE) && fs.existsSync(BACKTEST) && fs.existsSync(ENGINE),
+  [!!F, !!kit, !!block, fs.existsSync(CALIBRATE), fs.existsSync(BACKTEST), fs.existsSync(ENGINE)].join(","));
 
-if (F && block) {
+if (F && block && kit) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "calibration-"));
   const E = require(ENGINE);
   const B = require(BACKTEST);
@@ -131,19 +141,21 @@ if (F && block) {
   ok("the walk's first scored gameweek is read out of pipeline/calibrate.js", Number.isFinite(FLOOR), "the filter `g >= N && g <= DATA.gw.lastDone` was not found");
   const finished = (block.gw.events || []).filter((e) => e.fin).map((e) => e.id);
   const weeksWanted = finished.filter((g) => g >= FLOOR && g <= block.gw.lastDone);
+  const kitFinished = (kit.gw.events || []).filter((e) => e.fin).map((e) => e.id);
+  const kitWeeks = kitFinished.filter((g) => g >= FLOOR && g <= kit.gw.lastDone);
 
   /* ================================================================ (a) parity: the stage on a copy */
   const copy = path.join(tmp, "copy.json");
-  fs.writeFileSync(copy, fs.readFileSync(BLOCK));
+  fs.writeFileSync(copy, fs.readFileSync(KIT));
   const t0 = Date.now();
   const r = spawnSync(process.execPath, [CALIBRATE, copy], { cwd: ROOT, encoding: "utf8", timeout: 90000 });
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
-  ok("pipeline/calibrate.js runs on a copy of the block and exits 0 (" + secs + " s)", r.status === 0, "exit " + r.status + " " + String(r.stderr || "").trim().split("\n")[0]);
+  ok("pipeline/calibrate.js runs on a copy of the kit's block and exits 0 (" + secs + " s)", r.status === 0, "exit " + r.status + " " + String(r.stderr || "").trim().split("\n")[0]);
   const got = readJson(copy);
   const gotModel = got && got.model;
   ok("the stage writes model = {calib, backtest, at} into the block and nothing else in the block changes",
     !!gotModel && !!gotModel.calib && !!gotModel.backtest && typeof gotModel.at === "string" &&
-    diff(Object.assign({}, got, { model: null }), Object.assign({}, block, { model: null }), 0).out.length === 0,
+    diff(Object.assign({}, got, { model: null }), Object.assign({}, kit, { model: null }), 0).out.length === 0,
     gotModel ? Object.keys(gotModel).join(",") : "no model block written");
   ok("the stage reports the weeks it walked on stdout",
     !!gotModel && new RegExp("backtest GW" + gotModel.backtest.weeks.join(",")).test(r.stdout || ""),
@@ -171,10 +183,17 @@ if (F && block) {
     const m = block.model;
     ok("(b) the committed data/mc_data.json carries a model block", !!m && !!m.calib && !!m.backtest, m ? Object.keys(m).join(",") : "none");
     if (m) {
-      const dc = diff(m.calib, F.calib, 0);
-      ok("(b) the committed block's model.calib equals the fixture's exactly", dc.out.length === 0 && dc.stat.leaves > 0, head(dc.out));
-      const db = diff(m.backtest, F.backtest, TOL);
-      ok("(b) the committed block's backtest equals the fixture's within 1e-9 (" + db.stat.leaves + " numeric leaves)", db.out.length === 0, head(db.out));
+      /* The model must be what the stage computes from THIS block, re-derived here on a copy with the model removed. */
+      const bare = clone(block); delete bare.model;
+      const rc = B.run(bare, E, weeksWanted);
+      const dc = diff(rc.calib, m.calib, 0), db = diff(rc, m.backtest, TOL);
+      ok("(b) the committed block's model.calib is exactly what the stage computes from the committed data (" + dc.stat.leaves + " factors)", dc.out.length === 0 && dc.stat.leaves > 0, head(dc.out));
+      ok("(b) the committed block's backtest is what the stage computes from the committed data, within 1e-9 (" + db.stat.leaves + " numeric leaves)", db.out.length === 0 && db.stat.leaves > 50, head(db.out));
+      ok("(b) its weeks are the committed block's own finished gameweeks from the floor (" + FLOOR + ") to gw.lastDone (" + block.gw.lastDone + ")",
+        JSON.stringify(m.backtest.weeks) === JSON.stringify(weeksWanted) && weeksWanted.length > 0, "weeks " + JSON.stringify(m.backtest.weeks) + " wanted " + JSON.stringify(weeksWanted));
+      const fdc = diff(m.calib, F.calib, 0), fdb = diff(m.backtest, F.backtest, TOL);
+      console.log("NOTE the committed block's model against the kit's fixture: " + fdc.out.length + " of " + fdc.stat.leaves + " factors differ and " + fdb.out.length + " of " + fdb.stat.leaves +
+        " backtest leaves differ beyond 1e-9 — feed revisions since the kit's block (" + kit.asOf + " → " + block.asOf + "); printed, never asserted (E-130)");
     }
   }
 
@@ -191,8 +210,10 @@ if (F && block) {
     ok("(c) backtest.run on the block WITH its model gives the same factors as on the block without one — calibrating twice equals once",
       dc.out.length === 0 && dc.stat.leaves > 0, head(dc.out));
     ok("(c) and the same metrics within 1e-9 (" + db.stat.leaves + " numeric leaves)", db.out.length === 0, head(db.out));
-    ok("(c) the in-process run reproduces the fixture's factors too, so the stage and the module agree",
-      diff(r2.calib, F.calib, 0).out.length === 0 && diff(r2, F.backtest, TOL).out.length === 0, head(diff(r2, F.backtest, TOL).out));
+    const kitBare = clone(kit); delete kitBare.model;
+    const rk = B.run(kitBare, E, kitWeeks);
+    ok("(c) the in-process run on the kit's block reproduces the fixture's factors and backtest too, so the stage and the module agree",
+      diff(rk.calib, F.calib, 0).out.length === 0 && diff(rk, F.backtest, TOL).out.length === 0, head(diff(rk, F.backtest, TOL).out));
 
     /* Mutation. The module keeps the corrections out of their own evidence twice over: truncate() deletes the
        block's model from every cut-back copy, and every engine it builds is created with noCalib. Removing one
@@ -214,10 +235,10 @@ if (F && block) {
   /* ================================================================ (d) shape */
   if (gotModel) {
     ok("(d) model.at is an ISO instant", ISO_RE.test(gotModel.at) && !isNaN(Date.parse(gotModel.at)), String(gotModel.at));
-    ok("(d) backtest.weeks is exactly the finished gameweeks from the script's floor (" + FLOOR + ") to gw.lastDone (" + block.gw.lastDone + "), derived from the block's events",
-      JSON.stringify(gotModel.backtest.weeks) === JSON.stringify(weeksWanted) && weeksWanted.length > 0 &&
-      JSON.stringify(weeksWanted) === JSON.stringify(block.gw.withData.filter((g) => g >= FLOOR && g <= block.gw.lastDone)),
-      "weeks " + JSON.stringify(gotModel.backtest.weeks) + " finished " + JSON.stringify(finished));
+    ok("(d) backtest.weeks is exactly the finished gameweeks from the script's floor (" + FLOOR + ") to gw.lastDone (" + kit.gw.lastDone + "), derived from the block's events",
+      JSON.stringify(gotModel.backtest.weeks) === JSON.stringify(kitWeeks) && kitWeeks.length > 0 &&
+      JSON.stringify(kitWeeks) === JSON.stringify(kit.gw.withData.filter((g) => g >= FLOOR && g <= kit.gw.lastDone)),
+      "weeks " + JSON.stringify(gotModel.backtest.weeks) + " finished " + JSON.stringify(kitFinished));
     const factors = Object.entries(gotModel.calib);
     const bad = factors.filter(([, v]) => !(typeof v === "number" && Number.isFinite(v) && v >= 0.5 && v <= 2));
     const positions = Object.keys(gotModel.backtest.points.byPos);
@@ -230,18 +251,18 @@ if (F && block) {
 
   /* ================================================================ (e) mutations on a copy of backtest.js */
   {
-    const noModel = clone(block); delete noModel.model;
+    const noModel = clone(kit); delete noModel.model;   // the mutants are compared with the fixture, so they run on the fixture's own input
     /* The shrink: the corrections are applied only halfway, 1 + 0.5 × (ratio − 1). Set to the full ratio. */
     let shrink = null, err = "";
     try { shrink = loadBacktest(tmp, "shrink", [["1 + 0.5 * (s.ratio - 1)", "1 + 1.0 * (s.ratio - 1)", 1]]); } catch (e) { err = e.message; }
-    const rs = shrink && shrink.run(clone(noModel), E, weeksWanted);
+    const rs = shrink && shrink.run(clone(noModel), E, kitWeeks);
     const ds = rs ? diff(rs.calib, F.calib, 0) : { out: [] };
     ok("(e) mutation: the shrink set to the full ratio moves the factors and the parity comparator names them — (a) goes red",
       !!rs && ds.out.length > 0, err || "the factors did not move: " + JSON.stringify(rs && rs.calib));
     /* The last week dropped from the walk. */
     let dropped = null; err = "";
     try { dropped = loadBacktest(tmp, "drop", [["ks.forEach((k) => {", "ks.slice(0, -1).forEach((k) => {", 1]]); } catch (e) { err = e.message; }
-    const rd = dropped && dropped.run(clone(noModel), E, weeksWanted);
+    const rd = dropped && dropped.run(clone(noModel), E, kitWeeks);
     const dd = rd ? diff(rd, F.backtest, TOL) : { out: [] };
     ok("(e) mutation: the last week dropped from the walk moves the metrics and the comparator names them — (a) goes red",
       !!rd && dd.out.length > 0 && rd.points.all.n !== F.backtest.points.all.n,
