@@ -1592,3 +1592,18 @@ on the solved card, that PLAN week one's captain is named, sits in PLAN week one
 of that fifteen, and keeps today's assertion on the app's own card read with a typed price; checks 15 and 18 add the
 solved captain, fifteen and vice to the recommendations they hold to the flag rule. `qa/buttons.cjs` prefers the plan's
 first-week ids when it resolves a duplicated name.
+
+### E-127 · v110 · E-118 closed: the Plan tab's six older sections name their game, and the check that only counted now fails
+CAUSE: the wave logged E-118 open because `qa/mc_separation.cjs` could print how many stat rows carried a number and
+no game (5 at first paint, 16 with everything open) but was not allowed to fail on it: the fix sat in `src/ui.jsx`,
+which the suite's author did not own. The Command tab's two older sections were tagged Classic by the Today item; the
+Plan tab's six (`plan-tx`, `plan-wc`, `plan-opts`, `plan-xi`, `plan-time`, `plan-fb`) were not.
+CAUGHT: 28 Sep 2026, reading the full-gate log after the wave landed: the count still stood at 16 with everything
+open and the entry was still open.
+RULE: a section that shows one game's figures carries that game's tag in its first line, and the count of unlabelled
+rows is an assertion, not a report. Each of the six sections now opens with a Classic line that names what it shows
+and carries no figure, so no copy can drift; the check is armed as `unlabelled.first === 0 && unlabelled.open === 0`.
+TEST: `node qa/mc_separation.cjs` 31/31, the count 0 at first paint and 0 with everything open; removing the
+`plan-time` line from a copy of the source turns the armed check red ("0 at first paint, 5 with everything open").
+components 252/252, mc_render 65/65, visual 42/42 and unit_engine 272/272 on the rebuilt page. The browser suites run
+in the gate that follows the refresh, since the solver was using the machine when this was committed.

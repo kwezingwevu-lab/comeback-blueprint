@@ -217,6 +217,10 @@ ok("the strip check is not vacuous: " + stripsFound + " strips were found across
     });
   });
   ok("no stat row or strip cell names both games at once (" + rows + " rows over the renders; rows that carry a number and no game label in their row, block or tab: " + unlabelled.first + " at first paint, " + unlabelled.open + " with everything open — ERRORS.md E-118)", both.length === 0, both.join("; "));
+  /* E-118 armed: every stat row carrying a number resolves to a game by its own text, a heading above it inside its
+     section, a data-game attribute or the tab it sits on. The count reached zero when the Plan tab's six older sections
+     each gained a Classic line; from now on a row that loses its game fails the suite instead of only being printed. */
+  ok("every stat row that carries a number names its game: " + unlabelled.first + " unlabelled at first paint and " + unlabelled.open + " with everything open (E-118, armed)", unlabelled.first === 0 && unlabelled.open === 0, unlabelled.first + " at first paint, " + unlabelled.open + " with everything open");
   ok("both games are named across the four surfaces (" + [...names].join(" and ") + ")", names.has("Classic") && names.has("Draft"), [...names].join(","));
 }
 

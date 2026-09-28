@@ -7747,6 +7747,7 @@ function TabPlan(props) {
       </Section>
 
       <Section id="plan-tx" title="Transfers" open={sec("plan-tx")} onToggle={on.sec}>
+        <div className="dim"><span className="tag tag-s">Classic</span> The weekly transfers, from the squad and the free transfers you hold.</div>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="plan-tx">
         {hidden ? <div className="note note-w">Matches are running. Transfer panels come back when the last whistle goes.</div> : (
           <div>
@@ -7765,6 +7766,7 @@ function TabPlan(props) {
       </Section>
 
       <Section id="plan-wc" title="Wildcard fifteen" open={sec("plan-wc")} onToggle={on.sec}>
+        <div className="dim"><span className="tag tag-s">Classic</span> The wildcard fifteen, priced at today's selling values.</div>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="plan-wc">
         {hidden ? <div className="note note-w">Matches are running. Transfer panels come back when the last whistle goes.</div> : wc && wc.ok ? (
           <div>
@@ -7794,6 +7796,7 @@ function TabPlan(props) {
       </Section>
 
       <Section id="plan-opts" title="Three fifteens, priced" open={sec("plan-opts")} onToggle={on.sec}>
+        <div className="dim"><span className="tag tag-s">Classic</span> Three ways to build the wildcard fifteen, priced under one objective.</div>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="plan-opts">
         {hidden ? <div className="note note-w">Matches are running. Transfer panels come back when the last whistle goes.</div> : optRows.length ? (
           <div>
@@ -7868,6 +7871,7 @@ function TabPlan(props) {
       </Section>
 
       <Section id="plan-xi" title="Best XI and bench" open={sec("plan-xi")} onToggle={on.sec}>
+        <div className="dim"><span className="tag tag-s">Classic</span> The eleven and the bench of the wildcard fifteen.</div>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="plan-xi">
         {bx ? (
           <div>
@@ -7890,6 +7894,7 @@ function TabPlan(props) {
       </Section>
 
       <Section id="plan-time" title="Wildcard timing" open={sec("plan-time")} onToggle={on.sec}>
+        <div className="dim"><span className="tag tag-s">Classic</span> When to play the wildcard, judged by the weekly gap it closes.</div>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="plan-time">
         {tim ? (
           <div>
@@ -7924,6 +7929,7 @@ function TabPlan(props) {
       </Section>
 
       <Section id="plan-fb" title="Fallback, without the chip" open={sec("plan-fb")} onToggle={on.sec}>
+        <div className="dim"><span className="tag tag-s">Classic</span> The transfers to make without playing the chip.</div>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="plan-fb">
         {hidden ? <div className="note note-w">Matches are running. Transfer panels come back when the last whistle goes.</div> : (
         <div>
