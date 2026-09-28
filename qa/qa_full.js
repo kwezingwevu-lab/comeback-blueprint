@@ -571,5 +571,10 @@ for(const [iso,title,brief] of [['2026-11-12','Pull B — Strength','Today: Pull
  const t=await p.evaluate(()=>{const r=blSeries().rows[3];return {ma:r.ma,m:r.m,note:blTapeNote()};});
  T('Body Lab arms follow the tape (+1 cm arm lifts the arm scale above the model)',t.ma>t.m&&/^Arms, chest and thighs follow your tape/.test(t.note),JSON.stringify(t));
  T('AY: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+// --- AZ. heading levels never skip (axe-core "heading-order", 28 Sep 2026)
+{const p=await pg(b,'2026-10-16');const bad=[];
+ for(const v of ['home','lift','run','roadmap','fuel','numbers','track','guide']){await p.evaluate(n=>switchView(n),v);await wait(500);
+  const r=await p.evaluate(v=>{const el=document.getElementById('view-'+v),hs=[...el.querySelectorAll('h1,h2,h3,h4,h5,h6,[role=heading]')].filter(h=>h.offsetParent!==null);let prev=(el.querySelector('h2')?2:1),skips=[];hs.forEach(h=>{const l=h.getAttribute('aria-level')?+h.getAttribute('aria-level'):+h.tagName[1];if(l>prev+1)skips.push(l+' after '+prev+': '+h.textContent.trim().slice(0,30));prev=l;});return skips;},v);r.forEach(x=>bad.push(v+' '+x));}
+ T('headings: no level is skipped on any of the eight screens',bad.length===0,bad.join(' | '));T('AZ: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));})();

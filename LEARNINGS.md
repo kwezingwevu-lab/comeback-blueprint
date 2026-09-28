@@ -33,3 +33,4 @@ See CLAUDE.md §6 for the numbered list. Additions:
 - 2026-09-26: A ray-marched SDF body in linear light needs sRGB-looking inputs converted to linear before lighting; gamma on display-space colours washed the first render out. A rim light must be weighted by the view angle or it floods back views.
 - 2026-09-26: Subtracting two smooth-min ellipsoid bounds is not a distance (contour rings). Carry per-primitive values through the same smooth-min weights for anything measured on the surface.
 - 2026-09-26: Chart area fills bury the second line on multi-series charts; fill single-series charts only.
+- 2026-09-28: axe-core (`npm i --no-save axe-core`, inject into each view in Puppeteer) is a cheap independent accessibility check; run it after any layout or heading change. It found a level skip that eyeballing and our own tests had missed.

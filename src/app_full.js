@@ -2251,7 +2251,8 @@ BL.mode=load("cb2_blmode","form");
 /* ===== ACCESSIBILITY (2026-09-26): roles, states and keyboard for the div-based accordions and headings ===== */
 function a11yEnhance(){try{document.querySelectorAll(".tool-h,.supp-h,.rweek-h").forEach(h=>{if(!h.hasAttribute("role")){h.setAttribute("role","button");h.setAttribute("tabindex","0");}const open=h.classList.contains("open")||(h.parentElement&&h.parentElement.classList.contains("open"));h.setAttribute("aria-expanded",open?"true":"false");});
   document.querySelectorAll(".hw-tog").forEach(b=>{const id=b.dataset.tg,box=id&&document.getElementById("hw-"+id);b.setAttribute("aria-expanded",box&&box.classList.contains("open")?"true":"false");});
-  document.querySelectorAll(".card-t").forEach(c=>{if(!c.hasAttribute("role")){c.setAttribute("role","heading");c.setAttribute("aria-level","3");}});}catch(e){}}
+  /* heading levels follow the screen: under the view's h2 they are level 3; on a screen with no h2 (Home) they are level 2, so a level is never skipped */
+  document.querySelectorAll(".view").forEach(v=>{const lv=v.querySelector("h2")?"3":"2";v.querySelectorAll(".card-t").forEach(c=>{if(!c.hasAttribute("role"))c.setAttribute("role","heading");c.setAttribute("aria-level",lv);});v.querySelectorAll(".tool-h h4,.startban h4").forEach(h=>h.setAttribute("aria-level",lv));});}catch(e){}}
 var _a11yT=null;function a11ySoon(){clearTimeout(_a11yT);_a11yT=setTimeout(a11yEnhance,60);}
 document.addEventListener("click",e=>{if(e.target.closest(".tool-h,.supp-h,.rweek-h,.hw-tog"))a11ySoon();});
 document.addEventListener("keydown",e=>{if(e.key!=="Enter"&&e.key!==" ")return;const h=e.target.closest&&e.target.closest(".tool-h,.supp-h,.rweek-h,[role=button]");if(h&&h.tagName!=="BUTTON"&&h.tagName!=="A"&&h.tagName!=="INPUT"){e.preventDefault();h.click();}});

@@ -1,5 +1,10 @@
 # CHANGELOG.md — what has shipped (newest first)
 
+## 2026-09-28 (week 3)
+- Independent accessibility audit with axe-core (WCAG 2.0/2.1 A and AA plus best practice) over all eight screens, the header and the nav: two moderate "heading-order" findings (Home and Lift), fixed by setting heading levels from the screen they sit on; axe now reports zero violations. New regression check that no screen skips a heading level.
+- Screenshot audit (105 screens, real fonts, seeded data): zero page errors, no leaked placeholders.
+- Gates: Chromium 301/301 · PWA 16/16 · WebKit 29/29 · calendar helper 8/8.
+
 ## 2026-09-27 (week 3)
 - New-PR badge on Home (every all-time best from the last 7 days, gain over the previous best, tap to open it in Track).
 - Week card: the Weekly Review draws the week as a 1080×1350 image (sessions, weight + rate, waist, PRs, 28-day weight line, verdict, lean model) and shares or saves it.
