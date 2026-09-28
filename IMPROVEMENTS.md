@@ -2,7 +2,7 @@
 
 Every session adds to this list, builds everything on it that can be verified, and says plainly why the rest waits. "Shipped" means a named check in the QA suites proves it; nothing is marked shipped on the strength of reading the code.
 
-Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then a 64-finding adversarial review round fixed and proven (section R), then a visual round (section V, 14 items) and on 27 Sep the chart readout and progress photos (V15, V16, formerly K13 and K4), then a visual audit (section U, 87 confirmed findings, all fixed); 14 queued with the reason; 6 not possible from a web app, with the honest alternative.
+Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then a 64-finding adversarial review round fixed and proven (section R), then a visual round (section V, 14 items) and on 27 Sep the chart readout and progress photos (V15, V16, formerly K13 and K4), then a visual audit (section U, 87 confirmed findings, all fixed), then a second audit of the states the first never opened (section W, 91 confirmed, all addressed); 16 queued with the reason; 6 not possible from a web app, with the honest alternative.
 
 ## A. Correctness and coherence (every tab tells the same story)
 
@@ -149,6 +149,19 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then 
 | U7 | Track: region bars that never filled below 60% (--bad), selects, date width, neck note, Tests title, backup buttons, band label | 6 | Shipped · AB track, screenshot |
 | U8 | iPhone-only: fields under 16 px (focus zoom), sticky hover, desktop spinners; SA spelling | critic | Shipped · AB iPhone, WebKit iPhone, AB copy |
 
+## W. Audit round 2 (28 Sep): 99 reported, 91 confirmed, all addressed
+
+| # | Area | Findings | Status |
+|---|---|---|---|
+| W1 | Engine: body fat out of date (banner + one tap, header and ring only when lean mass exceeds the ceiling), ETA at or over the ceiling, engine follows the roadmap after the check, week counting past 104, ETA logged-rate cap, DEXA in the Day-1 week, route step and cut lengths, weight band during the cut | 12 | Shipped · AC-engine ×11, webkit engine |
+| W2 | Plan copy: March card after the weekend, route-aware Roadmap and Aggressive copy, cut copy in Fuel/Numbers, next milestone, fast track anchored to Day 1, Reality check threshold, trend copy in a cut, compact peak card | 13 | Shipped · AC-plan ×14 |
+| W3 | Coaching: attendance, stall in a deload, waist brake in a cut, first-week rate and creatine water, short-night rules, Extras pump, Volume-day titles, today's session done/half done | 17 | Shipped · AC coach ×23, webkit home |
+| W4 | Lift: same-location Last time, deload Fill, guided Next, home PR names, bodyweight and 0 kg bar, deload plotting, peak-week Lift and Fuel, midnight rollover, +1 set only while Aggressive is live, block emphasis never trimmed | 15 | Shipped · AC lift, midnight, cal and charts-07 ×21, webkit lift · block volume cut withheld (K17) |
+| W5 | Data safety: range checks, decimal comma, import dates/values/skips, storage-blocked honesty, Restore confirmation, Copy honesty, calendar-day backup age, error toasts | 15 | Shipped · AC data ×10, webkit data · 9 breakages gave 9 named failures |
+| W6 | Layout: toast width, macro tiles, delete buttons, landscape, long chart axes and readout names, list paging, landscape photos, year on long histories, gauge labels, lean tiers | 21 | Shipped · AC-ui ×11, webkit layout |
+
+Also shipped with round 2: a 624-render sweep (dates × seeds × modes × routes, 390 and 375 px) run by hand; it is not part of run.sh yet.
+
 ## K. Queued (not built yet) — what each needs
 
 | # | Item | Why it waits |
@@ -165,7 +178,9 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then 
 | K11 | Home Screen reminders at 04:30 and 20:00 | Web push on iPhone needs a push server; the Shortcuts app can do it today (see IPHONE.md) |
 | K12 | Split the 380 KB single file into modules | Only if the file becomes hard to edit; single-file is a feature for the phone |
 | K15 | Start Mini-Cut I one week earlier (W27, 13 Mar) instead of W28 (20 Mar) | Your call, not mine: today the two weeks after the check weekend run at Maximum, then the cut. Starting a week earlier trims ~0.3 kg of fat gain and costs a week of building. Say which and it is a one-line change |
-| K16 | A second audit pass over states the first one did not open | The critic listed them: charts and photos with months of data, the Data card on the published https page without the Claude account mirror, the installed app's safe areas, every Weekly Review verdict, the views after March, the specialisation blocks, and 375 px phones. Worth one more round once there is real data to render |
+| K16 | A third look at what the two audits still did not open | Still unexamined (from the critics): the iPhone keyboard covering the set grid while you log; the Events tab once the calendar snapshot goes stale (late 2027); corrupt, legacy or hand-edited backups; the share-sheet and download fallbacks; switching Gym and Home in the middle of a session; catching up a missed day; the Claude-account mirror states; VoiceOver (the set-done ticks and delete icons have no text label); a cold launch offline; a year of watch history imported in one paste; the installed Home Screen app opening with the data still in Safari. Worth one more round once there is real data |
+| K17 | Specialisation blocks: take the other muscles to maintenance? | Yours to decide. The Guide says the block's muscle takes 16-20 hard sets and everything else 6-8; built literally, weekly hard sets fall from about 177 to 101-121 and a Push B becomes seven single sets, which also contradicts the Guide's "total weekly work stays about the same". Shipped: the block's muscle takes the Guide's dose and is never trimmed; the rest keeps its base dose. If you want the literal version it is one edit (the batch is kept), and the Guide sentence would say so |
+| K18 | Waist brake in the two Maximum weeks (26-27) | Yours to decide. After the check the brake is the Maximum +3 cm, but the band route plans about +5 cm by March, so a lifter exactly on plan is told to "cut 300 kcal from the surplus" for two weeks. Options: hold the route's +5 cm until Mini-Cut I starts on 20 Mar, or start Mini-Cut I a week earlier (K15) |
 | K14 | Check the visual round on your iPhone | The sandbox WebKit is Playwright’s build, not iOS Safari; open the published app on the phone and report anything that looks off |
 
 ## L. Not possible from a web app (and the honest alternative)
