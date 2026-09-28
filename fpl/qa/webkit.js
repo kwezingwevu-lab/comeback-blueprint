@@ -48,7 +48,7 @@ const NOW = new Date(Date.parse(NEXT_EV.deadline_time) - 26 * 3600000).toISOStri
 // v110 D0: nine tabs — odds and review join before lab. Every count below is TABS.length, and
 // "G-suite-TABS-equal-the-app-tab-strip-under-webkit" compares this list once with the rendered .tabi ids.
 const TABS = ["command", "plan", "squad", "rivals", "draft", "chips", "odds", "review", "lab"];
-const FLOORS = { ".btn": 38, ".btn-sm": 32, ".tabi": 52, ".sec-h": 48, ".menu-i": 44, ".inp": 40, ".row": 38 };
+const FLOORS = { ".btn": 44, ".btn-sm": 32, ".btn-ic": 44, ".tabi": 52, ".sec-h": 48, ".menu-i": 44, ".inp": 44, ".row": 38, ".reveal": 44 };
 const GAKPO = 367;
 const PAGE_URL = H.PAGE_URL;
 /* A service worker needs a secure context, so the registration half of the PWA guard is
@@ -104,7 +104,7 @@ function stripProbe() {
     stripSW: tabs ? tabs.scrollWidth : -1, stripCW: tabs ? tabs.clientWidth : -1, cells: cells };
 }
 /* Judges one stripProbe reading against the rule: at every width the strip fits (document, strip box and element
-   walk), the cells are equal, at least 24x24 (WCAG 2.5.8) and 52 high (Part G), and each keeps its name in
+   walk), the cells are equal, at least Apple's 28 wide (HIG minimum; nine cells cannot reach 44, the named exception in Part G) and 24 by WCAG 2.5.8, and 52 high (Part G), and each keeps its name in
    aria-label; wider than 380px every label is shown at 11px or more and uncut; at 380px and narrower the cells are
    icon-only. Returns the list of breaches, empty when the reading passes. */
 function stripBreaches(m, count) {
@@ -116,7 +116,7 @@ function stripBreaches(m, count) {
   if (widths.length && Math.max.apply(null, widths) - Math.min.apply(null, widths) > 1) bad.push(w + ": widths spread " + (Math.max.apply(null, widths) - Math.min.apply(null, widths)).toFixed(2));
   m.cells.forEach(function (c) {
     if (c.left < -0.5 || c.right > w + 0.5) bad.push(w + ": " + c.id + " spans " + c.left.toFixed(2) + "–" + c.right.toFixed(2));
-    if (c.w < 24 || c.h < 24) bad.push(w + ": " + c.id + " is " + c.w.toFixed(2) + "x" + c.h.toFixed(2) + " (WCAG 2.5.8 floor 24x24)");
+    if (c.w < 28 || c.h < 28) bad.push(w + ": " + c.id + " is " + c.w.toFixed(2) + "x" + c.h.toFixed(2) + " (Apple's minimum 28x28; WCAG 2.5.8 floor 24x24)");
     if (c.h < 52 - 0.5) bad.push(w + ": " + c.id + " is " + c.h.toFixed(2) + " high (Part G .tabi 52)");
     if (!c.aria.trim()) bad.push(w + ": " + c.id + " has no aria-label");
     if (!c.label) { bad.push(w + ": " + c.id + " has no label span"); return; }
@@ -280,7 +280,7 @@ function shells() {
       '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
       '<meta name="color-scheme" content="dark">',
       "<title>FPL Mission Control — WebKit acceptance</title>",
-      "<style>html,body{margin:0;padding:0}#root{min-height:100vh}</style>",
+      "<style>html,body{margin:0;padding:0}#root{min-height:100vh;min-height:100svh}</style>",
       "</head><body>",
       '<div id="root"></div>',
       withShim ? "<script>" + STORAGE_SHIM + "</script>" : "",
@@ -532,6 +532,7 @@ async function main() {
       TABS.map(function (t) { return t + " " + tabWords[t]; }).join(", ") + " (gate < 500)");
 
     let minFont = { px: 999, sel: "(nothing measured)" };
+    const formSeen = { px: 999, n: 0, sel: "(none)" };
     const floorMin = {};
     Object.keys(FLOORS).forEach(function (k) { floorMin[k] = { min: null, where: "" }; });
 
@@ -559,9 +560,18 @@ async function main() {
           });
           fl[k] = { min: min, where: where };
         });
-        return { mn: mn, fl: fl };
+        let fm = { px: 999, n: 0, sel: "" };
+        Array.prototype.forEach.call(document.querySelectorAll(".mc-root input, .mc-root select, .mc-root textarea"), function (el) {
+          if (!vis(el)) return;
+          fm.n++;
+          const f3 = parseFloat(getComputedStyle(el).fontSize);
+          if (isFinite(f3) && f3 < fm.px) fm = { px: f3, n: fm.n, sel: el.tagName.toLowerCase() + "[" + (el.getAttribute("data-testid") || el.getAttribute("aria-label") || "") + "]" };
+        });
+        return { mn: mn, fl: fl, fm: fm };
       }, FLOORS);
       if (r.mn.px < minFont.px) minFont = { px: r.mn.px, sel: r.mn.sel + " on " + label };
+      formSeen.n += r.fm.n;
+      if (r.fm.px < formSeen.px) formSeen.px = r.fm.px, formSeen.sel = r.fm.sel + " on " + label;
       Object.keys(FLOORS).forEach(function (k) {
         const v = r.fl[k];
         if (v.min === null) return;
@@ -594,6 +604,21 @@ async function main() {
         got.min !== null && got.min >= FLOORS[k] - 0.5,
         got.min === null ? "no visible " + k + " element was rendered anywhere" : "minimum height " + got.min.toFixed(2) + "px on «" + got.where + "» (floor " + FLOORS[k] + ")");
     });
+
+    H.assert("G-form-controls-are-16px-or-larger-under-webkit", formSeen.n > 0 && formSeen.px >= 16,
+      formSeen.n + " visible input/select/textarea readings, smallest computed font-size " + formSeen.px + "px on " + formSeen.sel + " (floor 16px, WebKit's zoom-on-focus rule)");
+    MEASURED.formFloor = formSeen.px + "px over " + formSeen.n + " readings";
+    {
+      const hb = await page.evaluate(function () {
+        const r = document.querySelector('[data-testid="refresh"]'), m = document.querySelector('[data-testid="menu"]');
+        if (!r || !m) return null;
+        const a = r.getBoundingClientRect(), b = m.getBoundingClientRect();
+        return { rw: a.width, rh: a.height, mw: b.width, mh: b.height, gap: b.left - a.right };
+      });
+      H.assert("G-header-refresh-and-menu-are-44x44-with-12px-between-under-webkit",
+        !!hb && hb.rw >= 43.5 && hb.rh >= 43.5 && hb.mw >= 43.5 && hb.mh >= 43.5 && hb.gap >= 11.99,
+        hb ? "refresh " + hb.rw.toFixed(2) + "x" + hb.rh.toFixed(2) + ", menu " + hb.mw.toFixed(2) + "x" + hb.mh.toFixed(2) + ", gap " + hb.gap.toFixed(2) + " (Apple 44x44 pt, about 12 pt between bordered controls)" : "header buttons not found");
+    }
 
     const tabGeom = await page.evaluate(function () {
       return Array.prototype.map.call(document.querySelectorAll(".tabi"), function (e) {

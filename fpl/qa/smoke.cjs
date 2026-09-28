@@ -43,7 +43,7 @@ const LIVE_NOW = isoAt(NEXT_DL + 5 * 3600000);      // inside the live window of
 const TABS = ["command", "plan", "squad", "rivals", "draft", "chips", "odds", "review", "lab"];
 const PRIMARY = { command: "cmd-stand", plan: "plan-solved", squad: "sq-fifteen", rivals: "rv-table", draft: "df-claims", chips: "ch-now", odds: "od-next", review: "rw-classic", lab: "lab-data" };
 const TOKENS = ["--amb", "--bg", "--bg2", "--bg3", "--blu", "--cyn", "--dim", "--err", "--focus", "--grn", "--grn2", "--line", "--mute", "--ok", "--pnk", "--pnk2", "--pur", "--shadow", "--text", "--warn", "--wht"];
-const FLOORS = { ".btn": 38, ".btn-sm": 32, ".tabi": 52, ".sec-h": 48, ".menu-i": 44, ".inp": 40, ".row": 38 };
+const FLOORS = { ".btn": 44, ".btn-sm": 32, ".btn-ic": 44, ".tabi": 52, ".sec-h": 48, ".menu-i": 44, ".inp": 44, ".row": 38, ".reveal": 44 };
 const GAKPO = 367;
 
 // ---------------------------------------------------------------- small helpers
@@ -72,7 +72,7 @@ function stripProbe() {
     stripSW: tabs ? tabs.scrollWidth : -1, stripCW: tabs ? tabs.clientWidth : -1, cells: cells };
 }
 /* Judges one stripProbe reading against the rule: at every width the strip fits (document, strip box and element
-   walk), the cells are equal, at least 24x24 (WCAG 2.5.8) and 52 high (Part G), and each keeps its name in
+   walk), the cells are equal, at least Apple's 28 wide (HIG minimum; nine cells cannot reach 44, the named exception in Part G) and 24 by WCAG 2.5.8, and 52 high (Part G), and each keeps its name in
    aria-label; wider than 380px every label is shown at 11px or more and uncut; at 380px and narrower the cells are
    icon-only. Returns the list of breaches, empty when the reading passes. */
 function stripBreaches(m, count) {
@@ -84,7 +84,7 @@ function stripBreaches(m, count) {
   if (widths.length && Math.max.apply(null, widths) - Math.min.apply(null, widths) > 1) bad.push(w + ": widths spread " + (Math.max.apply(null, widths) - Math.min.apply(null, widths)).toFixed(2));
   m.cells.forEach(function (c) {
     if (c.left < -0.5 || c.right > w + 0.5) bad.push(w + ": " + c.id + " spans " + c.left.toFixed(2) + "–" + c.right.toFixed(2));
-    if (c.w < 24 || c.h < 24) bad.push(w + ": " + c.id + " is " + c.w.toFixed(2) + "x" + c.h.toFixed(2) + " (WCAG 2.5.8 floor 24x24)");
+    if (c.w < 28 || c.h < 28) bad.push(w + ": " + c.id + " is " + c.w.toFixed(2) + "x" + c.h.toFixed(2) + " (Apple's minimum 28x28; WCAG 2.5.8 floor 24x24)");
     if (c.h < 52 - 0.5) bad.push(w + ": " + c.id + " is " + c.h.toFixed(2) + " high (Part G .tabi 52)");
     if (!c.aria.trim()) bad.push(w + ": " + c.id + " has no aria-label");
     if (!c.label) { bad.push(w + ": " + c.id + " has no label span"); return; }
@@ -414,6 +414,7 @@ async function main() {
 
     await fresh({ html: html, mode: "full", now: NOW });
     let minFont = { px: 999, sel: "(nothing measured)" };
+    const formSeen = { px: 999, n: 0, sel: "(none)" };
     const floorMin = {};
     Object.keys(FLOORS).forEach(function (k) { floorMin[k] = { min: null, where: "" }; });
 
@@ -441,9 +442,18 @@ async function main() {
           });
           fl[k] = { min: min, where: where };
         });
-        return { mn: mn, fl: fl };
+        let fm = { px: 999, n: 0, sel: "" };
+        Array.prototype.forEach.call(document.querySelectorAll(".mc-root input, .mc-root select, .mc-root textarea"), function (el) {
+          if (!vis(el)) return;
+          fm.n++;
+          const f3 = parseFloat(getComputedStyle(el).fontSize);
+          if (isFinite(f3) && f3 < fm.px) fm = { px: f3, n: fm.n, sel: el.tagName.toLowerCase() + "[" + (el.getAttribute("data-testid") || el.getAttribute("aria-label") || "") + "]" };
+        });
+        return { mn: mn, fl: fl, fm: fm };
       }, FLOORS);
       if (r.mn.px < minFont.px) minFont = { px: r.mn.px, sel: r.mn.sel + " on " + label };
+      formSeen.n += r.fm.n;
+      if (r.fm.px < formSeen.px) formSeen.px = r.fm.px, formSeen.sel = r.fm.sel + " on " + label;
       Object.keys(FLOORS).forEach(function (k) {
         const v = r.fl[k];
         if (v.min === null) return;
@@ -473,6 +483,20 @@ async function main() {
         got.min !== null && got.min >= FLOORS[k] - 0.5,
         got.min === null ? "no visible " + k + " element was rendered anywhere" : "minimum height " + got.min.toFixed(1) + "px on «" + got.where + "» (floor " + FLOORS[k] + ")");
     });
+
+    H.assert("E023-form-controls-are-16px-or-larger-so-focus-does-not-zoom", formSeen.n > 0 && formSeen.px >= 16,
+      formSeen.n + " visible input/select/textarea readings, smallest computed font-size " + formSeen.px + "px on " + formSeen.sel + " (floor 16px, WebKit's zoom-on-focus rule)");
+    {
+      const hb = await page.evaluate(function () {
+        const r = document.querySelector('[data-testid="refresh"]'), m = document.querySelector('[data-testid="menu"]');
+        if (!r || !m) return null;
+        const a = r.getBoundingClientRect(), b = m.getBoundingClientRect();
+        return { rw: a.width, rh: a.height, mw: b.width, mh: b.height, gap: b.left - a.right };
+      });
+      H.assert("E024-header-refresh-and-menu-are-44x44-with-12px-between",
+        !!hb && hb.rw >= 43.5 && hb.rh >= 43.5 && hb.mw >= 43.5 && hb.mh >= 43.5 && hb.gap >= 11.99,
+        hb ? "refresh " + hb.rw.toFixed(2) + "x" + hb.rh.toFixed(2) + ", menu " + hb.mw.toFixed(2) + "x" + hb.mh.toFixed(2) + ", gap " + hb.gap.toFixed(2) + " (Apple 44x44 pt, about 12 pt between bordered controls)" : "header buttons not found");
+    }
 
     // ---------------------------------------------------------- 5. colour tokens and hex literals
 

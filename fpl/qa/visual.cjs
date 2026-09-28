@@ -16,10 +16,12 @@
  *   parent is another component), the pairing is tested on every neutral surface, which for a
  *   light-on-dark palette is the strictest reading, never a softer one.
  *
- *   audit_layout — the Part G phone rules that a stylesheet can hold on its own: the seven
- *   touch floors as min-heights, the 11px type floor in every rule of every media query, the tab
- *   strip fitting at 390px and at the width its own media query targets, the header title guard,
- *   and zero hex colour literals outside the token block.
+ *   audit_layout — the Part G phone rules that a stylesheet can hold on its own: the nine
+ *   touch floors as min-heights (Apple's 44 pt for .btn, .btn-ic, .inp and .reveal since 28 Sep 2026),
+ *   the 11px type floor in every rule of every media query, form controls at 16px, the tab
+ *   strip fitting at 390px and at the width its own media query targets (every cell at least
+ *   Apple's 28 wide), the header title guard, and zero hex colour literals outside the token
+ *   block and the Increase Contrast block, which may redefine only names from the 21-token list.
  *
  * WHY NODE-ONLY, AND WHY IT IS IN GROUP A
  *   smoke.cjs and webkit.js measure the type and touch floors in a real browser, at 390x844.
@@ -461,6 +463,40 @@ ok("audit_contrast · the app defines one theme (one token block); a second them
 const col = (n) => TOK[n] || (TOK[n] = tokenColour(n));
 const surfaces = (bg) => (bg === NEUTRAL ? NEUTRAL_SURFACES : [bg]);
 
+/* IOS27-13 · the Increase Contrast variant: one @media (prefers-contrast: more) block holding one .mc-root rule that
+   redefines existing token names and nothing else. Hex is allowed there (CONTRACT §7: hex only in token definitions),
+   in no other place outside the base token block. It is read here and audited like a second theme of three names. */
+const VARIANT_SRC = "@media\\s*\\(\\s*prefers-contrast\\s*:\\s*more\\s*\\)\\s*\\{\\s*\\.mc-root\\s*\\{([^}]*)\\}\\s*\\}";
+const VARIANTS = [...STYLE.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(new RegExp(VARIANT_SRC, "g"))].map((m) => {
+  const d = {};
+  m[1].split(";").forEach((x) => { const p = x.indexOf(":"); if (p > 0) d[x.slice(0, p).trim()] = x.slice(p + 1).trim(); });
+  return d;
+});
+const VAR_NAMES = VARIANTS.length ? Object.keys(VARIANTS[0]) : [];
+ok("audit_contrast · Increase Contrast: one prefers-contrast:more block, redefining only names from the 21-token list, each a plain hex",
+  VARIANTS.length === 1 && VAR_NAMES.length > 0 && VAR_NAMES.every((k) => /^--[\w-]+$/.test(k) && TOKEN_NAMES.includes(k.slice(2)) && /^#[0-9a-fA-F]{6}$/.test(VARIANTS[0][k])),
+  VARIANTS.length + " block(s); redefines " + (VAR_NAMES.map((k) => k + " " + VARIANTS[0][k]).join(", ") || "nothing"));
+const vcol = (n) => (VARIANTS.length && VARIANTS[0]["--" + n] ? VARIANTS[0]["--" + n].toLowerCase() : col(n));
+if (VARIANTS.length && Object.keys(TOK).length) {
+  for (const n of ["dim", "mute"]) {
+    const cs = NEUTRAL_SURFACES.map((sf) => contrast(vcol(n), col(sf)));
+    ok("audit_contrast · Increase Contrast: --" + n + " on --bg / --bg2 / --bg3 (threshold 7, Apple's small-text figure)", cs.every((c) => c >= 7), cs.map(fmt).join(" / "));
+  }
+  const ln = ["bg2", "bg3"].map((sf) => contrast(vcol("line"), col(sf)));
+  ok("audit_contrast · Increase Contrast: --line on --bg2 and on --bg3 (threshold 3, WCAG 1.4.11)", ln.every((c) => c >= 3), ln.map(fmt).join(" / "));
+  const order = NEUTRAL_SURFACES.map((sf) => [contrast(col("text"), col(sf)), contrast(vcol("dim"), col(sf)), contrast(vcol("mute"), col(sf))]);
+  ok("audit_contrast · Increase Contrast keeps the order --text > --dim > --mute on every neutral surface", order.every((o) => o[0] > o[1] && o[1] > o[2]), order.map((o) => o.map(fmt).join(" > ")).join(" · "));
+}
+if (Object.keys(TOK).length) {
+  /* IOS27-21 · small text toward Apple's 7:1 (Dark Mode: 'strive for a contrast ratio of 7:1, especially in small text').
+     --dim carries the 11 and 12px secondary text and reaches it on every neutral surface; --mute, the quietest step, is held
+     one step below --dim (the flatten-or-stop-using choice for the rest is the manager's, recorded in CLAUDE.md Part G). */
+  const dimOn = NEUTRAL_SURFACES.map((sf) => contrast(col("dim"), col(sf)));
+  ok("audit_contrast · --dim on --bg / --bg2 / --bg3 reaches 7:1 (small text, Apple's figure)", dimOn.every((c) => c >= 7), dimOn.map(fmt).join(" / "));
+  const stepOn = NEUTRAL_SURFACES.map((sf) => contrast(col("dim"), col(sf)) / contrast(col("mute"), col(sf)));
+  ok("audit_contrast · --mute stays a visible step below --dim on every neutral surface (contrast ratio of the two ≥ 1.2)", stepOn.every((r) => r >= 1.2), stepOn.map((r) => r.toFixed(3)).join(" / "));
+}
+
 if (Object.keys(TOK).length) {
   /* The three numbers the contrast fix recorded, computed here from the source and never typed. */
   const muteOn = NEUTRAL_SURFACES.map((s) => contrast(col("mute"), col(s)));
@@ -551,7 +587,7 @@ console.log("audit_layout");
 
 /* Part G touch floors. The numbers are the standard, not an observation; the three copies of
    the table (here, smoke.cjs, webkit.js) are held equal so none can drift on its own. */
-const FLOORS = { ".btn": 38, ".btn-sm": 32, ".tabi": 52, ".sec-h": 48, ".menu-i": 44, ".inp": 40, ".row": 38 };
+const FLOORS = { ".btn": 44, ".btn-sm": 32, ".btn-ic": 44, ".tabi": 52, ".sec-h": 48, ".menu-i": 44, ".inp": 44, ".row": 38, ".reveal": 44 };
 function floorsIn(file) {
   try { const m = /const FLOORS = (\{[^}]*\});/.exec(fs.readFileSync(path.join(ROOT, "qa", file), "utf8")); return m ? new Function("return " + m[1])() : null; } catch (e) { return null; }
 }
@@ -589,6 +625,16 @@ for (const cls of Object.keys(FLOORS)) {
     low.length === 0, low.length ? low.join(" · ") : "smallest is 11px");
 }
 
+/* IOS27-03 · form controls at 16px: WebKit's own rule zooms the page when a focused control's text is below 16px, so `.inp`
+   (the class every input, select and textarea carries) computes to 16px or more in the base stylesheet and in every media query. */
+{
+  const rules = RULES.filter((r) => /(^|[\s,])(?:textarea|select|input)?\.inp\b/.test(r.sel) || /^(?:textarea|select|input)$/.test(r.sel));
+  const fs = rules.filter((r) => r.decl["font-size"] !== undefined).map((r) => ({ sel: r.sel + (r.media ? " @media " + r.media : ""), px: pxOf(r.decl["font-size"]) }));
+  const low = fs.filter((x) => x.px === null || x.px < 16);
+  ok("audit_layout · form controls (.inp) are 16px or larger in every rule that sizes them (Part G, WebKit's zoom-on-focus rule)",
+    fs.length > 0 && low.length === 0, fs.length ? fs.map((x) => x.sel + " " + x.px + "px").join(", ") : ".inp sets no font-size");
+}
+
 /* The tab strip. Part G: equal-width icon tabs, one per TABS entry, no horizontal scroll (nine since v110 D0 —
    the count is read from the source's TABS and held equal to the lists smoke.cjs and webkit.js measure with,
    never typed here; it was `count === 7` until the strip grew). The CSS does this
@@ -610,6 +656,8 @@ for (const cls of Object.keys(FLOORS)) {
   const narrow = RULES.find((r) => r.sel === ".tabi" && r.media && /max-width\s*:\s*(\d+)px/.test(r.media));
   const narrowW = narrow ? parseInt(/max-width\s*:\s*(\d+)px/.exec(narrow.media)[1], 10) : null;
   const narrowMin = narrow && narrow.decl["min-width"] !== undefined ? pxOf(narrow.decl["min-width"]) : baseMin;
+  ok("audit_layout · every tab cell is at least Apple's 28 wide by its min-width, base and narrow (nine cells cannot reach 44: the named exception in Part G)",
+    baseMin !== null && baseMin >= 28 && narrowMin !== null && narrowMin >= 28, "base " + baseMin + "px, ≤" + narrowW + "px " + narrowMin + "px");
   ok("audit_layout · " + count + " tabs fit at 390px with the base rule and at ≤" + narrowW + "px with the media rule (no horizontal scroll)",
     count > 0 && suiteTabs.every((t) => Array.isArray(t) && t.length === count) && baseMin !== null && gap !== null && padH !== null && need(baseMin) <= 390 && (narrowW === null || (narrowMin !== null && need(narrowMin) <= Math.min(narrowW, 360))),
     "base " + count + "×" + baseMin + " + " + (count - 1) + "×" + gap + " + " + padH + " = " + (baseMin !== null && gap !== null && padH !== null ? need(baseMin) : "n/a") + " ≤ 390" +
@@ -636,7 +684,9 @@ for (const cls of Object.keys(FLOORS)) {
   const HEX = /#[0-9a-fA-F]{3,8}\b/g;
   const tokStart = STYLE.indexOf(".mc-root{"), tokEnd = tokStart < 0 ? -1 : STYLE.indexOf("}", tokStart);
   const tokenBlock = tokStart < 0 ? "" : STYLE.slice(tokStart, tokEnd);
-  const restStyle = tokStart < 0 ? STYLE : STYLE.slice(0, tokStart) + STYLE.slice(tokEnd);
+  const withoutBase = tokStart < 0 ? STYLE : STYLE.slice(0, tokStart) + STYLE.slice(tokEnd);
+  const inVariant = VARIANTS.reduce((n, v) => n + Object.values(v).filter((x) => /^#[0-9a-fA-F]{3,8}$/.test(x)).length, 0);
+  const restStyle = withoutBase.replace(new RegExp(VARIANT_SRC, "g"), "");
   const inTokens = (tokenBlock.match(HEX) || []).length;
   const offenders = [];
   let m;
@@ -644,7 +694,7 @@ for (const cls of Object.keys(FLOORS)) {
   const jsx = src.slice(0, styleStart) + blank(src.slice(styleStart, styleEnd + 2)) + src.slice(styleEnd + 2);
   while ((m = HEX.exec(jsx))) offenders.push("line " + jsx.slice(0, m.index).split("\n").length + ": " + m[0]);
   ok("audit_layout · 0 hex colour literals outside the token block (Part G)", offenders.length === 0,
-    offenders.length ? offenders.join(" · ") : inTokens + " hex values, all inside .mc-root{…} at line " + (styleLine + 1));
+    offenders.length ? offenders.join(" · ") : inTokens + " hex values, all inside .mc-root{…} at line " + (styleLine + 1) + (inVariant ? ", plus " + inVariant + " in the Increase Contrast block, which redefines only listed names" : ""));
   ok("audit_layout · the token block defines exactly the TOKENS list (" + TOKEN_NAMES.length + " names) and nothing else in hex",
     TOKEN_NAMES.length > 0 && inTokens === TOKEN_NAMES.length && TOKEN_NAMES.every((n) => new RegExp("--" + n + "\\s*:\\s*#").test(tokenBlock)),
     inTokens + " hex definitions for " + TOKEN_NAMES.length + " names");
