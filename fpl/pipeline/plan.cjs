@@ -106,20 +106,44 @@ function main() {
 
   /* 2–4. the kept plan */
   let plan = slim(so.plan), solvedBy = show(o.out) + " plan", longNote = "absent", timing = null, timingNote = "absent";
+  const sameProblem = [{ label: "main plan", p: so.plan }];   // E-128: solves of one integer programme, whose dual bounds are shared below
   if (fs.existsSync(o.long)) {
     const sl = readJson(o.long);
     if (sl.hash !== nowHash) longNote = "stale (hash " + sl.hash + ")";
     else if (!(sl.plan && sl.plan.ok)) longNote = "no feasible plan";
     else if ((sl.plan.obj || 0) > (plan.obj || 0)) { plan = slim(sl.plan); solvedBy = show(o.long) + " plan"; longNote = "kept (objective " + sl.plan.obj + ", gap " + sl.plan.gap + ")"; }
     else longNote = "not better (objective " + sl.plan.obj + " vs " + plan.obj + ")";
+    if (sl.hash === nowHash && sl.plan && sl.plan.ok) sameProblem.push({ label: "long solve", p: sl.plan });
   }
   if (fs.existsSync(o.timing)) {
     const st = readJson(o.timing);
+    if (st.hash === nowHash && st.now && st.now.ok) sameProblem.push({ label: "wildcard now", p: st.now });
     if (st.hash === nowHash && st.now && st.later && st.never) {
       /* the main plan and "wildcard now" are the same problem solved twice: keep whichever reached the better objective, and its proven gap */
       if ((st.now.obj || 0) > (plan.obj || 0)) { plan = Object.assign(slim(st.now), { detail: so.plan.detail }); solvedBy = show(o.timing) + " now"; }
       timing = { now: plan, later: slim(st.later), never: slim(st.never), at: st.at }; timingNote = "folded (now := the kept plan)";
     } else timingNote = st.hash === nowHash ? "incomplete (needs now, later and never)" : "stale (hash " + st.hash + ")";
+  }
+
+  /* 4b. The kept plan's proof (E-128). The main plan, the long solve and "wildcard now" are ONE integer programme solved
+     up to three times — classic() with its default arguments, which is checked here through the recorded params and not
+     assumed — so a dual bound proven by any of them bounds the best plan of all of them. Each solve proves
+     bound = objective × (1 + gap); the tightest of those is the best bound for the problem, and the kept plan is proven
+     within (best bound ÷ its own objective − 1) of the best possible. The gap is never reported tighter than the
+     tightest bound allows, and never looser than the kept solve's own. A solve with other parameters shares nothing. */
+  let gapNote = "the kept solve's own gap";
+  {
+    const key = JSON.stringify(plan.params || null);
+    const peers = sameProblem.filter((x) => x.p && x.p.ok && typeof x.p.obj === "number" && typeof x.p.gap === "number" && JSON.stringify(x.p.params || null) === key);
+    if (plan.params && peers.length && typeof plan.obj === "number" && plan.obj > 0 && typeof plan.gap === "number") {
+      const best = peers.reduce((a, x) => (x.p.obj * (1 + x.p.gap) < a.b ? { b: x.p.obj * (1 + x.p.gap), from: x.label, p: x.p } : a), { b: Infinity, from: null, p: null });
+      const certified = best.b / plan.obj - 1;
+      if (certified < plan.gap - 1e-12) {
+        plan = Object.assign({}, plan, { gapOwn: plan.gap, gap: Math.max(0, certified), gapFrom: best.from, gapBound: Math.round(best.b * 1e4) / 1e4 });
+        gapNote = "certified by the " + best.from + "'s bound " + plan.gapBound + " (its own gap " + plan.gapOwn.toFixed(4) + ")";
+      }
+    }
+    if (timing) timing.now = plan;   // "now" is the kept plan, with the proof it now carries
   }
 
   /* 5. free-hit weeks against the kept plan */
@@ -157,7 +181,7 @@ function main() {
 
   const chips = plan.weeks.filter((w) => w.chip).map((w) => "GW" + w.gw + " " + w.chip).join(", ") || "none";
   const hits = replay.reduce((a, r) => a + r.hitCount, 0);
-  console.log("plan.cjs wrote " + show(o.plan) + " · hash " + nowHash + " · kept " + solvedBy + " · total " + plan.total + " · objective " + plan.obj + " · gap " + plan.gap +
+  console.log("plan.cjs wrote " + show(o.plan) + " · hash " + nowHash + " · kept " + solvedBy + " · total " + plan.total + " · objective " + plan.obj + " · gap " + plan.gap + " (" + gapNote + ")" +
     " · " + plan.weeks.length + " weeks GW" + plan.weeks[0].gw + "–" + plan.weeks[plan.weeks.length - 1].gw + " · chips " + chips + " · replayed hits " + hits +
     " · long solve " + longNote + " · timing " + timingNote + " · free-hit weeks " + freeHit.length + " · Draft roster " + (so.draft && so.draft.ok ? "ok" : "absent"));
   if (differences.length) {

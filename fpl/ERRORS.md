@@ -1607,3 +1607,23 @@ TEST: `node qa/mc_separation.cjs` 31/31, the count 0 at first paint and 0 with e
 `plan-time` line from a copy of the source turns the armed check red ("0 at first paint, 5 with everything open").
 components 252/252, mc_render 65/65, visual 42/42 and unit_engine 272/272 on the rebuilt page. The browser suites run
 in the gate that follows the refresh, since the solver was using the machine when this was committed.
+
+### E-128 · v110 · the kept plan reported the gap of the solve that produced it, though a sibling solve of the same problem had proved a tighter bound
+CAUSE: `pipeline/plan.cjs` keeps the best plan by objective among the main solve, the long solve and the timing file's
+"wildcard now", and copied the gap of whichever solve won. Those three are one integer programme: `classic()` with its
+default arguments. A dual bound proved by any of them bounds the best plan of all of them, so the winner's honest gap
+is the tightest bound over its own objective, not its own solve's clock-limited gap. On the 28 Sep refresh the three
+solves gave objectives 671.63, 672.02 and 673.06 at gaps 4.4%, 1.0% and 5.8%. The best plan (673.06) came from the
+solve with the loosest gap, and reported as it stood it would have failed the 3% ceiling (§7.9) while being provably
+within 0.84% of the best possible, by the long solve's bound (672.02 × 1.01 = 678.7).
+CAUGHT: 28 Sep 2026, reading the solve logs during the second refresh: a timing solve with the best incumbent and a
+5.8% gap was about to become the kept plan.
+RULE: each solve proves bound = objective × (1 + gap). The kept plan's gap is min(bound) over the solves whose
+recorded `params` equal the kept plan's (checked, never assumed), divided by the kept plan's objective, less one. It is
+never tighter than that bound and never looser than the kept solve's own gap; `gapOwn`, `gapFrom` and `gapBound`
+record what supplied it. A solve with other parameters shares nothing. The 3% ceiling itself is unchanged.
+TEST: `qa/plan_legality.cjs` "the plan's gap is no tighter than the tightest bound the raw solves prove", which
+recomputes the floor from the raw solver files the plan names and fails on a missing file, a hash from other data or a
+claim below the floor; its mutation (a gap of 0.00001) goes red. On the committed 27 Sep solver files the same plan
+(weeks identical) is certified at 0.2467% by the long solve's bound instead of 0.4851% (41/41 on the old and the new
+plan file); changing the long solve's `tau` in a copy makes `plan.cjs` fall back to the plan's own 0.4851% gap.

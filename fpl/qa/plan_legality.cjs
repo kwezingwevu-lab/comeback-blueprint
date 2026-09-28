@@ -276,7 +276,26 @@ if (OPT.skipGap) {
   skip("the plan is proven close to the best possible (gap under " + GAP_MAX + ", §7.9)", "--skip-gap: a short, time-limited solve is asked to be legal, not to prove its gap (gap " + PF.plan.gap + ")");
   skip("the plan is at least as good as keeping the wildcard", "--skip-gap: two time-limited solves of different lengths are not comparable");
 } else {
-  ok("the plan is proven close to the best possible (gap under " + GAP_MAX + ", §7.9)", typeof PF.plan.gap === "number" && PF.plan.gap < GAP_MAX, "gap " + PF.plan.gap);
+  ok("the plan is proven close to the best possible (gap under " + GAP_MAX + ", §7.9)", typeof PF.plan.gap === "number" && PF.plan.gap < GAP_MAX, "gap " + PF.plan.gap + (PF.plan.gapFrom ? " (certified by the " + PF.plan.gapFrom + ", the kept solve's own gap " + PF.plan.gapOwn + ")" : ""));
+  /* E-128. The plan may claim a tighter proof than its own solve reached only if a solve of the SAME problem (same
+     hash, same recorded parameters) proved a bound that supports it. So recompute the tightest bound from the raw solver
+     files the plan names, and refuse a gap tighter than that bound allows, or a bound the raw files do not contain. */
+  {
+    const src = PF.source || {}, raws = [];
+    const grab = (rel, pick) => { const f = rel ? readJson(here(rel)) : null; if (f && f.hash === PF.hash) pick(f); return !!f; };
+    const readable = [
+      grab(src.out, (f) => f.plan && raws.push({ label: "main plan", p: f.plan })),
+      src.long ? grab(src.long, (f) => f.plan && raws.push({ label: "long solve", p: f.plan })) : true,
+      src.timing ? grab(src.timing, (f) => f.now && raws.push({ label: "wildcard now", p: f.now })) : true,
+    ];
+    const key = JSON.stringify((PF.plan || {}).params || null);
+    const peers = raws.filter((x) => x.p && x.p.ok && typeof x.p.obj === "number" && typeof x.p.gap === "number" && JSON.stringify(x.p.params || null) === key);
+    const bestB = peers.reduce((a, x) => Math.min(a, x.p.obj * (1 + x.p.gap)), Infinity);
+    const floorGap = isFinite(bestB) && PF.plan.obj > 0 ? bestB / PF.plan.obj - 1 : null;
+    ok("the plan's gap is no tighter than the tightest bound the raw solves prove (E-128): " + (floorGap === null ? "no bound" : "floor " + floorGap.toFixed(5)),
+      readable.every(Boolean) && floorGap !== null && PF.plan.gap >= floorGap - 1e-6 && PF.plan.gap <= (typeof PF.plan.gapOwn === "number" ? PF.plan.gapOwn : PF.plan.gap) + 1e-9,
+      "plan gap " + PF.plan.gap + " · floor from " + peers.map((x) => x.label).join(", ") + " " + (floorGap === null ? "none" : floorGap.toFixed(5)) + (readable.every(Boolean) ? "" : " · a raw solver file named by the plan is missing or was solved on other data"));
+  }
   ok("the plan is at least as good as keeping the wildcard", !PF.noWildcard || !PF.noWildcard.ok || PF.plan.total >= PF.noWildcard.total - WC_MARGIN, PF.plan.total + " vs " + (PF.noWildcard || {}).total);
 }
 
@@ -419,6 +438,16 @@ if (!OPT.noGolden && (OPT.golden || isReferencePlan)) {
   {
     const c = clone(PF); c.hash = "0000000000000000"; const h = hashCheck(c);
     ok("mutation: a foreign hash goes red on the content-hash check", !h.ok, h.detail);
+  }
+  /* 8b. E-128: a gap tighter than any raw bound proves */
+  if (!OPT.skipGap) {
+    const c = clone(PF); c.plan.gap = 0.00001; c.plan.gapOwn = c.plan.gapOwn || 0.05;
+    const src = PF.source || {}, raw = [];
+    [[src.out, (f) => f.plan], [src.long, (f) => f.plan], [src.timing, (f) => f.now]].forEach(([rel, pick]) => { const f = rel ? readJson(here(rel)) : null; if (f && f.hash === PF.hash && pick(f)) raw.push(pick(f)); });
+    const key = JSON.stringify((PF.plan || {}).params || null);
+    const bestB = raw.filter((p) => p.ok && typeof p.obj === "number" && typeof p.gap === "number" && JSON.stringify(p.params || null) === key).reduce((a, p) => Math.min(a, p.obj * (1 + p.gap)), Infinity);
+    const floorGap = isFinite(bestB) ? bestB / PF.plan.obj - 1 : null;
+    ok("mutation: a gap of 0.00001 no raw solve supports goes red on the E-128 check", floorGap !== null && c.plan.gap < floorGap - 1e-6, "floor " + (floorGap === null ? "none" : floorGap.toFixed(5)) + " vs claimed " + c.plan.gap);
   }
   /* 9. the acceptance: total and chip weeks moved */
   if (GOLDEN) {
