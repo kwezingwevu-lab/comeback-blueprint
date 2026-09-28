@@ -1681,3 +1681,20 @@ the copy. The branch now reads "ahead of every later week in the proof as well, 
 the tolerance of about 4 points".
 TEST: components D2 "the timing verdict says proved worse only on the objective proof and settled only beyond the
 tolerance", 252/252, which reaches this branch on the shipped plan.
+
+### E-095 · v110 · verify.sh derived the service worker's cache name from a hard-coded four-icon list (E-084's class), and the entry its own fix comment cites was never written
+CAUSE: `qa/verify.sh`'s check `pwa-service-worker-precaches-this-build-only` recomputes the worker's cache name from the
+shipped page, the manifest and the icons, exactly as `build.cjs` does. The suite hashed a typed list of four icon files;
+`build.cjs` hashes every icon it writes. On 26 Sep the icon set grew from four files to eleven, the two derivations
+disagreed and a correct build read red. A frozen list in a suite was standing in for what the build produces.
+CAUGHT: 26 Sep 2026, commit 4f0606a (the contrast fix and the full icon set), the run after the icon set grew. The fix
+comment in `qa/verify.sh` names this entry, and the entry was not written until now: a fixed error with no ledger line.
+RULE: the list is read off `dist/` itself, every `icon*.png` and `icon*.svg` there, sorted, which is what `build.cjs` walks,
+so a file added to the set is hashed by both sides or by neither. A fix comment that cites a ledger number is not done
+until the entry exists: `qa/verify.sh` now has a reason to be read next to this one.
+TEST: `bash qa/verify.sh` check `pwa-service-worker-precaches-this-build-only` (34/34 on the 28 Sep tree; the cache name
+it recomputes equals the one in `dist/sw.js` over all eleven icons).
+NUMBERING, for anyone reading the ledger in order: entries E-096 to E-111 and E-122 were reserved by the v110 spec's
+section 7 order and by the agents that wrote them, and are appended in the order they were written, so the file is not in
+numeric order. E-098 was never used. Nothing is missing, and nothing is renumbered, because an append-only ledger keeps
+the numbers its commits already cite.
