@@ -1,5 +1,5 @@
 /*
- * qa/buttons.cjs — every control, in both modes, on all seven tabs (CLAUDE.md H1 "buttons").
+ * qa/buttons.cjs — every control, in both modes, on every tab in TABS (CLAUDE.md H1 "buttons").
  *
  * For each mode and each tab: open every Section, then click every enabled button, input,
  * select and textarea in turn. After each click:
@@ -29,7 +29,8 @@ const LIVE = require(path.join(ROOT, "data", "live.json"));
 const E = require(path.join(ROOT, "src", "engine.js"));
 
 const NOW = "2026-09-11T08:00:00Z";
-const TABS = ["command", "plan", "squad", "rivals", "draft", "chips", "lab"];
+// v110 D0: nine tabs — odds and review join before lab; smoke.cjs compares the same list with the rendered strip.
+const TABS = ["command", "plan", "squad", "rivals", "draft", "chips", "odds", "review", "lab"];
 const MODES = ["full", "simple"];
 const CONTROLS = ".mc-root button, .mc-root input, .mc-root select, .mc-root textarea";
 
@@ -72,6 +73,9 @@ const LOCKED_15 = (function () {
 })();
 const PREFERRED = {};
 ENGINE_15.concat(LOCKED_15).concat(SAVED).forEach(function (id) { PREFERRED[id] = true; });
+// v110 D1 (E-114): the landing shows the solved plan's first-week fifteen (data/plan.json) whenever it matches the build, so
+// those ids join the preference list and a duplicated web_name on that card resolves to the plan's own id, never a guess.
+(function () { try { const P = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "plan.json"), "utf8")); const w = P.plan && Array.isArray(P.plan.weeks) ? P.plan.weeks[0] : null; (w && Array.isArray(w.squad) ? w.squad : []).forEach(function (id) { PREFERRED[id] = true; }); } catch (e) { /* no plan: nothing more to prefer */ } })();
 
 function resolveName(name) {
   const c = NAME_IDS[name];
@@ -177,7 +181,7 @@ async function main() {
   const coverage = [];                       // one row per mode/tab: eligible controls vs clicks made
 
   // Every control this pass is expected to click: visible, enabled and not a tab button
-  // (the loop's own navigation clicks all seven tabs).
+  // (the loop's own navigation clicks every tab in TABS).
   async function eligibleCount() {
     return page.evaluate(function (sel) {
       return Array.prototype.filter.call(document.querySelectorAll(sel), function (e) {
@@ -303,7 +307,7 @@ async function main() {
     }
 
     const short = coverage.filter(function (c) { return c.clicked < c.eligible; });
-    H.assert("every-control-on-both-modes-and-all-seven-tabs-was-clicked",
+    H.assert("every-control-on-both-modes-and-every-tab-was-clicked",
       coverage.length === MODES.length * TABS.length && short.length === 0 && clicks > 0,
       coverage.length + " passes, " + clicks + " clicks; per pass " +
       coverage.map(function (c) { return c.key + " " + c.clicked + "/" + c.eligible; }).join(", "));

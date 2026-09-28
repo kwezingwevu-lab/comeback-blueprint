@@ -21,6 +21,10 @@ const LIVE = require(path.join(ROOT, "data", "live.json"));
 // The engine is required here for ONE reason: the panel checks below compare what the screen
 // prints against what the engine computes, rather than against a number typed into the test.
 const ENG = require(path.join(ROOT, "src", "engine.js"));
+// v110 D1 (E-114): the solved plan and the build's precomputed results, read only to know which card the landing must
+// show and what the solved card recommends; every figure compared below is read from them or from the snapshot.
+const PLAN = require(path.join(ROOT, "data", "plan.json"));
+const PRE = require(path.join(ROOT, "data", "pre.json"));
 
 // E-084: these were "2026-09-11T08:00:00Z" and "2026-09-12T15:00:00Z" — the Friday and the
 // Saturday of GW4. The snapshot moved on to GW6 and every clock-relative check in this suite
@@ -34,8 +38,10 @@ const NEXT_LAST_KO = Math.max.apply(null, [NEXT_DL].concat(
     .map(function (f) { return Date.parse(f.kickoff_time); }).filter(isFinite)));
 const NOW = isoAt(NEXT_DL - 26 * 3600000);          // the day before the next deadline
 const LIVE_NOW = isoAt(NEXT_DL + 5 * 3600000);      // inside the live window of the next gameweek
-const TABS = ["command", "plan", "squad", "rivals", "draft", "chips", "lab"];
-const PRIMARY = { command: "cmd-stand", plan: "plan-tx", squad: "sq-fifteen", rivals: "rv-table", draft: "df-waivers", chips: "ch-now", lab: "lab-data" };
+// v110 D0: nine tabs — odds and review join before lab (GAP_v110 D4, D5). Every count below is TABS.length, and
+// "suite-TABS-equal-the-app-tab-strip" compares this list once with the rendered .tabi ids, so the two cannot drift.
+const TABS = ["command", "plan", "squad", "rivals", "draft", "chips", "odds", "review", "lab"];
+const PRIMARY = { command: "cmd-stand", plan: "plan-solved", squad: "sq-fifteen", rivals: "rv-table", draft: "df-claims", chips: "ch-now", odds: "od-next", review: "rw-classic", lab: "lab-data" };
 const TOKENS = ["--amb", "--bg", "--bg2", "--bg3", "--blu", "--cyn", "--dim", "--err", "--focus", "--grn", "--grn2", "--line", "--mute", "--ok", "--pnk", "--pnk2", "--pur", "--shadow", "--text", "--warn", "--wht"];
 const FLOORS = { ".btn": 38, ".btn-sm": 32, ".tabi": 52, ".sec-h": 48, ".menu-i": 44, ".inp": 40, ".row": 38 };
 const GAKPO = 367;
@@ -43,6 +49,60 @@ const GAKPO = 367;
 // ---------------------------------------------------------------- small helpers
 
 function words(s) { return String(s || "").trim().split(/\s+/).filter(Boolean).length; }
+
+/* v110 D0 · the tab strip rule (CLAUDE.md Part G, 27 Sep 2026), measured rather than read from the stylesheet: every
+   child of .tabs by its client rect (an element walk — a strip can clip or scroll while the document's scrollWidth
+   stays pinned at the viewport), the strip's own scroll box and the document's, and each label's natural width (a
+   clone with no max-width) against the width it was given. Returns plain numbers for the suite to judge. */
+function stripProbe() {
+  const tabs = document.querySelector(".tabs");
+  const cells = Array.prototype.map.call(tabs ? tabs.children : [], function (e) {
+    const r = e.getBoundingClientRect(), cs = getComputedStyle(e), sp = e.querySelector("span");
+    const inner = r.width - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    let label = null;
+    if (sp) {
+      const ls = getComputedStyle(sp), c = sp.cloneNode(true);
+      c.style.cssText = "position:absolute;visibility:hidden;max-width:none;white-space:nowrap;overflow:visible;display:inline";
+      e.appendChild(c); const natural = c.getBoundingClientRect().width; c.remove();
+      label = { shown: ls.display !== "none" && ls.visibility !== "hidden", fs: parseFloat(ls.fontSize), natural: natural, rendered: sp.getBoundingClientRect().width };
+    }
+    return { id: e.getAttribute("data-tab"), left: r.left, right: r.right, w: r.width, h: r.height, inner: inner, aria: e.getAttribute("aria-label") || "", label: label };
+  });
+  return { vw: window.innerWidth, docSW: document.documentElement.scrollWidth, docCW: document.documentElement.clientWidth,
+    stripSW: tabs ? tabs.scrollWidth : -1, stripCW: tabs ? tabs.clientWidth : -1, cells: cells };
+}
+/* Judges one stripProbe reading against the rule: at every width the strip fits (document, strip box and element
+   walk), the cells are equal, at least 24x24 (WCAG 2.5.8) and 52 high (Part G), and each keeps its name in
+   aria-label; wider than 380px every label is shown at 11px or more and uncut; at 380px and narrower the cells are
+   icon-only. Returns the list of breaches, empty when the reading passes. */
+function stripBreaches(m, count) {
+  const bad = [];
+  const w = m.vw, widths = m.cells.map(function (c) { return c.w; });
+  if (m.cells.length !== count) bad.push(w + ": " + m.cells.length + " cells, not " + count);
+  if (m.docSW > m.docCW) bad.push(w + ": document scrollWidth " + m.docSW + " > " + m.docCW);
+  if (m.stripSW > m.stripCW) bad.push(w + ": strip scrollWidth " + m.stripSW + " > " + m.stripCW);
+  if (widths.length && Math.max.apply(null, widths) - Math.min.apply(null, widths) > 1) bad.push(w + ": widths spread " + (Math.max.apply(null, widths) - Math.min.apply(null, widths)).toFixed(2));
+  m.cells.forEach(function (c) {
+    if (c.left < -0.5 || c.right > w + 0.5) bad.push(w + ": " + c.id + " spans " + c.left.toFixed(2) + "–" + c.right.toFixed(2));
+    if (c.w < 24 || c.h < 24) bad.push(w + ": " + c.id + " is " + c.w.toFixed(2) + "x" + c.h.toFixed(2) + " (WCAG 2.5.8 floor 24x24)");
+    if (c.h < 52 - 0.5) bad.push(w + ": " + c.id + " is " + c.h.toFixed(2) + " high (Part G .tabi 52)");
+    if (!c.aria.trim()) bad.push(w + ": " + c.id + " has no aria-label");
+    if (!c.label) { bad.push(w + ": " + c.id + " has no label span"); return; }
+    if (w > 380) {
+      if (!c.label.shown) bad.push(w + ": " + c.id + " label hidden");
+      else if (c.label.fs < 11) bad.push(w + ": " + c.id + " label " + c.label.fs + "px (floor 11)");
+      else if (c.label.natural > c.label.rendered + 0.01 || c.label.natural > c.inner + 0.01) bad.push(w + ": " + c.id + " label cut, " + c.label.natural.toFixed(2) + "px in " + Math.min(c.label.rendered, c.inner).toFixed(2));
+    } else if (c.label.shown) bad.push(w + ": " + c.id + " label shown at " + w + "px, where the rule is icon-only");
+  });
+  return bad;
+}
+function stripSummary(m) {
+  const shown = m.cells.filter(function (c) { return c.label && c.label.shown; });
+  const tight = shown.map(function (c) { return { id: c.id, room: c.inner - c.label.natural, natural: c.label.natural }; }).sort(function (a, b) { return a.room - b.room; })[0];
+  return m.vw + "px: " + m.cells.length + " × " + (m.cells[0] ? m.cells[0].w.toFixed(2) + "x" + m.cells[0].h.toFixed(2) : "?") +
+    ", document " + m.docSW + "/" + m.docCW + ", strip " + m.stripSW + "/" + m.stripCW + ", " +
+    (shown.length ? shown.length + " labels, tightest " + tight.id + " " + tight.natural.toFixed(2) + "px with " + tight.room.toFixed(2) + "px spare" : "icon-only");
+}
 
 function deepCopy(o) { return JSON.parse(JSON.stringify(o)); }
 
@@ -58,6 +118,16 @@ function nextGwRunning() {
   live.gw[nxt] = { elements: rows, fixture_xg: {} };
   live.picks[nxt] = { active_chip: null, picks: picks };
   return live;
+}
+
+/* v110 D1 (E-114): a saved state with one match price typed on the Odds tab (state.market), the setting that sets the
+   solved plan aside on the landing while leaving the app's own engine untouched (src/engine.js never reads it). The
+   gameweek and the team are read from the snapshot, never typed. */
+function withPrice(state) {
+  const s = deepCopy(state);
+  const g = String(LIVE.next_event), t = LIVE.teams[0].short_name;
+  s.market = {}; s.market[g] = {}; s.market[g][t] = { xg: 1.5 };
+  return s;
 }
 
 /* One element's flag lifted, or added, and nothing else touched. */
@@ -182,9 +252,18 @@ async function main() {
         tabs: root.querySelectorAll(".tabi").length,
         cardHtml: (function () { const l = root.querySelector(".landing"); return l ? l.innerHTML : ""; })(),
         panels: root.querySelectorAll(".landing .panel").length,
+        plan: (function () { const l = root.querySelector(".landing"); return l ? l.getAttribute("data-plan") || "" : ""; })(),
         text: (function () { const l = root.querySelector(".landing"); return l ? l.innerText : ""; })()
       };
     });
+    // v110 D1 (E-114): the app's seeded state, read back from storage once the app has written it, so the checks written
+    // for the app's own card can reopen the same session with one match price typed on the Odds tab (withPrice).
+    let SEEDED = null;
+    try {
+      await page.waitForFunction(function () { return !!window.localStorage.getItem("mc_state"); }, null, { timeout: 5000 });
+      SEEDED = await page.evaluate(function () { return JSON.parse(window.localStorage.getItem("mc_state")); });
+    } catch (e) { SEEDED = null; }
+    const STATE_PRICE = SEEDED && Array.isArray(SEEDED.squad) && SEEDED.squad.length ? withPrice(SEEDED) : null;
     H.assert("simple-mode-renders", !!simple && simple.landing && simple.boundary === 0 && simple.mode === "simple",
       simple ? "landing=" + simple.landing + " boundary=" + simple.boundary + " mode=" + simple.mode : "no .mc-root");
     H.assert("simple-mode-landing-is-the-first-card-in-mc-root", !!simple && simple.firstIsLanding && simple.beforeSections && simple.beforeStanding,
@@ -206,11 +285,14 @@ async function main() {
         firstIsLanding: !!first && first.classList.contains("landing"),
         beforeSections: !sec || !!(first && (first.compareDocumentPosition(sec) & Node.DOCUMENT_POSITION_FOLLOWING)),
         tabs: root.querySelectorAll(".tabi").length,
+        tabIds: Array.prototype.map.call(root.querySelectorAll(".tabi"), function (e) { return e.getAttribute("data-tab"); }),
         cardHtml: (function () { const l = root.querySelector(".landing"); return l ? l.innerHTML : ""; })()
       };
     });
-    H.assert("full-mode-renders", !!full && full.landing && full.boundary === 0 && full.mode === "full" && full.tabs === 7,
-      full ? "landing=" + full.landing + " boundary=" + full.boundary + " tabs=" + full.tabs : "no .mc-root");
+    H.assert("full-mode-renders", !!full && full.landing && full.boundary === 0 && full.mode === "full" && full.tabs === TABS.length,
+      full ? "landing=" + full.landing + " boundary=" + full.boundary + " tabs=" + full.tabs + " (suite TABS " + TABS.length + ")" : "no .mc-root");
+    H.assert("suite-TABS-equal-the-app-tab-strip", !!full && full.tabIds.join(",") === TABS.join(","),
+      full ? "rendered [" + full.tabIds.join(",") + "] · suite [" + TABS.join(",") + "]" : "no .mc-root");
     H.assert("full-mode-landing-is-the-first-card-in-mc-root", !!full && full.firstIsLanding && full.beforeSections,
       full ? "firstIsLanding=" + full.firstIsLanding + " beforeSections=" + full.beforeSections : "no page");
     H.assert("E022-both-modes-share-GwActionCard", !!simple && !!full && simple.cardHtml.length > 0 && simple.cardHtml === full.cardHtml,
@@ -251,14 +333,24 @@ async function main() {
     const realText = simple ? simple.text : "";
     const oneLine = realText.replace(/\n/g, " ");
     const rx = (n) => new RegExp(String(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    // E-114 (v110 D1): the landing shows the solved plan (data-plan="solved") whenever PLAN and PRE share a hash, and the
+    // app's own card (data-plan="app") whenever that plan is set aside. This pair was written for the app's own card, so
+    // it reads that card on both pages, each opened with one match price typed on the Odds tab (withPrice); the solved
+    // card is held by the check after the next one.
+    async function appCard(h) {
+      const p = await fresh({ html: h, mode: "simple", now: NOW, state: STATE_PRICE });
+      return { text: await landingText(p), plan: await p.getAttribute(".landing", "data-plan") };
+    }
+    const appReal = STATE_PRICE ? await appCard(html) : { text: "", plan: "" };
     // Half one: the flag is what keeps the subject out. Control = the same snapshot with his
     // flag lifted and nothing else changed.
-    let ctrlText = "";
-    if (SUBJECT) { const ctrlPage = await fresh({ html: htmlCtrl, mode: "simple", now: NOW }); ctrlText = await landingText(ctrlPage); }
+    let appCtrl = { text: "", plan: "" };
+    if (SUBJECT && STATE_PRICE) appCtrl = await appCard(htmlCtrl);
+    const ctrlText = appCtrl.text;
     H.assert("C1-flagged-player-is-absent-from-the-recommendation",
-      !!SUBJECT && rx(SUBJECT.name).test(ctrlText) && !rx(SUBJECT.name).test(realText),
-      SUBJECT ? "subject " + SUBJECT.name + " (id " + SUBJECT.id + ", shipped status " + SUBJECT.status + " " + SUBJECT.chance +
-        "%); control with the flag lifted names him = " + rx(SUBJECT.name).test(ctrlText) + "; shipped names him = " + rx(SUBJECT.name).test(realText)
+      !!SUBJECT && appReal.plan === "app" && appCtrl.plan === "app" && rx(SUBJECT.name).test(ctrlText) && !rx(SUBJECT.name).test(appReal.text),
+      SUBJECT ? "on the app's own card (landing " + appReal.plan + " / " + appCtrl.plan + " with a typed price): subject " + SUBJECT.name + " (id " + SUBJECT.id + ", shipped status " + SUBJECT.status + " " + SUBJECT.chance +
+        "%); control with the flag lifted names him = " + rx(SUBJECT.name).test(ctrlText) + "; shipped names him = " + rx(SUBJECT.name).test(appReal.text)
         : "no flagged player in the snapshot enters the fifteen once unflagged — the control is unsound");
     // Half two: the other direction, which cannot age at all. Take whoever the shipped plan
     // actually captains, flag him, and he must leave the armband, the vice slot and the fifteen.
@@ -269,12 +361,54 @@ async function main() {
       const capPage = await fresh({ html: H.buildPage({ inlineData: withFlag(capEl.id, true) }), mode: "simple", now: NOW });
       capFlaggedText = (await landingText(capPage)).replace(/\n/g, " ");
     }
+    // E-114: the same, on the app's own card (a typed price sets the solved plan aside): its captain, flagged, leaves it too
+    const appOne = appReal.text.replace(/\n/g, " ");
+    const appCap = (appOne.match(/Captain\s+([^,.·]+)/) || [])[1];
+    const appCapEl = appCap ? LIVE.elements.filter(function (e) { return e.web_name === appCap.trim(); })[0] : null;
+    let appCapFlagged = "";
+    if (appCapEl && STATE_PRICE) {
+      const acp = await fresh({ html: H.buildPage({ inlineData: withFlag(appCapEl.id, true) }), mode: "simple", now: NOW, state: STATE_PRICE });
+      appCapFlagged = (await landingText(acp)).replace(/\n/g, " ");
+    }
+    const gone = function (name, text) {
+      const e = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return !new RegExp("(Captain|vice)\\s+" + e).test(text) && !rx(name).test(text);
+    };
     H.assert("C1-flagged-player-is-never-captain-nor-vice",
       !!capEl && new RegExp("Captain\\s+" + shippedCap.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(oneLine) &&
       !new RegExp("(Captain|vice)\\s+" + shippedCap.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(capFlaggedText) &&
-      !rx(shippedCap.trim()).test(capFlaggedText),
-      capEl ? "the shipped plan captains " + shippedCap.trim() + " (id " + capEl.id + "); with a 75% flag on him and nothing else changed the landing reads «" +
-        capFlaggedText.slice(0, 120) + "»" : "no captain could be read off the shipped landing: «" + oneLine.slice(0, 120) + "»");
+      !rx(shippedCap.trim()).test(capFlaggedText) && !!appCapEl && gone(appCap.trim(), appCapFlagged),
+      (capEl ? "the shipped " + (simple ? simple.plan : "?") + " card captains " + shippedCap.trim() + " (id " + capEl.id + "); with a 75% flag on him and nothing else changed the landing reads «" +
+        capFlaggedText.slice(0, 120) + "»" : "no captain could be read off the shipped landing: «" + oneLine.slice(0, 120) + "»") +
+        " · the app's own card captains " + (appCap ? appCap.trim() : "nobody") + "; flagged, it reads «" + appCapFlagged.slice(0, 100) + "»");
+
+    // E-114 (v110 D1) · the solved card: it shows exactly when the data says it should, every player it recommends is
+    // unflagged in the snapshot and named on it, and a flag on one of them (its vice, named on the card) sets the plan
+    // aside: the app's own card answers and leaves him out.
+    {
+      const w1 = PLAN.plan && PLAN.plan.ok === true && Array.isArray(PLAN.plan.weeks) ? PLAN.plan.weeks[0] : null;
+      const ev1 = w1 ? LIVE.events.filter(function (e) { return Number(e.id) === w1.gw; })[0] : null;
+      const expectSolved = !!(w1 && typeof PRE.hash === "string" && PRE.hash === PLAN.hash && w1.gw === Number(LIVE.next_event) &&
+        ev1 && Date.parse(ev1.deadline_time) > Date.parse(NOW));
+      const byId = {}; LIVE.elements.forEach(function (e) { byId[e.id] = e; });
+      const flaggedEl = function (e) { return !e || e.status !== "a" || (e.chance !== null && e.chance !== undefined && e.chance < 100); };
+      const whole = !!w1 && (w1.chip === "wildcard" || w1.chip === "freehit");
+      const recIds = w1 ? (whole ? w1.squad : w1.in).concat([w1.cap, w1.vice]).filter(function (v, i, a) { return a.indexOf(v) === i; }) : [];
+      const nmOf = function (id) { return byId[id] ? byId[id].web_name : "id " + id; };
+      const flaggedRec = recIds.filter(function (id) { return flaggedEl(byId[id]); }).map(nmOf);
+      const unnamed = recIds.filter(function (id) { return !byId[id] || !rx(byId[id].web_name).test(realText); }).map(nmOf);
+      const vEl = w1 ? byId[w1.vice] : null;
+      let vText = "", vPlan = "";
+      if (vEl) {
+        const vp = await fresh({ html: H.buildPage({ inlineData: withFlag(vEl.id, true) }), mode: "simple", now: NOW });
+        vText = (await landingText(vp)).replace(/\n/g, " "); vPlan = await vp.getAttribute(".landing", "data-plan");
+      }
+      H.assert("C1-the-solved-landing-names-only-unflagged-players-and-a-new-flag-on-one-sets-it-aside",
+        expectSolved && !!simple && simple.plan === "solved" && recIds.length > 0 && flaggedRec.length === 0 && unnamed.length === 0 &&
+          !!vEl && vPlan === "app" && !rx(vEl.web_name).test(vText),
+        "data says solved " + expectSolved + ", landing " + (simple ? simple.plan : "?") + "; " + recIds.length + " recommended, flagged " + (flaggedRec.join(",") || "none") +
+          ", not named " + (unnamed.join(",") || "none") + "; vice " + (vEl ? vEl.web_name : "?") + " flagged → landing " + vPlan + " «" + vText.slice(0, 90) + "»");
+    }
 
     // ---------------------------------------------------------- 4. type floor and touch floors
 
@@ -394,12 +528,12 @@ async function main() {
     });
     const widths = tabGeom.map(function (t) { return t.w; });
     const spread = widths.length ? Math.max.apply(null, widths) - Math.min.apply(null, widths) : 999;
-    H.assert("seven-equal-width-icon-tabs",
-      tabGeom.length === 7 && spread <= 1 &&
+    H.assert("every-TABS-entry-is-an-equal-width-icon-tab",
+      tabGeom.length === TABS.length && spread <= 1 &&
       tabGeom.every(function (t, i) { return t.id === TABS[i] && t.testid === "tab-" + TABS[i] && !!t.aria; }),
       tabGeom.length + " tabs [" + tabGeom.map(function (t) { return t.id + " " + t.w + "px"; }).join(", ") + "], width spread " + spread.toFixed(1) + "px");
 
-    /* data-tab belongs to the seven tab buttons and to nothing else (CONTRACT §7). The root
+    /* data-tab belongs to the tab buttons and to nothing else (CONTRACT §7). The root
        carried it too, so the page exposed eight of them with "command" twice; the root's
        current tab is data-view now. */
     const tagged = await page.evaluate(function () {
@@ -407,8 +541,8 @@ async function main() {
         return { id: e.getAttribute("data-tab"), tabi: /\btabi\b/.test(e.getAttribute("class") || "") };
       });
     });
-    H.assert("exactly-seven-elements-carry-data-tab",
-      tagged.length === 7 && tagged.every(function (t) { return t.tabi; }) &&
+    H.assert("exactly-one-data-tab-element-per-TABS-entry",
+      tagged.length === TABS.length && tagged.every(function (t) { return t.tabi; }) &&
         tagged.map(function (t) { return t.id; }).join(",") === TABS.join(","),
       tagged.length + " elements carry data-tab: " + tagged.map(function (t) { return t.id + (t.tabi ? "" : " (not a tab button)"); }).join(", "));
 
@@ -424,7 +558,22 @@ async function main() {
     }
     await page.setViewportSize({ width: 390, height: 844 });
     H.assert("no-horizontal-scroll-at-360px-and-390px", scrolls.length === 0,
-      scrolls.length ? scrolls.join("; ") : "14 measurements (2 widths x 7 tabs), scrollWidth never exceeded clientWidth");
+      scrolls.length ? scrolls.join("; ") : (2 * TABS.length) + " measurements (2 widths x " + TABS.length + " tabs), scrollWidth never exceeded clientWidth");
+
+    // v110 D0 · the strip rule of CLAUDE.md Part G (27 Sep 2026), at 360, 390 and 430, by element walk.
+    {
+      const readings = [], breaches = [];
+      for (const w of [360, 390, 430]) {
+        await page.setViewportSize({ width: w, height: 844 });
+        await page.waitForTimeout(90);
+        const m = await page.evaluate(stripProbe);
+        readings.push(stripSummary(m));
+        stripBreaches(m, TABS.length).forEach(function (b) { breaches.push(b); });
+      }
+      await page.setViewportSize({ width: 390, height: 844 });
+      H.assert("tab-strip-fits-with-labels-above-380px-and-icon-only-at-360", breaches.length === 0,
+        breaches.length ? breaches.slice(0, 6).join("; ") : readings.join(" · "));
+    }
 
     // ---------------------------------------------------------- 7. header and menu
 
@@ -556,7 +705,7 @@ async function main() {
       }
     }
     H.assert("zero-dead-taps", disabled.length === 0,
-      disabled.length ? disabled.join(", ") : "every rendered control across both modes and all seven tabs was enabled");
+      disabled.length ? disabled.join(", ") : "every rendered control across both modes and all " + TABS.length + " tabs was enabled");
     H.assert("pool-collapses-when-the-fifteen-is-complete",
       !!blocks && blocks.blocks === 0 && blocks.confirms === 0 && /matches the entry/.test(blocks.squadCheck),
       blocks ? blocks.blocks + " .block notices, " + blocks.confirms + " confirm controls; squad check reads «" + blocks.squadCheck.slice(0, 60) + "»" : "squad tab not measured");
@@ -640,6 +789,45 @@ async function main() {
       "before " + snapBefore.mode + "/" + snapBefore.tab + " [" + snapBefore.secs.join(" ") + "] · after " + snapAfter.mode + "/" + snapAfter.tab + " [" + snapAfter.secs.join(" ") + "]");
     H.assert("reveals-survive-a-reload", revAfter === "true", "rev-ld-why aria-expanded after reload = " + revAfter);
 
+    // v110 D1 · the Command tab's dated checklist (cmd-next): a tap ticks an item, the tick is written with the state
+    // through window.storage (state.done, "<gameweek>:<item>") and it survives a reload. The item is read off the page.
+    {
+      await fresh({ html: html, mode: "full", now: NOW, ui: { mode: "full", tab: "command", open: { "cmd-next": true }, reveals: {} } });
+      let first = null;
+      try {
+        await page.waitForSelector('[data-testid="cmd-todo"] .todo', { timeout: 10000 });
+        first = await page.evaluate(function () { const b = document.querySelector('[data-testid="cmd-todo"] .todo'); return b ? { id: b.getAttribute("data-todo"), pressed: b.getAttribute("aria-pressed") } : null; });
+      } catch (e) { first = null; }
+      const sel = first ? '[data-testid="cmd-todo"] .todo[data-todo="' + first.id + '"]' : "";
+      const t0 = Date.now();
+      let flipped = false;
+      if (first) {
+        await page.click(sel);
+        try {
+          await page.waitForFunction(function (s) { const b = document.querySelector(s); return !!b && b.getAttribute("aria-pressed") === "true"; }, sel, { timeout: 10000 });
+          flipped = true;
+        } catch (e) { flipped = false; }
+      }
+      const tickMs = Date.now() - t0;
+      await page.waitForTimeout(300);
+      const stored = await page.evaluate(function () {
+        try { const s = JSON.parse(window.localStorage.getItem("mc_state")); return s && s.done && typeof s.done === "object" ? Object.keys(s.done).filter(function (k) { return s.done[k] === true; }) : []; }
+        catch (e) { return null; }
+      });
+      let after = null;
+      if (first) {
+        await page.reload({ waitUntil: "load" });
+        await page.waitForSelector(".mc-root");
+        try { await page.waitForSelector(sel, { timeout: 10000 }); after = await page.getAttribute(sel, "aria-pressed"); } catch (e) { after = null; }
+      }
+      const key = first && Array.isArray(stored) ? stored.filter(function (k) { return /^\d+:[a-z]+$/.test(k) && k.slice(k.indexOf(":") + 1) === first.id; })[0] : null;
+      H.assert("D1-a-checklist-tick-is-saved-with-the-state-and-survives-a-reload",
+        !!first && first.pressed === "false" && flipped && !!key && after === "true",
+        first ? "item " + first.id + " was " + first.pressed + ", after the tap " + (flipped ? "true" : "not true") + " in " + tickMs + " ms; stored ticks [" + (stored || []).join(",") + "]; after a reload " + after
+          : "no checklist item rendered in cmd-next");
+      console.log("(measured: checklist tick " + tickMs + " ms from tap to aria-pressed on " + (first ? first.id : "?") + ")");
+    }
+
     // ---------------------------------------------------------- 14. the LIVE window
 
     await fresh({ html: htmlLive, mode: "full", now: LIVE_NOW });
@@ -684,7 +872,7 @@ async function main() {
 
     // 13:00Z on the Saturday is inside the live window, so the landing shows live points and
     // only the header prints a countdown; 09:00Z on the Tuesday is past the last kick-off, so
-    // the landing is back and prints one too. Both times are walked, on all seven tabs.
+    // the landing is back and prints one too. Both times are walked, on every tab in TABS.
     // Derived from the snapshot (E-084): just after the next deadline, which is inside the live
     // window, and then past the last kick-off of that gameweek, where the landing comes back.
     const POST_DEADLINE = [isoAt(NEXT_DL + 3 * 3600000), isoAt(NEXT_LAST_KO + 14 * 3600000)];
@@ -716,7 +904,7 @@ async function main() {
     }
     H.assert("no-half-sentence-copy-once-the-deadline-has-passed", brokenCopy.length === 0,
       brokenCopy.length ? brokenCopy.join(" | ")
-        : "neither " + POST_DEADLINE.join(" nor ") + " rendered \"closed to deadline\" or \"closed left\" on any of the seven tabs");
+        : "neither " + POST_DEADLINE.join(" nor ") + " rendered \"closed to deadline\" or \"closed left\" on any of the " + TABS.length + " tabs");
     H.assert("the-header-says-the-deadline-is-closed-in-a-whole-phrase",
       POST_DEADLINE.every(function (w) { return /deadline closed/.test(headerPost[w] || ""); }),
       POST_DEADLINE.map(function (w) { return w + " «" + (headerPost[w] || "") + "»"; }).join(" · "));
@@ -791,19 +979,37 @@ async function main() {
             fifteen: names ? names.innerText.replace(/\s+/g, " ").trim() : "",
             captain: m ? m[1].trim() : "",
             vice: m ? m[2].trim() : "",
-            words: t.trim().split(/\s+/).length
+            words: t.trim().split(/\s+/).length,
+            plan: l ? l.getAttribute("data-plan") || "" : ""
           };
         });
         await lc.close();
       }
-      const a = lockShots.pure, b = lockShots.locked;
+      // E-114 (v110 D1): the unlocked landing is the solved card when PLAN and PRE share a hash, so the app's own unlocked
+      // card is read too, on a page with one typed price (withPrice): the lock must still change the app's own fifteen,
+      // and it must set the solved card aside.
+      {
+        const lc = await browser.newContext({ viewport: { width: 390, height: 844 } });
+        const lp = await lc.newPage();
+        await H.open(lp, { mode: "full", tab: "command", now: NOW, html: html, state: STATE_PRICE, ui: { mode: "full", tab: "command", open: {}, reveals: {} } });
+        lockShots.app = await lp.evaluate(function () {
+          const l = document.querySelector(".landing");
+          const names = l ? l.querySelector(".names") : null;
+          const t = l ? l.innerText : "";
+          const m = t.match(/Captain\s+([^,]+),\s*vice\s+([^.]+)\./);
+          return { fifteen: names ? names.innerText.replace(/\s+/g, " ").trim() : "", captain: m ? m[1].trim() : "", vice: m ? m[2].trim() : "",
+            words: t.trim().split(/\s+/).length, plan: l ? l.getAttribute("data-plan") || "" : "" };
+        });
+        await lc.close();
+      }
+      const a = lockShots.pure, b = lockShots.locked, c = lockShots.app;
       H.assert("locking-the-premiums-changes-the-landing-fifteen-and-keeps-a-captain",
-        a.fifteen !== "" && b.fifteen !== "" && a.fifteen !== b.fifteen &&
-          a.captain !== "" && a.captain !== "\u2014" && b.captain !== "" && b.captain !== "\u2014" &&
-          b.vice !== "" && b.vice !== "\u2014" && a.words < 110 && b.words < 110,
-        "rule-pure: captain " + a.captain + ", vice " + a.vice + ", " + a.words + " words · locked: captain " +
-          b.captain + ", vice " + b.vice + ", " + b.words + " words · the two fifteens " +
-          (a.fifteen === b.fifteen ? "are identical (the lock did nothing)" : "differ"));
+        !!STATE_PRICE && c.plan === "app" && b.plan === "app" && c.fifteen !== "" && b.fifteen !== "" && c.fifteen !== b.fifteen && a.fifteen !== b.fifteen &&
+          a.captain !== "" && a.captain !== "\u2014" && b.captain !== "" && b.captain !== "\u2014" && c.captain !== "" && c.captain !== "\u2014" &&
+          b.vice !== "" && b.vice !== "\u2014" && a.words < 110 && b.words < 110 && c.words < 110,
+        "unlocked (" + a.plan + " card): captain " + a.captain + ", vice " + a.vice + ", " + a.words + " words · the app's own unlocked card: captain " + c.captain +
+          ", " + c.words + " words · locked (" + b.plan + " card): captain " + b.captain + ", vice " + b.vice + ", " + b.words + " words · the app's own two fifteens " +
+          (c.fifteen === b.fifteen ? "are identical (the lock did nothing)" : "differ") + ", the landing's " + (a.fifteen === b.fifteen ? "does not move" : "moves"));
     }
 
     // ---------------------------------------------------------- F4 / F5 / F8 caveat panels

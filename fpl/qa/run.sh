@@ -647,6 +647,15 @@ sh_suite   qa/solver_smoke.sh     # a 30-second solve → plan.cjs → legality 
 
 node_suite qa/unit_engine.cjs     # 6 256 ms alone, 6 028 in order
 node_suite qa/components.cjs      # component output under react-dom/server, valid + degraded + junk — 37 777 ms alone, 40 279 in order
+node_suite qa/mc_render.cjs       # D4 Odds and D5 Review: first-paint words, a source per match, the margin removed, the override round trip through the buttons' own handlers, avoidable ≤ bench scored, the games never summed — about 1 s alone
+node_suite qa/mc_data.cjs         # E1 data: the baked block whole and consistent (double round robin, rosters 2/5/5/3, the Draft table reconciled with its matches, the bank with the transfer log, horizons read) — 27 checks, about 0.6 s
+node_suite qa/mc_maths.cjs        # E1 maths + market: odds sum to one, Poisson, ratings normalised, the fit, bookmaker prices used where loaded and priced back within 1.2 pp — 19 checks, about 0.5 s
+node_suite qa/mc_projections.cjs  # E1 projections: bands, build-up sums, horizons, goals conceded and DefCon by position, dated overrides, return dates — 15 checks, about 0.8 s
+node_suite qa/mc_rules.cjs        # E1 rules (CLAUDE.md Part N): shapes, club cap, legal elevens, the FT ledger on a chip week, chips, selling prices, DefCon thresholds, FWD never CS, GKP never DefCon, no Draft captain or club cap, like for like, phase-aware labels — 42 checks, about 1.5 s
+node_suite qa/mc_separation.cjs   # E1 separation: landing + Command, Plan and Draft rendered under react-dom/server, the Classic total + Draft points-for never shown, every strip stat labelled with its game; each game's search blind to the other — 30 checks, about 6 s
+node_suite qa/mc_property.cjs     # E1 property: generated cases on a fixed seed, at least the spec's 3 900 (12 336 on 27 Sep) — 12 checks, about 3 s
+node_suite qa/mc_simulation.cjs   # E1 simulation: seeds repeat, percentiles ordered, mean near the projection, TC over captain, head-to-head and title race sum to one, pre.json equal to the engine — 15 checks, about 2.5 s
+node_suite qa/mc_optimisers.cjs   # E1 optimisers: transfers, wildcard, Draft moves, waivers, the claims sheet (Part N2 lodging order), trades and price watch, and pre.json equal to each search — 37 checks, about 1.9 s
 
 # ---------------------------------------------------------------- D. browser suites
 #

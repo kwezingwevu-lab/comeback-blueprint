@@ -4,10 +4,10 @@
 #   11 live reconciliations  — the shipped snapshot and the app's own numbers against
 #                              a fresh pull of the public API. Skipped, loudly, when the
 #                              network is unreachable; the SUITE line says so.
-#   22 static invariants     — things that must hold whether or not the network is up,
-#                              I1..I22 below, one of which is the esbuild syntax gate.
+#   23 static invariants     — things that must hold whether or not the network is up,
+#                              I1..I23 below, one of which is the esbuild syntax gate.
 #   ---
-#   33 checks
+#   34 checks
 #
 # The arithmetic, spelled out so nobody has to guess: the master prompt lists nine
 # invariant sentences, two of which name two artefacts each (banned fields in the
@@ -19,7 +19,9 @@
 # exist and parse; the colours are the --bg token; the registration guard is executed
 # rather than grepped; the worker precaches this build only; every manifest-named file is
 # in the worker SHELL; and nothing the app ships is excluded by a gitignore rule
-# (E-076): 11 + 22 = 33.
+# (E-076): 11 + 22 = 33. v110 D0 (the integration of the ported engine) reads I5's marker list
+# from CONTRACT.md §2 instead of typing six, extends I8 to the five new blocks, and adds I23 —
+# the precompute, the plan, the WEEKLY block and the baked data share one content hash: 34.
 #
 # Every check prints "PASS <name> — <detail>" or "FAIL <name> — <detail>", and the last
 # line is "SUITE verify <pass>/<total>". Exit 1 on any FAIL.
@@ -307,10 +309,19 @@ acct2="$(grep -n -e '/my-team/' -e '/transfers/' -e 'login' "$APP" "$DIST" 2>/de
 if [ -z "$acct2" ]; then ok "no-account-touching-url-in-the-shipped-app" "clean in $APP and $DIST"
 else bad "no-account-touching-url-in-the-shipped-app" "$(printf '%s' "$acct2" | tr '\n' ' ')"; fi
 
-# I5 · the six CONTRACT §2 markers, once each, in order
+# I5 · the CONTRACT §2 markers, once each, in order
+# v110 D0: the list is READ from CONTRACT.md §2 — every backticked "// … — START" / "// … — END" in that section, in
+# the order written — and the count printed is the list's own length. It used to be six markers typed here; the
+# integration made it sixteen, and a count typed in two places is E-084's class. build.cjs keeps its own list, so a
+# build that drops or reorders a marker is judged against the contract, not against itself.
 markers_out="$(node -e '
 const fs=require("fs");
-const M=["// ENGINE — START","// ENGINE — END","// WEEKLY STRATEGY ENGINE — START","// WEEKLY STRATEGY ENGINE — END","// LIVE DATA — START","// LIVE DATA — END"];
+const C=fs.readFileSync("CONTRACT.md","utf8");
+const a=C.indexOf("\n## 2."), b=C.indexOf("\n## 3.");
+if(a<0||b<a){console.log("CONTRACT.md has no section 2");process.exit(1);}
+const M=[]; const re=/`(\/\/ [^`]+? — (?:START|END))`/g; let m;
+while((m=re.exec(C.slice(a,b)))) if(M.indexOf(m[1])<0) M.push(m[1]);
+if(M.length<2||M.length%2){console.log("CONTRACT.md section 2 lists "+M.length+" markers, not START/END pairs");process.exit(1);}
 const f="app/FPL_Mission_Control.jsx";
 if(!fs.existsSync(f)){console.log(f+" does not exist");process.exit(1);}
 const s=fs.readFileSync(f,"utf8");
@@ -318,10 +329,10 @@ const at=[],bad=[];
 M.forEach(m=>{const n=s.split(m).length-1; if(n!==1) bad.push(m+" ×"+n); at.push(s.indexOf(m));});
 const ordered=at.every((v,i)=>i===0||v>at[i-1]);
 if(!ordered) bad.push("markers out of order");
-console.log(bad.length?bad.join("; "):"six markers, one each, in order at "+at.join("/"));
+console.log(bad.length?bad.join("; "):M.length+" markers, one each, in order at "+at.join("/"));
 process.exit(bad.length?1:0);' 2>&1 | tail -1)"
-if printf '%s' "$markers_out" | grep -q "six markers"; then ok "six-contract-markers-exactly-once-and-in-order" "$markers_out"
-else bad "six-contract-markers-exactly-once-and-in-order" "$markers_out"; fi
+if printf '%s' "$markers_out" | grep -q "markers, one each, in order"; then ok "contract-markers-exactly-once-and-in-order" "$markers_out"
+else bad "contract-markers-exactly-once-and-in-order" "$markers_out"; fi
 
 # I6 · APP_VERSION stamped, and equal to package.json's major
 ver_out="$(node -e '
@@ -385,7 +396,8 @@ const APP = "app/FPL_Mission_Control.jsx";
 const DIST = "dist/index.html";
 const bad = [];
 const note = [];
-const need = [APP, DIST, "src/engine.js", "src/ui.jsx", "data/weekly.js", "data/live.json", "build.cjs"];
+const need = [APP, DIST, "src/engine.js", "src/ui.jsx", "data/weekly.js", "data/live.json", "build.cjs",
+  "src/mc_engine.js", "src/mc_ui.jsx", "data/mc_data.json", "data/plan.json", "data/pre.json"];
 for (const f of need) {
   if (!fs.existsSync(f)) { console.log(f + " does not exist"); process.exit(1); }
   if (fs.statSync(f).size === 0) { console.log(f + " is empty"); process.exit(1); }
@@ -404,19 +416,36 @@ function same(label, shipped, source) {
   bad.push(label + " differs from byte " + k + " (source " + source.length + "B, shipped " + shipped.length + "B)");
 }
 same("engine", between("// ENGINE — START", "// ENGINE — END"), fs.readFileSync("src/engine.js", "utf8").trim());
-same("weekly", between("// WEEKLY STRATEGY ENGINE — START", "// WEEKLY STRATEGY ENGINE — END"), fs.readFileSync("data/weekly.js", "utf8").trim());
-const liveBlock = between("// LIVE DATA — START", "// LIVE DATA — END");
-const head = "const LIVE = ";
-if (!liveBlock.startsWith(head) || !liveBlock.endsWith(";")) {
-  bad.push("the LIVE block is not one " + head + "<literal>; statement");
-} else {
-  let shipped = null, source = null;
-  try { shipped = JSON.stringify(JSON.parse(liveBlock.slice(head.length, -1))); } catch (e) { bad.push("the shipped LIVE literal does not parse as JSON: " + e.message); }
-  try { source = JSON.stringify(JSON.parse(fs.readFileSync("data/live.json", "utf8"))); } catch (e) { bad.push("data/live.json does not parse as JSON: " + e.message); }
-  if (shipped && source) same("live", shipped, source);
+/* v110 D0: the ported engine ships inside a wrapper, because the module is UMD and the assembled file is an ES
+   module that qa/components.cjs evaluates under Node, where a bare module.exports assignment would replace the
+   harness module object. The wrapper is two exact lines; everything between them is src/mc_engine.js verbatim. */
+{
+  const blk = between("// MC ENGINE — START", "// MC ENGINE — END");
+  const W0 = "const MCEngine = (function () { const module = { exports: {} }; const exports = module.exports;";
+  const W1 = "return module.exports; })();";
+  const i0 = blk.indexOf("\n"), i1 = blk.lastIndexOf("\n");
+  if (i0 < 0 || i1 <= i0 || blk.slice(0, i0) !== W0 || blk.slice(i1 + 1) !== W1) bad.push("the MC ENGINE block is not the two-line wrapper around the module (head «" + blk.slice(0, 60) + "», tail «" + blk.slice(i1 + 1, i1 + 40) + "»)");
+  else same("mc engine", blk.slice(i0 + 1, i1), fs.readFileSync("src/mc_engine.js", "utf8").trim());
 }
+same("weekly", between("// WEEKLY STRATEGY ENGINE — START", "// WEEKLY STRATEGY ENGINE — END"), fs.readFileSync("data/weekly.js", "utf8").trim());
+/* One JSON literal per data block: parsed back and compared with its source file as data. `at` is the one
+   clock in data/pre.json; it is outside the comparison (content, never clocks — E-093, E-101). */
+function literal(label, a, b, head, file, dropAt) {
+  const blk = between(a, b);
+  if (!blk.startsWith(head) || !blk.endsWith(";")) { bad.push("the " + label + " block is not one " + head + "<literal>; statement"); return; }
+  let shipped = null, source = null;
+  const strip = function (o) { if (dropAt && o && typeof o === "object") delete o.at; return JSON.stringify(o); };
+  try { shipped = strip(JSON.parse(blk.slice(head.length, -1))); } catch (e) { bad.push("the shipped " + label + " literal does not parse as JSON: " + e.message); }
+  try { source = strip(JSON.parse(fs.readFileSync(file, "utf8"))); } catch (e) { bad.push(file + " does not parse as JSON: " + e.message); }
+  if (shipped && source) same(label, shipped, source);
+}
+literal("live", "// LIVE DATA — START", "// LIVE DATA — END", "const LIVE = ", "data/live.json", false);
+literal("mc data", "// MC DATA — START", "// MC DATA — END", "const MC = ", "data/mc_data.json", false);
+literal("plan", "// PLAN — START", "// PLAN — END", "const PLAN = ", "data/plan.json", false);
+literal("precomputed", "// PRECOMPUTED — START", "// PRECOMPUTED — END", "const PRE = ", "data/pre.json", true);
 /* The ui body, lifted the way build.cjs lifts it: blank lines, comments and imports off the top,
-   and everything from the first other statement on is the body (CONTRACT section 2 item 5). */
+   and everything from the first other statement on is the body (CONTRACT section 2 item 5). Since v110 D0 it
+   has an exact place — after the PRECOMPUTED block and up to the MC UI marker — and must fill it exactly. */
 const lines = fs.readFileSync("src/ui.jsx", "utf8").split("\n");
 let k = 0;
 for (; k < lines.length; k++) {
@@ -425,8 +454,8 @@ for (; k < lines.length; k++) {
   break;
 }
 const uiBody = lines.slice(k).join("\n").trim();
-if (app.indexOf(uiBody) >= 0) note.push("ui body " + uiBody.length + "B verbatim");
-else bad.push("the src/ui.jsx body after its imports (" + uiBody.length + "B) is not in " + APP + " verbatim");
+same("ui body", between("// PRECOMPUTED — END", "// MC UI — START"), uiBody);
+same("mc ui", between("// MC UI — START", "// MC UI — END"), fs.readFileSync("src/mc_ui.jsx", "utf8").trim());
 /* The one hop no content comparison reaches: esbuild output against its input. Both files come
    out of one build.cjs run, the assembled app first, so only the app NEWER than the page is a
    fault, and equal timestamps pass. build.cjs is held the same way: nothing else covers it. */
@@ -781,6 +810,27 @@ process.stdout.write(m.icons.map(i=>"dist/"+String(i.src).replace(/^\.\//,"")).j
     bad "pwa-no-shipped-file-is-gitignored" "excluded from the repository:$excluded — the manifest names files the repository does not carry"
   fi
 fi
+
+# I23 · one content hash across the four things the app ships from the pipeline (v110 D0)
+# data/pre.json (pipeline/precompute.cjs), data/plan.json (pipeline/plan.cjs), the WEEKLY block (pipeline/weekly.cjs)
+# and the export hash of data/mc_data.json (pipeline/export.js buildInput) must be one hash. It is a hash of
+# content, never a clock (E-093, E-101): a plan solved on other data, a weekly block written from an older plan or
+# a precompute left over from another build is red here even when every file parses and every block is verbatim.
+hash_out="$(node -e '
+const fs=require("fs"), path=require("path");
+const R=process.cwd();
+const rd=function(f){ return JSON.parse(fs.readFileSync(path.join(R,f),"utf8")); };
+let pre, plan, weekly, mc, exp;
+try { pre=rd("data/pre.json").hash; } catch(e){ console.log("data/pre.json: "+e.message); process.exit(1); }
+try { plan=rd("data/plan.json").hash; } catch(e){ console.log("data/plan.json: "+e.message); process.exit(1); }
+try { weekly=(new Function(fs.readFileSync(path.join(R,"data","weekly.js"),"utf8")+"\n;return WEEKLY;"))().hash; } catch(e){ console.log("data/weekly.js: "+e.message); process.exit(1); }
+try { mc=rd("data/mc_data.json"); exp=require(path.join(R,"pipeline","export.js")).buildInput(mc, require(path.join(R,"src","mc_engine.js")).create(mc)).hash; } catch(e){ console.log("export hash of data/mc_data.json: "+e.message); process.exit(1); }
+const all=[pre,plan,weekly,exp];
+const one=all.every(function(h){ return typeof h==="string" && h.length>0 && h===exp; });
+console.log((one?"one hash ":"hashes differ: ")+"pre "+pre+" · plan "+plan+" · WEEKLY "+weekly+" · export of data/mc_data.json "+exp);
+process.exit(one?0:1);' 2>&1 | tail -1)"
+if printf '%s' "$hash_out" | grep -q "^one hash "; then ok "pre-plan-weekly-and-baked-data-share-one-content-hash" "$hash_out"
+else bad "pre-plan-weekly-and-baked-data-share-one-content-hash" "$hash_out"; fi
 
 # ---------------------------------------------------------------- verdict
 

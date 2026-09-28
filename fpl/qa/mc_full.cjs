@@ -224,10 +224,14 @@ catch (e) { console.log("FAIL mc_full — esbuild is not installed in fpl/node_m
 const SRC = fs.readFileSync(APP, "utf8");
 
 // Every top-level function declaration in the shipped file, in source order.
+// E-123: the MC ENGINE block (CONTRACT §2) is src/mc_engine.js verbatim inside a wrapper function, so its
+// column-0 `function` lines are the UMD factory's inner functions, not module scope. Scanned as they stand they
+// were eight names this suite could not find in the evaluated module. The block is left out of the scan only.
 const FN_NAMES = [];
 const DECL = /^(?:export\s+default\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/gm;
+const SCAN_SRC = SRC.replace(/\/\/ MC ENGINE — START[\s\S]*?\/\/ MC ENGINE — END/, "");
 let mm;
-while ((mm = DECL.exec(SRC))) FN_NAMES.push(mm[1]);
+while ((mm = DECL.exec(SCAN_SRC))) FN_NAMES.push(mm[1]);
 
 const EPILOGUE = "\nmodule.exports.__FNS__ = {" +
   FN_NAMES.map(function (n) { return JSON.stringify(n) + ": (typeof " + n + " === \"function\" ? " + n + " : null)"; }).join(",") +

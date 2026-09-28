@@ -13,7 +13,13 @@
  * clear (this suite has to be able to wipe storage for real).
  *
  * Output: PASS/FAIL per check, then "SUITE webkit <pass>/<total>"; exit 1 on any FAIL.
- * Screenshots: qa/shots/webkit-<tab>.png at 390x844.
+ * Screenshots: qa/shots/webkit-<tab>.png at 390x844 (Playwright's default scheme, light), webkit-<tab>-dark.png
+ * (section 9, prefers-color-scheme dark) and webkit-odds-full.png / webkit-review-full.png (the two v110 tabs,
+ * full page, every section and reveal open, dark).
+ *
+ * Section 9 (v110 §5 D7, E5) re-measures the Part G gates in each colour scheme in its own context — landing,
+ * first paint against the source's PRIMARY, type and touch floors, no horizontal scroll by document width AND by a
+ * whole-page element walk at 360 and 390, the strip rule — and holds the light and dark renders identical.
  *
  * Run: node qa/webkit.js
  *
@@ -39,7 +45,9 @@ const LIVE = require(path.join(ROOT, "data", "live.json"));
 // snapshot's own is_next event, like the clocks in qa/smoke.cjs.
 const NEXT_EV = LIVE.events.filter(function (e) { return e.is_next; })[0] || LIVE.events[LIVE.events.length - 1];
 const NOW = new Date(Date.parse(NEXT_EV.deadline_time) - 26 * 3600000).toISOString().replace(/\.\d{3}Z$/, "Z");   // the day before the next deadline
-const TABS = ["command", "plan", "squad", "rivals", "draft", "chips", "lab"];
+// v110 D0: nine tabs — odds and review join before lab. Every count below is TABS.length, and
+// "G-suite-TABS-equal-the-app-tab-strip-under-webkit" compares this list once with the rendered .tabi ids.
+const TABS = ["command", "plan", "squad", "rivals", "draft", "chips", "odds", "review", "lab"];
 const FLOORS = { ".btn": 38, ".btn-sm": 32, ".tabi": 52, ".sec-h": 48, ".menu-i": 44, ".inp": 40, ".row": 38 };
 const GAKPO = 367;
 const PAGE_URL = H.PAGE_URL;
@@ -64,9 +72,190 @@ const STORAGE_SHIM = [
 
 const MEASURED = {};
 
+/* Proof mode for section 9 only: WEBKIT_MUTATE=light-palette adds a light palette under prefers-color-scheme: light,
+   which the scheme-identity check must fire on; WEBKIT_MUTATE=clipped-wide puts a 600px bar inside the first open
+   section, where .section{overflow:hidden} clips it, so the document's scrollWidth stays pinned and only the element
+   walk can see it. Neither touches sections 1–8. */
+const MUT = String(process.env.WEBKIT_MUTATE || "");
+
 // ---------------------------------------------------------------- helpers
 
 function words(s) { return String(s || "").trim().split(/\s+/).filter(Boolean).length; }
+
+/* v110 D0 · the tab strip rule (CLAUDE.md Part G, 27 Sep 2026), measured rather than read from the stylesheet: every
+   child of .tabs by its client rect (an element walk — a strip can clip or scroll while the document's scrollWidth
+   stays pinned at the viewport), the strip's own scroll box and the document's, and each label's natural width (a
+   clone with no max-width) against the width it was given. Returns plain numbers for the suite to judge. */
+function stripProbe() {
+  const tabs = document.querySelector(".tabs");
+  const cells = Array.prototype.map.call(tabs ? tabs.children : [], function (e) {
+    const r = e.getBoundingClientRect(), cs = getComputedStyle(e), sp = e.querySelector("span");
+    const inner = r.width - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    let label = null;
+    if (sp) {
+      const ls = getComputedStyle(sp), c = sp.cloneNode(true);
+      c.style.cssText = "position:absolute;visibility:hidden;max-width:none;white-space:nowrap;overflow:visible;display:inline";
+      e.appendChild(c); const natural = c.getBoundingClientRect().width; c.remove();
+      label = { shown: ls.display !== "none" && ls.visibility !== "hidden", fs: parseFloat(ls.fontSize), natural: natural, rendered: sp.getBoundingClientRect().width };
+    }
+    return { id: e.getAttribute("data-tab"), left: r.left, right: r.right, w: r.width, h: r.height, inner: inner, aria: e.getAttribute("aria-label") || "", label: label };
+  });
+  return { vw: window.innerWidth, docSW: document.documentElement.scrollWidth, docCW: document.documentElement.clientWidth,
+    stripSW: tabs ? tabs.scrollWidth : -1, stripCW: tabs ? tabs.clientWidth : -1, cells: cells };
+}
+/* Judges one stripProbe reading against the rule: at every width the strip fits (document, strip box and element
+   walk), the cells are equal, at least 24x24 (WCAG 2.5.8) and 52 high (Part G), and each keeps its name in
+   aria-label; wider than 380px every label is shown at 11px or more and uncut; at 380px and narrower the cells are
+   icon-only. Returns the list of breaches, empty when the reading passes. */
+function stripBreaches(m, count) {
+  const bad = [];
+  const w = m.vw, widths = m.cells.map(function (c) { return c.w; });
+  if (m.cells.length !== count) bad.push(w + ": " + m.cells.length + " cells, not " + count);
+  if (m.docSW > m.docCW) bad.push(w + ": document scrollWidth " + m.docSW + " > " + m.docCW);
+  if (m.stripSW > m.stripCW) bad.push(w + ": strip scrollWidth " + m.stripSW + " > " + m.stripCW);
+  if (widths.length && Math.max.apply(null, widths) - Math.min.apply(null, widths) > 1) bad.push(w + ": widths spread " + (Math.max.apply(null, widths) - Math.min.apply(null, widths)).toFixed(2));
+  m.cells.forEach(function (c) {
+    if (c.left < -0.5 || c.right > w + 0.5) bad.push(w + ": " + c.id + " spans " + c.left.toFixed(2) + "–" + c.right.toFixed(2));
+    if (c.w < 24 || c.h < 24) bad.push(w + ": " + c.id + " is " + c.w.toFixed(2) + "x" + c.h.toFixed(2) + " (WCAG 2.5.8 floor 24x24)");
+    if (c.h < 52 - 0.5) bad.push(w + ": " + c.id + " is " + c.h.toFixed(2) + " high (Part G .tabi 52)");
+    if (!c.aria.trim()) bad.push(w + ": " + c.id + " has no aria-label");
+    if (!c.label) { bad.push(w + ": " + c.id + " has no label span"); return; }
+    if (w > 380) {
+      if (!c.label.shown) bad.push(w + ": " + c.id + " label hidden");
+      else if (c.label.fs < 11) bad.push(w + ": " + c.id + " label " + c.label.fs + "px (floor 11)");
+      else if (c.label.natural > c.label.rendered + 0.01 || c.label.natural > c.inner + 0.01) bad.push(w + ": " + c.id + " label cut, " + c.label.natural.toFixed(2) + "px in " + Math.min(c.label.rendered, c.inner).toFixed(2));
+    } else if (c.label.shown) bad.push(w + ": " + c.id + " label shown at " + w + "px, where the rule is icon-only");
+  });
+  return bad;
+}
+function stripSummary(m) {
+  const shown = m.cells.filter(function (c) { return c.label && c.label.shown; });
+  const tight = shown.map(function (c) { return { id: c.id, room: c.inner - c.label.natural, natural: c.label.natural }; }).sort(function (a, b) { return a.room - b.room; })[0];
+  return m.vw + "px: " + m.cells.length + " × " + (m.cells[0] ? m.cells[0].w.toFixed(2) + "x" + m.cells[0].h.toFixed(2) : "?") +
+    ", document " + m.docSW + "/" + m.docCW + ", strip " + m.stripSW + "/" + m.stripCW + ", " +
+    (shown.length ? shown.length + " labels, tightest " + tight.id + " " + tight.natural.toFixed(2) + "px with " + tight.room.toFixed(2) + "px spare" : "icon-only");
+}
+
+/* v110 D7/E5 · PRIMARY read from the assembled app the harness bundles (app/FPL_Mission_Control.jsx), so this suite
+   carries no second copy of it to drift. Returns {} when it cannot be read; the check that uses it then fails. */
+function sourcePrimary() {
+  let src = "";
+  try { src = fs.readFileSync(H.appPath, "utf8"); } catch (e) { return {}; }
+  const m = src.match(/\nconst PRIMARY = \{([^}]*)\};/);
+  const out = {};
+  if (!m) return out;
+  const re = /([a-z0-9_]+):\s*"([^"]+)"/g;
+  let x;
+  while ((x = re.exec(m[1]))) out[x[1]] = x[2];
+  return out;
+}
+
+/* The tab as it first paints: the words the manager sees and which sections are open (as qa/smoke.cjs measures it). */
+function firstPaintProbe() {
+  const r = document.querySelector(".mc-root");
+  const secs = Array.prototype.slice.call(r.querySelectorAll(".section"));
+  return {
+    words: (r.innerText || "").trim().split(/\s+/).filter(Boolean).length,
+    open: secs.filter(function (s) { const h = s.querySelector(".sec-h"); return h && h.getAttribute("aria-expanded") === "true"; })
+      .map(function (s) { return s.getAttribute("data-section"); }),
+    view: r.getAttribute("data-view"),
+    dark: window.matchMedia("(prefers-color-scheme: dark)").matches
+  };
+}
+
+/* Part G type and touch floors on whatever is on screen: the smallest computed font-size on a visible text-bearing
+   element, and the smallest height per touch class. The same measure as section 3's, as a function of the page. */
+function floorProbe(FL) {
+  const vis = function (el) {
+    const b = el.getBoundingClientRect(), cs = getComputedStyle(el);
+    return b.width > 0 && b.height > 0 && cs.visibility !== "hidden" && cs.display !== "none" && Number(cs.opacity) > 0;
+  };
+  let mn = { px: 999, sel: "" };
+  Array.prototype.forEach.call(document.querySelectorAll(".mc-root *"), function (el) {
+    if (el.tagName === "STYLE") return;
+    if (!Array.prototype.some.call(el.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); })) return;
+    if (!vis(el)) return;
+    const f = parseFloat(getComputedStyle(el).fontSize);
+    if (isFinite(f) && f < mn.px) mn = { px: f, sel: (el.getAttribute("class") || el.tagName.toLowerCase()) + " «" + el.textContent.trim().slice(0, 24) + "»" };
+  });
+  const fl = {};
+  Object.keys(FL).forEach(function (k) {
+    let min = null, where = "";
+    Array.prototype.forEach.call(document.querySelectorAll(".mc-root " + k), function (el) {
+      if (!vis(el)) return;
+      const h = el.getBoundingClientRect().height;
+      if (min === null || h < min) { min = h; where = el.textContent.trim().slice(0, 24); }
+    });
+    fl[k] = { min: min, where: where };
+  });
+  return { mn: mn, fl: fl };
+}
+
+/* The whole-page element walk of qa/browser.py (WALK_JS), in Safari's engine: every element's client rects against
+   the viewport, excusing only an overshoot that an INNER overflow-x scroller can still bring into view. The document's
+   own scrollWidth is returned beside it as a measurement; it cannot see a child that .section{overflow:hidden} clips. */
+function walkProbe(eps) {
+  const vw = document.documentElement.clientWidth, bad = [];
+  let n = 0;
+  const name = function (el) {
+    let s = el.tagName.toLowerCase();
+    const c = el.getAttribute && el.getAttribute("class");
+    if (c && typeof c === "string" && c.trim()) s += "." + c.trim().split(/\s+/).join(".");
+    const t = el.getAttribute && el.getAttribute("data-testid");
+    if (t) s += '[data-testid="' + t + '"]';
+    return s;
+  };
+  Array.prototype.forEach.call(document.querySelectorAll("*"), function (el) {
+    const cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0") return;
+    let right = -Infinity, left = Infinity;
+    Array.prototype.forEach.call(el.getClientRects(), function (r) {
+      if (r.width === 0 && r.height === 0) return;
+      if (r.right > right) right = r.right;
+      if (r.left < left) left = r.left;
+    });
+    if (right === -Infinity) return;
+    n++;
+    [["right", right - vw], ["left", -left]].forEach(function (p) {
+      if (p[1] <= eps) return;
+      let reach = 0;
+      for (let a = el.parentElement; a && a !== document.documentElement; a = a.parentElement) {
+        if (!/(auto|scroll)/.test(getComputedStyle(a).overflowX)) continue;
+        const avail = p[0] === "right" ? a.scrollWidth - a.clientWidth - a.scrollLeft : a.scrollLeft;
+        if (avail > 1) reach += avail;
+      }
+      if (p[1] - reach > eps) bad.push({ sel: name(el), side: p[0], over: Math.round(p[1] * 100) / 100, text: (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40) });
+    });
+  });
+  return { vw: vw, n: n, docSW: document.documentElement.scrollWidth, docCW: document.documentElement.clientWidth, bad: bad };
+}
+
+/* A 6x12 grid of mean luminance (Rec.709 on sRGB bytes) over a PNG, computed exactly per block rather than by a
+   canvas downscale, whose filter differs between engines. The same signature qa/browser.py compares schemes with. */
+async function gridProbe(a) {
+  const url = a[0], cols = a[1], rows = a[2];
+  const img = new Image();
+  await new Promise(function (res, rej) { img.onload = res; img.onerror = function () { rej(new Error("the screenshot did not decode")); }; img.src = url; });
+  const W = img.naturalWidth, Hh = img.naturalHeight, c = document.createElement("canvas");
+  c.width = W; c.height = Hh;
+  const g = c.getContext("2d");
+  g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, W, Hh).data, sum = new Array(cols * rows).fill(0), cnt = new Array(cols * rows).fill(0);
+  for (let y = 0; y < Hh; y++) {
+    const ry = Math.min(rows - 1, Math.floor(y * rows / Hh));
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4, k = ry * cols + Math.min(cols - 1, Math.floor(x * cols / W));
+      sum[k] += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; cnt[k]++;
+    }
+  }
+  return { sig: sum.map(function (s, k) { return Math.round(s / cnt[k] * 10) / 10; }), w: W, h: Hh };
+}
+
+/* Width and height out of a PNG's IHDR, so a written screenshot is checked for what it is, not only that it exists. */
+function pngSize(buf) {
+  if (!buf || buf.length < 24 || buf.readUInt32BE(12) !== 0x49484452) return null;
+  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+}
 
 function launchWebkit() {
   let webkit;
@@ -296,7 +485,7 @@ async function main() {
       harnessBoot.landing && harnessBoot.boundary === 0 && harnessBoot.storage,
       "mode=" + harnessBoot.mode + " landing=" + harnessBoot.landing + " boundary=" + harnessBoot.boundary + " window.storage=" + harnessBoot.storage);
 
-    // ------------------------------------------------------ 2. all seven tabs + simple landing
+    // ------------------------------------------------------ 2. every tab + simple landing
 
     const simpleText = await landingText(page);
     const simpleShape = await page.evaluate(function () {
@@ -322,7 +511,7 @@ async function main() {
       });
       tabWords[t] = words(r.text); tabBoundary[t] = r.boundary; tabSecs[t] = r.secs;
     }
-    H.assert("all-seven-tabs-render-in-full-mode",
+    H.assert("every-tab-renders-in-full-mode",
       TABS.every(function (t) { return tabWords[t] > 0 && tabSecs[t] >= 1; }),
       TABS.map(function (t) { return t + " " + tabWords[t] + "w/" + tabSecs[t] + "sec"; }).join(", "));
     H.assert("no-boundary-anywhere-under-webkit",
@@ -414,8 +603,11 @@ async function main() {
     const widths = tabGeom.map(function (t) { return t.w; });
     const spread = widths.length ? Math.max.apply(null, widths) - Math.min.apply(null, widths) : 999;
     MEASURED.tabWidths = tabGeom.map(function (t) { return t.id + " " + t.w; }).join(" ") + " · spread " + spread.toFixed(2) + "px";
-    H.assert("G-seven-equal-width-icon-tabs-under-webkit",
-      tabGeom.length === 7 && spread <= 1 &&
+    H.assert("G-suite-TABS-equal-the-app-tab-strip-under-webkit",
+      tabGeom.map(function (t) { return t.id; }).join(",") === TABS.join(","),
+      "rendered [" + tabGeom.map(function (t) { return t.id; }).join(",") + "] · suite [" + TABS.join(",") + "]");
+    H.assert("G-every-TABS-entry-is-an-equal-width-icon-tab-under-webkit",
+      tabGeom.length === TABS.length && spread <= 1 &&
       tabGeom.every(function (t, i) { return t.id === TABS[i] && t.testid === "tab-" + TABS[i] && !!t.aria; }),
       tabGeom.length + " tabs [" + tabGeom.map(function (t) { return t.id + " " + t.w + "px"; }).join(", ") + "], width spread " + spread.toFixed(2) + "px");
 
@@ -433,7 +625,23 @@ async function main() {
     await page.setViewportSize(VIEW);
     MEASURED.scroll = scrollNums.join(" ");
     H.assert("G-no-horizontal-scroll-at-360px-and-390px-under-webkit", scrolls.length === 0,
-      scrolls.length ? scrolls.join("; ") : "14 measurements (2 widths x 7 tabs), scrollWidth never exceeded clientWidth");
+      scrolls.length ? scrolls.join("; ") : (2 * TABS.length) + " measurements (2 widths x " + TABS.length + " tabs), scrollWidth never exceeded clientWidth");
+
+    // v110 D0 · the strip rule of CLAUDE.md Part G (27 Sep 2026), at 360, 390 and 430, by element walk, in Safari's engine.
+    {
+      const readings = [], breaches = [];
+      for (const w of [360, 390, 430]) {
+        await page.setViewportSize({ width: w, height: 844 });
+        await page.waitForTimeout(110);
+        const m = await page.evaluate(stripProbe);
+        readings.push(stripSummary(m));
+        stripBreaches(m, TABS.length).forEach(function (b) { breaches.push(b); });
+      }
+      await page.setViewportSize(VIEW);
+      MEASURED.strip = readings.join(" · ");
+      H.assert("G-tab-strip-fits-with-labels-above-380px-and-icon-only-at-360-under-webkit", breaches.length === 0,
+        breaches.length ? breaches.slice(0, 6).join("; ") : readings.join(" · "));
+    }
 
     // ------------------------------------------------------ 4. storage: both paths survive a reload
     //
@@ -668,14 +876,196 @@ async function main() {
         const st = fs.statSync(file);
         written.push(t + " " + Math.round(st.size / 1024) + "kB");
       }
-      H.assert("390x844-screenshots-written-for-all-seven-tabs",
-        written.length === 7 && TABS.every(function (t) { return fs.existsSync(path.join(SHOTS, "webkit-" + t + ".png")); }),
+      H.assert("390x844-screenshots-written-for-every-tab",
+        written.length === TABS.length && TABS.every(function (t) { return fs.existsSync(path.join(SHOTS, "webkit-" + t + ".png")); }),
         "qa/shots/webkit-<tab>.png: " + written.join(", "));
+    }
+
+    // ------------------------------------------------------ 9. both schemes (v110 §5 D7, E5)
+    //
+    // Every Part G measurement above ran in Playwright's default scheme, which is light, and the manager's iPhone is
+    // as likely to be in dark. The app declares no light palette (qa/browser.py holds that tripwire in Chromium), so
+    // this pass renders each scheme in its own context, proves the emulation took (matchMedia), re-measures the Part G
+    // gates in each, and holds the two renders identical in Safari's engine: every tab at first paint and the landing
+    // card, by a 6x12 luminance grid (qa/browser.py's signature, tolerance 1.0) with byte equality reported beside it.
+    // It writes webkit-<tab>-dark.png for every tab, and full-page shots of the two v110 tabs with everything open.
+    {
+      const PRIMARY = sourcePrimary();
+      const SCHEMES = ["light", "dark"];
+      const R = {};
+      const sigCtx = await browser.newContext();
+      const sigPage = await sigCtx.newPage();
+      await sigPage.setContent("<!doctype html><body></body>");
+      const grid = function (png) { return sigPage.evaluate(gridProbe, ["data:image/png;base64," + png.toString("base64"), 6, 12]); };
+      for (const scheme of SCHEMES) {
+        const r = { shots: {}, first: {}, font: { px: 999, sel: "(nothing measured)" }, floors: {}, walk: [], walkNums: [], strip: [], stripBad: [] };
+        Object.keys(FLOORS).forEach(function (k) { r.floors[k] = { min: null, where: "" }; });
+        const c = await browser.newContext({ viewport: VIEW, colorScheme: scheme });
+        const p = await c.newPage();
+        watch(p, "scheme/" + scheme);
+        try {
+          await openPage(p, { html: HTML.shim, now: NOW });
+          if (MUT === "light-palette") {
+            await p.evaluate(function () {
+              const s = document.createElement("style");
+              s.textContent = "@media (prefers-color-scheme: light){.mc-root{--bg:#ffffff !important;--bg2:#f2f4f8 !important;--text:#0b0e13 !important}}";
+              document.head.appendChild(s);
+            });
+          }
+          r.media = await p.evaluate(function () { return window.matchMedia("(prefers-color-scheme: dark)").matches; });
+          r.landing = await p.evaluate(function () {
+            const l = document.querySelector(".mc-root .landing");
+            if (!l) return null;
+            const t = (l.innerText || "").trim();
+            return { words: t.split(/\s+/).filter(Boolean).length, panels: l.querySelectorAll(".panel").length, text: t.replace(/\s+/g, " ") };
+          });
+          r.shots.landing = await p.screenshot();
+          await p.click('[data-testid="menu"]');
+          await p.click('.menu-i[data-mode="full"]');
+          await p.waitForTimeout(250);
+          for (const t of TABS) {
+            await p.click('[data-testid="tab-' + t + '"]');
+            await p.waitForFunction(function (id) { const x = document.querySelector(".mc-root"); return x && x.getAttribute("data-view") === id; }, t, { timeout: 15000 });
+            await p.waitForTimeout(250);
+            r.first[t] = await p.evaluate(firstPaintProbe);
+            r.shots[t] = await p.screenshot();
+            if (scheme === "dark") fs.writeFileSync(path.join(SHOTS, "webkit-" + t + "-dark.png"), r.shots[t]);
+          }
+          for (const t of TABS) {
+            await p.click('[data-testid="tab-' + t + '"]');
+            await p.waitForFunction(function (id) { const x = document.querySelector(".mc-root"); return x && x.getAttribute("data-view") === id; }, t, { timeout: 15000 });
+            await p.waitForTimeout(120);
+            await openAllSections(p);
+            await openAllReveals(p);
+            await p.waitForTimeout(180);
+            const m = await p.evaluate(floorProbe, FLOORS);
+            if (m.mn.px < r.font.px) r.font = { px: m.mn.px, sel: m.mn.sel + " on " + t };
+            Object.keys(FLOORS).forEach(function (k) {
+              const v = m.fl[k];
+              if (v.min !== null && (r.floors[k].min === null || v.min < r.floors[k].min)) r.floors[k] = { min: v.min, where: v.where + " on " + t };
+            });
+            if (scheme === "dark" && (t === "odds" || t === "review")) {
+              const file = path.join(SHOTS, "webkit-" + t + "-full.png");
+              // From the top: the strip is sticky, and a full-page capture taken mid-scroll paints it mid-page.
+              await p.evaluate(function () { window.scrollTo(0, 0); });
+              await p.waitForTimeout(120);
+              await p.screenshot({ path: file, fullPage: true });
+              r.shots[t + "-full"] = fs.readFileSync(file);
+            }
+          }
+          await p.click('[data-testid="menu"]');
+          await p.waitForSelector(".menu");
+          const mm = await p.evaluate(floorProbe, FLOORS);
+          if (mm.mn.px < r.font.px) r.font = { px: mm.mn.px, sel: mm.mn.sel + " on the menu" };
+          Object.keys(FLOORS).forEach(function (k) {
+            const v = mm.fl[k];
+            if (v.min !== null && (r.floors[k].min === null || v.min < r.floors[k].min)) r.floors[k] = { min: v.min, where: v.where + " on the menu" };
+          });
+          await p.click('[data-testid="menu"]');
+          for (const w of [360, 390]) {
+            await p.setViewportSize({ width: w, height: 844 });
+            for (const t of TABS) {
+              await p.click('[data-testid="tab-' + t + '"]');
+              await p.waitForFunction(function (id) { const x = document.querySelector(".mc-root"); return x && x.getAttribute("data-view") === id; }, t, { timeout: 15000 });
+              await p.waitForTimeout(110);
+              if (MUT === "clipped-wide") {
+                await p.evaluate(function () {
+                  const b = document.querySelector(".mc-root .section .sec-b");
+                  if (!b || document.getElementById("mutation-clipped-wide")) return;
+                  const d = document.createElement("div");
+                  d.id = "mutation-clipped-wide"; d.style.cssText = "width:600px;height:12px"; d.textContent = "MUTATION clipped wide bar";
+                  b.appendChild(d);
+                });
+              }
+              const wk = await p.evaluate(walkProbe, 0.5);
+              r.walkNums.push(w + "/" + t + " " + wk.bad.length + "/" + wk.docSW);
+              if (wk.docSW > wk.docCW) r.walk.push(w + "px/" + t + " document scrollWidth " + wk.docSW + " > " + wk.docCW);
+              wk.bad.slice(0, 2).forEach(function (b) { r.walk.push(w + "px/" + t + " " + b.sel + " " + b.side + " edge over by " + b.over + "px «" + b.text + "»"); });
+            }
+          }
+          for (const w of [360, 390, 430]) {
+            await p.setViewportSize({ width: w, height: 844 });
+            await p.waitForTimeout(110);
+            const sm = await p.evaluate(stripProbe);
+            r.strip.push(stripSummary(sm));
+            stripBreaches(sm, TABS.length).forEach(function (b) { r.stripBad.push(b); });
+          }
+        } finally {
+          await c.close();
+        }
+        R[scheme] = r;
+      }
+
+      for (const scheme of SCHEMES) {
+        const r = R[scheme], tag = scheme + "-scheme-under-webkit";
+        H.assert("D7-the-" + scheme + "-scheme-is-emulated-under-webkit", r.media === (scheme === "dark"),
+          "matchMedia('(prefers-color-scheme: dark)').matches = " + r.media + " in a context created with colorScheme " + scheme);
+        const lw = r.landing ? r.landing.words : -1, lp = r.landing ? r.landing.panels : -1;
+        H.assert("G-landing-card-under-110-visible-words-in-at-most-4-panels-" + tag,
+          !!r.landing && lw > 0 && lw < 110 && lp >= 1 && lp <= 4,
+          r.landing ? lw + " visible words in " + lp + " panels (gates < 110 words, ≤ 4 panels)" : "no .landing in simple mode at boot");
+        const fpBad = TABS.filter(function (t) { const f = r.first[t]; return !f || f.view !== t || f.words >= 500 || !PRIMARY[t] || f.open.length !== 1 || f.open[0] !== PRIMARY[t]; });
+        H.assert("G-every-tab-first-paint-under-500-words-with-only-its-PRIMARY-open-" + tag, fpBad.length === 0 && Object.keys(PRIMARY).length > 0,
+          TABS.map(function (t) { const f = r.first[t]; return t + " " + (f ? f.words + "w [" + f.open.join("|") + "]" : "not rendered") + (PRIMARY[t] ? "" : " (no PRIMARY in the source)"); }).join(", ") +
+          (fpBad.length ? " · off the gate: " + fpBad.join(", ") : " (gate < 500, exactly the PRIMARY open)"));
+        H.assert("G-type-floor-11px-" + tag, r.font.px >= 11, "smallest visible computed font-size " + r.font.px + "px on " + r.font.sel + " (floor 11px)");
+        const lowFloors = Object.keys(FLOORS).filter(function (k) { return r.floors[k].min === null || r.floors[k].min < FLOORS[k] - 0.5; });
+        H.assert("G-touch-floors-" + tag, lowFloors.length === 0,
+          Object.keys(FLOORS).map(function (k) { return k + " " + (r.floors[k].min === null ? "none rendered" : r.floors[k].min.toFixed(2) + " «" + r.floors[k].where + "»") + " (floor " + FLOORS[k] + ")"; }).join(" · "));
+        H.assert("G-no-horizontal-scroll-at-360px-and-390px-by-document-width-and-element-walk-" + tag, r.walk.length === 0,
+          r.walk.length ? r.walk.slice(0, 5).join("; ") : (2 * TABS.length) + " readings (2 widths × " + TABS.length + " tabs, every section and reveal open): no element past the viewport that an inner scroller cannot reach, and document scrollWidth never over clientWidth");
+        H.assert("G-tab-strip-fits-with-labels-above-380px-and-icon-only-at-360-" + tag, r.stripBad.length === 0,
+          r.stripBad.length ? r.stripBad.slice(0, 6).join("; ") : r.strip.join(" · "));
+      }
+
+      // The two schemes, render for render.
+      const pairs = ["landing"].concat(TABS), diffs = [];
+      let same = 0, worst = { max: 0, at: "" };
+      for (const k of pairs) {
+        const a = R.light.shots[k], b = R.dark.shots[k];
+        if (!a || !b) { diffs.push(k + " missing"); continue; }
+        if (a.equals(b)) { same++; continue; }
+        const ga = await grid(a), gb = await grid(b);
+        let mx = 0;
+        ga.sig.forEach(function (v, i) { mx = Math.max(mx, Math.abs(v - gb.sig[i])); });
+        if (mx > worst.max) worst = { max: mx, at: k };
+        if (mx > 1.0 || ga.w !== gb.w || ga.h !== gb.h) diffs.push(k + " grid max |delta| " + mx.toFixed(1) + " (" + ga.w + "x" + ga.h + " vs " + gb.w + "x" + gb.h + ")");
+      }
+      const sameLanding = !!R.light.landing && !!R.dark.landing && R.light.landing.text === R.dark.landing.text;
+      MEASURED.identity = diffs.length ? diffs.slice(0, 4).join("; ") : pairs.length + " renders compared at 390x844 (the landing and " + TABS.length + " tabs at first paint): " + same + " byte-identical PNGs, the rest within a 6x12 luminance max |delta| of " + worst.max.toFixed(1) + " (tolerance 1.0)" + (sameLanding ? "; the landing's words are the same text" : "; the landing's words DIFFER");
+      H.assert("D7-every-tab-and-the-landing-render-identically-in-light-and-dark-under-webkit", diffs.length === 0 && sameLanding, MEASURED.identity);
+      await sigCtx.close();
+
+      const newTabs = ["odds", "review"].filter(function (t) { return TABS.indexOf(t) >= 0; });
+      const shotBad = [], shotSeen = [];
+      newTabs.forEach(function (t) {
+        [["webkit-" + t + ".png", VIEW.height], ["webkit-" + t + "-dark.png", VIEW.height], ["webkit-" + t + "-full.png", null]].forEach(function (f) {
+          const file = path.join(SHOTS, f[0]);
+          const sz = fs.existsSync(file) ? pngSize(fs.readFileSync(file)) : null;
+          if (!sz) { shotBad.push(f[0] + " missing or not a PNG"); return; }
+          if (sz.w !== VIEW.width || (f[1] !== null && sz.h !== f[1]) || (f[1] === null && sz.h <= VIEW.height)) shotBad.push(f[0] + " is " + sz.w + "x" + sz.h);
+          shotSeen.push(f[0] + " " + sz.w + "x" + sz.h);
+        });
+        if (!R.dark.first[t] || R.dark.first[t].view !== t) shotBad.push("the dark first-paint shot of " + t + " was not taken on " + t);
+      });
+      MEASURED.shots = shotSeen.join(", ");
+      H.assert("screenshots-of-the-two-v110-tabs-at-first-paint-in-both-schemes-and-full-page-open-under-webkit",
+        newTabs.length === 2 && shotBad.length === 0,
+        newTabs.length !== 2 ? "TABS carries " + newTabs.join(",") + " of odds,review" : shotBad.length ? shotBad.join("; ") : shotSeen.join(", "));
+
+      MEASURED.schemes = SCHEMES.map(function (s) {
+        return s + ": landing " + (R[s].landing ? R[s].landing.words : "?") + "w · first paint " + TABS.map(function (t) { return t + " " + (R[s].first[t] ? R[s].first[t].words : "?"); }).join(" ") +
+          " · type " + R[s].font.px + "px · walk (offenders/document scrollWidth) " + R[s].walkNums.join(" ");
+      }).join(" ‖ ");
     }
 
     // ------------------------------------------------------ close
 
     console.log("(webkit measured: landing " + MEASURED.landingWords + " words / " + MEASURED.landingPanels + " panels · tab words " + MEASURED.tabWords + ")");
+    console.log("(webkit measured, by scheme: " + MEASURED.schemes + ")");
+    console.log("(webkit measured, light against dark: " + MEASURED.identity + ")");
+    console.log("(webkit measured, the v110 tabs' screenshots: " + MEASURED.shots + ")");
+    if (MUT) console.log("(webkit MUTATION MODE " + MUT + ": section 9 ran on a deliberately broken page; a red there is the proof)");
     console.log("(webkit measured: type floor " + MEASURED.typeFloor + ")");
     console.log("(webkit measured: touch floors " + MEASURED.touch + ")");
     console.log("(webkit measured: smallest of each class — " + MEASURED.touchWhere + ")");

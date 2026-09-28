@@ -2388,8 +2388,17 @@ function h2hProjection(ctx, opts) {
 
 // ---------------------------------------------------------------- state (§6), D3
 
-function sanitiseState(raw) {
-  var out = { version: 88, exported_at: null, entry: null, squad: [], bank: 0, ft: 1, value: 0, confirmed_gw: 0, leagues: [], draft: { league_id: null, entry_id: null, roster: [], watchlist: [] }, ui: { mode: "simple", tab: "command", open: {}, reveals: {} }, ledger: [], refresh: { pair: "sonnet46", last: null } };
+/* v110 D0 · `market` is the Odds tab's store of bookmaker overrides: { "<gameweek>": { "<team short name>": { xg } } }.
+   A gameweek is 1–38; xg is a finite number from 0.2 to 5 inclusive (goals a side is expected to score, after the
+   margin is removed); the team is one of `opts.teams` when the caller passes the engine's team list (the app passes
+   MCEngine's teamNames), and otherwise a three-letter capital short name, the form every club's short name takes.
+   Anything else is dropped, never repaired, and the map is capped so a corrupt store cannot grow it (E-003's rule,
+   applied to a map). The ported engine reads it through setMarket; nothing here computes with it.
+   v110 D1 · `done` is the Command tab's checklist ticks: { "<gameweek>:<item>": true }. The gameweek is 1–38, the item is
+   two to twelve lower-case letters (the checklist's own ids), and only `true` is kept, so an untick is a deletion and a
+   junk value never reads as ticked. Capped like `market`; an own "__proto__" key cannot pass the pattern. */
+function sanitiseState(raw, opts) {
+  var out = { version: 88, exported_at: null, entry: null, squad: [], bank: 0, ft: 1, value: 0, confirmed_gw: 0, leagues: [], draft: { league_id: null, entry_id: null, roster: [], watchlist: [] }, ui: { mode: "simple", tab: "command", open: {}, reveals: {} }, ledger: [], refresh: { pair: "sonnet46", last: null }, market: {}, done: {} };
   try {
     var r = raw;
     if (typeof r === "string") { try { r = JSON.parse(r); } catch (e) { r = null; } }
@@ -2421,7 +2430,7 @@ function sanitiseState(raw) {
     if (typeof d.roster_note === "string") out.draft.roster_note = d.roster_note.slice(0, 600);
     var u = isObj(r.ui) ? r.ui : {};
     out.ui.mode = u.mode === "full" ? "full" : "simple";
-    var tabs = ["command", "plan", "squad", "rivals", "draft", "chips", "lab"];
+    var tabs = ["command", "plan", "squad", "rivals", "draft", "chips", "odds", "review", "lab"];
     out.ui.tab = tabs.indexOf(u.tab) >= 0 ? u.tab : "command";
     ["open", "reveals"].forEach(function (k) { var src = isObj(u[k]) ? u[k] : {}; var n = 0; Object.keys(src).forEach(function (key) { if (n++ < 200 && typeof key === "string" && key.length <= 60) out.ui[k][key] = !!src[key]; }); });
     arr(r.ledger).slice(0, 500).forEach(function (row) {
@@ -2431,6 +2440,34 @@ function sanitiseState(raw) {
     var rf = isObj(r.refresh) ? r.refresh : {};
     out.refresh.pair = REFRESH_PAIRS[rf.pair] ? rf.pair : "sonnet46";
     out.refresh.last = typeof rf.last === "string" ? rf.last.slice(0, 40) : null;
+    var XG_MIN = 0.2, XG_MAX = 5, MARKET_CAP = 200, SCAN = 100;
+    var known = null;
+    if (isObj(opts) && Array.isArray(opts.teams)) {
+      known = opts.teams.slice(0, SCAN).filter(function (t) { return typeof t === "string" && t.length >= 2 && t.length <= 4 && t === t.toUpperCase() && t !== "__PROTO__"; });
+    }
+    var teamOk = function (t) { return known ? known.indexOf(t) >= 0 : /^[A-Z]{3}$/.test(t); };
+    var mk = isObj(r.market) ? r.market : {}, kept = 0;
+    Object.keys(mk).slice(0, SCAN).forEach(function (g) {
+      var gw = num(g, NaN), row = mk[g];
+      if (!isFinite(gw) || gw !== Math.trunc(gw) || gw < 1 || gw > 38 || !isObj(row)) return;
+      Object.keys(row).slice(0, SCAN).forEach(function (t) {
+        if (kept >= MARKET_CAP || !teamOk(t) || !isObj(row[t])) return;
+        var xg = num(row[t].xg, NaN);
+        if (!isFinite(xg) || xg < XG_MIN || xg > XG_MAX) return;
+        var key = String(gw);
+        if (!Object.prototype.hasOwnProperty.call(out.market, key)) out.market[key] = {};
+        out.market[key][t] = { xg: xg };
+        kept++;
+      });
+    });
+    var dn = isObj(r.done) ? r.done : {}, ticks = 0;
+    Object.keys(dn).slice(0, 400).forEach(function (k) {
+      if (ticks >= 100 || dn[k] !== true) return;
+      var m = /^([1-9]|[1-3][0-9]):([a-z]{2,12})$/.exec(k);
+      if (!m || Number(m[1]) > 38) return;
+      out.done[k] = true;
+      ticks++;
+    });
   } catch (e) { /* total: defaults stand */ }
   return out;
 }

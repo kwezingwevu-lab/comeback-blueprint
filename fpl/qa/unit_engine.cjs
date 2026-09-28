@@ -901,6 +901,66 @@ check("SANITISE-clamps-ft-to-the-cap-of-5", function () {
   const s = E.sanitiseState({ ft: 99 });
   return { ok: s.ft === 5, detail: "ft = " + s.ft };
 });
+/* v110 D0 · state.market, the Odds tab's overrides: gameweek → team → { xg }. A gameweek is 1–38, xg is a finite
+   number from 0.2 to 5 inclusive, the team is one of the short names the caller passes as opts.teams (the app passes
+   the engine's own team list) — or, with no list, a three-letter capital short name — and the whole map is capped.
+   The team names below are the synthetic snapshot's own, read from it, never typed. */
+{
+  const T = SYN.teams.map(function (t) { return t.short_name; });
+  const OPT = { teams: T };
+  check("SANITISE-market-is-an-empty-object-by-default-and-under-every-junk-kind", function () {
+    const bad = [];
+    const base = E.sanitiseState({});
+    if (!base.market || typeof base.market !== "object" || Array.isArray(base.market) || Object.keys(base.market).length) bad.push("default " + JSON.stringify(base.market));
+    JUNK_KINDS.forEach(function (pair) {
+      [undefined, OPT, pair[1]].forEach(function (o, i) {
+        let s;
+        try { s = E.sanitiseState(pair[1], o); } catch (e) { bad.push(pair[0] + " opts#" + i + " threw " + e.message); return; }
+        if (!s.market || typeof s.market !== "object" || Array.isArray(s.market)) bad.push(pair[0] + " opts#" + i + " market " + JSON.stringify(s.market));
+      });
+    });
+    return { ok: bad.length === 0, detail: JUNK_KINDS.length + " junk kinds × 3 opts (none, the team list, junk): " + (bad.slice(0, 4).join("; ") || "market is always a plain object") };
+  });
+  check("SANITISE-market-keeps-valid-overrides-at-the-bounds", function () {
+    const raw = { market: { 6: {}, 7: {} } };
+    raw.market[6][T[0]] = { xg: 1.8 }; raw.market[6][T[1]] = { xg: 0.2 }; raw.market[7][T[2]] = { xg: 5 }; raw.market[7][T[3]] = { xg: "2.25" };
+    const s = E.sanitiseState(raw, OPT), m = s.market;
+    const ok = m[6] && m[7] && m[6][T[0]].xg === 1.8 && m[6][T[1]].xg === 0.2 && m[7][T[2]].xg === 5 && m[7][T[3]].xg === 2.25 &&
+      Object.keys(m).length === 2 && Object.keys(m[6]).length === 2 && Object.keys(m[7]).length === 2 &&
+      JSON.stringify(E.sanitiseState(s, OPT).market) === JSON.stringify(m);
+    return { ok: !!ok, detail: JSON.stringify(m) };
+  });
+  check("SANITISE-market-drops-bad-gameweeks-bad-xg-unknown-teams-and-junk-rows", function () {
+    const raw = { market: { 0: {}, 39: {}, x: {}, "6.5": {}, 6: {}, 8: "junk", 9: [1, 2], 10: null } };
+    raw.market[0][T[0]] = { xg: 1 }; raw.market[39][T[0]] = { xg: 1 }; raw.market.x[T[0]] = { xg: 1 }; raw.market["6.5"][T[0]] = { xg: 1 };
+    raw.market[6][T[0]] = { xg: 0.19 }; raw.market[6][T[1]] = { xg: 5.01 }; raw.market[6][T[2]] = { xg: NaN }; raw.market[6][T[3]] = { xg: Infinity };
+    raw.market[6][T[4]] = { xg: "junk" }; raw.market[6][T[5]] = 3; raw.market[6][T[6]] = null; raw.market[6][T[7]] = { cs: 0.4 };
+    raw.market[6]["NOT" + T[0]] = { xg: 1.2 };
+    const s = E.sanitiseState(raw, OPT);
+    // an own "__proto__" key, as JSON.parse makes one from a stored string, is refused and never becomes a prototype
+    const p = E.sanitiseState(JSON.parse('{"market":{"6":{"__proto__":{"xg":1.2}},"__proto__":{"' + T[0] + '":{"xg":1.2}}}}'), { teams: T.concat(["__proto__"]) });
+    return { ok: Object.keys(s.market).length === 0 && Object.keys(p.market).length === 0 && Object.getPrototypeOf(p.market) === Object.prototype && ({}).xg === undefined,
+      detail: JSON.stringify(s.market) + " · " + JSON.stringify(p.market) };
+  });
+  check("SANITISE-market-without-a-team-list-keeps-only-three-letter-capital-short-names", function () {
+    const s = E.sanitiseState({ market: { 6: { ABC: { xg: 1.1 }, abc: { xg: 1.1 }, ABCD: { xg: 1.1 }, A1C: { xg: 1.1 } } } });
+    const s2 = E.sanitiseState({ market: { 6: { ABC: { xg: 1.1 } } } }, OPT);
+    return { ok: JSON.stringify(s.market) === JSON.stringify({ 6: { ABC: { xg: 1.1 } } }) && Object.keys(s2.market).length === 0,
+      detail: "no list " + JSON.stringify(s.market) + " · with the snapshot's list " + JSON.stringify(s2.market) };
+  });
+  check("SANITISE-market-is-capped-in-size", function () {
+    const many = []; for (let i = 0; i < 60; i++) many.push("Q" + String.fromCharCode(65 + (i % 26)) + String.fromCharCode(65 + Math.floor(i / 26)));
+    const raw = { market: {} };
+    for (let g = 1; g <= 38; g++) { raw.market[g] = {}; many.forEach(function (t) { raw.market[g][t] = { xg: 1.5 }; }); }
+    const s = E.sanitiseState(raw, { teams: many });
+    const n = Object.keys(s.market).reduce(function (a, g) { return a + Object.keys(s.market[g]).length; }, 0);
+    return { ok: n > 0 && n < 38 * many.length, detail: n + " of " + (38 * many.length) + " valid overrides kept" };
+  });
+  check("SANITISE-ui-tab-accepts-the-odds-and-review-tabs", function () {
+    const a = E.sanitiseState({ ui: { tab: "odds" } }).ui.tab, b = E.sanitiseState({ ui: { tab: "review" } }).ui.tab, c = E.sanitiseState({ ui: { tab: "nope" } }).ui.tab;
+    return { ok: a === "odds" && b === "review" && c === "command", detail: a + " · " + b + " · " + c };
+  });
+}
 
 // ================================================================ C1/C2/C3 — decisions
 

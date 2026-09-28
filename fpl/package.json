@@ -11,6 +11,7 @@
     "weekly": "node pipeline/weekly.cjs",
     "solve": "python3 pipeline/solve.py",
     "plan": "node pipeline/plan.cjs",
+    "precompute": "node pipeline/precompute.cjs",
     "build": "node build.cjs",
     "tdz": "node qa/tdz_check.cjs app/FPL_Mission_Control.jsx",
     "verify": "bash qa/verify.sh",

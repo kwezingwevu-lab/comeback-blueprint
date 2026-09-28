@@ -1361,3 +1361,234 @@ app's eleven, bank not negative), otherwise the app's rule-bound C2 protocol is 
 TEST: `node qa/smoke_wk.cjs` check 28 on the written block; `node qa/parity.cjs` 51/51 with fitOnly added; the 26 Sep
 dry run: twelve claims, Mainoo held back ("d 75%"), zero conflicts, and the fallback switched to the C2 protocol
 because the optimiser's no-wildcard week sold Shaw, whom the Konsa rule protects.
+
+### E-123 · v110 · the suites' top-level-function scanners read the ported engine's inner functions as module scope
+CAUSE: `qa/mc_full.cjs` and `qa/components.cjs` find "every top-level function" in the assembled file with one
+regex, `^(?:export\s+default\s+)?function\s+NAME\s*\(` on multiline source — column 0, not scope. The D0
+integration ships `src/mc_engine.js` verbatim (CONTRACT §2 item 3), and the kit writes its UMD factory's inner
+functions at column 0: `clamp`, `poisPmf`, `poisTail`, `expFloorDiv`, `mulberry`, `rPois`, `rBinom`, `rNorm`,
+`quantile`, `create`. In the assembled file they sit inside the wrapper function and the factory, so they are not
+in module scope, and the source may not be re-indented because verify.sh I8 holds it byte for byte. mc_full asserts
+that every extracted name is a function in the evaluated module ("mc_full-no-extracted-name-is-missing-from-the-
+evaluated-scope") and then fuzzes each one; eight of the ten are nowhere at module scope (`clamp` and `quantile` are
+found only because `src/engine.js` declares its own), so the suite would have gone red on an app that is correct,
+and would have fuzzed `null`.
+CAUGHT: 27 Sep 2026, D0 integration, before any gate run: a replica of mc_full's extraction and evaluation on the
+first assembled file listed 259 names with 8 missing from module scope; with the MC ENGINE block left out of the
+scan, 249 names and 0 missing. mc_full itself was not run by the integration agent (the orchestrator runs it).
+RULE: a scan for top-level declarations is a scan of top-level code. Both scanners now blank the `// MC ENGINE —
+START` … `END` block (one wrapper, verbatim source, no module-scope declarations by construction) before they
+extract names; nothing else about either suite changed. A future block that ships a module inside a wrapper is
+added to the same exclusion, never re-indented to dodge the regex.
+TEST: `qa/components.cjs` 153/153 on the integrated file; mc_full's extraction reproduced out of the suite (249
+names, 0 missing); the orchestrator's `qa/mc_full.cjs` run is the gate.
+
+### E-116 · v110 · the Odds tab would have named a price the manager typed as a bookmaker's goal and clean-sheet price
+CAUSE: the ported engine tags a match's goals by where they came from — `lambdas(...).src` is "odds" for a baked
+match price (the INTEL row carries `from: "odds"`), "market" for anything else in its MARKET table, "model" otherwise.
+A price the manager adds on the Odds tab reaches that table through `setMarket` as `{ xg }` with no `from`, so the
+engine tags it "market", the same tag as the baked goal and clean-sheet anchors. The kit's vOdds (ui.js 320–332, the
+executable spec for this tab's copy) maps "market" to "bookmaker goal and clean-sheet prices", so a straight port
+names a match price the manager typed himself as a goal or clean-sheet price from a bookmaker. That is one wrong
+label next to a number he is about to act on, and the "your price is active" note depends on the same knowledge.
+CAUGHT: 27 Sep 2026, building D4, before any build: tracing an override through `setMarket` and `lambdas` while
+writing the round trip in qa/mc_render.cjs.
+RULE: provenance comes from the store that holds it. A match either of whose sides carries a price in
+`ctx.state.market` is labelled "bookmaker match prices, added by you", whatever the engine's tag (`mcOddsRows` in
+src/mc_ui.jsx). The engine's tag decides only for the baked prices. The engine is not changed: `src/mc_engine.js`
+ships byte for byte (verify.sh I8).
+TEST: `qa/mc_render.cjs` "trip-first-paint-names-the-price-as-yours-and-shows-its-goals". The apply button's own
+onClick writes both sides through an App-equivalent `on.market`, and the next first paint must carry that label.
+Mutation: labelling from the engine's tag alone (`const src = L.src`) → 64/65, red on that check.
+
+### E-117 · v110 · the kit's Review copy carried two Draft league facts as prose
+CAUSE: the kit's vReview (ui.js 333–356) is the executable spec for the Review tab's copy, and it writes two facts
+about the Draft table as fixed words. The no-win note says points scored "sits in the bottom two of the league". The
+bench note says "In a head-to-head league decided by two points twice already, that is the whole season". Both were
+true of the table the day they were written, and neither is derived from it. Ported verbatim, both go false the
+first week the table moves. This is the class spec §1.7, §6 and §7.6 forbid ("seven points off the lead" when the
+gap was eight), and E-084 / E-094 caught the same class in tests.
+CAUGHT: 27 Sep 2026, building D5, reading vReview line by line before porting its copy.
+RULE: a league fact in copy is computed at render time or it is not written. The no-win note quotes the manager's
+points scored and their rank among the league's points-for, both read from `MC.draft.standings`. The bench note
+counts the losses by `MC_UI_CFG.closeLoss` points or fewer from the review rows. The threshold is a definition, stated
+as a number, not a fact about the season. The free-transfer bank the Classic note quotes is `PLAN.replay`'s
+`ftBefore` for the next gameweek, never the solver's field or the bake's.
+TEST: `qa/mc_render.cjs` "review-league-facts-in-the-notes-are-computed-from-the-table-(E-117)" asks for the notes
+with the conditions forced, then again on a table where the manager's points-for is moved to the top; the quoted
+rank must follow (rank 7 of 8, then 1 of 8). "review-the-free-transfer-bank-quoted-is-PLAN.replay's-and-follows-it"
+moves the replay's bank and the note must follow. Mutations: the kit's "bottom two" prose → 64/65; the bank read from
+`MC.classic.ftNext` → 64/65. Each is red on its own check.
+
+### E-112 · v110 · two suites read the plan tab's old primary section as if it were always open
+CAUSE: v110 §5 D2 makes the solved Classic plan (`plan-solved`) the plan tab's PRIMARY, so Transfers (`plan-tx`) is
+closed on first paint. Two suites assumed the old primary. `qa/smoke.cjs` typed its own copy of PRIMARY with
+`plan: "plan-tx"`. `qa/smoke_wk.cjs` read `plan-tx`'s innerText straight after opening the tab, without opening the
+section. A closed Section renders no body, so the check "sells … are unavailable and say so" then read only the
+title. It went red on a panel that does name the status once opened. A suite that reads a section's text without
+opening it is testing the open/closed state, not the copy.
+CAUGHT: 27 Sep 2026, building D2. The pre-migration `qa/smoke_wk.cjs`, run against the new build in a scratch copy
+of the tree, gave 36/37: "Brobbey is sold on a status of d and the panel does not say so". The migrated check gives
+37/37 on the same build.
+RULE: a suite that reads a section's text opens it first and waits for its body to show. It never relies on which
+section is PRIMARY. A suite that pins PRIMARY changes with the app's table in the same change.
+`qa/components.cjs` already reads PRIMARY out of the assembled file.
+TEST: `qa/smoke_wk.cjs` 37/37. It clicks `sec-plan-tx` when that section is closed, then waits for
+`[data-section="plan-tx"] .sec-b` to show text. Only then does it read the panel, so a panel that never opens
+times out instead of passing empty. `qa/smoke.cjs` 62/62 with `plan: "plan-solved"`, "every tab first paint opens
+exactly its PRIMARY". `qa/components.cjs` "D2-first-paint-opens-the-solved-plan-first-and-leaves-transfers-closed-…".
+
+### E-118 · v110 · the Command and Plan tabs show Classic figures with no game named in the row, its section or its tab (§1.1, Part N3)
+CAUSE: v110 §1.1 and Part N3 say every number the app shows is labelled with its game. The repo's own stat rows
+predate that law. The Command tab's first section, "Where the season stands" (`cmd-stand`, open at first paint on the
+first tab), lists overall rank, season points, the last gameweek's points, points left on the bench and squad value.
+All five are Classic, and neither the rows, the section title nor the tab ("Now") names the game. "What the engine
+checked" (`cmd-checks`) adds two more, flags on the fifteen and free transfers. The Plan tab's older sections
+(`plan-tx`, `plan-wc`, `plan-opts`, `plan-xi`, `plan-time`, `plan-fb`) carry sixteen more rows the same way. The
+port's own panels are labelled: the solved-plan strip sits under a Classic tag, and every Draft figure sits on the
+tab named Draft. No figure is summed or compared across the games, so no number is wrong. But both games score
+"points", and a manager reading the first tab cannot tell from the page which game a number belongs to. That is
+the confusion the law exists to prevent.
+CAUGHT: 27 Sep 2026, porting the kit's separation group (qa.js 89–93 and 273) as `qa/mc_separation.cjs`. The suite
+resolves each stat row's game from its own text, the nearest heading above it inside its section, a `data-game`
+attribute, or the tab it sits on. Five rows at first paint and 23 with everything open resolve to no game. Every
+strip stat resolves to exactly one.
+RULE: a stat row or strip cell names its game in its own text, in a heading above it inside its section, or
+through the tab it sits on. It is never left to the reader to infer. A section that shows one game's figures
+carries a Classic or Draft tag in its first line, as `plan-solved` does.
+TEST: `qa/mc_separation.cjs` "every strip stat on the … is labelled with exactly one game" is armed on the landing
+card and the Command, Plan and Draft tabs, at first paint and with everything open. Its mutation, the Plan strip
+without its tag, goes red. The row count is printed by "no stat row or strip cell names both games at once (… 5 at
+first paint, 23 with everything open — ERRORS.md E-118)", but it does not fail the suite yet. The fix is in
+`src/ui.jsx` (TabCommand's `cmd-stand` and `cmd-checks`, and TabPlan's older sections), which the E1 item may not
+edit. Open. Once each of those sections carries a Classic tag in its first line, the count reaches zero and the
+check is armed as `unlabelled.first === 0 && unlabelled.open === 0`.
+
+### E-113 · v110 · smoke_wk read the Draft tab's old primary, and the free-agent panel's first rows by index, as if neither could move (recurrence of E-112's class)
+CAUSE: v110 §5 D3 makes the Draft claims sheet (`df-claims`) the draft tab's PRIMARY, so the app's own claim search
+(`df-waivers`, now titled "Quick check: the app's own claim search") is closed on first paint. `qa/smoke_wk.cjs`
+waited twice for "waivers process" in `df-waivers` straight after opening the tab, without opening the section, and a
+closed Section renders no body. The same change puts the ported engine's ranking to the Draft horizon first in the
+free-agent panel, with the phase-aware "how to get him", and keeps the app's own five-week rows behind the
+`df-pool-app` reveal (§1.4: the proven answer shows, the repo's stays as a labelled Reveal). Check 34 read every
+`.row` in `df-pool` by position, so the first twelve rows it compared would have been the new ranking's. E-112 wrote
+the rule ("a suite that reads a section's text opens it first") and applied it to the plan tab only; the two Draft
+reads in the same file still relied on which section is PRIMARY.
+CAUGHT: 27 Sep 2026, building D3. The unmigrated `qa/smoke_wk.cjs`, run from a temporary copy against the new build,
+gave 29/37. The draft wait timed out in both page passes, so eight checks read a page that never finished opening.
+Four are the Draft checks (28, 34, 35 and 36). The other four are the deadline, sells, captain and timing checks,
+which share the first pass's session with the draft tab. The migrated file gives 37/37 on the same build.
+RULE: every read of a Section in a browser suite opens it first and waits for its body, whichever section is PRIMARY.
+A read of rows inside a panel is scoped to the element that owns them, a data-testid, never to the section's first
+N `.row` elements, because a panel can gain a table above them. A suite that pins PRIMARY changes with the app's
+table in the same change.
+TEST: `qa/smoke_wk.cjs` 37/37. In both page passes it clicks `sec-df-waivers` when that section is closed, then waits
+for "waivers process". Check 34 opens `rev-df-pool-app` and reads only `[data-testid="df-pool-app"] .row`, in order.
+`qa/smoke.cjs` 62/62 with `draft: "df-claims"`. `qa/components.cjs` has two matching checks,
+"D3-first-paint-opens-the-claims-sheet-alone-and-keeps-the-app's-own-search-closed-as-a-quick-check" and
+"D3-free-agents-rank-to-the-horizon-with-how-to-get-him-and-keep-the-app's-own-rows-behind-a-reveal". The second one
+counts the reveal's rows against `draftPool(ctx)`.
+
+### E-119 · v110 · the committed refresh workflow could never have started, and the check it was validated with could not see why
+CAUSE: the v89 `.github/workflows/refresh.yml` (committed in baac4bc) set `LOGS: ${{ runner.temp }}/logs` and
+`HELPERS: ${{ runner.temp }}/helpers` in the job-level `env:`. GitHub provides only the github, needs, strategy,
+matrix, vars, secrets and inputs contexts there; `runner` exists from the steps on. A workflow that names a context
+where it is not available is rejected when it is loaded, so the first scheduled morning after a merge to main would
+have failed before any step ran, and the failure-issue step, being a step, would not have run either: a red badge
+and nothing else, which is the muted failure the file's own header was written to prevent. The v89 validation was
+`python3 -c "import yaml; yaml.safe_load(...)"` (E-077's TEST). That checks YAML syntax, not the workflow schema or
+where each context may be used, and it printed nothing wrong for the invalid file.
+CAUGHT: 27 Sep 2026, v110 E7, before the rewrite: actionlint 1.7.12 (installed into a scratch folder from PyPI's
+actionlint-py, not a project dependency) on the committed file reports `context "runner" is not allowed here` at
+lines 65 and 66; the same file passes `yaml.safe_load`. main carries no workflow, and a schedule runs only on the
+default branch, so it never ran.
+RULE: a workflow file is validated with actionlint, which also runs shellcheck on every `run:` block;
+`yaml.safe_load` is the first line of that check, never the whole of it. A path under the runner's temp folder is
+set by a step through `$GITHUB_ENV`, never in the job's `env:`. A `run:` block is executed once before it is
+trusted: the E7 rewrite was rehearsed step by step, with its own text extracted from the YAML, in a scratch copy of
+the tree.
+TEST: actionlint over the rewritten `refresh.yml` with shellcheck on: 0 findings (the first draft had one, SC1087,
+fixed); `gate.yml` 0 schema findings (shellcheck's one info-level SC2012 in its Playwright step predates this item
+and is left alone); the v89 file 2 errors. No repo suite runs actionlint yet: it is a Go binary and the project
+takes no new dependency without a decision, so the rule is held by practice until `gate.yml` gains a step for it.
+This entry names that gap rather than calling it closed.
+
+### E-120 · v110 · the kit's deadline board draws its chalk circle through the countdown, and a suite pinned 26 hours out could never see it (D7)
+CAUSE: the kit's styles.css draws the Today board's big circle as `.board:before` (240px, `right:-120px;top:-120px`,
+a 2px chalk border), and sets the countdown beside it in `.board .big` at `clamp(2.6rem,11vw,4.6rem)` with no width
+limit. So the circle's clipped box, the board's top-right 124px, overlaps the countdown whenever the countdown text is
+long, and at 390 that means any reading with a two-digit hour and a two-digit minute: roughly half the hours of any
+gameweek. Every browser suite pins its clock 26 hours before
+the deadline, where the text reads "1d 2h 0m", one of its narrowest forms. The kit is the executable spec for Today's
+layout, so a verbatim port would have shipped a D7 breach that no existing suite could see.
+CAUGHT: 27 Sep 2026, E5/D7, before the Today board landed. The board was transplanted from the kit's stylesheet into
+the app with the snapshot's own fixtures (`python3 qa/browser.py --mutate kit-board`), and the countdown was also
+measured on a kit-faithful scratch page (Chromium, sandbox fonts). At 390 the pinned "1d 2h 0m" ends at x 219.4,
+clear of the circle's box, which starts at 252. "1d 23h 59m", "3d 12h 30m" and "6d 23h 59m" all end at 267.9, and
+"12d 22h 10m" at 292.2, and every one of them crosses; "5d 18h 0m" (243.7) and "2d 3h 4m" (219.4) clear. The stroke
+itself crosses the text too, not just the box. At 320 even "1d 2h 0m" crosses. In the app on the long clock,
+"21d 16h 29m" crosses at 390 and at 320, in both schemes. Nothing shipped: no decorative line renders in today's
+build.
+RULE: no decorative line's box intersects a text node's client rect, at 390 or at 320. On Today this is measured
+again on the long clock, one minute after the previous deadline, where the countdown is at its widest, because the
+pinned clock shows its narrowest form. A port of the kit's board keeps the countdown's box clear of the circle's
+box, by limiting the countdown's width or by moving or shrinking the circle. It is measured by the suite, not judged
+by eye.
+TEST: `qa/browser.py` checks `browser-d7-<tab>-<scheme>-chalk-lines-clear-of-text-at-390/-320` on every tab, and
+`browser-d7-command-long-clock-<scheme>-chalk-lines-clear-of-text-at-390/-320`. Decorative lines are found by class
+and as every empty-content ::before/::after that paints a border or background. `--mutate kit-board` is red at 320
+on every tab and on the long clock at 390 and 320. `--mutate chalk-cross` is red at 390. Today, with no decorative
+line in the build, the check prints a SKIP with its reason and runs the moment one renders.
+
+### E-122 · v110 · copy said "seven points off the lead" when the gap was eight (spec §7.6)
+CAUSE: the v109 Today copy wrote the Draft league's gap to the leader as prose. It was true of the table the day it was
+written, and a table moves every gameweek while prose does not, so it read "seven points off the lead" when the gap was
+eight. The class is E-117's (two Draft league facts in the kit's Review copy) and, in tests, E-084's and E-094's.
+CAUGHT: spec §7.6, carried into v110 as a required entry, and checked on 27 Sep 2026 while porting the kit's vToday
+(v110 §5 D1): a grep of this file found §7.6 cited only as a class inside E-117, with no entry and no test of its own.
+On the baked table of 27 Sep the gap is eight again (Yoh-Nited on 4 league points, the leader on 12), which is the
+number a typed "seven" would have kept printing.
+RULE: a league-table figure in copy (a position, a points total, a gap to the leader, a lead over second) is computed
+from the table when the panel draws and is never written as prose. On the landing card and the Command tab it comes
+from one helper, `draftTableView(MC)` in `src/ui.jsx`, reading `MC.draft.standings`: the position is the table's own
+rank, the gap is the rank-1 entry's league points minus the manager's, and the top-of-the-table and level cases are
+worded by the same computation. The Classic rank move on the Command tab is read from `MC.classic.gws` the same way.
+TEST: `qa/components.cjs` "D1-E122-every-league-table-figure-on-the-landing-and-the-Command-tab-is-read-from-the-table-and-moves-with-it"
+renders the landing's Draft panel and `cmd-last`'s table row on the baked table and then on three moved copies of it
+(the leader three points further on, the manager's rank swapped with third, the manager top by two). Each render must
+carry the moved figure and not the old one: «7th of 8, 8 off the lead» on the baked table, «1st of 8, top of the table,
+2 clear» on the last copy. "D1-cmd-last-reads-each-game's-last-gameweek-from-the-baked-block-and-moves-with-it" moves
+the last Classic gameweek's score and average and requires the copy to follow. Mutation: the gap typed as
+"7 off the lead" → 237/238, red on the E-122 check alone.
+
+### E-114 · v110 · three browser checks read the landing card as if only the app's own search could fill it (recurrence of E-112's class)
+CAUSE: v110 §5 D1 makes the landing card show the solved plan's first week whenever `PLAN.plan` exists, `PLAN.hash`
+equals `PRE.hash`, that week is the snapshot's next gameweek and its deadline is still ahead. The app's own card
+(`buildPlan`) now answers only when that plan is set aside. Three browser checks were written when the app's own search
+was the only thing the landing could show. smoke's "C1-flagged-player-is-absent-from-the-recommendation" lifts one flag
+in the snapshot and expects the landing to name that player; the solved plan is fixed at build time and does not move
+with the snapshot's flags, so the control half could no longer pass on a correct app. smoke_wk's check 13
+"captain-in-the-xi-on-the-wildcard-path" expects the landing to name the app's own wildcard captain. smoke's
+"locking-the-premiums-changes-the-landing-fifteen-and-keeps-a-captain" compared the app's own unlocked fifteen with the
+locked one. A fourth suite, `qa/buttons.cjs`, resolves the landing's names against the fifteens the app's own engine can
+show, and the solved fifteen carries a web_name ("Thomas") that two elements share.
+CAUGHT: 27 Sep 2026, building D1. The pre-migration `qa/smoke.cjs`, run from a temporary copy against the new build,
+gave 61/62, red on "control with the flag lifted names him = false; shipped names him = false" (subject Semenyo). The
+pre-migration `qa/smoke_wk.cjs` gave 36/37, red on check 13 ("captain Groß … the landing card does not"). buttons.cjs's
+resolver, replayed in Node on the solved fifteen, leaves "Thomas" unresolved without the plan's ids and resolves all
+fifteen names to the plan's own ids with them; buttons.cjs itself was not run (not permitted in this item).
+RULE: a browser check that reads the landing names the card it expects, by `data-plan="solved"` or `data-plan="app"` on
+`.landing`, and asserts that card's property. The app's own card is reached with the one setting that sets the solved
+plan aside and leaves the app's own engine untouched: a match price typed on the Odds tab (`state.market`, which
+`src/engine.js` never reads). A check migrated this way keeps every property it had, never a weaker comparison, and the
+solved card gets its own, stronger assertion.
+TEST: `qa/smoke.cjs` 64/64. "C1-flagged-player-is-absent-from-the-recommendation" and a new app's-own half of
+"C1-flagged-player-is-never-captain-nor-vice" run on pages opened with the app's seeded state plus one typed price, and
+both pages must read `data-plan="app"`. The new "C1-the-solved-landing-names-only-unflagged-players-and-a-new-flag-on-one-sets-it-aside"
+requires the solved card exactly when the data says so, every player it recommends unflagged and named on it, and a
+flag on its vice to hand the card to the app's own search without naming him. "locking-the-premiums-…" also reads the
+app's own unlocked card and requires the lock to set the solved card aside. `qa/smoke_wk.cjs` 37/37: check 13 asserts,
+on the solved card, that PLAN week one's captain is named, sits in PLAN week one's eleven and in this engine's `bestXI`
+of that fifteen, and keeps today's assertion on the app's own card read with a typed price; checks 15 and 18 add the
+solved captain, fifteen and vice to the recommendations they hold to the flag rule. `qa/buttons.cjs` prefers the plan's
+first-week ids when it resolves a duplicated name.

@@ -40,6 +40,7 @@
 name: fpl-gate
 
 on:
+  workflow_dispatch:   # v110 E7: refresh.yml starts the full gate on its refresh/<date> branch this way; a push or pull request made with GITHUB_TOKEN starts nothing
   push:
     paths:
       - "fpl/**"
@@ -166,6 +167,28 @@ jobs:
       # react-dom/server, no browser — which is why it runs before the browser install.
       - name: components (render output)
         run: node qa/components.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      # v110 D4 Odds and D5 Review under react-dom/server: first paint, a source per match, the override round trip.
+      - name: mc_render (the Odds and Review tabs)
+        run: node qa/mc_render.cjs 2>&1 | tee -a "$GATE_LOG"
+
+      # v110 E1: the kit's reference suites ported against the ported engine, the baked block and the plan; node only.
+      - name: mc_data (E1 data)
+        run: node qa/mc_data.cjs 2>&1 | tee -a "$GATE_LOG"
+      - name: mc_maths (E1 maths and market)
+        run: node qa/mc_maths.cjs 2>&1 | tee -a "$GATE_LOG"
+      - name: mc_projections (E1 projections)
+        run: node qa/mc_projections.cjs 2>&1 | tee -a "$GATE_LOG"
+      - name: mc_rules (E1 rules, CLAUDE.md Part N)
+        run: node qa/mc_rules.cjs 2>&1 | tee -a "$GATE_LOG"
+      - name: mc_separation (E1 separation, the two games never mix)
+        run: node qa/mc_separation.cjs 2>&1 | tee -a "$GATE_LOG"
+      - name: mc_property (E1 property, at least 3,900 generated cases)
+        run: node qa/mc_property.cjs 2>&1 | tee -a "$GATE_LOG"
+      - name: mc_simulation (E1 simulation)
+        run: node qa/mc_simulation.cjs 2>&1 | tee -a "$GATE_LOG"
+      - name: mc_optimisers (E1 optimisers)
+        run: node qa/mc_optimisers.cjs 2>&1 | tee -a "$GATE_LOG"
 
       # ---------------------------------------------------------------- browsers for group D
 

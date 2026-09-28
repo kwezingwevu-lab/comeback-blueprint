@@ -239,6 +239,7 @@ Transfers **+76** · Captaincy **+51** · Chip timing **+30** · Team value by G
 | Touch floors | `.btn` 38 · `.btn-sm` 32 · `.tabi` 52 · `.sec-h` 48 · `.menu-i` 44 · `.inp` 40 · `.row` 38 | 21px buttons |
 | Colour | 21 tokens on `.mc-root`; **0 hex literals in markup**; grn=do · pnk=out/alarm · dim=secondary · amb/cyn never on the landing | 86 distinct colours |
 | Tabs | 7 equal-width icon tabs, no horizontal scroll | text tabs |
+| Tabs, v110 (27 Sep 2026, supersedes the row above) | one equal cell per `TABS` entry (nine: odds and review before lab) in one row, `flex:1 1 0`; above 380px every label shows at 11px, uncut; at 380px and below the cells are icon-only with the name in `aria-label`; every cell ≥24×24 (WCAG 2.5.8) and ≥52 high; no horizontal scroll by document width or by an element walk of `.tabs` children at 360, 390 and 430, in Chromium and WebKit. Chosen by measurement: at 360 the widest label ("Review", 36.08px in the sandbox's Liberation Sans) does not fit the 35.33px a cell leaves, at 390 it fits with 2.59px spare. Held by smoke `tab-strip-fits-with-labels-above-380px-and-icon-only-at-360`, its webkit twin and visual audit_layout | 7 tabs, 44px floor (9 would need 444px) |
 | Header | title · status line · ↻ · ⋯ menu (simple/full, guide, glossary) | 4 buttons in a row |
 | Feedback | `:active` scale(.97) everywhere · `.refbar` while refreshing · `.gwbar` cycle progress · `prefers-reduced-motion` | none |
 | Persistence | tab, sections, reveals, pool state survive reload | reopened on Command |

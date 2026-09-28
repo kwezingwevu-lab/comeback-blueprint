@@ -31,13 +31,18 @@ fpl/
 Node scripts are CommonJS (`.cjs`). No TypeScript. No dependencies beyond package.json. Node 22.
 
 ## 2. The assembled single file (build.cjs)
-`app/FPL_Mission_Control.jsx` = in this order:
+`app/FPL_Mission_Control.jsx` = in this order (v110 D0, 27 Sep 2026: eight blocks, sixteen markers):
 1. the import lines from the top of `src/ui.jsx` (`react`, `recharts`, `lucide-react`) — imports must stay first in an ES module;
 2. `// ENGINE — START` … contents of `src/engine.js` … `// ENGINE — END`;
-3. `// WEEKLY STRATEGY ENGINE — START` … contents of `data/weekly.js` … `// WEEKLY STRATEGY ENGINE — END`;
-4. `// LIVE DATA — START` … `const LIVE = <data/live.json as a JS literal>;` … `// LIVE DATA — END`;
-5. the rest of `src/ui.jsx` (everything after its import lines), which ends with `export default function App(){…}` (or `export default App`).
-Also stamps `const APP_VERSION = "v87";` (from package.json `version` major) right after the imports. Marker text is exact (em dash, one space each side). `verify.sh` asserts all six markers appear exactly once and in this order.
+3. `// MC ENGINE — START` … `src/mc_engine.js` verbatim inside a two-line wrapper — `const MCEngine = (function () { const module = { exports: {} }; const exports = module.exports;` above it and `return module.exports; })();` below it — … `// MC ENGINE — END`. The module is UMD and the assembled file is an ES module that `qa/components.cjs` and `qa/mc_full.cjs` evaluate under Node with a `module` of their own in scope, so a bare `module.exports = factory()` would be assigned over the harness's object; inside the wrapper it lands on the wrapper's own `module` and becomes the one binding the app reads, `MCEngine`;
+4. `// WEEKLY STRATEGY ENGINE — START` … contents of `data/weekly.js` … `// WEEKLY STRATEGY ENGINE — END`;
+5. `// LIVE DATA — START` … `const LIVE = <data/live.json as a JS literal>;` … `// LIVE DATA — END`;
+6. `// MC DATA — START` … `const MC = <data/mc_data.json as a JS literal>;` … `// MC DATA — END`;
+7. `// PLAN — START` … `const PLAN = <data/plan.json as a JS literal>;` … `// PLAN — END`;
+8. `// PRECOMPUTED — START` … `const PRE = <data/pre.json as a JS literal>;` … `// PRECOMPUTED — END` — `data/pre.json` is written by `pipeline/precompute.cjs`, which `build.cjs` runs first and which refuses (exit 3) when `data/plan.json` was solved on data other than `data/mc_data.json`;
+9. the rest of `src/ui.jsx` (everything after its import lines), which ends with `export default function App(){…}` (or `export default App`);
+10. `// MC UI — START` … `src/mc_ui.jsx` verbatim … `// MC UI — END` — module-level components (`TabOdds`, `TabReview` and the Build phase's) in the same module scope as the ui body, with no import or export of their own; function declarations are hoisted, so App renders them although they follow it.
+Also stamps `const APP_VERSION = "v87";` (from package.json `version` major) right after the imports. Marker text is exact (em dash, one space each side), and no source may contain a marker's text. `verify.sh` I5 reads the marker list from this section — every backticked START and END marker above, in the order written — and asserts each appears exactly once in that order; I8 compares every block with its source (the wrapper's two lines exactly, the data blocks as parsed JSON, `at` in `data/pre.json` excepted as a clock); I23 holds `data/pre.json`, `data/plan.json`, the WEEKLY block and the export hash of `data/mc_data.json` to one content hash.
 
 `dist/index.html`: esbuild bundle of the assembled JSX (`--bundle --format=iife --jsx=automatic --loader:.jsx=jsx --minify-syntax`) inlined in one HTML file with a tiny `window.storage` shim over `localStorage` (only if `window.storage` is absent) and `<div id="root">`. Mobile viewport meta. No external requests except the D4 refresh path.
 
@@ -184,6 +189,8 @@ Required functions (signatures in the file header comment; these names are asser
   "ui": { "mode": "simple", "tab": "command", "open": {}, "reveals": {} },
   "ledger": [ {gw, type, pick, alt, xp_pick, xp_alt, outcome, regret} ],
   "refresh": { "pair": "sonnet46", "last": null },
+  "market": { "6": { "ARS": { "xg": 1.85 } } },          // v110 D0: the Odds tab's overrides — gameweek 1–38 → team short name (the engine's teamNames, passed as sanitiseState(raw, { teams }); without it a three-letter capital name) → finite xg 0.2–5; anything else dropped, capped at 200; applied by App through MCEngine setMarket
+  "done": { "6:claims": true },                           // v110 D1: the Command tab's checklist ticks — "<gameweek 1–38>:<item, 2–12 lower-case letters>" → true only (an untick deletes the key); anything else dropped, capped at 100; written by App's on.done(key)
   "notes": { … }                                         // v89, NOT imported: see below
 }
 ```
@@ -225,6 +232,7 @@ so a typed number cannot survive in this file.
 - Root `<div className="mc-root">` carries exactly 21 colour tokens as CSS custom properties: `--bg --bg2 --bg3 --line --text --dim --mute --grn --grn2 --pnk --pnk2 --amb --cyn --blu --pur --wht --shadow --focus --ok --warn --err`. Markup uses `var(--…)` only; **0 hex literals** in any `style`/`className` markup (hex may appear only inside the token definitions in the one `<style>` block).
 - Class names the gates measure: `.btn` (≥38px tall) `.btn-sm` (≥32) `.tabi` (≥52) `.sec-h` (≥48) `.menu-i` (≥44) `.inp` (≥40) `.row` (≥38) `.refbar` `.gwbar` `.note` `.landing` `.reveal` `.section` `.boundary`.
 - Seven equal-width icon tabs in this order, with `data-tab` values: `command · plan · squad · rivals · draft · chips · lab`.
+- v110 D0 (27 Sep 2026) supersedes the line above: **nine** equal-width tabs, `command · plan · squad · rivals · draft · chips · odds · review · lab` (`odds` → `TabOdds`, primary `od-next`; `review` → `TabReview`, primary `rw-classic`; both in `src/mc_ui.jsx`), labels at 11px above 380px and icon-only at 380px and below with the name in `aria-label` (CLAUDE.md Part G); every tab and the landing card receive `mc = { MC, PLAN, PRE, E }`, `E = MCEngine.create(MC)` made once in App.
 - Lab tab sections: `lab-data` (primary, open) · `lab-refresh` · `lab-tour` · **`lab-minutes`** · `lab-ts` · `lab-ledger` · `lab-export` · `lab-import` · `lab-guide` · `lab-gloss`. `lab-minutes` is the F4 caveat panel: it names the model that is driving P(start) today, prints both Brier scores per walk-forward transition against the engine's own figures, carries the reliability curve behind `lab-min-rel` and the fitted and unfitted terms behind `lab-min-terms`, and states the gate and what would open it. Reveals: `lab-tour-chart`, `lab-min-rel`, `lab-min-terms`.
 - Chips tab sections: `ch-now` (primary, open) · **`ch-solver`** · `ch-regret`. `ch-solver` is the F8 panel: both set expiries, the confirmed windows, the joint plan with each assignment's value, and an explicit “no window is confirmed yet” when there is none — which is the truth on the shipped snapshot. Reveal: `ch-solver-how`.
 - Draft tab sections: `df-waivers` (primary, open) · `df-pool` · `df-h2h` · `df-xi` · `df-watch` · `df-league`. With a league id `df-waivers` leads with claims from the real pool and puts the written ones behind the `df-written` reveal; without one it keeps the written claims, the honest "free agents cannot be listed without the draft league id" notice and the `df-eng` reveal. The league control accepts an address, a league id or an entry id and shows what it read. Each tab button has `data-testid="tab-<name>"` and an `aria-label`.

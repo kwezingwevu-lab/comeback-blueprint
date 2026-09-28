@@ -28,6 +28,19 @@ const E = require(path.join(ROOT, "src", "engine.js"));
 const LIVE = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "live.json"), "utf8"));
 const STATE = JSON.parse(fs.readFileSync(path.join(ROOT, "state", "kwezi.json"), "utf8"));
 const WEEKLY = new Function(fs.readFileSync(path.join(ROOT, "data", "weekly.js"), "utf8") + "\nreturn WEEKLY;")();
+// v110 D1 (E-114): the solved plan and the build's precomputed results. The landing shows the plan's first week whenever
+// the two share a hash for the next gameweek, so its captain and its recommendations are held here beside the app's own.
+const PLAN = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "plan.json"), "utf8"));
+const PRE = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "pre.json"), "utf8"));
+const W1 = PLAN.plan && PLAN.plan.ok === true && Array.isArray(PLAN.plan.weeks) && PLAN.plan.weeks.length ? PLAN.plan.weeks[0] : null;
+/* A saved state with one match price typed on the Odds tab (state.market): the setting that sets the solved plan aside on
+   the landing and leaves the app's own engine untouched. Gameweek and team are read from the snapshot, never typed. */
+function withPrice(state) {
+  const s = JSON.parse(JSON.stringify(state));
+  const g = String(LIVE.next_event), t = LIVE.teams[0].short_name;
+  s.market = {}; s.market[g] = {}; s.market[g][t] = { xg: 1.5 };
+  return s;
+}
 
 const assert = H.assert;
 const ENTRY = 3546875;
@@ -97,7 +110,8 @@ const captains = [
   { label: "wildcard path", id: wcXI.capId, xi: wcXI.ids },
   { label: "fallback path", id: fbXI.capId, xi: fbXI.ids },
   { label: "written fallback captain", id: Number(WRITTEN.captain) || null, xi: fbXI.ids },
-  { label: "transfer plan", id: tp.captain, xi: tp.xi || postXI.ids }
+  { label: "transfer plan", id: tp.captain, xi: tp.xi || postXI.ids },
+  { label: "solved plan", id: W1 ? W1.cap : null, xi: W1 ? W1.xi : [] }
 ].filter((c) => c.id);
 
 // ---------------------------------------------------------------- fresh pull (reconciliations only)
@@ -142,7 +156,7 @@ function flaggedLive(e) { return !e || e.status !== "a" || (e.chance !== null &&
 // ---------------------------------------------------------------- the UI pass
 
 async function collectUI() {
-  const out = { ok: false, why: "", status: "", landing: "", timing: "", txText: "", draftRows: [], draftText: "", poolText: "" };
+  const out = { ok: false, why: "", status: "", landing: "", landingPlan: "", landingApp: "", landingAppPlan: "", timing: "", txText: "", draftRows: [], draftText: "", poolText: "" };
   let browser = null;
   try {
     browser = await H.launch();
@@ -154,9 +168,17 @@ async function collectUI() {
     });
     out.status = await page.evaluate(() => { const e = document.querySelector('[data-testid="status"]'); return e ? e.innerText : ""; });
     out.landing = await page.evaluate(() => { const e = document.querySelector(".landing"); return e ? e.innerText : ""; });
+    out.landingPlan = await page.evaluate(() => { const e = document.querySelector(".landing"); return e ? e.getAttribute("data-plan") || "" : ""; });
 
     await page.click('[data-testid="tab-plan"]');
     await page.waitForSelector('[data-section="plan-time"]', { timeout: 15000 });
+    // E-112: v110 D2 made the solved plan (plan-solved) the plan tab's PRIMARY, so Transfers is closed on first paint.
+    // The sells check reads what the manager sees once he opens it, so it is opened, and read only once its body shows.
+    if ((await page.getAttribute('[data-testid="sec-plan-tx"]', "aria-expanded")) !== "true") await page.click('[data-testid="sec-plan-tx"]');
+    await page.waitForFunction(() => {
+      const s = document.querySelector('[data-section="plan-tx"] .sec-b');
+      return !!s && !s.hidden && s.innerText.trim().length > 0;
+    }, null, { timeout: 15000 });
     out.txText = await page.evaluate(() => { const e = document.querySelector('[data-section="plan-tx"]'); return e ? e.innerText : ""; });
     await page.click('[data-testid="sec-plan-time"]');
     await page.waitForFunction(() => {
@@ -166,6 +188,10 @@ async function collectUI() {
     out.timing = await page.evaluate(() => document.querySelector('[data-section="plan-time"]').innerText);
 
     await page.click('[data-testid="tab-draft"]');
+    // E-113: v110 D3 made the claims sheet (df-claims) the draft tab's PRIMARY, so the app's own claim search (df-waivers)
+    // is closed on first paint. The checks below read what the manager sees once he opens it, so it is opened first.
+    await page.waitForSelector('[data-testid="sec-df-waivers"]', { timeout: 15000 });
+    if ((await page.getAttribute('[data-testid="sec-df-waivers"]', "aria-expanded")) !== "true") await page.click('[data-testid="sec-df-waivers"]');
     await page.waitForFunction(() => {
       const s = document.querySelector('[data-section="df-waivers"]');
       return !!s && /waivers process/.test(s.innerText);
@@ -181,6 +207,16 @@ async function collectUI() {
       return !!s && !s.hidden && s.innerText.trim().length > 0;
     }, null, { timeout: 15000 });
     out.poolText = await page.evaluate(() => document.querySelector('[data-section="df-pool"]').innerText);
+    // E-114 (v110 D1): the app's own card, which answers whenever the solved plan is set aside, on a page opened with one
+    // match price typed on the Odds tab. A new page is a new browser context, so the two sessions share no storage.
+    const page2 = await browser.newPage();
+    await H.open(page2, {
+      mode: "full", state: withPrice(STATE), now: NOW,
+      ui: { mode: "full", tab: "command", open: {}, reveals: {} },
+      mocks: { "https://fantasy.premierleague.com/**": (route) => route.abort(), "https://api.anthropic.com/**": (route) => route.abort() }
+    });
+    out.landingApp = await page2.evaluate(() => { const e = document.querySelector(".landing"); return e ? e.innerText : ""; });
+    out.landingAppPlan = await page2.evaluate(() => { const e = document.querySelector(".landing"); return e ? e.getAttribute("data-plan") || "" : ""; });
     out.ok = true;
   } catch (e) {
     out.why = e && e.message ? String(e.message) : String(e);
@@ -203,6 +239,9 @@ async function collectDraftUI() {
       ui: { mode: "full", tab: "draft", open: {}, reveals: {} },
       mocks: { "https://fantasy.premierleague.com/**": (route) => route.abort(), "https://api.anthropic.com/**": (route) => route.abort() }
     });
+    // E-113: df-waivers is closed on first paint since v110 D3; open it, then read it
+    await page.waitForSelector('[data-testid="sec-df-waivers"]', { timeout: 20000 });
+    if ((await page.getAttribute('[data-testid="sec-df-waivers"]', "aria-expanded")) !== "true") await page.click('[data-testid="sec-df-waivers"]');
     await page.waitForFunction(() => {
       const s = document.querySelector('[data-section="df-waivers"]');
       return !!s && /waivers process/.test(s.innerText);
@@ -215,8 +254,13 @@ async function collectDraftUI() {
       return !!s && !s.hidden && /Unclaimed and available/.test(s.innerText);
     }, null, { timeout: 20000 });
     out.poolText = await page.evaluate(() => document.querySelector('[data-section="df-pool"]').innerText);
+    // E-113: since v110 D3 the free-agent panel leads with the Draft engine's ranking to the horizon, and the app's own
+    // five-week rows sit behind the df-pool-app reveal. Check 34 is about those rows, so the reveal is opened and only
+    // its rows are read, in order.
+    if ((await page.getAttribute('[data-testid="rev-df-pool-app"]', "aria-expanded")) !== "true") await page.click('[data-testid="rev-df-pool-app"]');
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="df-pool-app"] .row').length > 0, null, { timeout: 20000 });
     out.poolRows = await page.evaluate(() => Array.prototype.map.call(
-      document.querySelectorAll('[data-section="df-pool"] .row'),
+      document.querySelectorAll('[data-testid="df-pool-app"] .row'),
       (r) => r.innerText.replace(/\s+/g, " ").trim()
     ));
 
@@ -407,13 +451,31 @@ async function main() {
   }
 
   // ---- 13 · E-019: the captain is in the XI, on the wildcard path
+  // E-114 (v110 D1): the landing shows the solved plan whenever PLAN and PRE share a hash for the next gameweek and its
+  // deadline is ahead, and the app's own card whenever that plan is set aside. Both are held. The solved card's captain
+  // must be named on it and sit in the plan's own eleven AND in this engine's best eleven of that fifteen; the app's own
+  // card (read with a typed price when the solved card shows) keeps today's assertion on the wildcard path.
   {
     const inXi = !!wcXI.capId && wcXI.ids.indexOf(wcXI.capId) >= 0;
-    const shown = ui.ok ? ui.landing.indexOf("Captain " + nm(wcXI.capId)) >= 0 : false;
-    const onCard = ui.ok ? ui.landing.indexOf(nm(wcXI.capId)) >= 0 : false;
+    const ev1 = W1 ? LIVE.events.filter((e) => Number(e.id) === W1.gw)[0] : null;
+    const expectSolved = !!(W1 && typeof PRE.hash === "string" && PRE.hash === PLAN.hash && W1.gw === Number(ctx.nextEvent) &&
+      ev1 && Date.parse(ev1.deadline_time) > Date.parse(NOW));
+    const appText = expectSolved ? ui.landingApp : ui.landing, appPlan = expectSolved ? ui.landingAppPlan : ui.landingPlan;
+    const shown = ui.ok ? appText.indexOf("Captain " + nm(wcXI.capId)) >= 0 : false;
+    const onCard = ui.ok ? appText.indexOf(nm(wcXI.capId)) >= 0 : false;
+    let solvedOk = true, solvedWhy = "";
+    if (expectSolved) {
+      const bx = E.bestXI(W1.squad, ctx);
+      const named = ui.landing.indexOf("Captain " + nm(W1.cap)) >= 0;
+      const inPlanXi = W1.xi.indexOf(W1.cap) >= 0, inEngXi = !!bx && Array.isArray(bx.ids) && bx.ids.indexOf(W1.cap) >= 0;
+      solvedOk = ui.landingPlan === "solved" && named && inPlanXi && inEngXi;
+      solvedWhy = "solved card (" + ui.landingPlan + "): captain " + nm(W1.cap) + (named ? " named" : " NOT named") + (inPlanXi ? ", in the plan's eleven" : ", NOT in the plan's eleven") +
+        (inEngXi ? ", in this engine's best eleven of that fifteen (" + bx.formation + ")" : ", NOT in this engine's best eleven of that fifteen") + " · ";
+    }
     assert("captain-in-the-xi-on-the-wildcard-path",
-      wc.ok && inXi && shown && onCard,
-      "wildcard XI " + wcXI.formation + ", captain " + nm(wcXI.capId) + (inXi ? " is in the eleven" : " is NOT in the eleven") + "; the landing card " + (shown ? "names him and lists him in the fifteen" : "does not: " + ui.landing.slice(0, 120).replace(/\n/g, " · ")));
+      wc.ok && inXi && shown && onCard && appPlan === "app" && solvedOk,
+      solvedWhy + "the app's own card (" + appPlan + (expectSolved ? ", a typed price sets the solved plan aside" : "") + "): wildcard XI " + wcXI.formation + ", captain " + nm(wcXI.capId) +
+        (inXi ? " is in the eleven" : " is NOT in the eleven") + "; the card " + (shown ? "names him and lists him in the fifteen" : "does not: " + appText.slice(0, 120).replace(/\n/g, " · ")));
   }
 
   // ---- 14 · and on the fallback path, where no chip is played
@@ -493,7 +555,9 @@ async function main() {
 
   // ---- 18 · E-019: no flagged player appears in any recommendation at all
   {
-    const rec = [...new Set([].concat(wc.ok ? wc.ids : [], buys, captains.map((c) => c.id), wcXI.ids))];
+    // E-114 (v110 D1): the solved card recommends its first week's fifteen (a wildcard or free hit) or its buys, and its vice
+    const solvedRec = W1 ? ((W1.chip === "wildcard" || W1.chip === "freehit") ? W1.squad : W1.in).concat([W1.vice]) : [];
+    const rec = [...new Set([].concat(wc.ok ? wc.ids : [], buys, captains.map((c) => c.id), wcXI.ids, solvedRec))];
     const bad = rec.filter((id) => (ctx.flags[id] && ctx.flags[id].flagged) || flaggedLive(liveEl(id)));
     const flaggedNow = ctx.elList.filter((el) => ctx.flags[el.id].flagged).length;
     assert("no-flagged-player-in-any-recommendation",

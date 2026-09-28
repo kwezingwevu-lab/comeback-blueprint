@@ -589,7 +589,9 @@ for (const cls of Object.keys(FLOORS)) {
     low.length === 0, low.length ? low.join(" · ") : "smallest is 11px");
 }
 
-/* The tab strip. Part G: seven equal-width icon tabs, no horizontal scroll. The CSS does this
+/* The tab strip. Part G: equal-width icon tabs, one per TABS entry, no horizontal scroll (nine since v110 D0 —
+   the count is read from the source's TABS and held equal to the lists smoke.cjs and webkit.js measure with,
+   never typed here; it was `count === 7` until the strip grew). The CSS does this
    with flex:1 1 0 on .tabi (equal share of the strip) and a min-width that lets every tab fit:
    count × min-width + gaps + strip padding must not exceed the viewport, at 390px with the base
    rule and at the narrower width the media query targets. */
@@ -600,6 +602,7 @@ for (const cls of Object.keys(FLOORS)) {
     !!tabs && /^flex$/.test(tabs.decl.display || "") && flex.length === 3 && flex[0] === "1" && flex[1] === "1" && parseFloat(flex[2]) === 0,
     "flex " + (tabi ? tabi.decl.flex : "n/a") + ", .tabs display " + (tabs ? tabs.decl.display : "n/a"));
   const count = ((/const TABS = \[([\s\S]*?)\];/.exec(src) || ["", ""])[1].match(/\{\s*id:/g) || []).length;
+  const suiteTabs = ["smoke.cjs", "webkit.js"].map((f) => { try { const m = /const TABS = (\[[^\]]*\]);/.exec(fs.readFileSync(path.join(ROOT, "qa", f), "utf8")); return m ? new Function("return " + m[1])() : null; } catch (e) { return null; } });
   const padH = (() => { const p = (tabs && tabs.decl.padding ? tabs.decl.padding : "0").split(/\s+/).map(pxOf); if (p.some((x) => x === null)) return null; return p.length === 1 ? 2 * p[0] : 2 * p[1]; })();
   const gap = tabs ? pxOf(tabs.decl.gap || "0") : null;
   const need = (minw) => count * minw + (count - 1) * gap + padH;
@@ -608,7 +611,7 @@ for (const cls of Object.keys(FLOORS)) {
   const narrowW = narrow ? parseInt(/max-width\s*:\s*(\d+)px/.exec(narrow.media)[1], 10) : null;
   const narrowMin = narrow && narrow.decl["min-width"] !== undefined ? pxOf(narrow.decl["min-width"]) : baseMin;
   ok("audit_layout · " + count + " tabs fit at 390px with the base rule and at ≤" + narrowW + "px with the media rule (no horizontal scroll)",
-    count === 7 && baseMin !== null && gap !== null && padH !== null && need(baseMin) <= 390 && (narrowW === null || (narrowMin !== null && need(narrowMin) <= Math.min(narrowW, 360))),
+    count > 0 && suiteTabs.every((t) => Array.isArray(t) && t.length === count) && baseMin !== null && gap !== null && padH !== null && need(baseMin) <= 390 && (narrowW === null || (narrowMin !== null && need(narrowMin) <= Math.min(narrowW, 360))),
     "base " + count + "×" + baseMin + " + " + (count - 1) + "×" + gap + " + " + padH + " = " + (baseMin !== null && gap !== null && padH !== null ? need(baseMin) : "n/a") + " ≤ 390" +
     (narrowW !== null ? "; ≤" + narrowW + "px: " + count + "×" + narrowMin + " … = " + need(narrowMin) + " ≤ " + Math.min(narrowW, 360) : ""));
 }

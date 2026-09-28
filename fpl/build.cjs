@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /* build.cjs — assembles the single file and the standalone page (CONTRACT §2).
  *
- *   app/FPL_Mission_Control.jsx  imports · APP_VERSION · engine · weekly · live · ui
+ *   app/FPL_Mission_Control.jsx  imports · APP_VERSION · engine · mc engine · weekly · live · mc data · plan ·
+ *                                precomputed · ui · mc ui (CONTRACT §2, sixteen markers since v110 D0)
+ *   data/pre.json                pipeline/precompute.cjs, run first: the heavy searches, once per build; rewritten
+ *                                only when its content changes, so the build still reproduces the tree byte for byte
  *   dist/index.html              esbuild IIFE bundle of that file, inlined, with a
  *                                window.storage shim over localStorage.
  *   dist/manifest.webmanifest    installable-app metadata; its colours ARE the --bg token
@@ -27,13 +30,35 @@ const read = function (rel) { return fs.readFileSync(P(rel), "utf8"); };
 const pkg = JSON.parse(read("package.json"));
 const APP_VERSION = "v" + String(pkg.version).split(".")[0];
 
+/* The markers, in the order they are written (CONTRACT §2). verify.sh I5 reads its own list out of CONTRACT.md, so
+   this one and that one are held against each other rather than one copied from the other. */
 const M = {
   engineStart: "// ENGINE — START",
   engineEnd: "// ENGINE — END",
+  mcEngineStart: "// MC ENGINE — START",
+  mcEngineEnd: "// MC ENGINE — END",
   weeklyStart: "// WEEKLY STRATEGY ENGINE — START",
   weeklyEnd: "// WEEKLY STRATEGY ENGINE — END",
   liveStart: "// LIVE DATA — START",
-  liveEnd: "// LIVE DATA — END"
+  liveEnd: "// LIVE DATA — END",
+  mcDataStart: "// MC DATA — START",
+  mcDataEnd: "// MC DATA — END",
+  planStart: "// PLAN — START",
+  planEnd: "// PLAN — END",
+  preStart: "// PRECOMPUTED — START",
+  preEnd: "// PRECOMPUTED — END",
+  mcUiStart: "// MC UI — START",
+  mcUiEnd: "// MC UI — END"
+};
+
+/* src/mc_engine.js is UMD: `module.exports = factory()` when a CommonJS `module` is in scope, `root.MCEngine`
+   otherwise. The assembled file is an ES module, and qa/components.cjs and qa/mc_full.cjs evaluate it under Node
+   with their own `module` object in scope — a bare UMD would assign the engine over that object. So the module runs
+   inside a function with a `module` of its own, and its export becomes the one binding the app reads, MCEngine.
+   Two exact lines; the source between them is byte for byte, and verify.sh I8 compares it. */
+const MC_WRAP = {
+  head: "const MCEngine = (function () { const module = { exports: {} }; const exports = module.exports;",
+  tail: "return module.exports; })();"
 };
 
 /* The import lines have to stay at the top of an ES module, so they are lifted off
@@ -66,11 +91,30 @@ function jsLiteral(obj) {
   return JSON.stringify(obj).replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 }
 
+/* src/mc_ui.jsx is appended after the ui body, inside the same ES module, so it may not import or export: an import
+   after the first statement breaks the module and a second export collides with App's. */
+function mcUiSource() {
+  const src = read("src/mc_ui.jsx").trim();
+  src.split("\n").forEach(function (line, i) {
+    const t = line.trim();
+    if (/^(import|export)\s/.test(t)) {
+      throw new Error("src/mc_ui.jsx line " + (i + 1) + " is an " + t.split(/\s/)[0] + " statement: " + t.slice(0, 80) +
+        " — it is appended inside src/ui.jsx's module, so it uses that module's scope and exports nothing");
+    }
+  });
+  return src;
+}
+
 function assemble() {
   const ui = splitImports(read("src/ui.jsx"));
   const engine = read("src/engine.js").trim();
+  const mcEngine = read("src/mc_engine.js").trim();
   const weekly = read("data/weekly.js").trim();
   const live = JSON.parse(read("data/live.json"));
+  const mcData = JSON.parse(read("data/mc_data.json"));
+  const plan = JSON.parse(read("data/plan.json"));
+  const pre = JSON.parse(read("data/pre.json"));
+  const mcUi = mcUiSource();
 
   const out = [
     "/* FPL Mission Control " + APP_VERSION + " — assembled by build.cjs; edit src/ui.jsx, src/engine.js,",
@@ -83,6 +127,12 @@ function assemble() {
     engine,
     M.engineEnd,
     "",
+    M.mcEngineStart,
+    MC_WRAP.head,
+    mcEngine,
+    MC_WRAP.tail,
+    M.mcEngineEnd,
+    "",
     M.weeklyStart,
     weekly,
     M.weeklyEnd,
@@ -91,7 +141,23 @@ function assemble() {
     "const LIVE = " + jsLiteral(live) + ";",
     M.liveEnd,
     "",
+    M.mcDataStart,
+    "const MC = " + jsLiteral(mcData) + ";",
+    M.mcDataEnd,
+    "",
+    M.planStart,
+    "const PLAN = " + jsLiteral(plan) + ";",
+    M.planEnd,
+    "",
+    M.preStart,
+    "const PRE = " + jsLiteral(pre) + ";",
+    M.preEnd,
+    "",
     ui.rest.trim(),
+    "",
+    M.mcUiStart,
+    mcUi,
+    M.mcUiEnd,
     ""
   ].join("\n");
 
@@ -103,10 +169,12 @@ function assemble() {
   for (let i = 1; i < order.length; i++) {
     if (order[i].at < order[i - 1].at) throw new Error("marker out of order: " + order[i].text);
   }
-  /* The banned fields must not reach the data block or be read anywhere: the only
+  /* The banned fields must not reach any data block or be read anywhere: the only
      permitted mention is the engine header comment that names them as banned. */
-  const liveBlock = out.slice(out.indexOf(M.liveStart), out.indexOf(M.liveEnd));
-  if (/ep_this|ep_next/.test(liveBlock)) throw new Error("banned field ep_this/ep_next is in the live data block");
+  [["live data", M.liveStart, M.liveEnd], ["mc data", M.mcDataStart, M.mcDataEnd], ["plan", M.planStart, M.planEnd],
+    ["precomputed", M.preStart, M.preEnd]].forEach(function (b) {
+    if (/ep_this|ep_next/.test(out.slice(out.indexOf(b[1]), out.indexOf(b[2])))) throw new Error("banned field ep_this/ep_next is in the " + b[0] + " block");
+  });
   const reads = out.match(/\.ep_(this|next)\b|\[\s*["']ep_(this|next)/g);
   if (reads) throw new Error("banned field read in code: " + reads.join(", "));
 
@@ -742,6 +810,15 @@ function checkPageIcons(html, mf) {
 }
 
 function main() {
+  /* data/pre.json first, so `npm run build` and the gate's build step both refresh it. A refusal (the plan was
+     solved on other data, or two claims sheets for one plan) stops the build: nothing is assembled from it. */
+  let preRun;
+  try { preRun = require("./pipeline/precompute.cjs"); }
+  catch (e) { throw new Error("build: pipeline/precompute.cjs could not be loaded — " + (e && e.message ? e.message : e)); }
+  let preRes;
+  try { preRes = preRun.precompute(); }
+  catch (e) { throw new Error("build: pipeline/precompute.cjs refused" + (e && e.code ? " (exit " + e.code + ")" : "") + " — " + (e && e.message ? e.message : e)); }
+  console.log(preRun.summary(preRes));
   const jsx = assemble();
   const js = bundle();
   fs.mkdirSync(P("dist"), { recursive: true });
@@ -805,7 +882,8 @@ function main() {
     mask.pct.toFixed(1) + "% of the " + MASK_SAFE_R + "u safe radius at scale " + mask.scale.toFixed(4) +
     " (clips above " + mask.limit.toFixed(4) + ")");
   console.log("page icon links              " + linked.length + " (" + linked.join(", ") + "), all named by the manifest");
-  console.log("version " + APP_VERSION + "  markers 6/6  order ok  " + parsed.length + " PNGs parsed back");
+  const nm = Object.keys(M).length;
+  console.log("version " + APP_VERSION + "  markers " + nm + "/" + nm + "  order ok  " + parsed.length + " PNGs parsed back");
 }
 
 main();

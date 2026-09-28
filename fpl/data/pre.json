@@ -1,0 +1,1159 @@
+{
+ "at": "2026-09-27T17:10:13.090Z",
+ "hash": "cef80183f9a5a2ae",
+ "claims": {
+  "game": "draft",
+  "sheet": [
+   {
+    "add": 566,
+    "drop": 116,
+    "gain": 35.26027514973418,
+    "kind": "first"
+   },
+   {
+    "add": 79,
+    "drop": 553,
+    "gain": 21.78758204832245,
+    "kind": "first"
+   },
+   {
+    "add": 533,
+    "drop": 305,
+    "gain": 15.590614346350321,
+    "kind": "first"
+   },
+   {
+    "add": 542,
+    "drop": 286,
+    "gain": 14.037281321814,
+    "kind": "first"
+   },
+   {
+    "add": 60,
+    "drop": 330,
+    "gain": 12.982598362829215,
+    "kind": "first"
+   },
+   {
+    "add": 295,
+    "drop": 491,
+    "gain": 11.659674197831649,
+    "kind": "first"
+   },
+   {
+    "add": 428,
+    "drop": 268,
+    "gain": 6.560491777325488,
+    "kind": "first"
+   },
+   {
+    "add": 93,
+    "drop": 116,
+    "gain": 24.925431184831545,
+    "kind": "backup",
+    "of": 566
+   },
+   {
+    "add": 634,
+    "drop": 553,
+    "gain": 8.814642264282906,
+    "kind": "backup",
+    "of": 79
+   },
+   {
+    "add": 332,
+    "drop": 305,
+    "gain": 11.042241043102571,
+    "kind": "backup",
+    "of": 533
+   },
+   {
+    "add": 41,
+    "drop": 286,
+    "gain": 10.653073450517475,
+    "kind": "backup",
+    "of": 542
+   },
+   {
+    "add": 173,
+    "drop": 330,
+    "gain": 5.648171140037164,
+    "kind": "backup",
+    "of": 60
+   }
+  ],
+  "strategy": "firsts",
+  "altValue": 634.8491256153443,
+  "sim": [
+   {
+    "round": 1,
+    "add": 566,
+    "drop": 116,
+    "ok": false,
+    "why": "already claimed"
+   },
+   {
+    "round": 1,
+    "add": 79,
+    "drop": 553,
+    "ok": true,
+    "why": null
+   },
+   {
+    "round": 2,
+    "add": 533,
+    "drop": 305,
+    "ok": false,
+    "why": "already claimed"
+   },
+   {
+    "round": 2,
+    "add": 542,
+    "drop": 286,
+    "ok": false,
+    "why": "already claimed"
+   },
+   {
+    "round": 2,
+    "add": 60,
+    "drop": 330,
+    "ok": false,
+    "why": "already claimed"
+   },
+   {
+    "round": 2,
+    "add": 295,
+    "drop": 491,
+    "ok": true,
+    "why": null
+   },
+   {
+    "round": 3,
+    "add": 428,
+    "drop": 268,
+    "ok": false,
+    "why": "already claimed"
+   },
+   {
+    "round": 3,
+    "add": 93,
+    "drop": 116,
+    "ok": true,
+    "why": null
+   },
+   {
+    "round": 4,
+    "add": 634,
+    "drop": 553,
+    "ok": false,
+    "why": "drop already gone"
+   },
+   {
+    "round": 4,
+    "add": 332,
+    "drop": 305,
+    "ok": true,
+    "why": null
+   },
+   {
+    "round": 5,
+    "add": 41,
+    "drop": 286,
+    "ok": true,
+    "why": null
+   },
+   {
+    "round": 6,
+    "add": 173,
+    "drop": 330,
+    "ok": true,
+    "why": null
+   }
+  ],
+  "landed": [
+   79,
+   295,
+   93,
+   332,
+   41,
+   173
+  ],
+  "lost": [
+   566,
+   533,
+   542,
+   60,
+   428
+  ],
+  "valueNow": 596.1653580807147,
+  "valueStress": 637.6560557105201,
+  "valueAll": 666.0890733251243,
+  "allFirst": 666.0890733251243,
+  "held": [
+   {
+    "add": 432,
+    "drop": 98,
+    "status": "d",
+    "chance": 75
+   }
+  ],
+  "rivals": {
+   "Muggles & Wizards": [
+    566,
+    533,
+    542
+   ],
+   "Sizobona Phambili FC": [
+    566,
+    542,
+    533
+   ],
+   "Isak at this game": [
+    566,
+    533,
+    542
+   ],
+   "Saka Potatoes": [
+    566,
+    533,
+    60
+   ],
+   "Penderentials FC": [
+    566,
+    79,
+    542
+   ],
+   "Thabz Appeal": [
+    566,
+    533,
+    60
+   ],
+   "Unique Stars": [
+    566,
+    542,
+    428
+   ]
+  },
+  "orderings": [
+   {
+    "name": "all first choices, then backups",
+    "mean": 640.5914517089412,
+    "p10": 626.5197863805548,
+    "p90": 652.9257078530385
+   },
+   {
+    "name": "each backup under its first choice",
+    "mean": 641.2089442738582,
+    "p10": 629.9563469991695,
+    "p90": 651.9759790321027
+   },
+   {
+    "name": "highest expected gain first",
+    "mean": 633.5483249008404,
+    "p10": 623.2996579384758,
+    "p90": 644.3330394675666
+   },
+   {
+    "name": "likeliest to land first",
+    "mean": 633.5213252216756,
+    "p10": 623.2996579384758,
+    "p90": 644.3330394675666
+   }
+  ],
+  "land": {
+   "41": 0.71,
+   "60": 0.314,
+   "79": 0.8626666666666667,
+   "93": 0.292,
+   "173": 0.686,
+   "295": 0.7413333333333333,
+   "332": 0.6446666666666667,
+   "428": 0.184,
+   "533": 0.12,
+   "542": 0.16666666666666666,
+   "566": 0.47733333333333333,
+   "634": 0.13066666666666665
+  },
+  "meanValue": 640.5914517089412,
+  "p10": 626.5197863805548,
+  "p90": 652.9257078530385,
+  "runs": 1500
+ },
+ "trades": {
+  "game": "draft",
+  "both": [],
+  "ask": [
+   {
+    "rival": "Thabz Appeal",
+    "get": 138,
+    "give": 553,
+    "mine": 4.572373625877162,
+    "theirs": -0.5249112167114163,
+    "both": false
+   },
+   {
+    "rival": "Thabz Appeal",
+    "get": 138,
+    "give": 491,
+    "mine": 4.572373625877162,
+    "theirs": -0.5249112167114163,
+    "both": false
+   },
+   {
+    "rival": "Penderentials FC",
+    "get": 384,
+    "give": 109,
+    "mine": 3.137725679453524,
+    "theirs": -0.08625477040845908,
+    "both": false
+   },
+   {
+    "rival": "Thabz Appeal",
+    "get": 649,
+    "give": 116,
+    "mine": 3.130467405690524,
+    "theirs": -1.1176324949303762,
+    "both": false
+   },
+   {
+    "rival": "Thabz Appeal",
+    "get": 258,
+    "give": 116,
+    "mine": 2.2485754880588047,
+    "theirs": -0.34790517880003335,
+    "both": false
+   },
+   {
+    "rival": "Isak at this game",
+    "get": 226,
+    "give": 572,
+    "mine": 1.9157629026547056,
+    "theirs": -0.38315284800410154,
+    "both": false
+   },
+   {
+    "rival": "Isak at this game",
+    "get": 57,
+    "give": 109,
+    "mine": 1.5096286365352398,
+    "theirs": 0.022981418115136876,
+    "both": false
+   },
+   {
+    "rival": "Penderentials FC",
+    "get": 384,
+    "give": 572,
+    "mine": 1.3631454183246206,
+    "theirs": -0.04675208339301662,
+    "both": false
+   },
+   {
+    "rival": "Thabz Appeal",
+    "get": 200,
+    "give": 330,
+    "mine": 2.530942849870371,
+    "theirs": -1.3480410087414612,
+    "both": false
+   },
+   {
+    "rival": "Thabz Appeal",
+    "get": 200,
+    "give": 305,
+    "mine": 3.4572748655973555,
+    "theirs": -2.3293241227396493,
+    "both": false
+   },
+   {
+    "rival": "Thabz Appeal",
+    "get": 87,
+    "give": 330,
+    "mine": 2.6586883411335975,
+    "theirs": -2.0566613644422205,
+    "both": false
+   },
+   {
+    "rival": "Thabz Appeal",
+    "get": 13,
+    "give": 268,
+    "mine": 1.8113785340532331,
+    "theirs": -1.2976700653265425,
+    "both": false
+   },
+   {
+    "rival": "Sizobona Phambili FC",
+    "get": 445,
+    "give": 305,
+    "mine": 2.0041716352330923,
+    "theirs": -1.502278602200704,
+    "both": false
+   },
+   {
+    "rival": "Sizobona Phambili FC",
+    "get": 445,
+    "give": 330,
+    "mine": 1.0778396195061077,
+    "theirs": -0.6051186295211437,
+    "both": false
+   },
+   {
+    "rival": "Muggles & Wizards",
+    "get": 367,
+    "give": 544,
+    "mine": 1.6438839546863164,
+    "theirs": -1.6438839546863164,
+    "both": false
+   },
+   {
+    "rival": "Penderentials FC",
+    "get": 356,
+    "give": 388,
+    "mine": 1.2056293286624395,
+    "theirs": -1.2056293286624395,
+    "both": false
+   },
+   {
+    "rival": "Penderentials FC",
+    "get": 124,
+    "give": 69,
+    "mine": 1.0297327212755363,
+    "theirs": -1.0297327212755363,
+    "both": false
+   },
+   {
+    "rival": "Muggles & Wizards",
+    "get": 237,
+    "give": 286,
+    "mine": 1.9653646817029085,
+    "theirs": -1.9653646817030221,
+    "both": false
+   },
+   {
+    "rival": "Unique Stars",
+    "get": 316,
+    "give": 166,
+    "mine": 2.271050380818224,
+    "theirs": -2.2710503808183375,
+    "both": false
+   },
+   {
+    "rival": "Sizobona Phambili FC",
+    "get": 236,
+    "give": 98,
+    "mine": 1.316297910155754,
+    "theirs": -1.4642497153494105,
+    "both": false
+   },
+   {
+    "rival": "Penderentials FC",
+    "get": 397,
+    "give": 544,
+    "mine": 1.9729083200901414,
+    "theirs": -2.1928746444101535,
+    "both": false
+   }
+  ]
+ },
+ "transfers": {
+  "game": "classic",
+  "gw": 6,
+  "horizonEnd": 19,
+  "maxMoves": 4,
+  "moves": [
+   {
+    "out": 423,
+    "inn": 566,
+    "label": "Shaw -> Silva",
+    "gain": 24.467192430424348,
+    "gainNext": 1.1824454145207852,
+    "bankAfter": 0.9
+   },
+   {
+    "out": 397,
+    "inn": 427,
+    "label": "Semenyo -> Mbeumo",
+    "gain": 13.53047683917282,
+    "gainNext": 2.454045744033081,
+    "bankAfter": 1.4
+   },
+   {
+    "out": 175,
+    "inn": 449,
+    "label": "van Ewijk -> Hall",
+    "gain": 12.283197883210846,
+    "gainNext": 2.361615384378304,
+    "bankAfter": 0.1
+   },
+   {
+    "out": 552,
+    "inn": 249,
+    "label": "Brobbey -> Barry",
+    "gain": 3.1640497813004913,
+    "gainNext": 0.34783306872521536,
+    "bankAfter": 0.2
+   }
+  ],
+  "value": 844.5223898463394,
+  "baseValue": 791.0774729122309,
+  "bank": 0.2
+ },
+ "classicSim": {
+  "game": "classic",
+  "gw": 6,
+  "saved": false,
+  "draws": 20000,
+  "seed": 11,
+  "mean": 51.79515,
+  "sd": 13.515712577496666,
+  "p10": 36,
+  "p25": 42,
+  "p50": 50,
+  "p75": 60,
+  "p90": 70,
+  "min": 15,
+  "max": 127
+ },
+ "h2h": {
+  "game": "draft",
+  "gw": 6,
+  "opp": "Isak at this game",
+  "mySaved": false,
+  "theirSaved": false,
+  "draws": 30000,
+  "seed": 5,
+  "win": 0.6094666666666667,
+  "draw": 0.028866666666666665,
+  "lose": 0.3616666666666667,
+  "me": {
+   "mean": 39.877233333333336,
+   "sd": 8.352506311214444,
+   "p10": 29,
+   "p25": 34,
+   "p50": 39,
+   "p75": 45,
+   "p90": 51,
+   "min": 13,
+   "max": 78
+  },
+  "them": {
+   "mean": 36.08626666666667,
+   "sd": 10.331303147661913,
+   "p10": 23,
+   "p25": 29,
+   "p50": 35,
+   "p75": 43,
+   "p90": 50,
+   "min": 8,
+   "max": 92
+  },
+  "n": 30000
+ },
+ "review": {
+  "classic": {
+   "game": "classic",
+   "weeks": 5,
+   "rows": [
+    {
+     "gw": 1,
+     "pts": 58,
+     "avg": 50,
+     "rank": 2201654,
+     "bench": 3,
+     "tx": 0,
+     "hit": 0,
+     "chip": null,
+     "cap": {
+      "n": "Haaland",
+      "pts": 2
+     },
+     "bestCap": {
+      "n": "João Pedro",
+      "pts": 11
+     },
+     "capGap": 9,
+     "xiPts": 56,
+     "bestXiPts": 56,
+     "leftOnBench": 0,
+     "top": [
+      {
+       "n": "João Pedro",
+       "pts": 11
+      },
+      {
+       "n": "Saka",
+       "pts": 9
+      },
+      {
+       "n": "Rogers",
+       "pts": 8
+      }
+     ],
+     "blanks": [
+      "Diop",
+      "Shaw",
+      "Semenyo",
+      "Haaland",
+      "Brobbey"
+     ],
+     "benchBest": [
+      {
+       "n": "Kinsky",
+       "pts": 2
+      },
+      {
+       "n": "van Ewijk",
+       "pts": 1
+      }
+     ]
+    },
+    {
+     "gw": 2,
+     "pts": 70,
+     "avg": 81,
+     "rank": 4886627,
+     "bench": 4,
+     "tx": 0,
+     "hit": 0,
+     "chip": null,
+     "cap": {
+      "n": "João Pedro",
+      "pts": 9
+     },
+     "bestCap": {
+      "n": "Haaland",
+      "pts": 13
+     },
+     "capGap": 4,
+     "xiPts": 61,
+     "bestXiPts": 62,
+     "leftOnBench": 1,
+     "top": [
+      {
+       "n": "Haaland",
+       "pts": 13
+      },
+      {
+       "n": "Saka",
+       "pts": 11
+      },
+      {
+       "n": "João Pedro",
+       "pts": 9
+      }
+     ],
+     "blanks": [
+      "Kinsky",
+      "Konsa",
+      "Shaw",
+      "Brobbey"
+     ],
+     "benchBest": [
+      {
+       "n": "van Ewijk",
+       "pts": 2
+      },
+      {
+       "n": "Diop",
+       "pts": 2
+      }
+     ]
+    },
+    {
+     "gw": 3,
+     "pts": 50,
+     "avg": 51,
+     "rank": 5081590,
+     "bench": 14,
+     "tx": 0,
+     "hit": 0,
+     "chip": null,
+     "cap": {
+      "n": "Haaland",
+      "pts": 9
+     },
+     "bestCap": {
+      "n": "Haaland",
+      "pts": 9
+     },
+     "capGap": 0,
+     "xiPts": 41,
+     "bestXiPts": 48,
+     "leftOnBench": 7,
+     "top": [
+      {
+       "n": "Haaland",
+       "pts": 9
+      },
+      {
+       "n": "Semenyo",
+       "pts": 6
+      },
+      {
+       "n": "Rogers",
+       "pts": 6
+      }
+     ],
+     "blanks": [
+      "Gabriel",
+      "Saka",
+      "Brobbey",
+      "João Pedro"
+     ],
+     "benchBest": [
+      {
+       "n": "Kinsky",
+       "pts": 6
+      },
+      {
+       "n": "Konsa",
+       "pts": 4
+      }
+     ]
+    },
+    {
+     "gw": 4,
+     "pts": 71,
+     "avg": 69,
+     "rank": 4763136,
+     "bench": 14,
+     "tx": 0,
+     "hit": 0,
+     "chip": null,
+     "cap": {
+      "n": "Haaland",
+      "pts": 9
+     },
+     "bestCap": {
+      "n": "João Pedro",
+      "pts": 12
+     },
+     "capGap": 3,
+     "xiPts": 62,
+     "bestXiPts": 68,
+     "leftOnBench": 6,
+     "top": [
+      {
+       "n": "João Pedro",
+       "pts": 12
+      },
+      {
+       "n": "Gabriel",
+       "pts": 9
+      },
+      {
+       "n": "Haaland",
+       "pts": 9
+      }
+     ],
+     "blanks": [
+      "Diop",
+      "van Ewijk",
+      "Brobbey"
+     ],
+     "benchBest": [
+      {
+       "n": "Kinsky",
+       "pts": 7
+      },
+      {
+       "n": "Konsa",
+       "pts": 6
+      }
+     ]
+    },
+    {
+     "gw": 5,
+     "pts": 62,
+     "avg": 48,
+     "rank": 3435040,
+     "bench": 8,
+     "tx": 1,
+     "hit": 0,
+     "chip": null,
+     "cap": {
+      "n": "Haaland",
+      "pts": 6
+     },
+     "bestCap": {
+      "n": "Semenyo",
+      "pts": 17
+     },
+     "capGap": 11,
+     "xiPts": 56,
+     "bestXiPts": 61,
+     "leftOnBench": 5,
+     "top": [
+      {
+       "n": "Semenyo",
+       "pts": 17
+      },
+      {
+       "n": "Brobbey",
+       "pts": 17
+      },
+      {
+       "n": "Haaland",
+       "pts": 6
+      }
+     ],
+     "blanks": [
+      "Kinsky",
+      "Gabriel",
+      "Konsa",
+      "Rogers",
+      "Szoboszlai",
+      "Saka",
+      "Calvert-Lewin"
+     ],
+     "benchBest": [
+      {
+       "n": "Verbruggen",
+       "pts": 6
+      },
+      {
+       "n": "Shaw",
+       "pts": 2
+      }
+     ]
+    }
+   ],
+   "benchScored": 43,
+   "avoidable": 19,
+   "captainGap": 27,
+   "captainBest": 1,
+   "vsAverage": 12,
+   "noTransfers": false,
+   "flags": {
+    "captain": true,
+    "bench": true,
+    "noTransfers": false
+   }
+  },
+  "draft": {
+   "game": "draft",
+   "weeks": 5,
+   "rows": [
+    {
+     "gw": 1,
+     "mine": 32,
+     "opp": 39,
+     "oppName": "Thabz Appeal",
+     "res": "L",
+     "xiPts": 32,
+     "bestXiPts": 35,
+     "leftOnBench": 3,
+     "flip": false,
+     "top": [
+      {
+       "n": "Guéhi",
+       "pts": 10
+      },
+      {
+       "n": "Verbruggen",
+       "pts": 6
+      },
+      {
+       "n": "Donnarumma",
+       "pts": 3
+      }
+     ],
+     "benchBest": [
+      {
+       "n": "Verbruggen",
+       "pts": 6
+      },
+      {
+       "n": "Van Hecke",
+       "pts": 1
+      }
+     ]
+    },
+    {
+     "gw": 2,
+     "mine": 42,
+     "opp": 43,
+     "oppName": "Penderentials FC",
+     "res": "L",
+     "xiPts": 42,
+     "bestXiPts": 42,
+     "leftOnBench": 0,
+     "flip": false,
+     "top": [
+      {
+       "n": "Gibbs-White",
+       "pts": 13
+      },
+      {
+       "n": "Mbeumo",
+       "pts": 11
+      },
+      {
+       "n": "Rice",
+       "pts": 5
+      }
+     ],
+     "benchBest": [
+      {
+       "n": "Donnarumma",
+       "pts": 0
+      },
+      {
+       "n": "Senesi",
+       "pts": 0
+      }
+     ]
+    },
+    {
+     "gw": 3,
+     "mine": 42,
+     "opp": 42,
+     "oppName": "Sizobona Phambili FC",
+     "res": "D",
+     "xiPts": 42,
+     "bestXiPts": 47,
+     "leftOnBench": 5,
+     "flip": true,
+     "top": [
+      {
+       "n": "Guéhi",
+       "pts": 8
+      },
+      {
+       "n": "Van Hecke",
+       "pts": 8
+      },
+      {
+       "n": "Mbeumo",
+       "pts": 8
+      }
+     ],
+     "benchBest": [
+      {
+       "n": "Donnarumma",
+       "pts": 7
+      },
+      {
+       "n": "Hughes",
+       "pts": 1
+      }
+     ]
+    },
+    {
+     "gw": 4,
+     "mine": 47,
+     "opp": 49,
+     "oppName": "Unique Stars",
+     "res": "L",
+     "xiPts": 47,
+     "bestXiPts": 55,
+     "leftOnBench": 8,
+     "flip": true,
+     "top": [
+      {
+       "n": "Bogle",
+       "pts": 15
+      },
+      {
+       "n": "Verbruggen",
+       "pts": 8
+      },
+      {
+       "n": "Igor Jesus",
+       "pts": 7
+      }
+     ],
+     "benchBest": [
+      {
+       "n": "Verbruggen",
+       "pts": 8
+      },
+      {
+       "n": "Egan",
+       "pts": 2
+      }
+     ]
+    },
+    {
+     "gw": 5,
+     "mine": 35,
+     "opp": 18,
+     "oppName": "Saka Potatoes",
+     "res": "W",
+     "xiPts": 35,
+     "bestXiPts": 40,
+     "leftOnBench": 5,
+     "flip": false,
+     "top": [
+      {
+       "n": "Tzolakis",
+       "pts": 6
+      },
+      {
+       "n": "Verbruggen",
+       "pts": 6
+      },
+      {
+       "n": "N.Jackson",
+       "pts": 6
+      }
+     ],
+     "benchBest": [
+      {
+       "n": "Verbruggen",
+       "pts": 6
+      },
+      {
+       "n": "N.Jackson",
+       "pts": 6
+      }
+     ]
+    }
+   ],
+   "perWeek": [
+    {
+     "gw": 1,
+     "benchScored": 7
+    },
+    {
+     "gw": 2,
+     "benchScored": 0
+    },
+    {
+     "gw": 3,
+     "benchScored": 8
+    },
+    {
+     "gw": 4,
+     "benchScored": 11
+    },
+    {
+     "gw": 5,
+     "benchScored": 13
+    }
+   ],
+   "benchScored": 39,
+   "avoidable": 21,
+   "flipped": [
+    3,
+    4
+   ],
+   "wins": 1,
+   "draws": 1,
+   "losses": 3,
+   "flags": {
+    "bench": true,
+    "noWins": false,
+    "flipped": true
+   }
+  }
+ },
+ "draftMoves": {
+  "game": "draft",
+  "gw": 6,
+  "horizonEnd": 20,
+  "top": [
+   {
+    "add": 566,
+    "drop": 116,
+    "how": "waiver",
+    "gain": 28.277647597081796,
+    "gainNext": 0.377905978015562
+   },
+   {
+    "add": 533,
+    "drop": 305,
+    "how": "waiver",
+    "gain": 14.457712323028545,
+    "gainNext": 0.43731123077400014
+   },
+   {
+    "add": 542,
+    "drop": 286,
+    "how": "waiver",
+    "gain": 14.03728132181402,
+    "gainNext": 0.5489861124916757
+   },
+   {
+    "add": 60,
+    "drop": 330,
+    "how": "waiver",
+    "gain": 12.125153912498604,
+    "gainNext": 0.3198891896225078
+   },
+   {
+    "add": 428,
+    "drop": 268,
+    "how": "waiver",
+    "gain": 6.560491777325524,
+    "gainNext": 0.33877908190845574
+   }
+  ],
+  "ahead": [
+   "Sizobona Phambili FC"
+  ],
+  "contested": {
+   "Sizobona Phambili FC": [
+    {
+     "add": 566,
+     "drop": 358,
+     "gain": 22.25270787831755
+    },
+    {
+     "add": 542,
+     "drop": 156,
+     "gain": 11.329439793926667
+    },
+    {
+     "add": 533,
+     "drop": 445,
+     "gain": 11.143567129291796
+    }
+   ]
+  },
+  "backups": [
+   {
+    "add": 60,
+    "drop": 116,
+    "how": "waiver",
+    "gain": 21.04629602690352,
+    "gainNext": -0.04898233100982452
+   },
+   {
+    "add": 428,
+    "drop": 286,
+    "how": "waiver",
+    "gain": 13.185399026611321,
+    "gainNext": 0.9167779144842001
+   },
+   {
+    "add": 93,
+    "drop": 305,
+    "how": "waiver",
+    "gain": 9.94799353350129,
+    "gainNext": 0.2002970174181513
+   },
+   {
+    "add": 332,
+    "drop": 330,
+    "how": "waiver",
+    "gain": 9.160991200140643,
+    "gainNext": 0
+   },
+   {
+    "add": 432,
+    "drop": 268,
+    "how": "waiver",
+    "gain": 6.167979287606499,
+    "gainNext": -0.444752198146503
+   }
+  ]
+ },
+ "changes": [
+  "The engine that turns bookmaker match prices into goals and expected points now runs inside the app beside the original one. Where both answer the same question, the panel shows the answer proven against the reference and keeps the other behind a reveal.",
+  "The Classic plan is solved to the first chip deadline and replayed under the game's own rules, so the free transfers, hits and bank shown for each week come from that replay and never from the solver's own counts. A wildcard or free-hit week keeps the free-transfer count exactly as it was.",
+  "The Draft claims sheet is built from the solved roster in the order the league processes claims, like for like by position, and a flagged player is held back as both first choice and backup until the press conferences clear him.",
+  "The weekly plan block is written from the solved plan by the pipeline rather than typed by hand, and it carries the same content hash as the plan and the data the plan was solved on, so a stale block cannot pass as current.",
+  "The heavy searches (the claims stress test, the Draft trades and moves, the Classic transfer search, the Classic gameweek simulation, the Draft head-to-head and the review) run once when the app is built, so the phone opens without waiting for them.",
+  "Odds and Review are new tabs: Odds for the match prices behind every projection and any price you type in yourself, Review for the transfers made and the bench points that were avoidable, each game on its own.",
+  "Rival managers' personal names are removed at the source; the app keeps team names and entry numbers only."
+ ]
+}
