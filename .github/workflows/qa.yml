@@ -1,5 +1,5 @@
 # Runs the full QA on every push and pull request: Chromium functional suite, PWA offline acceptance,
-# WebKit (Safari engine) acceptance, and a reproducible-build check (dist/ must equal a fresh build of src/).
+# WebKit (Safari engine) acceptance, a 624-render sweep, and a reproducible-build check (dist/ must equal a fresh build of src/).
 name: QA
 on:
   push:
@@ -23,6 +23,8 @@ jobs:
         run: bash qa/run.sh
       - name: WebKit (Safari engine) acceptance
         run: node qa/webkit.js
+      - name: Sweep every view across dates, seeds, modes and routes (390 px)
+        run: node qa/sweep.js qa/ComebackBlueprint.html 390
       - name: dist/ is a faithful build of src/ (never hand-edited)
         run: python3 build.py && git diff --exit-code -- dist/
       - uses: actions/upload-artifact@v4

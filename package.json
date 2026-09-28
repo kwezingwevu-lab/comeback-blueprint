@@ -10,6 +10,7 @@
     "webkit": "npx playwright install webkit",
     "qa:webkit": "node qa/webkit.js",
     "qa:pwa": "node qa/pwa.js",
+    "qa:sweep": "node qa/sweep.js",
     "icons": "node src/pwa/make-icons.js",
     "calendar": "node tools/calendar-refresh.js --geocode",
     "calendar:selftest": "node tools/calendar-refresh.js --selftest"
