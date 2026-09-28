@@ -54,6 +54,9 @@ for(const mode of ['tab','standalone']){const c2=await b.createBrowserContext();
   if(mode==='tab')T('pwa: iPhone Safari tab shows the install advice (7-day clean-up, separate storage)',r.inst&&!r.rest&&/browser tab/.test(r.t),JSON.stringify(r));
   else T('pwa: iOS standalone (reported as display-mode: fullscreen) is detected and an empty install offers Restore',r.sa&&r.rest&&!r.inst&&/Home Screen app/.test(r.t),JSON.stringify(r));
   await c2.close();}
+// service worker: the redirect stub must never replace the cached app; the page must revalidate past the HTTP cache
+{const r=await p.evaluate(async()=>{const k=(await caches.keys()).find(x=>x.startsWith('cb-app-'));const c=await caches.open(k);const size=async()=>{const m=await c.match('./ComebackBlueprint.html');return m?(await m.text()).length:0;};const before=await size();await fetch('index.html');await new Promise(r=>setTimeout(r,500));const after=await size();return {before,after};});
+ T('pwa: fetching index.html does not overwrite the cached app (no cache poisoning)',r.before>100000&&r.after===r.before,JSON.stringify(r));}
 T('pwa: no page errors',errs.length===0,errs.join('|').slice(0,300));
 await b.close();srv.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'PWA ALL PASS');console.log('PWA RESULT:',pass+'/'+R.length);process.exit(pass===R.length?0:1);

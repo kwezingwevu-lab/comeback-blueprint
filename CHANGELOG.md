@@ -1,5 +1,16 @@
 # CHANGELOG.md — what has shipped (newest first)
 
+## 2026-09-28 (week 3) — review fixes, batch 1: storage, restore, service worker
+From a 102-agent review of the whole app (39 findings confirmed by adversarial skeptics), the storage layer first:
+- Vault and account mirror can no longer overwrite your data before a restore: nothing is written to either until their boot read has finished, and a failed cloud read on an empty copy retries (2, 6, 15 s) and writes nothing.
+- `#import=` links wait for that boot, so an import cannot land before the restore that should come first.
+- A restore is now the newest state (`cb2_ts` bumped): an older cloud copy no longer wins after the reload. This was the real cause of the intermittent legacy-restore failure in the harness.
+- Restore validates the file's shape first, asks before replacing, keeps a safety copy (`cb2_prerestore`) and writes only backup keys. `cb2_voice` and `cb2_blmode` are now in backups.
+- Stored data is sanitised on load (non-object rows, non-string dates, bad `entries`), so one corrupt record cannot blank a screen.
+- A full or blocked device store says so ("Tap Backup now") and the data still goes into the backup.
+- Service worker: install and page fetches bypass the HTTP cache; only the app file is cached under the app key (the `index.html` redirect stub can no longer replace the cached app).
+- Gates: Chromium 311/311 · PWA 17/17 · WebKit 29/29 · calendar helper 8/8.
+
 ## 2026-09-28 (week 3)
 - Independent accessibility audit with axe-core (WCAG 2.0/2.1 A and AA plus best practice) over all eight screens, the header and the nav: two moderate "heading-order" findings (Home and Lift), fixed by setting heading levels from the screen they sit on; axe now reports zero violations. New regression check that no screen skips a heading level.
 - Screenshot audit (105 screens, real fonts, seeded data): zero page errors, no leaked placeholders.

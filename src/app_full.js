@@ -5,14 +5,20 @@ window.onerror=function(msg,src,line,col,err){try{var d=document.createElement("
 const RACE_ISO="2026-09-24";const START_ISO="2026-09-12";const MILESTONE_ISO="2027-03-06";const MILESTONE_WK=Math.floor(dayDiff(START_ISO,MILESTONE_ISO)/7)+1;const PLAN_WEEKS=9;const ROADMAP_WEEKS=104;
 let STORAGE_OK=true;try{const k="__cb2";localStorage.setItem(k,"1");localStorage.removeItem(k);}catch(e){STORAGE_OK=false;}
 const mem={};
-function load(k,d){try{if(!STORAGE_OK)return k in mem?mem[k]:d;const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
-function persist(k,v){try{if(!STORAGE_OK){mem[k]=v;return;}localStorage.setItem(k,JSON.stringify(v));}catch(e){mem[k]=v;}}
+var _saveFailAt=0;
+/* mem[k] holds a value whose localStorage write failed (quota); it must win over the stale stored copy so backups, the vault and reloads see what the user just logged */
+function load(k,d){try{if(k in mem)return mem[k];if(!STORAGE_OK)return d;const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+function persist(k,v){try{if(!STORAGE_OK){mem[k]=v;return;}localStorage.setItem(k,JSON.stringify(v));delete mem[k];}catch(e){mem[k]=v;const t=Date.now();if(t-_saveFailAt>60000&&typeof toast==="function"){_saveFailAt=t;try{toast("This device would not save that (storage is full or blocked). Tap Backup now so nothing is lost.");}catch(_){}}}}
 const DB={
   profile:load("cb2_profile",{weight:88,height:177,age:38,bf:18,goal:102.3,goalBf:24,act:1.55,goal10k:"55:00",phase:"hyper"}),
   sessions:load("cb2_sessions",[]),runs:load("cb2_runs",[]),weight:load("cb2_weight",[]),measure:load("cb2_measure",[]),lifts:load("cb2_lifts",[]),
   save(){persist("cb2_profile",this.profile);persist("cb2_sessions",this.sessions);persist("cb2_runs",this.runs);persist("cb2_weight",this.weight);persist("cb2_measure",this.measure);persist("cb2_lifts",this.lifts);persist("cb2_sleep",this.sleep||[]);persist("cb2_rhr",this.rhr||[]);persist("cb2_steps",this.steps||[]);persist("cb2_dexa",this.dexa||[]);persist("cb2_ts",Date.now());cloudQueue();}
 };
 DB.sleep=load("cb2_sleep",[]);DB.rhr=load("cb2_rhr",[]);DB.steps=load("cb2_steps",[]);DB.dexa=load("cb2_dexa",[]);
+/* whatever storage or a restore hands us, every collection is a list of objects with string dates before any renderer sees it */
+function cleanRows(a,k){return Array.isArray(a)?a.filter(x=>x&&typeof x==="object"&&!Array.isArray(x)&&(!k||typeof x[k]==="string")):[];}
+function sanitizeDB(){DB.sessions=cleanRows(DB.sessions,"dateISO").map(x=>{if(!x.entries||typeof x.entries!=="object"||Array.isArray(x.entries))x.entries={};Object.keys(x.entries).forEach(k=>{if(!Array.isArray(x.entries[k]))x.entries[k]=[];});return x;});["runs","weight","measure","sleep","rhr","steps","dexa"].forEach(k=>{DB[k]=cleanRows(DB[k],"date");});DB.lifts=cleanRows(DB.lifts);if(!DB.profile||typeof DB.profile!=="object"||Array.isArray(DB.profile))DB.profile={weight:88,height:177,age:38,bf:18,goal:102.3,goalBf:24,act:1.55,goal10k:"55:00",phase:"hyper"};}
+sanitizeDB();
 if(!load("cb2_pure",false)){DB.profile.phase="hyper";DB.save();persist("cb2_pure",true);}
 function isoLocal(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function todayISO(){return isoLocal(new Date());}
@@ -553,27 +559,33 @@ function renderRest(){const lab=document.getElementById("restTime");if(lab)lab.t
 function startRest(sec){const bar=document.getElementById("restTimer");if(!bar)return;_restEnd=nowMs()+sec*1000;_restLeft=sec;bar.classList.add("show");renderRest();clearInterval(_restInt);_restInt=setInterval(restTick,250);}
 function wireRest(){if(_restWired)return;_restWired=true;const end=document.getElementById("restEnd"),plus=document.getElementById("restPlus");if(end)end.addEventListener("click",()=>{clearInterval(_restInt);_restInt=null;_restLeft=0;document.getElementById("restTimer").classList.remove("show");});if(plus)plus.addEventListener("click",()=>{if(_restInt){_restEnd+=15000;restTick();}else startRest(15);});}
 /* ===== HOME ===== */
-function backupJSON(){const keys=["cb2_profile","cb2_sessions","cb2_runs","cb2_weight","cb2_measure","cb2_lifts","cb2_bulk","cb2_ceilbf","cb2_pure","cb2_ts","cb2_march","cb2_focuslb","cb2_radius","cb2_sleep","cb2_rhr","cb2_steps","cb2_dexa","cb2_fuelq","cb2_loc","cb2_incr","cb2_awake","cb2_beep","cb2_curex","cb2_lastbackup"];const o={};keys.forEach(k=>{const v=load(k,null);if(v!=null)o[k]=v;});return JSON.stringify(o);}
+const BACKUP_KEYS=["cb2_profile","cb2_sessions","cb2_runs","cb2_weight","cb2_measure","cb2_lifts","cb2_bulk","cb2_ceilbf","cb2_pure","cb2_ts","cb2_march","cb2_focuslb","cb2_radius","cb2_sleep","cb2_rhr","cb2_steps","cb2_dexa","cb2_fuelq","cb2_loc","cb2_incr","cb2_awake","cb2_beep","cb2_curex","cb2_lastbackup","cb2_voice","cb2_blmode"];
+function backupJSON(){const keys=BACKUP_KEYS;const o={};keys.forEach(k=>{const v=load(k,null);if(v!=null)o[k]=v;});return JSON.stringify(o);}
 function showDataBox(val,forRestore){const box=document.getElementById("dataBox"),ta=document.getElementById("dataTa"),ap=document.getElementById("dataApply");box.style.display="block";ta.value=val||"";ta.placeholder=forRestore?"Paste your backup here, then tap Apply":"";ap.style.display=forRestore?"block":"none";ta.focus();if(!forRestore)ta.select();}
 function doBackup(){persist("cb2_lastbackup",Date.now());const j=backupJSON();if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(j).then(()=>toast("Backup copied \u2014 paste into Notes, and into any new version via Restore",true)).catch(()=>showDataBox(j,false));}else showDataBox(j,false);}
 function doRestore(){showDataBox("",true);}
-function applyRestoreText(txt){try{const o=JSON.parse(txt);let n=0;Object.keys(o).forEach(k=>{if(o[k]!=null){persist(k,o[k]);n++;}});if(!n)throw 0;toast("Restored — reloading…",true);setTimeout(()=>location.reload(),600);}catch(e){toast("That doesn’t look like a valid backup");}}
-function applyRestore(){applyRestoreText(document.getElementById("dataTa").value);}
+/* a restore is checked before anything is written: only known keys, lists must be lists, and the current data is kept under cb2_prerestore */
+var RESTORE_LISTS=["cb2_sessions","cb2_runs","cb2_weight","cb2_measure","cb2_lifts","cb2_sleep","cb2_rhr","cb2_steps","cb2_dexa"];
+function restoreProblem(o){if(!o||typeof o!=="object"||Array.isArray(o))return "it is not a backup object";let n=0;for(const k of BACKUP_KEYS){if(o[k]==null)continue;n++;if(RESTORE_LISTS.includes(k)&&!Array.isArray(o[k]))return k.slice(4)+" should be a list";if(k==="cb2_profile"&&(typeof o[k]!=="object"||Array.isArray(o[k])))return "the profile should be an object";}return n?null:"it holds no Comeback Blueprint data";}
+function applyRestoreText(txt){try{const o=JSON.parse(txt),bad=restoreProblem(o);if(bad){toast("That file can’t be restored: "+bad+". Nothing was changed.");return;}try{persist("cb2_prerestore",backupJSON());}catch(e){}let n=0;BACKUP_KEYS.forEach(k=>{if(o[k]!=null){persist(k,o[k]);n++;}});persist("cb2_ts",Date.now()); /* the restore is the newest state: a cloud copy saved a moment ago must not win the timestamp comparison after the reload */ toast("Restored — reloading…",true);setTimeout(()=>location.reload(),600);}catch(e){toast("That doesn’t look like a valid backup");}}
+function applyRestore(){if(!confirm("Restore this backup? It replaces what it contains on this device (a safety copy of what is here now is kept)."))return;applyRestoreText(document.getElementById("dataTa").value);}
 async function shareBackup(){const j=backupJSON();const name="ComebackBlueprint-backup-"+todayISO()+".json";try{const f=new File([j],name,{type:"application/json"});if(navigator.canShare&&navigator.canShare({files:[f]})&&navigator.share){await navigator.share({files:[f],title:"Comeback Blueprint backup"});persist("cb2_lastbackup",Date.now());toast("Shared \u2014 pick iCloud Drive or Google Drive to make it permanent",true);renderHome();return;}}catch(e){if(e&&e.name==="AbortError")return;}downloadBackup();}
 function downloadBackup(){persist("cb2_lastbackup",Date.now());const j=backupJSON();const blob=new Blob([j],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="comeback-backup-"+todayISO()+".json";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},400);toast("Backup file downloaded — keep it in Files or Drive",true);}
-function restoreFromFile(inp){const f=inp.files&&inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>applyRestoreText(String(r.result));r.readAsText(f);}
+function restoreFromFile(inp){const f=inp.files&&inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{if(!confirm("Restore this backup? It replaces what it contains on this device (a safety copy of what is here now is kept)."))return;applyRestoreText(String(r.result));};r.readAsText(f);}
 function cloudOK(){try{return !!(window.storage&&window.storage.get&&window.storage.set);}catch(e){return false;}}
 var _ct=null;
-var _cloudLastAck=0,_cloudReady=false;
+var _cloudLastAck=0,_cloudReady=false,_cloudTrying=false,_idbReady=false,_bootDone=false,_afterBoot=[];
+function afterBoot(f){if(_bootDone)f();else _afterBoot.push(f);}
 function cloudPayload(){return JSON.stringify({ts:Date.now(),data:JSON.parse(backupJSON())});}
 function cloudSaveNow(){if(!cloudOK()||!_cloudReady)return;clearTimeout(_ct);try{window.storage.set("cb2_all",cloudPayload()).then(()=>{_cloudLastAck=Date.now();const el=document.getElementById("cloudAck");if(el)el.textContent="Saved "+new Date(_cloudLastAck).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+" \u2713";}).catch(()=>{});}catch(e){}}
 function idbOpen(){return new Promise((res,rej)=>{try{const q=indexedDB.open("cb2",1);q.onupgradeneeded=()=>{q.result.createObjectStore("kv");};q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);}catch(e){rej(e);}});}
-function idbSave(){try{idbOpen().then(db=>{const tx=db.transaction("kv","readwrite");tx.objectStore("kv").put(cloudPayload(),"cb2_all");}).catch(()=>{});}catch(e){}}
+function idbSave(){if(!_idbReady)return;try{idbOpen().then(db=>{const tx=db.transaction("kv","readwrite");tx.objectStore("kv").put(cloudPayload(),"cb2_all");}).catch(()=>{});}catch(e){}}
 function idbLoad(){return idbOpen().then(db=>new Promise(res=>{const q=db.transaction("kv","readonly").objectStore("kv").get("cb2_all");q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null);})).catch(()=>null);}
-async function idbBoot(){try{const empty=DB.sessions.length===0&&DB.weight.length===0&&DB.measure.length===0;if(!empty)return;const raw=await idbLoad();if(!raw)return;const o=JSON.parse(raw);const data=o.data||o;if(!hasLogsIn(data))return;let n=0;Object.keys(data).forEach(k=>{if(data[k]!=null){persist(k,data[k]);n++;}});if(n){reloadDB();rerenderAll();toast("Restored from the device vault \u2713",true);}}catch(e){}}
-function cloudQueue(){idbSave();if(!cloudOK()||!_cloudReady)return;clearTimeout(_ct);_ct=setTimeout(cloudSaveNow,250);}
-async function cloudBoot(){if(!cloudOK())return;
-  let cloud=null;try{const res=await window.storage.get("cb2_all");if(res&&res.value)cloud=JSON.parse(res.value);}catch(e){}
+async function idbBoot(){try{await idbBoot0();}finally{_idbReady=true;idbSave();}}
+async function idbBoot0(){try{const empty=DB.sessions.length===0&&DB.weight.length===0&&DB.measure.length===0;if(!empty)return;const raw=await idbLoad();if(!raw)return;const o=JSON.parse(raw);const data=o.data||o;if(!hasLogsIn(data))return;let n=0;Object.keys(data).forEach(k=>{if(data[k]!=null){persist(k,data[k]);n++;}});if(n){reloadDB();rerenderAll();toast("Restored from the device vault \u2713",true);}}catch(e){}}
+function cloudQueue(){idbSave();if(!cloudOK())return;if(!_cloudReady){if(_bootDone&&!_cloudTrying){_cloudTrying=true;cloudBoot(3).finally(()=>{_cloudTrying=false;});}return;}clearTimeout(_ct);_ct=setTimeout(cloudSaveNow,250);}
+async function cloudBoot(tries){if(!cloudOK())return;tries=tries||0;
+  let cloud=null,readOK=true;try{const res=await window.storage.get("cb2_all");if(res&&res.value)cloud=JSON.parse(res.value);}catch(e){readOK=false;}
   let cts=0,cdata=null;
   if(cloud){if(cloud.data){cts=cloud.ts||0;cdata=cloud.data;}else{cdata=cloud;cts=0;}}
   const lts=load("cb2_ts",0);
@@ -582,8 +594,10 @@ async function cloudBoot(){if(!cloudOK())return;
     let n=0;Object.keys(cdata).forEach(k=>{if(cdata[k]!=null){persist(k,cdata[k]);n++;}});
     if(n){reloadDB();rerenderAll();toast("Cloud data loaded \u2713",true);}
   }
+  /* a failed read is not "nothing there": with an empty copy, retry and stay read-only rather than replace the cloud blob with nothing */
+  if(!readOK&&empty){if(tries<3)setTimeout(()=>cloudBoot(tries+1),[2000,6000,15000][tries]);return;}
   _cloudReady=true;cloudSaveNow();}
-function reloadDB(){DB.profile=load("cb2_profile",DB.profile);DB.sessions=load("cb2_sessions",[]);DB.runs=load("cb2_runs",[]);DB.weight=load("cb2_weight",[]);DB.measure=load("cb2_measure",[]);DB.lifts=load("cb2_lifts",[]);DB.sleep=load("cb2_sleep",[]);DB.rhr=load("cb2_rhr",[]);DB.steps=load("cb2_steps",[]);DB.dexa=load("cb2_dexa",[]);ceilBf=load("cb2_ceilbf",18);LOC=load("cb2_loc","gym");bulkMode=load("cb2_bulk",bulkMode);marchKey=load("cb2_march",marchKey);focusLB=load("cb2_focuslb",focusLB);radiusKm=load("cb2_radius",radiusKm);fuelQ=load("cb2_fuelq",fuelQ);INCR=Object.assign({bar:2.5,db:2,mach:2.5},load("cb2_incr",{}));_leanCache=null;if(!Array.isArray(DB.lifts))DB.lifts=[];}
+function reloadDB(){DB.profile=load("cb2_profile",DB.profile);DB.sessions=load("cb2_sessions",[]);DB.runs=load("cb2_runs",[]);DB.weight=load("cb2_weight",[]);DB.measure=load("cb2_measure",[]);DB.lifts=load("cb2_lifts",[]);DB.sleep=load("cb2_sleep",[]);DB.rhr=load("cb2_rhr",[]);DB.steps=load("cb2_steps",[]);DB.dexa=load("cb2_dexa",[]);ceilBf=load("cb2_ceilbf",18);LOC=load("cb2_loc","gym");bulkMode=load("cb2_bulk",bulkMode);marchKey=load("cb2_march",marchKey);focusLB=load("cb2_focuslb",focusLB);radiusKm=load("cb2_radius",radiusKm);fuelQ=load("cb2_fuelq",fuelQ);INCR=Object.assign({bar:2.5,db:2,mach:2.5},load("cb2_incr",{}));_leanCache=null;sanitizeDB();}
 function rerenderAll(){try{const act=[...document.querySelectorAll('[id^="view-"]')].find(el=>el.offsetParent!==null);renderHome();updateHeader();if(act&&act.id!=="view-home")switchView(act.id.replace("view-",""));}catch(e){}}
 function dataCardHTML(){setTimeout(()=>safeStep("phoneCaps",phoneCapsRender),0);const empty=DB.sessions.length===0&&DB.runs.length===0&&DB.weight.length===0;
   return `<div class="card" style="border-color:rgba(255,197,61,.3)"><div class="card-t" style="color:var(--gold)"><span class="ic">${ICON.check}</span>Your Data \u2014 Keep It Safe</div>
@@ -2024,9 +2038,9 @@ const VIEW_ALIAS={home:"home",today:"home",lift:"lift",train:"lift",events:"run"
 function clearHash(){try{history.replaceState(null,"",location.pathname+location.search);}catch(e){try{location.hash="";}catch(_){}}}
 function routeFromHash(){let h=location.hash||"";if(h.length<2)return;h=h.slice(1);
   if(/^import=/i.test(h)){let txt="";try{txt=decodeURIComponent(h.slice(7));}catch(e){txt=h.slice(7);}txt=txt.replace(/\|/g,"\n");
-    const r=importHealthText(txt);clearHash();
+    afterBoot(()=>{const r=importHealthText(txt);clearHash();
     if(r.n){toast("Imported "+r.n+" reading"+(r.n===1?"":"s")+" from your Shortcut ("+Object.entries(r.kinds).map(([k,v])=>v+" "+k).join(", ")+") ✓",true);renderHome();updateHeader();}
-    else toast("That import link had nothing I could read — format: 2026-09-26,weight,88.4");return;}
+    else toast("That import link had nothing I could read — format: 2026-09-26,weight,88.4");});return;}
   let key="";try{key=decodeURIComponent(h).toLowerCase();}catch(e){key=h.toLowerCase();}
   const v=VIEW_ALIAS[key];if(v&&typeof switchView==="function")switchView(v);}
 window.addEventListener("hashchange",()=>safeStep("routeFromHash",routeFromHash));
@@ -2260,5 +2274,5 @@ try{new MutationObserver(a11ySoon).observe(document.body,{childList:true,subtree
 /* ===== INIT ===== */
 function safeStep(n,f){try{f();}catch(e){try{window.onerror(n+": "+(e&&e.message||e),"",0,0,e);}catch(_){}}}
 document.addEventListener("visibilitychange",function(){if(document.visibilityState==="hidden")cloudSaveNow();});window.addEventListener("pagehide",function(){cloudSaveNow();});
-safeStep("wireRest",wireRest);safeStep("renderHome",renderHome);safeStep("updateHeader",updateHeader);safeStep("pwaInit",pwaInit);safeStep("routeFromHash",routeFromHash);setTimeout(function(){safeStep("idbBoot",idbBoot);safeStep("cloudBoot",cloudBoot);},600);try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}document.addEventListener("click",e=>{const r=e.target.closest("#radiusSeg button");if(r&&+r.dataset.r!==radiusKm){radiusKm=+r.dataset.r;persist("cb2_radius",radiusKm);switchView("run");}});document.addEventListener("click",e=>{const f=e.target.closest("#focusSeg button");if(f){const v=f.dataset.fx==="on";if(v!==focusLB){focusLB=v;persist("cb2_focuslb",focusLB);switchView("lift");}}});document.addEventListener("click",e=>{const m=e.target.closest("#marchSeg button");if(m&&m.dataset.mk!==marchKey){marchKey=m.dataset.mk;persist("cb2_march",marchKey);renderHome();updateHeader();toast("March route: "+marchTarget().label,true);}});document.addEventListener("click",e=>{const q=e.target.closest("#fuelQSeg button");if(q&&q.dataset.q!==fuelQ){fuelQ=q.dataset.q;persist("cb2_fuelq",fuelQ);switchView("fuel");}});document.addEventListener("click",e=>{const b=e.target.closest("#locSeg button");if(b&&b.dataset.loc!==LOC){LOC=b.dataset.loc;persist("cb2_loc",LOC);switchView("lift");}});
+safeStep("wireRest",wireRest);safeStep("renderHome",renderHome);safeStep("updateHeader",updateHeader);safeStep("pwaInit",pwaInit);safeStep("routeFromHash",routeFromHash);setTimeout(async function(){try{await idbBoot();}catch(e){}try{await cloudBoot();}catch(e){}_bootDone=true;_afterBoot.splice(0).forEach(f=>{try{f();}catch(e){}});},600);try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}document.addEventListener("click",e=>{const r=e.target.closest("#radiusSeg button");if(r&&+r.dataset.r!==radiusKm){radiusKm=+r.dataset.r;persist("cb2_radius",radiusKm);switchView("run");}});document.addEventListener("click",e=>{const f=e.target.closest("#focusSeg button");if(f){const v=f.dataset.fx==="on";if(v!==focusLB){focusLB=v;persist("cb2_focuslb",focusLB);switchView("lift");}}});document.addEventListener("click",e=>{const m=e.target.closest("#marchSeg button");if(m&&m.dataset.mk!==marchKey){marchKey=m.dataset.mk;persist("cb2_march",marchKey);renderHome();updateHeader();toast("March route: "+marchTarget().label,true);}});document.addEventListener("click",e=>{const q=e.target.closest("#fuelQSeg button");if(q&&q.dataset.q!==fuelQ){fuelQ=q.dataset.q;persist("cb2_fuelq",fuelQ);switchView("fuel");}});document.addEventListener("click",e=>{const b=e.target.closest("#locSeg button");if(b&&b.dataset.loc!==LOC){LOC=b.dataset.loc;persist("cb2_loc",LOC);switchView("lift");}});
 

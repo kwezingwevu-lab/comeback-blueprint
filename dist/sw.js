@@ -2,10 +2,10 @@
    Strategy: the app page is network-first (so a new build arrives the moment you are online) with an
    offline fallback to the last cached copy; icons/manifest are cache-first; Google Fonts are
    stale-while-revalidate. Your logs never pass through here — they live in localStorage/IndexedDB. */
-const VERSION="210e8348d58c";
+const VERSION="0707a1a3da45";
 const CACHE="cb-app-"+VERSION, FONTS="cb-fonts-v1";
 const CORE=["./ComebackBlueprint.html","./manifest.webmanifest","./icons/icon-180.png","./icons/icon-192.png","./icons/icon-512.png","./icons/icon-maskable-512.png"];
-self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()));});
+self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE.map(u=>new Request(u,{cache:"reload"})))).then(()=>self.skipWaiting()));});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith("cb-app-")&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 self.addEventListener("message",e=>{if(e.data==="version"&&e.source)e.source.postMessage({type:"sw-version",version:VERSION});});
 function timeout(ms,p){return new Promise((res,rej)=>{const t=setTimeout(()=>rej(new Error("timeout")),ms);p.then(v=>{clearTimeout(t);res(v);},er=>{clearTimeout(t);rej(er);});});}
@@ -15,7 +15,8 @@ self.addEventListener("fetch",e=>{
   if(url.origin===location.origin){
     const isPage=req.mode==="navigate"||url.pathname.endsWith(".html")||url.pathname.endsWith("/");
     if(isPage){
-      e.respondWith(timeout(4000,fetch(req)).then(r=>{if(r&&r.ok){const cp=r.clone();caches.open(CACHE).then(c=>c.put("./ComebackBlueprint.html",cp));}return r;})
+      const isApp=url.pathname.endsWith("/ComebackBlueprint.html");
+      e.respondWith(timeout(4000,fetch(req.url,{cache:"no-cache",credentials:"same-origin"})).then(r=>{if(r&&r.ok&&isApp){const cp=r.clone();caches.open(CACHE).then(c=>c.put("./ComebackBlueprint.html",cp));}return r;})
         .catch(()=>caches.match("./ComebackBlueprint.html",{ignoreSearch:true}).then(r=>r||caches.match(req,{ignoreSearch:true}))));
       return;
     }

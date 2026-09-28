@@ -6,7 +6,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const OFFLINE=async p=>{await p.setRequestInterception(true);p.on('request',r=>{const u=r.url();if(u.startsWith('file:')||u.startsWith('data:'))r.continue();else r.respond({status:200,contentType:'text/css',body:''});});};
 // The user lives in Johannesburg (UTC+2): run every page in that timezone so date bugs that hide in UTC show up here.
 async function page(b,iso,extra){const p=await b.newPage();await p.emulateTimezone('Africa/Johannesburg');await OFFLINE(p);p.__errs=[];p.on('pageerror',e=>p.__errs.push(e.message));p.on('console',m=>{if(m.type()==='error')p.__errs.push(m.text());});
-  await p.evaluateOnNewDocument(MOCK,iso);await p.evaluateOnNewDocument(STORAGE);if(extra)await p.evaluateOnNewDocument(extra);
+  await p.evaluateOnNewDocument(()=>{if(window.name==='__pg')return;window.name='__pg';try{indexedDB.deleteDatabase('cb2');}catch(e){}});await p.evaluateOnNewDocument(MOCK,iso);await p.evaluateOnNewDocument(STORAGE);if(extra)await p.evaluateOnNewDocument(extra);
   await p.goto('file://'+path.resolve('ComebackBlueprint.html'),{waitUntil:'networkidle0'});await p.setViewport({width:390,height:844,deviceScaleFactor:1});await wait(900);return p;}
 (async()=>{const b=await puppeteer.launch({headless:'new',args:['--no-sandbox','--disable-setuid-sandbox','--enable-unsafe-swiftshader','--use-angle=swiftshader']});
 // ===== A. Boot + all views (Fri 11 Sep) =====
@@ -183,7 +183,7 @@ const d5=await tt('2027-01-05');T('time: Jan = Posterior specialization block',/
  T('Q: no errors',q.__errs.length===0,q.__errs.join('|'));await q.close();}
 
 // ===== R. Tape body-fat estimator =====
-{const q=await page(b,'2026-09-12',()=>{localStorage.clear();localStorage.setItem('cb2_pure',JSON.stringify(true));});
+{const q=await page(b,'2026-09-12',()=>{localStorage.clear();localStorage.setItem('cb2_pure',JSON.stringify(true));localStorage.setItem('cb2_weight',JSON.stringify([{date:'2026-09-12',v:88.4}]));});
  await q.evaluate(()=>switchView('numbers'));await wait(300);
  T('bf: hint shown when no neck logged',await q.evaluate(()=>document.body.innerText.includes('Body fat is still a typed number')));
  await q.evaluate(()=>switchView('track'));await wait(300);
@@ -386,7 +386,8 @@ for(const [iso,title,brief] of [['2026-11-12','Pull B — Strength','Today: Pull
  T('dexa: Use writes the % to the engine and the scan anchors lean mass',+dx.bf===19.5&&dx.src==='DEXA',JSON.stringify(dx));
  await p.evaluate(()=>document.getElementById('exportBtn').click());await wait(400);T('backup: Track "Download full backup" is the complete format and resets the age indicator',await p.evaluate(()=>!!localStorage.getItem('cb2_lastbackup')&&JSON.parse(backupJSON()).cb2_dexa.length===1));
  const tmp=path.join(require('os').tmpdir(),'cb-legacy-'+process.pid+'.json');fs.writeFileSync(tmp,JSON.stringify({app:'ComebackBlueprint',version:2,profile:{weight:90,height:177,age:38,bf:18,goal:102.3,goalBf:24,act:1.55},sessions:[SS('2026-09-20','pushA',{pa1:sets(3,8,60)})],weight:[{date:'2026-09-20',v:90}],measure:[],lifts:[]}));
- const fi=await p.$('#importFile');await fi.uploadFile(tmp);
+ for(let k=0;k<4&&!p.__dialogs.some(m=>/Restore this backup/.test(m));k++){const fi=await p.$('#importFile');if(fi)await fi.uploadFile(tmp);await wait(1500);} // a re-render can detach the input mid-upload: re-grab it and retry until the confirmation appears
+ 
  // waitForNavigation can be satisfied by the export download above, so poll for the restored state across the reload,
  // then re-read after the vault (600 ms) and cloud boots to prove nothing old is written back
  const rd=()=>p.evaluate(()=>({s:DB.sessions.length,w:DB.weight.map(x=>x.v).join()})).catch(()=>null);let lr=null;const until=Date.now()+15000;
@@ -576,5 +577,32 @@ for(const [iso,title,brief] of [['2026-11-12','Pull B — Strength','Today: Pull
  for(const v of ['home','lift','run','roadmap','fuel','numbers','track','guide']){await p.evaluate(n=>switchView(n),v);await wait(500);
   const r=await p.evaluate(v=>{const el=document.getElementById('view-'+v),hs=[...el.querySelectorAll('h1,h2,h3,h4,h5,h6,[role=heading]')].filter(h=>h.offsetParent!==null);let prev=(el.querySelector('h2')?2:1),skips=[];hs.forEach(h=>{const l=h.getAttribute('aria-level')?+h.getAttribute('aria-level'):+h.tagName[1];if(l>prev+1)skips.push(l+' after '+prev+': '+h.textContent.trim().slice(0,30));prev=l;});return skips;},v);r.forEach(x=>bad.push(v+' '+x));}
  T('headings: no level is skipped on any of the eight screens',bad.length===0,bad.join(' | '));T('AZ: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+// --- BA. storage safety from the 28 Sep review (vault, cloud, import order, restore shape, full quota)
+{const p=await pg(b,'2026-10-16');await p.click('.tab[data-view="track"]');await wait(300);
+ await p.evaluate(()=>{document.getElementById('wVal').value='88.6';document.getElementById('wAdd').click();});await wait(1500);
+ await p.evaluate(()=>{localStorage.clear();});const nav=p.waitForNavigation({waitUntil:'load',timeout:20000});await p.reload();await nav;await wait(2600);
+ T('vault: an empty copy restores from the device vault (it is no longer overwritten with nothing at boot)',await p.evaluate(()=>DB.weight.length===1&&+DB.weight[0].v===88.6),await p.evaluate(()=>JSON.stringify(DB.weight)));
+ await p.evaluate(()=>{localStorage.clear();});await p.goto('about:blank');await p.goto('file://'+path.resolve('ComebackBlueprint.html')+'#import='+encodeURIComponent('2026-10-15,weight,90.1'),{waitUntil:'load'});await wait(2600);
+ const im=await p.evaluate(()=>({w:DB.weight.map(x=>+x.v).sort(),h:location.hash}));
+ T('a Shortcut import link waits for the vault: history restored first, then the reading added',im.w.join()==='88.6,90.1'&&!/import/.test(im.h),JSON.stringify(im));
+ T('BA-1: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+{const p=await pg(b,'2026-10-16');await p.evaluateOnNewDocument(()=>{window.__sets=0;window.storage={async get(){throw new Error('network')},async set(){window.__sets++;return {};}};});
+ const nav=p.waitForNavigation({waitUntil:'load',timeout:20000});await p.reload();await nav;await wait(3400);
+ T('cloud: a failed read on an empty copy never writes an empty snapshot over the account mirror',await p.evaluate(()=>window.__sets===0),await p.evaluate(()=>String(window.__sets)));await done(p);}
+{const p=await pg(b,'2026-10-16',{cb2_sessions:[{id:'a',dateISO:'2026-10-10',day:'legsA',loc:'gym',entries:{ga1:[{r:'8',w:'80'}]}},null,{id:'b',dateISO:5,entries:'x'},{id:'c',dateISO:'2026-10-11',day:'legsA',entries:{ga1:'oops'}}],cb2_weight:[null,{date:'2026-10-10',v:88},'x'],cb2_measure:[{date:null}]});
+ const r=await p.evaluate(()=>({home:document.getElementById('view-home').innerHTML.length,n:[DB.sessions.length,DB.weight.length,DB.measure.length]}));
+ T('hostile stored data is cleaned on load: Home renders and only well-formed rows remain',r.home>800&&r.n.join()==='2,1,0',JSON.stringify(r));
+ const rs=await p.evaluate(()=>{const before=localStorage.getItem('cb2_weight');applyRestoreText('{"cb2_weight":"oops"}');const a=document.getElementById('toast').innerText;applyRestoreText('[1,2,3]');const c=document.getElementById('toast').innerText;return {same:localStorage.getItem('cb2_weight')===before,a,c,stray:localStorage.getItem('0')};});
+ T('restore refuses a wrong-shaped file, says why, and changes nothing',rs.same&&/can’t be restored/.test(rs.a)&&/can’t be restored/.test(rs.c)&&rs.stray===null,JSON.stringify(rs));
+ T('BA-2: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+{const p=await pg(b,'2026-10-16');await p.click('.tab[data-view="track"]');await wait(300);
+ await p.evaluate(()=>{window.__toasts=[];const ot=window.toast;window.toast=function(m){window.__toasts.push(String(m));return ot.apply(this,arguments);};const o=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='cb2_weight')throw new DOMException('full','QuotaExceededError');return o.call(this,k,v);};document.getElementById('wVal').value='89.2';document.getElementById('wAdd').click();});await wait(500);
+ const q2=await p.evaluate(()=>({bk:JSON.parse(backupJSON()).cb2_weight.map(x=>+x.v),t:window.__toasts.join(' | ')}));
+ T('a full device store still backs up what was just logged, and says so',q2.bk.includes(89.2)&&/would not save/.test(q2.t),JSON.stringify(q2));
+ T('BA-3: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+{const p=await pg(b,'2026-10-16',{cb2_weight:[{date:'2026-10-10',v:88.9}]});await p.evaluateOnNewDocument(()=>{const blob=JSON.stringify({ts:Date.parse('2026-10-16T05:00:00Z'),data:{cb2_weight:[{date:'2026-10-10',v:88.9}],cb2_sessions:[]}});window.storage={async get(){return{value:blob}},async set(){return {}}};});
+ const nav=p.waitForNavigation({waitUntil:'load',timeout:20000});await p.reload();await nav;await wait(3000);
+ const nav2=p.waitForNavigation({waitUntil:'load',timeout:20000});await p.evaluate(()=>applyRestoreText(JSON.stringify({app:'ComebackBlueprint',version:2,cb2_profile:{weight:90,height:177,age:38,bf:18,goal:102.3,goalBf:24,act:1.55},cb2_sessions:[],cb2_weight:[{date:'2026-10-12',v:90}],cb2_measure:[],cb2_lifts:[]})));await nav2;await wait(4000);
+ const rr=await p.evaluate(()=>DB.weight.map(x=>x.v).join());T('backup: a restore is the newest state, an older cloud copy does not win after the reload',rr==='90',rr);await done(p);}
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));})();
