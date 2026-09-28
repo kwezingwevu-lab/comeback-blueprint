@@ -1,53 +1,87 @@
-# FPL Mission Control — scheduled snapshot refresh (fpl/ only).
+# FPL Mission Control — scheduled refresh of the data and the plan, delivered as a pull request (fpl/ only).
 #
-# The defect this closes: fpl/data/live.json is a committed snapshot, and refreshing it needed a
-# human to start a session. On 26 Sep 2026 the app was found carrying a snapshot from 12 Sep —
-# two gameweeks and one transfer out of date, with the wildcard plan still recommending a chip
-# that had not been played. A snapshot that only moves when somebody remembers is not a snapshot,
-# it is a countdown.
+# v110 §5 E7: a manual trigger plus a daily schedule during the international break; pull, bake, calibrate,
+# export, solve, plan, build and gate; then a PULL REQUEST with the new data and a one-paragraph note. It fails
+# loudly when the FPL endpoints refuse the runner, and it never commits a stale snapshot as fresh.
 #
-# WHY TWICE A DAY, AND WHY THE SECOND ONE IS CONDITIONAL
-# Cron cannot know when a deadline is: deadlines move every week and the international break
-# pushes them days. So the schedule is fixed and the JOB decides. The 06:17 UTC run always
-# proceeds — prices change overnight (roughly 01:30–02:30 UTC), so the morning pull is the one
-# that catches them. The 16:17 UTC run proceeds ONLY when the next deadline is inside 36 hours,
-# which is the window in which flags, prices and press conferences actually move the decision.
-# Outside that window it reads one endpoint, says so and stops, which costs seconds.
-# Both minutes are :17 on purpose: scheduled runs bunch up at the top of the hour on GitHub's
-# shared runners and get delayed there.
+# WHAT CHANGED FROM THE v89 VERSION (rewritten 27 Sep 2026)
+#  - The v89 file could never have started. Its job-level `env:` read `${{ runner.temp }}`, and GitHub does not
+#    provide the `runner` context there, so the whole workflow was invalid; `yaml.safe_load` accepts it, actionlint
+#    does not (ERRORS.md E-119). The run's folders are now set by the first step, through $GITHUB_ENV.
+#  - It refreshed data/live.json alone. Since the v110 wave the app also reads the baked block, the plan, the
+#    WEEKLY block and the precomputed panels, so a v89 commit would have shipped a fresh live.json beside a stale
+#    plan under a subject line that said "refreshed". It now runs the whole pipeline (pipeline/README.md).
+#  - It pushed to the branch it ran on. It now pushes refresh/<yyyy-mm-dd> and opens a pull request; a person
+#    merges. An older open refresh pull request is closed as superseded, because merging it after a newer one would
+#    put older data over newer.
+#  - One schedule instead of two (the 16:17 run is gone), and the question it asks is different: not "is a deadline
+#    close" but "are we inside an international break". A normal week has a session in it; a break does not.
 #
-# WHY IT RUNS THE SUITES ITSELF
-# A push made with GITHUB_TOKEN does not trigger other workflows, so .github/workflows/gate.yml
-# will NOT run on the commit this job makes — that is GitHub's loop protection, not a choice. The
-# fast suites therefore run HERE, before the commit, and a red suite means no commit at all. The
-# two workflows do not otherwise collide: gate.yml is read-only, matches on fpl/** and .github/
-# workflows/gate.yml (not this file), and nothing here edits it.
+# STILL TRUE FROM v89, AND KEPT
+#  - Cron cannot know when a deadline is: deadlines move every week and a break pushes them days or weeks. So the
+#    schedule is fixed and the JOB decides from bootstrap-static, which is also the cheapest check that the API
+#    answers this runner at all. 06:17 UTC (08:17 SAST) catches the overnight price changes (roughly 01:30–02:30
+#    UTC). The minute is :17 on purpose: scheduled runs bunch at the top of the hour on shared runners.
+#  - A push made with GITHUB_TOKEN starts no other workflow, and neither does a pull request opened with it: that is
+#    GitHub's loop protection, not a choice. So the fast gate runs HERE, before anything is pushed, and one red step
+#    means no branch and no pull request. The job then starts gate.yml on the new branch by workflow_dispatch (the
+#    one event GITHUB_TOKEN may trigger), so the browser suites run too; the pull request says whether that worked.
+#  - Values that came out of a public API are read, never sourced: `. file` would run their words as commands
+#    (ERRORS.md E-080). Every key=value file below is read with sed.
+#  - It never touches src/, state/ or an account endpoint. It reads the public feeds and rebuilds.
+#  - A red run opens (or comments on) one issue, so a failing schedule is not a badge somebody learns to ignore.
 #
-# WHAT IT WILL NOT DO
-#  - It will not commit when any suite is red (CLAUDE.md A2 law 3). It says which check failed and
-#    prints the failing line, so the reader can see whether the snapshot is malformed or the
-#    expectation is frozen to a past gameweek.
-#  - It will not commit when the snapshot did not actually change. `fetched_at` moves on every
-#    pull, so it is excluded from the comparison: a no-change day produces no commit at all.
-#  - It never touches src/, state/ or an account endpoint. It pulls the public API and rebuilds.
+# THE WINDOW (the decision step)
+#  - Scheduled: proceeds only when the next deadline is at most 21 days away AND it follows the last passed
+#    deadline by at least 12 days. Measured on the 2026/27 calendar (bootstrap, 27 Sep 2026): the three breaks are
+#    21.7, 14.7 and 21.0 days, and the longest gap between ordinary gameweeks is 10.8 (GW20 to GW21).
+#  - By hand: the break test is skipped; the 21-day limit still applies unless `force` is ticked.
+#  - Outside the window it prints the reason and exits 0 (green), having fetched two feeds: bootstrap-static and
+#    the Draft game endpoint, the two v110 §2 names as the check that the runner is answered.
+#
+# NOTHING CHANGED → NO PULL REQUEST
+#  Content, never clocks (E-093, E-101): pipeline/refresh_note.cjs sets the clock fields aside and compares the
+#  decision inputs — the export hash, the gameweek and its deadlines, both squads, and the price, status and news of
+#  every player the manager owns. Ownership and transfer counts move by the hour and change no decision, so they
+#  alone open nothing. When the export hash has not moved, the committed plan was solved on this very input: it is
+#  kept, not re-solved (a 240-second runner solve would only replace a longer proof with a shorter one).
+#
+# NEVER STALE AS FRESH
+#  - The raw feeds go to a fresh folder under the runner's temp: nothing from an earlier pull can be "kept", and the
+#    feeds, which carry rival managers' personal names, are outside the checkout and can never be staged (§1.5).
+#  - pipeline/pull.sh's guard: a feed that does not answer with JSON leaves nothing behind and the pull exits
+#    non-zero, so the job fails and says which feed.
+#  - refresh_note.cjs refuses (exit 3) a pull that is behind the committed snapshot, a block and a live.json that
+#    disagree on the gameweek, any shipped file not written by this run, and a plan not solved on this data.
+#  - pipeline/plan.cjs and pipeline/precompute.cjs (inside build.cjs) refuse a plan whose hash is not this data's.
+#  - Only named paths are staged; anything else the run touched is reported and left out.
+#
+# THE SOLVE runs `python3 pipeline/solve.py 240`: the main plan, the no-wildcard plan, the free hit by week and the
+# two Draft rosters. The chip-timing and long solves are optional and skipped here; plan.json's source records the
+# files it did not fold as stale, and the note says so.
+#
+# ONE REPOSITORY SETTING IS NEEDED: Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to
+# create and approve pull requests". Without it `gh pr create` is refused; the job then fails with that sentence and
+# the branch it pushed, which can be opened as a pull request by hand.
 name: fpl-refresh
 
 on:
   schedule:
-    - cron: "17 6 * * *"      # always proceeds
-    - cron: "17 16 * * *"     # proceeds only inside 36 h of the next deadline
+    - cron: "17 6 * * *"        # daily; the job proceeds only inside an international break
   workflow_dispatch:
     inputs:
       force:
-        description: "Proceed even when no deadline is close (the 36-hour gate is skipped)"
+        description: "Skip the window test (the 21-day limit). The no-change exit still applies."
         type: boolean
-        default: true
+        default: false
 
 permissions:
-  contents: write     # the commit
-  issues: write       # the failure report, so a red run is readable without opening logs
+  contents: write         # push refresh/<date>
+  pull-requests: write    # open or update the pull request; close the ones it supersedes
+  issues: write           # the failure report
+  actions: write          # start gate.yml on the refresh branch (workflow_dispatch)
 
-# One refresh at a time. Two runs pulling and pushing the same file would race on the commit.
+# One refresh at a time: two runs pushing the same refresh/<date> branch would race.
 concurrency:
   group: fpl-refresh
   cancel-in-progress: false
@@ -55,371 +89,479 @@ concurrency:
 defaults:
   run:
     working-directory: fpl
-    shell: bash
+    shell: bash           # bash -eo pipefail: a stage failing behind `tee` still fails its step
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     env:
-      LOGS: ${{ runner.temp }}/logs
-      HELPERS: ${{ runner.temp }}/helpers
       EVENT_NAME: ${{ github.event_name }}
-      EVENT_CRON: ${{ github.event.schedule }}
       FORCE: ${{ github.event.inputs.force }}
-      AFTERNOON_CRON: "17 16 * * *"
+      BASE: ${{ github.ref_name }}
+      SOLVE_SECONDS: "240"
+      MAX_AHEAD_DAYS: "21"
+      BREAK_MIN_DAYS: "12"
+      PULL_UA: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"
 
     steps:
-      # Full history, not the default depth of 1. The push step rebases on origin and retries once
-      # if a human pushed while this job was running, and `git rebase` in a shallow clone has no
-      # merge base to work from. This repository is small; the depth costs nothing here.
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+
+      # ------------------------------------------------------------------ 0. the run's folders
+      # Here and not in the job's env: the runner context does not exist there (E-119). RF_SINCE is the moment the
+      # run began; every file the pull request carries must have been written after it.
+      - name: Prepare the run's folders (outside the checkout)
+        run: |
+          {
+            echo "RF_LOGS=$RUNNER_TEMP/logs"
+            echo "RF_HELPERS=$RUNNER_TEMP/helpers"
+            echo "RF_FEEDS=$RUNNER_TEMP/feeds"
+            echo "RF_SINCE=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/logs/gate" "$RUNNER_TEMP/helpers/before" "$RUNNER_TEMP/feeds"
+
+      # ------------------------------------------------------------------ 1. proceed?
+      - name: Decide whether this run proceeds (both APIs answer, and the window)
+        id: window
+        run: |
+          set -uo pipefail
+          cat > "$RF_HELPERS/window.cjs" <<'CJS'
+          "use strict";
+          /* The window, decided in one process so the numbers stay numbers. An earlier version passed hours back to
+             bash and handed them to a second `node -e` for the comparison; a deadline a few minutes in the past made
+             that argument "-0.3", which node read as a command-line option, so the step printed "node: bad option"
+             and declined for a reason that had nothing to do with the deadline. One number, one place.
+             Deadlines come from events[].deadline_time, never from this file (CLAUDE.md B2). Times print in SAST. */
+          const fs = require("fs");
+          const MAX_AHEAD = Number(process.env.MAX_AHEAD_DAYS), BREAK_MIN = Number(process.env.BREAK_MIN_DAYS);
+          const event = process.env.EVENT_NAME || "", force = process.env.FORCE === "true";
+          const now = process.argv[3] ? Date.parse(process.argv[3]) : Date.now();
+          const DAY = 864e5, SAST = 2 * 3600e3, f1 = (x) => (Math.round(x * 10) / 10).toFixed(1), p2 = (n) => String(n).padStart(2, "0");
+          const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+          const sast = (t) => { const d = new Date(t + SAST); return DAYS[d.getUTCDay()] + " " + d.getUTCDate() + " " + MON[d.getUTCMonth()] + " " + p2(d.getUTCHours()) + ":" + p2(d.getUTCMinutes()) + " SAST"; };
+          const boot = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const evs = (Array.isArray(boot.events) ? boot.events : [])
+            .map((e) => ({ id: Number(e.id), t: Date.parse(e.deadline_time), iso: e.deadline_time }))
+            .filter((e) => Number.isFinite(e.id) && Number.isFinite(e.t)).sort((a, b) => a.t - b.t);
+          const next = evs.find((e) => e.t > now) || null, prev = evs.filter((e) => e.t <= now).pop() || null;
+          const days = next ? (next.t - now) / DAY : null, gap = next && prev ? (next.t - prev.t) / DAY : null;
+          const inBreak = gap !== null && gap >= BREAK_MIN, nx = next ? "GW" + next.id + " (" + sast(next.t) + ")" : "";
+          let proceed = 0, why;
+          if (!Number.isFinite(MAX_AHEAD) || !Number.isFinite(BREAK_MIN)) { proceed = "error"; why = "MAX_AHEAD_DAYS and BREAK_MIN_DAYS must be numbers"; }
+          else if (!next) why = "the API lists no deadline ahead: the season is over or its calendar is not published";
+          else if (force) { proceed = 1; why = "run by hand with force, so the window test was skipped; the next deadline, " + nx + ", is " + f1(days) + " days away"; }
+          else if (days > MAX_AHEAD) why = "the next deadline, " + nx + ", is " + f1(days) + " days away, more than " + MAX_AHEAD;
+          else if (event === "schedule" && !inBreak) why = "no international break: the next deadline, " + nx + ", follows " + (prev ? "GW" + prev.id + "'s by " + f1(gap) + " days" : "no earlier deadline") + ", under the " + BREAK_MIN + "-day break threshold, and a scheduled run proceeds only inside a break";
+          else { proceed = 1; why = event === "schedule" ? "inside an international break: the next deadline, " + nx + ", follows GW" + prev.id + "'s by " + f1(gap) + " days and is " + f1(days) + " days away" : "run by hand: the next deadline, " + nx + ", is " + f1(days) + " days away"; }
+          [["proceed", proceed], ["why", why], ["next_gw", next ? next.id : ""], ["prev_gw", prev ? prev.id : ""], ["deadline", next ? next.iso : ""],
+            ["deadline_sast", next ? sast(next.t) : ""], ["days", days === null ? "" : f1(days)], ["gap_days", gap === null ? "" : f1(gap)], ["in_break", inBreak ? 1 : 0]]
+            .forEach(([k, v]) => console.log(k + "=" + v));
+          CJS
+
+          # Both games' APIs, as v110 §2's preflight asks. A refusal is a red run with the code in its title, never a
+          # quiet skip: a refresh that cannot reach its source is exactly the failure this job exists to surface.
+          probe() {   # probe <name> <url> <file>
+            local code
+            code="$(curl -sS --max-time 60 --retry 2 --retry-delay 5 -A "$PULL_UA" -o "$3" -w '%{http_code}' "$2" 2>"$3.err")" || true
+            if [ "$code" = "200" ] && node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$3" 2>/dev/null; then
+              echo "$1 answered: $2 (HTTP 200, JSON)"
+              return 0
+            fi
+            local why="answered HTTP ${code:-000}"
+            case "${code:-000}" in
+              000) why="did not answer at all ($(head -c 200 "$3.err" 2>/dev/null | tr '\n' ' '))" ;;
+              200) why="answered HTTP 200 with something that is not JSON (the game's 'being updated' page, or a block page)" ;;
+              401|403|429) why="refused this runner (HTTP $code)" ;;
+            esac
+            echo "::error title=The FPL API refused the runner ($1)::$2 $why. Nothing was fetched, baked or proposed."
+            { echo "### fpl-refresh — the FPL API refused the runner"; echo ""; echo "$2 $why."; echo ""; echo "Nothing was fetched, baked or proposed."; } >> "$GITHUB_STEP_SUMMARY"
+            return 1
+          }
+          probe "Classic" "https://fantasy.premierleague.com/api/bootstrap-static/" "$RF_HELPERS/boot.json" || exit 1
+          probe "Draft" "https://draft.premierleague.com/api/game" "$RF_HELPERS/dgame.json" || exit 1
+
+          node "$RF_HELPERS/window.cjs" "$RF_HELPERS/boot.json" > "$RF_HELPERS/window.fields"
+          cat "$RF_HELPERS/window.fields"
+          gv() { sed -n "s/^$1=//p" "$RF_HELPERS/window.fields" | head -1; }
+          proceed="$(gv proceed)"
+          why="$(gv why)"
+          case "$proceed" in
+            0|1) ;;
+            *) echo "::error title=The window step could not decide::$why"; exit 1 ;;
+          esac
+          {
+            echo "proceed=$proceed"
+            echo "next_gw=$(gv next_gw)"
+            echo "deadline_sast=$(gv deadline_sast)"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### fpl-refresh"
+            echo ""
+            if [ "$proceed" = "1" ]; then echo "**Proceeding** — $why."; else echo "**Not proceeding** — $why. Nothing else was fetched."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "proceed=$proceed — $why"
+
+      - name: Keep the committed snapshot for the comparison
+        if: steps.window.outputs.proceed == '1'
+        run: cp data/mc_data.json data/plan.json data/live.json data/solver_in.json "$RF_HELPERS/before/"
 
       - uses: actions/setup-node@v4
+        if: steps.window.outputs.proceed == '1'
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: fpl/package-lock.json
 
-      - name: Install (npm ci)
-        run: |
-          mkdir -p "$LOGS" "$HELPERS"
-          npm ci 2>&1 | tee "$LOGS/npm.log"
+      - uses: actions/setup-python@v5
+        if: steps.window.outputs.proceed == '1'
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: fpl/pipeline/requirements.txt
 
-      # ------------------------------------------------------------------ 1. proceed?
-      # The only network call before the decision is one bootstrap-static pull, which is also
-      # the cheapest possible check that the API is up at all.
-      - name: Decide whether this run proceeds
-        id: gate
+      - name: Install (npm ci; the optimiser's scipy and numpy)
+        if: steps.window.outputs.proceed == '1'
+        run: |
+          npm ci 2>&1 | tee "$RF_LOGS/npm.log"
+          python3 -m pip install --disable-pip-version-check -r pipeline/requirements.txt 2>&1 | tee "$RF_LOGS/pip.log"
+
+      # ------------------------------------------------------------------ 2. pull
+      - name: Pull (pipeline/pull.sh into a fresh folder, then data/fetch_live.cjs)
+        if: steps.window.outputs.proceed == '1'
         run: |
           set -uo pipefail
-          cat > "$HELPERS/gate.cjs" <<'CJS'
-          "use strict";
-          /* Hours to the next deadline, from events[].is_next.deadline_time — never hard-coded
-             (CLAUDE.md B2) — and the window decision itself, because the number is a number in
-             here and a string out there. An earlier version passed hours back to bash and let
-             bash hand it to a second `node -e` for the comparison; a deadline a few minutes in
-             the past makes that argument "-0.3", which node reads as a command-line option and
-             refuses, so the step printed "node: bad option" and the run silently declined for a
-             reason that had nothing to do with the deadline. One number, one place.
-             The window is 36 hours ahead to 3 hours behind: the trailing edge keeps the run
-             going through the minutes after a deadline, when the API can still report the
-             gameweek that has just locked as is_next. */
-          const fs = require("fs");
-          const AHEAD = 36, BEHIND = -3;
-          const boot = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-          const events = Array.isArray(boot.events) ? boot.events : [];
-          const next = events.filter((e) => e.is_next)[0] || null;
-          const cur = events.filter((e) => e.is_current)[0] || null;
-          const now = Date.now();
-          let hours = null;
-          if (next && next.deadline_time) {
-            const t = Date.parse(next.deadline_time);
-            if (!Number.isNaN(t)) hours = (t - now) / 3600000;
-          }
-          const inside = hours !== null && hours <= AHEAD && hours > BEHIND;
-          console.log("next_event=" + (next ? next.id : ""));
-          console.log("current_event=" + (cur ? cur.id : ""));
-          console.log("deadline=" + (next && next.deadline_time ? next.deadline_time : ""));
-          console.log("hours=" + (hours === null ? "" : hours.toFixed(1)));
-          console.log("inside_window=" + (inside ? "1" : "0"));
-          console.log("window=" + AHEAD + "h ahead to " + Math.abs(BEHIND) + "h behind");
-          CJS
-          if ! curl -sS --max-time 60 --retry 2 --retry-delay 3 \
-               https://fantasy.premierleague.com/api/bootstrap-static/ -o "$HELPERS/boot.json"; then
-            echo "::error title=FPL API unreachable::bootstrap-static did not answer; nothing was fetched and nothing was committed"
+          rc=0
+          FEEDS="$RF_FEEDS" bash pipeline/pull.sh > "$RF_LOGS/pull.log" 2>&1 || rc=$?
+          cat "$RF_LOGS/pull.log"
+          if [ "$rc" -ne 0 ]; then
+            case "$rc" in
+              1) what="a feed the bake cannot do without did not answer with JSON" ;;
+              2) what="bootstrap-static did not answer, so the gameweek in play is unknown" ;;
+              3) what="some feeds did not answer with JSON, and a fresh runner has no earlier copy to fall back on" ;;
+              *) what="pipeline/pull.sh exited $rc" ;;
+            esac
+            miss="$(grep -E '^  (MISS|kept) ' "$RF_LOGS/pull.log" | sed 's/^  //' | head -8 | tr '\n' ' ' || true)"
+            echo "::error title=The pull failed (pull.sh exit $rc)::$what. $miss Nothing was baked, solved or proposed."
             exit 1
           fi
-          node "$HELPERS/gate.cjs" "$HELPERS/boot.json" | tee "$LOGS/gate.fields"
-          # Read, never source. Two reasons, and the second is the serious one: `window` is a
-          # sentence and `. file` would have run its words as commands, and every value in that
-          # file came out of a public API — sourcing API-derived text is a shell-injection path
-          # that no deadline string has to be malicious to trip. See ERRORS.md E-080.
-          gv() { sed -n "s/^$1=//p" "$LOGS/gate.fields" | head -1; }
-          next_event="$(gv next_event)"
-          deadline="$(gv deadline)"
-          hours="$(gv hours)"
-          inside_window="$(gv inside_window)"
-          window="$(gv window)"
-
-          AFTERNOON=0
-          if [ "$EVENT_NAME" = "schedule" ] && [ "$EVENT_CRON" = "$AFTERNOON_CRON" ]; then AFTERNOON=1; fi
-
-          PROCEED=1
-          WHY="the daily run always proceeds"
-          if [ "$AFTERNOON" -eq 1 ]; then
-            if [ -z "$hours" ]; then
-              PROCEED=0; WHY="the afternoon run needs a next deadline and the API reports none"
-            elif [ "${inside_window:-0}" = "1" ]; then
-              WHY="the next deadline is ${hours}h away, inside the ${window} window"
-            else
-              PROCEED=0; WHY="the next deadline is ${hours}h away, outside the ${window} window"
-            fi
-          fi
-          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$FORCE" = "true" ]; then
-            PROCEED=1; WHY="run by hand with force=true"
+          rc=0
+          node data/fetch_live.cjs > "$RF_LOGS/fetch_live.log" 2>&1 || rc=$?
+          cat "$RF_LOGS/fetch_live.log"
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=fetch_live failed (exit $rc)::$(tail -1 "$RF_LOGS/fetch_live.log"). data/live.json was not replaced and nothing was proposed."
+            exit 1
           fi
 
-          {
-            echo "proceed=$PROCEED"
-            echo "hours=${hours:-}"
-            echo "deadline=${deadline:-}"
-            echo "next_event=${next_event:-}"
-          } >> "$GITHUB_OUTPUT"
-          echo "### fpl-refresh" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "GW${next_event:-?} deadline ${deadline:-unknown} · ${hours:-?}h away · $WHY" >> "$GITHUB_STEP_SUMMARY"
-          echo "proceed=$PROCEED — $WHY"
-
-      # ------------------------------------------------------------------ 2. baseline
-      # validate_live is run on the COMMITTED snapshot first, and this measurement never fails
-      # the job. Its purpose is to tell two very different reds apart afterwards: a check that
-      # was already failing before the fetch is an expectation frozen to a past gameweek, and a
-      # check that was green and is now red is a snapshot this job just broke.
-      - name: Baseline validate_live (committed snapshot, never gates)
-        if: steps.gate.outputs.proceed == '1'
+      # ------------------------------------------------------------------ 3. bake → calibrate → export
+      - name: Bake, calibrate and export
+        if: steps.window.outputs.proceed == '1'
         run: |
-          set -uo pipefail
-          # $HELPERS, not $LOGS, and the distinction is load-bearing: this log describes the
-          # snapshot that is ALREADY committed, and the "no FAIL line in any suite log" step below
-          # sweeps $LOGS. Leave it there and a run whose own suites are all green fails on red the
-          # previous snapshot brought with it. See ERRORS.md E-081.
-          node data/validate_live.cjs > "$HELPERS/validate.before.log" 2>&1 || true
-          grep '^FAIL ' "$HELPERS/validate.before.log" | sed 's/ — .*//' | sort -u > "$HELPERS/validate.before.names" || true
-          echo "checks already failing on the committed snapshot, before anything was fetched: $(wc -l < "$HELPERS/validate.before.names")"
-          tail -1 "$HELPERS/validate.before.log" || true
+          node pipeline/bake.js --feeds "$RF_FEEDS" 2>&1 | tee "$RF_LOGS/bake.log"
+          node pipeline/calibrate.js 2>&1 | tee "$RF_LOGS/calibrate.log"
+          node pipeline/export.js 2>&1 | tee "$RF_LOGS/export.log"
 
-      # ------------------------------------------------------------------ 3. fetch
-      - name: Fetch the public API into data/live.json
-        if: steps.gate.outputs.proceed == '1'
-        run: |
-          set -uo pipefail
-          cp data/live.json "$HELPERS/live.prev.json"
-          node data/fetch_live.cjs 2>&1 | tee "$LOGS/fetch.log"
-
-      # ------------------------------------------------------------------ 4. did it change?
-      - name: Compare the new snapshot with the committed one
+      # ------------------------------------------------------------------ 4. did anything a decision rests on change?
+      - name: Compare with the committed snapshot (content, never clocks)
         id: diff
-        if: steps.gate.outputs.proceed == '1'
+        if: steps.window.outputs.proceed == '1'
         run: |
           set -uo pipefail
-          cat > "$HELPERS/compare.cjs" <<'CJS'
-          "use strict";
-          /* prev vs next, with fetched_at excluded — it moves on every pull, so comparing it
-             would make every single day look like a change and fill the history with noise. */
-          const fs = require("fs");
-          const prev = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-          const next = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
-          const strip = (o) => { const c = JSON.parse(JSON.stringify(o)); delete c.fetched_at; return c; };
-          const changed = JSON.stringify(strip(prev)) !== JSON.stringify(strip(next));
-
-          const byId = (arr) => new Map((arr || []).map((e) => [Number(e.id), e]));
-          const a = byId(prev.elements), b = byId(next.elements);
-          let price = 0, status = 0, added = 0, removed = 0;
-          const priceLines = [];
-          b.forEach((el, id) => {
-            const was = a.get(id);
-            if (!was) { added++; return; }
-            if (Number(was.now_cost) !== Number(el.now_cost)) {
-              price++;
-              if (priceLines.length < 12) {
-                const d = (Number(el.now_cost) - Number(was.now_cost)) / 10;
-                priceLines.push(el.web_name + " " + (d > 0 ? "+" : "") + d.toFixed(1));
-              }
-            }
-            if (String(was.status) !== String(el.status) || String(was.chance) !== String(el.chance)) status++;
-          });
-          a.forEach((el, id) => { if (!b.has(id)) removed++; });
-
-          const nextDl = (live) => {
-            const e = (live.events || []).filter((x) => x.is_next)[0];
-            return e && e.deadline_time ? e.deadline_time : "none";
-          };
-          const fin = (live) => (live.events || []).filter((e) => e.finished).length;
-          const rivals = (live) => Object.keys(live.rivals || {}).length;
-
-          const bits = [];
-          if (Number(prev.next_event) !== Number(next.next_event)) bits.push("GW" + prev.next_event + "→GW" + next.next_event);
-          else bits.push("GW" + next.next_event);
-          if (nextDl(prev) !== nextDl(next)) bits.push("deadline " + nextDl(next) + " (was " + nextDl(prev) + ")");
-          else bits.push("deadline " + nextDl(next));
-          if (fin(prev) !== fin(next)) bits.push(fin(prev) + "→" + fin(next) + " finished GWs");
-          bits.push(price + " price move" + (price === 1 ? "" : "s"));
-          bits.push(status + " status change" + (status === 1 ? "" : "s"));
-          if (added || removed) bits.push("+" + added + "/-" + removed + " players");
-          if (rivals(prev) !== rivals(next)) bits.push(rivals(prev) + "→" + rivals(next) + " rivals");
-
-          const subject = "fpl data: " + bits.join(" · ");
-          const body = [
-            subject,
-            "",
-            "Refreshed by .github/workflows/refresh.yml from the public FPL and draft APIs.",
-            "fetched_at " + next.fetched_at + " (was " + prev.fetched_at + ")",
-            "next_event " + next.next_event + " · current_event " + next.current_event +
-              " · finished " + fin(next) + " · ft_available " + next.ft_available,
-            "elements " + (next.elements || []).length + " · rivals " + rivals(next) +
-              " · price moves " + price + " · status changes " + status,
-            priceLines.length ? "price: " + priceLines.join(", ") + (price > priceLines.length ? " …" : "") : "price: none",
-            "",
-            "The fast suites (validate_live, unit_engine, verify.sh, components, mc_full 3000) were",
-            "green before this commit was made; a red suite blocks the commit."
-          ].join("\n");
-
-          fs.writeFileSync(process.argv[4], subject.slice(0, 200) + "\n");
-          fs.writeFileSync(process.argv[5], body + "\n");
-          console.log("changed=" + (changed ? "1" : "0"));
-          console.log(subject);
-          CJS
-          node "$HELPERS/compare.cjs" "$HELPERS/live.prev.json" data/live.json \
-               "$HELPERS/subject.txt" "$HELPERS/body.txt" | tee "$LOGS/compare.log"
-          CH="$(grep -o 'changed=[01]' "$LOGS/compare.log" | head -1 | cut -d= -f2)"
-          echo "changed=$CH" >> "$GITHUB_OUTPUT"
-          {
-            echo ""
-            if [ "$CH" = "1" ]; then echo "**The snapshot moved.** $(cat "$HELPERS/subject.txt")";
-            else echo "**No change.** The pull is byte-identical to the committed snapshot once \`fetched_at\` is excluded, so there is nothing to commit."; fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      # ------------------------------------------------------------------ 5. the suites
-      # Order matters: validate_live reads the new snapshot, build.cjs has to run before verify.sh
-      # (which asserts dist/ is not older than the sources), and the browser suites are NOT run
-      # here on purpose — mc_all and the Chromium/WebKit suites are the release gate's job and
-      # would turn a few minutes into forty.
-      - name: validate_live (new snapshot, with the before-and-after breakdown)
-        if: steps.gate.outputs.proceed == '1' && steps.diff.outputs.changed == '1'
-        run: |
-          set -uo pipefail
-          RC=0
-          node data/validate_live.cjs > "$LOGS/validate.after.log" 2>&1 || RC=$?
-          tail -3 "$LOGS/validate.after.log"
-          if [ "$RC" -eq 0 ]; then exit 0; fi
-          grep '^FAIL ' "$LOGS/validate.after.log" | sed 's/ — .*//' | sort -u > "$HELPERS/validate.after.names" || true
-          comm -13 "$HELPERS/validate.before.names" "$HELPERS/validate.after.names" > "$HELPERS/validate.new.names" || true
-          comm -12 "$HELPERS/validate.before.names" "$HELPERS/validate.after.names" > "$HELPERS/validate.old.names" || true
-          NEW="$(wc -l < "$HELPERS/validate.new.names")"
-          OLD="$(wc -l < "$HELPERS/validate.old.names")"
-          {
-            echo "## validate_live is red — $(tail -1 "$LOGS/validate.after.log")"
-            echo ""
-            echo "$NEW check(s) NEWLY broken by this fetch, $OLD already failing on the committed snapshot."
-            echo ""
-            if [ "$NEW" -gt 0 ]; then
-              echo "### Newly broken — the snapshot this job just wrote is the suspect"
-              echo '```'
-              while IFS= read -r n; do grep -F -- "$n" "$LOGS/validate.after.log" | head -1; done < "$HELPERS/validate.new.names"
-              echo '```'
-            fi
-            if [ "$OLD" -gt 0 ]; then
-              echo "### Already failing before the fetch — an expectation frozen to a past gameweek, not a regression (ERRORS.md E-064)"
-              echo '```'
-              while IFS= read -r n; do
-                printf 'before: %s\n' "$(grep -F -- "$n" "$HELPERS/validate.before.log" | head -1)"
-                printf 'after : %s\n' "$(grep -F -- "$n" "$LOGS/validate.after.log" | head -1)"
-              done < "$HELPERS/validate.old.names"
-              echo '```'
-            fi
-            echo ""
-            echo "Nothing was committed."
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "::error title=validate_live red ($NEW newly broken, $OLD pre-existing)::see the job summary for the failing checks with their actual values"
-          exit 1
-
-      - name: build (build.cjs → app/ + dist/)
-        if: steps.gate.outputs.proceed == '1' && steps.diff.outputs.changed == '1'
-        run: node build.cjs 2>&1 | tee "$LOGS/build.log"
-
-      - name: unit_engine
-        if: steps.gate.outputs.proceed == '1' && steps.diff.outputs.changed == '1'
-        run: node qa/unit_engine.cjs 2>&1 | tee "$LOGS/unit_engine.log"
-
-      - name: verify.sh (live reconciliation + invariants)
-        if: steps.gate.outputs.proceed == '1' && steps.diff.outputs.changed == '1'
-        run: bash qa/verify.sh 2>&1 | tee "$LOGS/verify.log"
-
-      - name: components (render output)
-        if: steps.gate.outputs.proceed == '1' && steps.diff.outputs.changed == '1'
-        run: node qa/components.cjs 2>&1 | tee "$LOGS/components.log"
-
-      - name: mc_full 3000
-        if: steps.gate.outputs.proceed == '1' && steps.diff.outputs.changed == '1'
-        run: node --stack-size=4000 qa/mc_full.cjs 3000 2>&1 | tee "$LOGS/mc_full.log"
-
-      # A suite can print FAIL and still exit 0 if it is ever wired up wrongly; gate.yml already
-      # guards against that and so does this.
-      - name: No FAIL line in any suite log
-        if: steps.gate.outputs.proceed == '1' && steps.diff.outputs.changed == '1'
-        run: |
-          set -uo pipefail
-          if grep -rn '^FAIL ' "$LOGS" ; then
-            echo "::error title=a suite printed FAIL::the commit was not made"
+          rc=0
+          node pipeline/refresh_note.cjs --before "$RF_HELPERS/before" --after data --check --since "$RF_SINCE" > "$RF_HELPERS/check.fields" 2>&1 || rc=$?
+          cat "$RF_HELPERS/check.fields"
+          if [ "$rc" -eq 3 ]; then
+            echo "::error title=Stale pull refused::$(grep '^stale: ' "$RF_HELPERS/check.fields" | head -3 | tr '\n' ' ')Nothing was proposed."
             exit 1
           fi
-          echo "no FAIL line in any suite log"
+          if [ "$rc" -ne 0 ]; then echo "::error title=The comparison failed (exit $rc)::$(tail -1 "$RF_HELPERS/check.fields")"; exit 1; fi
+          gv() { sed -n "s/^$1=//p" "$RF_HELPERS/check.fields" | head -1; }
+          changed="$(gv changed)"; resolve="$(gv resolve)"; reason="$(gv reason)"
+          case "$changed$resolve" in 00|10|11) ;; *) echo "::error title=The comparison printed changed=$changed resolve=$resolve::"; exit 1 ;; esac
+          { echo "changed=$changed"; echo "resolve=$resolve"; } >> "$GITHUB_OUTPUT"
+          {
+            echo ""
+            if [ "$changed" = "1" ]; then echo "**The data moved** — $reason."
+            else echo "**Nothing to propose** — $reason. No branch and no pull request."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      # ------------------------------------------------------------------ 6. commit
-      - name: Commit and push the refreshed snapshot
-        if: steps.gate.outputs.proceed == '1' && steps.diff.outputs.changed == '1'
+      # ------------------------------------------------------------------ 5. solve (only on new data) → plan → WEEKLY
+      - name: Solve (python3 pipeline/solve.py 240)
+        if: steps.diff.outputs.changed == '1' && steps.diff.outputs.resolve == '1'
+        timeout-minutes: 30
+        run: python3 pipeline/solve.py "$SOLVE_SECONDS" 2>&1 | tee "$RF_LOGS/solve.log"
+
+      - name: Plan (pipeline/plan.cjs keeps the solve that matches this data and replays the ledger)
+        if: steps.diff.outputs.changed == '1'
+        env:
+          RESOLVE: ${{ steps.diff.outputs.resolve }}
         run: |
           set -uo pipefail
+          if [ "$RESOLVE" = "0" ]; then
+            echo "The export hash did not move: data/solver_out.json was solved on this very input, so it is kept and not re-solved."
+          fi
+          rc=0
+          node pipeline/plan.cjs > "$RF_LOGS/plan.log" 2>&1 || rc=$?
+          cat "$RF_LOGS/plan.log"
+          case "$rc" in
+            0) ;;
+            2) echo "::error title=plan.cjs: the replayed ledger disagrees with the solver (exit 2)::the replay is what the app reads (§7.1); see the plan step's log"; exit 1 ;;
+            3) echo "::error title=plan.cjs refused the solve (exit 3)::$(grep 'refused' "$RF_LOGS/plan.log" | head -1)"; exit 1 ;;
+            *) echo "::error title=plan.cjs exited $rc::"; exit 1 ;;
+          esac
+
+      # weekly.cjs exits 4, having written the block, when a decision breaks one of the app's rules, "so a person
+      # decides". Here the person is the reviewer: the pull request says so in its title and lists each conflict.
+      - name: WEEKLY block (pipeline/weekly.cjs, same app version)
+        id: weekly
+        if: steps.diff.outputs.changed == '1'
+        run: |
+          set -uo pipefail
+          version="$(node -e 'const t=require("fs").readFileSync("data/weekly.js","utf8");process.stdout.write(String((new Function(t+";return WEEKLY;"))().version))')"
+          case "$version" in ''|*[!0-9]*) echo "::error title=No WEEKLY version::data/weekly.js did not give a version number ('$version')"; exit 1 ;; esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          rc=0
+          node pipeline/weekly.cjs --version "$version" > "$RF_LOGS/weekly.log" 2>&1 || rc=$?
+          cat "$RF_LOGS/weekly.log"
+          : > "$RF_HELPERS/conflicts.txt"
+          if [ "$rc" -eq 4 ]; then
+            sed -n '/^CONFLICTS/,$p' "$RF_LOGS/weekly.log" | grep '^  - ' | sed 's/^  - //' > "$RF_HELPERS/conflicts.txt" || true
+            echo "::warning title=The WEEKLY block breaks $(wc -l < "$RF_HELPERS/conflicts.txt") of the app's rules::the pull request will say it needs a decision"
+          elif [ "$rc" -ne 0 ]; then
+            echo "::error title=weekly.cjs exited $rc::$(grep 'refused' "$RF_LOGS/weekly.log" | head -1)"
+            exit 1
+          fi
+
+      # ------------------------------------------------------------------ 6. build (qa/run.sh steps 1–4)
+      - name: Build (tdz on the sources, esbuild, build.cjs, tdz on the built app)
+        if: steps.diff.outputs.changed == '1'
+        run: |
+          G="$RF_LOGS/gate"
+          srcs=(src/engine.js src/ui.jsx)
+          if [ -f src/mc_ui.jsx ]; then srcs+=(src/mc_ui.jsx); fi
+          { node qa/tdz_check.cjs --self-test && node qa/tdz_check.cjs "${srcs[@]}"; } 2>&1 | tee "$G/01-tdz-sources.log"
+          npx --no-install esbuild app/FPL_Mission_Control.jsx --bundle --loader:.jsx=jsx --jsx=automatic --outfile="$RF_HELPERS/mc.js" 2>&1 | tee "$G/02-esbuild.log"
+          node build.cjs 2>&1 | tee "$G/03-build.log"
+          node qa/tdz_check.cjs app/FPL_Mission_Control.jsx 2>&1 | tee "$G/04-tdz-built.log"
+
+      # ------------------------------------------------------------------ 7. the fast gate
+      # qa/run.sh groups A–C, read from its own --dry-run so the list cannot drift from the gate: every suite row up to
+      # qa/smoke.cjs, where group D (the browsers; this runner has no /opt/pw-browsers) begins. qa/solver_smoke.sh is
+      # left out by name: it proves a 30-second solve returns a legal plan, and this job has just either run the real
+      # solve, whose plan plan_legality checks in full, or kept a plan that plan.cjs matched to this data by hash.
+      # Every suite runs even after a red one, so the report names every failure at once.
+      - name: Fast gate (qa/run.sh groups A–C, in its order)
+        id: gate
+        if: steps.diff.outputs.changed == '1'
+        run: |
+          set -uo pipefail
+          G="$RF_LOGS/gate"
+          bash qa/run.sh --dry-run > "$RF_HELPERS/dryrun.txt"
+          : > "$RF_HELPERS/fast.list"
+          boundary=0
+          while IFS= read -r line; do
+            if [[ "$line" =~ ^[[:space:]]*[0-9]+[[:space:]]+(node|bash|python3)[[:space:]]+(.*[^[:space:]])[[:space:]]+(present|MISSING)$ ]]; then
+              runner="${BASH_REMATCH[1]}"; cmd="${BASH_REMATCH[2]}"; state="${BASH_REMATCH[3]}"
+              file="${cmd%% *}"
+              if [ "$file" = "qa/smoke.cjs" ]; then boundary=1; break; fi
+              if [ "$file" = "qa/solver_smoke.sh" ]; then echo "left out by name: $cmd"; continue; fi
+              printf '%s|%s|%s\n' "$runner" "$cmd" "$state" >> "$RF_HELPERS/fast.list"
+            fi
+          done < "$RF_HELPERS/dryrun.txt"
+          if [ "$boundary" -ne 1 ]; then
+            echo "::error title=The group boundary moved::qa/run.sh --dry-run no longer lists qa/smoke.cjs, which marks where group D starts; update this step"
+            exit 1
+          fi
+          # The floor: the suites v110 §5 E7 names must all be in the list. A suite that left groups A–C is a hole here.
+          lost=""
+          for need in qa/privacy.cjs qa/no_frozen.cjs qa/visual.cjs data/validate_live.cjs qa/waiver_log.cjs qa/prices.cjs \
+                      qa/parity.cjs qa/bake.cjs qa/export_hash.cjs qa/calibration.cjs qa/plan_legality.cjs qa/verify.sh \
+                      qa/pull_guard.cjs qa/unit_engine.cjs qa/components.cjs qa/mc_render.cjs qa/mc_data.cjs qa/mc_maths.cjs \
+                      qa/mc_projections.cjs qa/mc_rules.cjs qa/mc_separation.cjs qa/mc_property.cjs qa/mc_simulation.cjs qa/mc_optimisers.cjs; do
+            grep -q "|${need}[ |]" "$RF_HELPERS/fast.list" || lost="$lost $need"
+          done
+          if [ -n "$lost" ]; then echo "::error title=The fast gate lost suites::not in qa/run.sh groups A–C any more:$lost"; exit 1; fi
+
+          {
+            echo "| # | step | exit | ms | last line |"
+            echo "|---|---|---|---|---|"
+            for f in 01-tdz-sources 02-esbuild 03-build 04-tdz-built; do
+              echo "| ${f%%-*} | ${f#*-} | 0 | | $(grep -v '^[[:space:]]*$' "$G/$f.log" | tail -1 | cut -c1-120 | tr '|' '/') |"
+            done
+          } > "$RF_HELPERS/gate.md"
+          i=4; red=0
+          while IFS='|' read -r runner cmd state; do
+            i=$((i + 1))
+            file="${cmd%% *}"; base="$(basename "${file%.*}")"
+            log="$G/$(printf '%02d' "$i")-$base.log"
+            echo "---- $i · $runner $cmd"
+            if [ "$state" = "MISSING" ]; then
+              echo "FAIL $cmd — the file does not exist" | tee "$log"; rc=127; ms=0
+            else
+              t0=$(date +%s%3N)
+              # the dry run prints the file and its arguments separated by spaces; word splitting is intended
+              # shellcheck disable=SC2086
+              $runner $cmd > "$log" 2>&1 < /dev/null && rc=0 || rc=$?
+              ms=$(( $(date +%s%3N) - t0 ))
+            fi
+            last="$(grep -v '^[[:space:]]*$' "$log" | tail -1 | cut -c1-120 | tr '|' '/')"
+            echo "exit $rc · ${ms} ms · $last"
+            if [ "$rc" -ne 0 ]; then red=$((red + 1)); grep -n "FAIL" "$log" | head -20 || true; fi
+            echo "| $(printf '%02d' "$i") | $cmd | $rc | $ms | $last |" >> "$RF_HELPERS/gate.md"
+          done < "$RF_HELPERS/fast.list"
+          echo "steps=$i" >> "$GITHUB_OUTPUT"
+          { echo ""; echo "**Fast gate:** $i steps, $red red."; } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$red" -ne 0 ]; then
+            echo "::error title=The fast gate is red ($red of $i)::nothing was pushed; the failing lines are in the step log and the failure issue"
+            exit 1
+          fi
+
+      # A suite can print FAIL and still exit 0 if it is ever wired up wrongly; gate.yml guards against that and so
+      # does this. Only this run's gate logs are swept (E-081: never a log that describes the committed snapshot).
+      - name: No "FAIL" in any gate log
+        if: steps.diff.outputs.changed == '1'
+        run: |
+          if grep -rn "FAIL" "$RF_LOGS/gate"; then
+            echo "::error title=A gate log printed FAIL::nothing was pushed"
+            exit 1
+          fi
+          echo "no FAIL in $(find "$RF_LOGS/gate" -name '*.log' | wc -l) gate logs"
+
+      # ------------------------------------------------------------------ 8. the note, the branch, the pull request
+      - name: Write the note (pipeline/refresh_note.cjs)
+        if: steps.diff.outputs.changed == '1'
+        run: |
+          set -uo pipefail
+          rc=0
+          node pipeline/refresh_note.cjs --before "$RF_HELPERS/before" --after data --since "$RF_SINCE" \
+               --out "$RF_HELPERS/note.md" --title "$RF_HELPERS/title.txt" > "$RF_LOGS/note.log" 2>&1 || rc=$?
+          cat "$RF_LOGS/note.log"
+          if [ "$rc" -ne 0 ]; then echo "::error title=The note refused (exit $rc)::$(grep '^stale: ' "$RF_LOGS/note.log" | head -2 | tr '\n' ' ')"; exit 1; fi
+          { echo ""; echo "**Note:** $(cat "$RF_HELPERS/note.md")"; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Push refresh/<date> and open the pull request
+        if: steps.diff.outputs.changed == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          VERSION: ${{ steps.weekly.outputs.version }}
+          STEPS: ${{ steps.gate.outputs.steps }}
+        run: |
+          set -uo pipefail
+          DATE="$(date -u -d '+2 hours' +%Y-%m-%d)"          # the date in SAST (UTC+2, no daylight saving)
+          BR="refresh/$DATE"
+          EXPORT="$(node -p 'require("./data/solver_in.json").hash')"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/live.json app/FPL_Mission_Control.jsx dist
+          git switch -c "$BR"
+          # Named paths only. The raw feeds are outside the checkout; anything else the run touched is reported below.
+          git add -- data/live.json data/mc_data.json data/solver_in.json data/solver_out.json data/plan.json \
+                     data/weekly.js data/pre.json app/FPL_Mission_Control.jsx dist
+          other="$(git status --porcelain --untracked-files=all | grep -v '^[AM]  ' || true)"
+          if [ -n "$other" ]; then
+            echo "::warning title=The run touched files outside the refresh set::left out of the commit: $(printf '%s' "$other" | tr '\n' ' ')"
+          fi
           if git diff --cached --quiet; then
-            echo "nothing staged after all — no commit"
+            echo "Nothing staged after all: the decision inputs moved but no shipped file differs. No pull request."
+            { echo ""; echo "Nothing staged: no shipped file differs from the committed one."; } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          git commit -F "$HELPERS/body.txt"
-          BR="${GITHUB_REF_NAME}"
-          for attempt in 1 2; do
-            if git push origin "HEAD:$BR"; then
-              echo "pushed to $BR on attempt $attempt"
-              { echo ""; echo "Committed: $(cat "$HELPERS/subject.txt")"; } >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-            echo "push rejected; rebasing on origin/$BR and retrying once"
-            git fetch origin "$BR"
-            git rebase "origin/$BR" || { echo "::error title=rebase failed::a human has to look at this"; exit 1; }
-          done
-          echo "::error title=push failed twice::nothing was committed to $BR"
-          exit 1
+          git diff --cached --stat
+          {
+            echo "v$VERSION: data refresh $DATE — export hash $EXPORT, $STEPS fast-gate steps green"
+            echo ""
+            cat "$RF_HELPERS/note.md"
+            echo ""
+            echo "Written by .github/workflows/refresh.yml (run $RUN_ID) from the public Classic and Draft feeds."
+          } > "$RF_HELPERS/commit.txt"
+          git commit -q -F "$RF_HELPERS/commit.txt"
+          git push --force origin "HEAD:refs/heads/$BR"
 
-      # ------------------------------------------------------------------ 7. failure report
-      # A scheduled job that fails into a red badge gets muted. This turns every red run into one
-      # readable issue with the failing lines in it, and updates the same issue instead of opening
-      # a new one every day.
+          # The browser suites and the million-iteration ones did not run here. workflow_dispatch is the one event a
+          # GITHUB_TOKEN may start, so the full gate is started on the branch; the pull request says whether it was.
+          if gh workflow run gate.yml --ref "$BR" > "$RF_HELPERS/dispatch.out" 2>&1; then
+            DISPATCH="gate.yml (the full gate, browsers included) was started on \`$BR\` by this job; its result shows on the branch's head commit."
+          else
+            DISPATCH="gate.yml could not be started on \`$BR\` ($(head -1 "$RF_HELPERS/dispatch.out")), so the browser suites and the million-iteration suites have not run on this data: run \`bash qa/run.sh\` before merging."
+          fi
+
+          TITLE="$(head -1 "$RF_HELPERS/title.txt")"
+          N_CONFLICTS="$(grep -c . "$RF_HELPERS/conflicts.txt" || true)"
+          if [ "${N_CONFLICTS:-0}" -gt 0 ]; then TITLE="$TITLE (needs a decision)"; fi
+          {
+            cat "$RF_HELPERS/note.md"
+            echo ""
+            if [ "${N_CONFLICTS:-0}" -gt 0 ]; then
+              echo "**Needs a decision before merging.** pipeline/weekly.cjs wrote the WEEKLY block and names $N_CONFLICTS conflict(s) with the app's rules:"
+              echo ""
+              sed 's/^/- /' "$RF_HELPERS/conflicts.txt"
+              echo ""
+            fi
+            echo "**Checks run on the runner before this branch was pushed** — qa/run.sh steps 1–4 and groups A–C, in its order (qa/solver_smoke.sh left out: the real solve or a hash-matched plan stands in for it). Every one is green:"
+            echo ""
+            cat "$RF_HELPERS/gate.md"
+            echo ""
+            echo "$DISPATCH"
+            echo ""
+            echo "Branch \`$BR\` from \`$BASE\` · export hash $EXPORT · run $RUN_ID · never merge an older refresh after a newer one."
+          } > "$RF_HELPERS/body.md"
+
+          PR="$(gh pr list --head "$BR" --base "$BASE" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$PR" ]; then
+            gh pr edit "$PR" --title "$TITLE" --body-file "$RF_HELPERS/body.md"
+            echo "updated pull request #$PR on $BR"
+          else
+            if ! URL="$(gh pr create --base "$BASE" --head "$BR" --title "$TITLE" --body-file "$RF_HELPERS/body.md" 2>"$RF_HELPERS/pr.err")"; then
+              cat "$RF_HELPERS/pr.err"
+              echo "::error title=The pull request could not be opened::$(head -1 "$RF_HELPERS/pr.err"). The branch $BR is pushed and green; open it by hand, or allow GitHub Actions to create pull requests (Settings → Actions → General → Workflow permissions)."
+              exit 1
+            fi
+            PR="${URL##*/}"
+            echo "opened pull request #$PR: $URL"
+          fi
+
+          # Older refresh pull requests carry older data. Merging one after this would put it over newer data.
+          gh pr list --state open --base "$BASE" --json number,headRefName --jq '.[] | "\(.number) \(.headRefName)"' |
+            while read -r n head; do
+              case "$head" in
+                refresh/*)
+                  if [ "$head" != "$BR" ]; then
+                    gh pr close "$n" --delete-branch --comment "Superseded by #$PR, which carries a later snapshot. Merging this one after it would put older data over newer." ||
+                      echo "::warning title=Could not close #$n::close it by hand; it carries older data than #$PR"
+                  fi ;;
+              esac
+            done
+          { echo ""; echo "**Pull request #$PR** on \`$BR\`: $TITLE"; } >> "$GITHUB_STEP_SUMMARY"
+
+      # ------------------------------------------------------------------ 9. failure report
+      # A scheduled job that fails into a red badge gets muted. Every red run lands in one issue, with the failing lines
+      # in it, and later red runs comment on that issue instead of opening another.
       - name: Open or update the failure issue
         if: failure()
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           set -uo pipefail
-          TITLE="fpl-refresh is failing — the snapshot is not being kept current"
+          TITLE="fpl-refresh is failing: the data and the plan are not being refreshed"
           {
-            echo "The scheduled snapshot refresh failed and **nothing was committed**."
+            echo "The refresh failed and **nothing was merged**. Run $RUN_ID, $(date -u -d '+2 hours' '+%a %-d %b %H:%M') SAST."
             echo ""
-            echo "Run: $RUN_URL"
-            echo ""
-            echo "Failing lines from the suite logs:"
+            echo "Failing lines from this run's logs:"
             echo '```'
-            grep -rh '^FAIL ' "$LOGS" 2>/dev/null | sort -u | head -40 || echo "(no FAIL line — the failure was a step error, not a suite; see the run log)"
+            grep -rh "FAIL\|refused\|REFUSED\|stale: \|MISS " "${RF_LOGS:-/nonexistent}" "${RF_HELPERS:-/nonexistent}/check.fields" 2>/dev/null | sort -u | head -40 ||
+              echo "(no FAIL line: a step errored before or outside the suites; its annotation names it)"
             echo '```'
-            for f in validate.after.log verify.log unit_engine.log components.log mc_full.log; do
-              if [ -f "$LOGS/$f" ]; then echo "\`$f\` last line: $(tail -1 "$LOGS/$f")"; fi
-            done
             echo ""
-            echo "Read it this way: a check that appears in the run's \"newly broken\" list means the"
-            echo "snapshot this job wrote is the suspect. A check listed as already failing before the"
-            echo "fetch is an expectation frozen to a past gameweek (ERRORS.md E-064) — the football"
-            echo "moved and the assertion did not, and the fix is in the suite, not in the data."
+            echo "How to read it: a refusal from the FPL API (HTTP 403 or 429) is the runner being blocked, and the job"
+            echo "has to run somewhere the API answers. A \`stale:\` line means the pull was behind the committed"
+            echo "snapshot and was refused on purpose. A red suite on data that merely moved is either new data the app"
+            echo "cannot take or a suite frozen to the old snapshot (ERRORS.md E-064, E-084): the fix for the second is"
+            echo "in the suite, never in the data."
           } > "$RUNNER_TEMP/issue.md"
           EXISTING="$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty' || true)"
           if [ -n "$EXISTING" ]; then
-            gh issue comment "$EXISTING" --body-file "$RUNNER_TEMP/issue.md"
-            echo "commented on issue #$EXISTING"
+            gh issue comment "$EXISTING" --body-file "$RUNNER_TEMP/issue.md" && echo "commented on issue #$EXISTING"
           else
-            gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/issue.md" || \
+            gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/issue.md" ||
               echo "could not open an issue (issues may be disabled); the failure is still in the job summary"
           fi

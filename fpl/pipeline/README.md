@@ -108,3 +108,18 @@ reads `data/weekly.js` and `data/live.json`; wiring the baked block and the plan
 interface work in `docs/GAP_v110.md` section D, and the rule it must keep is E-101's: a solved plan ships
 only when its hash equals the export hash of the block being shipped, which `pipeline/plan.cjs` enforces
 before anything is written. Then `bash qa/run.sh` is the gate, and nothing ships red.
+
+## 9. Refresh — `.github/workflows/refresh.yml` with `node pipeline/refresh_note.cjs`
+
+Runs stages 1–8 on a GitHub runner and proposes the result as a pull request on `refresh/<yyyy-mm-dd>`; it never
+commits to the branch it runs on. It proceeds daily at 06:17 UTC only inside an international break (the next deadline
+at most 21 days away and at least 12 days after the last one, read from bootstrap), or when started by hand. The raw
+feeds go to the runner's temp folder, outside the checkout. `refresh_note.cjs --check`, after the export, compares
+the pull with the committed snapshot on content with the clocks set aside: when nothing a decision rests on moved it
+exits the job green with the reason, and when the export hash has not moved the committed plan is kept rather than
+re-solved. The solve is `python3 pipeline/solve.py 240`; the chip-timing and long solves are skipped there, and
+`plan.json`'s source says so. After stage 8 the fast gate (`qa/run.sh` steps 1–4 and groups A–C, read from its
+`--dry-run`) must be green before anything is pushed. `refresh_note.cjs` then writes the one-paragraph note, which
+covers the gameweek, the deadlines, price moves and flags on the manager's players, and the plan's change in each
+game. It refuses (exit 3) a pull that is behind the committed snapshot, or any file not written by the run.
+Dry-run it on the tree with `node pipeline/refresh_note.cjs --before data --after data`, which says nothing changed.
