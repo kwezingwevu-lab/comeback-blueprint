@@ -1127,8 +1127,9 @@ const cpage=async(seed,cloud,mode)=>{const c=await b.createBrowserContext();cons
    for(let i=0;i<30;i++){const a=await acct(q);if(a&&a.data&&a.data.cb2_weight&&a.data.cb2_weight.length===2)break;await wait(120);}
    const nav=q.waitForNavigation({waitUntil:'load',timeout:15000}).catch(()=>null);
    await tryEval(q,j=>{applyRestoreText(j);},r.backup);await nav;
-   await ready(q);await wait(300);
-   r.after=await tryEval(q,async()=>{const ac=JSON.parse(window.__cs.cb2_all);const raw=await idbLoad();let vw=-1;try{vw=JSON.parse(raw).data.cb2_weight.length;}catch(e){}return {w:DB.weight.length,ls:JSON.parse(localStorage.getItem('cb2_weight')||'[]').length,acct:ac.data.cb2_weight.length,vault:vw,toast:document.getElementById('toast').innerText};});}
+   await ready(q);
+   // poll until the mirrors show the restored generation (a slow machine finishes the account and vault writes later, never earlier)
+   for(let i=0;i<50;i++){r.after=await tryEval(q,async()=>{let ac=null;try{ac=JSON.parse(window.__cs.cb2_all);}catch(e){}const raw=await idbLoad();let vw=-1;try{vw=JSON.parse(raw).data.cb2_weight.length;}catch(e){}const cw=ac&&ac.data&&ac.data.cb2_weight;return {w:DB.weight.length,ls:JSON.parse(localStorage.getItem('cb2_weight')||'[]').length,acct:cw?cw.length:-1,vault:vw,toast:document.getElementById('toast').innerText};});if(r.after&&r.after.w===1&&r.after.ls===1&&r.after.acct===1&&r.after.vault===1)break;await wait(150);}}
  T('AD-S1 mirrors: inside Claude, restoring an older backup is not undone at the next launch by the account copy, and the device vault holds the restored generation too',!!r.after&&r.after.w===1&&r.after.ls===1&&r.after.acct===1&&r.after.vault===1&&!/Cloud data loaded/.test(r.after.toast||''),JSON.stringify(r.after||r).slice(0,300));
  await done(q);}
 {const q=await cpage({cb2_weight:[{date:'2026-09-20',v:88.4}],cb2_bulk:'aggr'});let r={};
@@ -1139,8 +1140,9 @@ const cpage=async(seed,cloud,mode)=>{const c=await b.createBrowserContext();cons
    for(let i=0;i<30;i++){const a=await acct(q);if(a&&a.data&&a.data.cb2_bulk==='cut')break;await wait(120);}
    r.acct=(await acct(q)||{data:{}}).data.cb2_bulk;
    const nav=q.waitForNavigation({waitUntil:'load',timeout:15000}).catch(()=>null);await tryEval(q,()=>{location.reload();});await nav;
-   await ready(q);await wait(300);
-   r.after=await tryEval(q,()=>({mode:bulkMode,ls:localStorage.getItem('cb2_bulk'),toast:document.getElementById('toast').innerText}));}
+   await ready(q);
+   const rd=()=>tryEval(q,()=>({mode:bulkMode,ls:localStorage.getItem('cb2_bulk'),toast:document.getElementById('toast').innerText}));
+   r.after=await rd();await wait(600);const again=await rd();if(again&&again.mode!=='cut')r.after=again;}
  T('AD-S1 mirrors: a nutrition mode changed after the last log reaches the account copy and is not reverted at the next launch (a setting counts as a change)',r.acct==='cut'&&!!r.after&&r.after.mode==='cut'&&r.after.ls==='"cut"'&&!/Cloud data loaded/.test(r.after.toast||''),JSON.stringify(r).slice(0,300));
  await done(q);}
 {const q=await cpage({cb2_measure:[{date:'2026-09-27',waist:90,neck:38}],cb2_ts:5000000000000},{ts:1000,data:{cb2_measure:[{date:'2026-09-01',waist:95}],cb2_weight:[{date:'2026-09-01',v:90}]}});let r={};
@@ -1156,8 +1158,8 @@ const cpage=async(seed,cloud,mode)=>{const c=await b.createBrowserContext();cons
  T('AD-S1 mirrors: reloadDB refreshes the Lift phase, so a vault or account restore never leaves the Lift on the wrong programme',!!r&&r.a==='hyper'&&r.b2==='build'&&r.c==='hyper',JSON.stringify(r));
  await done(q);}
 {let ok1=null,bad=null,hang=null;
- {const q=await cpage({cb2_weight:DEMO_W},null,'ok');if(await ready(q)){await wait(200);ok1=await tryEval(q,()=>{switchView('home');return {lives:document.getElementById('dataLives').innerText,ack:(document.getElementById('cloudAck')||{}).textContent,calls:window.__setCalls};});}await done(q);}
- {const q=await cpage({cb2_weight:DEMO_W},null,'fail');await wait(1500);bad=await tryEval(q,async()=>{switchView('home');await new Promise(r=>setTimeout(r,150));return {lives:document.getElementById('dataLives').innerText,ack:(document.getElementById('cloudAck')||{}).textContent,err:_cloudErr,calls:window.__setCalls};});await done(q);}
+ {const q=await cpage({cb2_weight:DEMO_W},null,'ok');if(await ready(q)){for(let i=0;i<40;i++){ok1=await tryEval(q,()=>{switchView('home');return {lives:document.getElementById('dataLives').innerText,ack:(document.getElementById('cloudAck')||{}).textContent,calls:window.__setCalls};});if(ok1&&/Claude account ✓ \d/.test(ok1.lives||'')&&/Saved .* ✓/.test(ok1.ack||''))break;await wait(150);}}await done(q);}
+ {const q=await cpage({cb2_weight:DEMO_W},null,'fail');for(let i=0;i<50;i++){bad=await tryEval(q,async()=>{switchView('home');await new Promise(r=>setTimeout(r,150));return {lives:document.getElementById('dataLives').innerText,ack:(document.getElementById('cloudAck')||{}).textContent,err:_cloudErr,calls:window.__setCalls};});if(bad&&bad.err==='save'&&/failed/.test(bad.ack||''))break;await wait(150);}await done(q);}
  {const q=await cpage({cb2_weight:DEMO_W},null,'hang');let g=null;for(let i=0;i<50&&!(g&&g.err);i++){await wait(150);g=await tryEval(q,()=>({err:_cloudErr,calls:window.__setCalls}));}
    hang=await tryEval(q,async()=>{switchView('home');await new Promise(r=>setTimeout(r,150));return {lives:document.getElementById('dataLives').innerText,ack:(document.getElementById('cloudAck')||{}).textContent,err:_cloudErr,calls:window.__setCalls};});await done(q);}
  T('AD-S1 Data card: "Claude account" ticks with the time only after a write has succeeded; a rejected write shows "last save failed" and never a tick',!!ok1&&/Claude account ✓ \d/.test(ok1.lives||'')&&/Saved .* ✓/.test(ok1.ack||'')&&!!bad&&bad.err==='save'&&/Claude account ✗ last save failed/.test(bad.lives||'')&&!/Claude account ✓/.test(bad.lives||'')&&/failed/.test(bad.ack||''),JSON.stringify({ok1,bad}).slice(0,400));
