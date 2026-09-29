@@ -9,7 +9,11 @@
  *                                        and WAITS for .mc-root; throws when the app never
  *                                        mounts (pass allowNoMount:true to opt out and read
  *                                        page.mcMounted yourself) — E-052
- *   visibleText(page)                  → innerText of .mc-root (never textContent)
+ *   visibleText(page)                  → the text a person can see under .mc-root, from a walk over its
+ *                                        text nodes (IOS27-16: not innerText, which Safari 27 changed to keep
+ *                                        every <option> of a <select>; not a bare textContent, which counts
+ *                                        <style> and hidden nodes)
+ *   visibleWords(page)                 → the number of words in visibleText(page), the count the Part G gates use
  *   assert(name, cond, detail)         → prints "PASS name" / "FAIL name — detail"
  *   done(suite)                        → prints "SUITE <name> <pass>/<total>", exits 1 on any FAIL
  *                                        and on a total of 0 (a suite that asserted nothing) — E-052
@@ -138,13 +142,20 @@ function bundleApp() {
   return out.outputFiles[0].text;
 }
 
-// A tiny window.storage shim over localStorage (mirrors the one dist/index.html carries),
-// installed only when the page has not already been given one by open().
+// A tiny window.storage over localStorage, installed only when the page has not already been given one by open().
+// It keeps the artifact's contract, which Anthropic documents as text only: set() takes a string and refuses anything
+// else with a TypeError (counted on window.__STORAGE_NONTEXT__, so a suite can assert the app never sends a non-string),
+// get() answers { key, value: <the text> }. Until IOS27-04 every double here JSON-encoded whatever it was given, which
+// is why an app writing objects to a text-only store went unseen (E-135).
 const STORAGE_SHIM = [
   "if (!window.storage) {",
+  "  window.__STORAGE_NONTEXT__ = 0;",
   "  window.storage = {",
-  "    async get(k){ try { const v = localStorage.getItem(k); return v === null ? null : { value: JSON.parse(v) }; } catch (e) { return null; } },",
-  "    async set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} return true; }",
+  "    async get(k){ try { const v = localStorage.getItem(k); return v === null ? null : { key: k, value: v }; } catch (e) { return null; } },",
+  "    async set(k, v){",
+  "      if (typeof v !== 'string') { window.__STORAGE_NONTEXT__++; throw new TypeError('window.storage.set: the value must be a string (artifact storage is text only)'); }",
+  "      try { localStorage.setItem(k, v); } catch (e) {} return { key: k, value: v };",
+  "    }",
   "  };",
   "}"
 ].join("\n");
@@ -244,18 +255,22 @@ async function open(page, opts) {
         ui.mode = s.mode;
       }
       if (ui !== null && ui !== undefined) write("mc_ui", ui);
+      /* The seeds above are objects: the copy an older build saved, which the app must still read. Everything the app
+         writes is text, as the artifact's storage requires; a non-string is refused with a TypeError and counted. */
+      window.__STORAGE_NONTEXT__ = 0;
       window.storage = {
         get: async function (k) {
-          if (Object.prototype.hasOwnProperty.call(mem, k)) return { value: mem[k] };
+          if (Object.prototype.hasOwnProperty.call(mem, k)) return { key: k, value: mem[k] };
           try {
             const v = window.localStorage.getItem(k);
-            return v === null ? null : { value: JSON.parse(v) };
+            return v === null ? null : { key: k, value: v };
           } catch (e) { return null; }
         },
         set: async function (k, v) {
+          if (typeof v !== "string") { window.__STORAGE_NONTEXT__++; throw new TypeError("window.storage.set: the value must be a string (artifact storage is text only)"); }
           mem[k] = v;
-          try { window.localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ }
-          return true;
+          try { window.localStorage.setItem(k, v); } catch (e) { /* ignore */ }
+          return { key: k, value: v };
         }
       };
     } catch (e) { /* never break page load from the harness */ }
@@ -310,12 +325,68 @@ async function open(page, opts) {
 
 // ---------------------------------------------------------------- reading the page
 
+/* IOS27-16. Word gates (the landing under 110, every tab under 500) count what a person can see, and the count must not
+   move when a WebKit release changes innerText. Safari 27 made innerText keep the text of every <option> inside a
+   <select> (WebKit 175006854), which would add a whole option list to a count that a person reads as one selected value.
+   So this walks the text nodes under .mc-root and keeps a node when
+     - no ancestor is <style>, <script>, <template>, <noscript>, [hidden] or aria-hidden="true",
+     - its parent has client rects and computes visibility:visible,
+     - and, inside a <select>, it is the selected <option> of a select that is itself visible, counted once.
+   Text nodes in one block container are joined without a break and each new block container starts a new line, so the
+   result reads like innerText and splits into the same words. The same walk is qa/ios.cjs's counter, measured equal to it
+   on every tab; innerText is never used to decide. */
 async function visibleText(page) {
   if (!page || typeof page.evaluate !== "function") throw new Error("harness: visibleText(page) needs a Playwright page");
   return page.evaluate(function () {
-    const el = document.querySelector(".mc-root");
-    return el ? el.innerText : "";          // innerText, never textContent (it includes <style>)
+    const root = document.querySelector(".mc-root");
+    if (!root) return "";
+    const skipTag = { STYLE: 1, SCRIPT: 1, TEMPLATE: 1, NOSCRIPT: 1 };
+    const memo = new Map();
+    const hidden = function (el) {
+      if (memo.has(el)) return memo.get(el);
+      let h = false;
+      if (skipTag[el.tagName] || el.hidden === true || (el.getAttribute && el.getAttribute("aria-hidden") === "true")) h = true;
+      else if (el !== root && el.parentElement) h = hidden(el.parentElement);
+      memo.set(el, h);
+      return h;
+    };
+    const blockOf = function (el) {
+      for (let n = el; n; n = n.parentElement) {
+        if (n === root) return root;
+        const d = getComputedStyle(n).display;
+        if (d !== "inline" && d !== "contents") return n;
+      }
+      return root;
+    };
+    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const lines = [];
+    let n, last = null;
+    while ((n = tw.nextNode())) {
+      const v = n.nodeValue;
+      if (!v || !v.trim()) continue;
+      const p = n.parentElement;
+      if (!p || hidden(p)) continue;
+      const opt = p.closest("option");
+      let blk;
+      if (opt) {
+        const s = opt.closest("select");
+        if (!s || !opt.selected || hidden(s) || !s.getClientRects().length || getComputedStyle(s).visibility !== "visible") continue;
+        blk = s;
+      } else {
+        if (!p.getClientRects().length || getComputedStyle(p).visibility !== "visible") continue;
+        blk = blockOf(p);
+      }
+      if (blk === last && lines.length) lines[lines.length - 1] += v;
+      else lines.push(v);
+      last = blk;
+    }
+    return lines.map(function (l) { return l.replace(/[ \t\r\n]+/g, " ").trim(); }).filter(Boolean).join("\n");
   });
+}
+
+async function visibleWords(page) {
+  const t = await visibleText(page);
+  return t.split(/\s+/).filter(Boolean).length;
 }
 
 module.exports = {
@@ -330,6 +401,7 @@ module.exports = {
   launch: launch,
   open: open,
   visibleText: visibleText,
+  visibleWords: visibleWords,
   assert: assert,
   done: done,
   counts: counts,

@@ -37,7 +37,7 @@ run says which mode it was. `MC_ITERS=<n>` still overrides both.
   browser is present and `install-deps webkit` has been run. Covers: `dist/index.html` booting from a `file://` URL and the
   harness page booting, both with zero page errors; seven tabs in full mode, the landing in simple mode, no `.boundary`;
   the Part G gates re-measured under WebKit with every number printed (landing < 110 words, every tab < 500, 11px type
-  floor, seven touch floors, seven equal-width tabs, no horizontal scroll at 360px and 390px); the `window.storage` path
+  floor, form controls at 16px, nine touch floors (Apple's 44 for `.btn`, `.btn-ic`, `.inp` and `.reveal`), the header buttons at 44×44 with 12px between them, nine equal-width tabs, no horizontal scroll at 360px and 390px); the `window.storage` path
   and the `localStorage` fallback each persisting mode, tab and open sections across a reload; export → wipe → import
   restoring the squad; a mocked 400 clearing `.refbar` with the state unchanged; the D3 block rendering and clearing on
   confirm; 390×844 screenshots to `qa/shots/webkit-<tab>.png`. Bar: `SUITE webkit 30/30`.

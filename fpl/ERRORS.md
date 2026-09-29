@@ -1698,3 +1698,102 @@ NUMBERING, for anyone reading the ledger in order: entries E-096 to E-111 and E-
 section 7 order and by the agents that wrote them, and are appended in the order they were written, so the file is not in
 numeric order. E-098 was never used. Nothing is missing, and nothing is renumbered, because an append-only ledger keeps
 the numbers its commits already cite.
+
+### E-132 · v110 · the plan's Reduce Motion rule left the press scale on every button
+CAUSE: PLAN.md IOS27-12 says to add `.btn:active,.btn-sm:active,.tabi:active,.sec-h:active,.menu-i:active,.inp:active,.reveal:active{transform:none}`
+inside `@media (prefers-reduced-motion: reduce)`. The scale it cancels is set by a base rule whose selector list also carries
+`.mc-root button:active` (specificity 0,2,1), which matches every `<button class="btn">`; the plan's `.btn:active` is 0,2,0 and loses.
+Measured in the sandbox WebKit on a copy of dist carrying the plan's wording, through the CSSOM route ios IOS27-12 uses, with Reduce Motion
+emulated: the plan's rule left `matrix(0.97, 0, 0, 0.97, 0, 0)` on a pressed `.btn`; the shipped rule gives `none`. Nothing that shipped carried
+the plan's wording.
+CAUGHT: 28 Sep 2026, while writing the rule: the specificity of the two selector lists was compared, then measured with a probe. Not caught by a
+suite, because the only check was written against the plan's wording.
+RULE: an override of a state rule takes the specificity of the strongest selector it must beat (here the `.mc-root` prefix on every selector), and the
+static check asks for a twin of equal or higher specificity for every base rule, never for a rule that merely has the same name.
+TEST: visual `Reduce Motion: every :active press-scale rule has a transform:none twin of equal or higher specificity inside prefers-reduced-motion`
+(11 press-scale selectors, 11 twins; with the plan's wording the same check finds 7 twins and names the four `.mc-root` selectors left without one) and
+ios IOS27-12 `a pressed .btn is not scaled`.
+
+### E-134 · v110 · the plan typed "mounts within 4 s" for a navigation that waits 3 s before it falls back to the cache
+CAUSE: PLAN.md IOS27-17 and the ios check written from it asserted that `.mc-root` mounts within 4 s while `index.html` is held for 10 s. The
+plan's own design is a 3 s race, so the answer that beats it cannot start before 3 s, and the cached shell then has to boot. The bound was a
+number typed before anything was measured; the adversarial verifier of ios.cjs measured a controlled reload that opens straight from the cache
+at 3.47 s in this sandbox, so 3 s + that boot is beyond 4 s for any correct worker, and a cache-first one as well. The check could not have
+passed, whatever the worker did.
+CAUGHT: 28 Sep 2026, by the verifier's measurement, before the worker was written. This is the first change this chain makes to a check, made
+under the rule that a check may change only when it is proved wrong against its source, and the replacement asserts the same property at least as
+strictly.
+RULE: a time bound in a check is derived from the timer it tests plus a boot measured in the same run, never typed. Here the property is that the
+page opens from the cached shell without waiting for the network: `.mc-root` mounts no earlier than `RACE_MS` (read out of `dist/sw.js`; the
+network was still held), no later than `RACE_MS` plus the controlled-reload boot plus 1 s, and before the held response is released (read from the
+server's own log). The boot is measured four times, twice before the held reload and twice after it, and the largest is used, because the pool runs three
+WebKit contexts at once and the same reload took 1.3 s alone (standalone probe: prompt 1.34 s, held reload mounted at 4.35 s with the race at
+3.01 s) and up to 2.9 s beside them. Every number is printed.
+TEST: ios `IOS27-17 slow network: ... mounts from the cached shell after the race and before the held response is released, within race +
+controlled-reload boot + 1 s`; with the race removed from `dist/sw.js` (the fetch awaited alone) the page mounts only when the held response is
+released and the check is red.
+
+### E-135 · v110 · the app wrote objects to a store Anthropic documents as text only, and every test double accepted them
+CAUSE: `store.set` passed the raw state object to `window.storage.set`; Anthropic documents artifact storage as text only. Every double in this
+repository (the harness's two, the webkit suite's, the dist shim) JSON-encoded whatever it was given, so a write the real store may refuse could
+not fail here, and the read side returned an object where the real store returns `{ key, value: <string> }`. The doubles were written from what the
+adapter did, not from what the platform documents, which is how the mismatch stayed invisible through every suite.
+CAUGHT: 27 Sep 2026 by the iOS 27 research (plan IOS27-04), from the support page's own words; fixed 28 Sep. Found by reading the documentation,
+not by a suite: no suite could have seen it.
+RULE: a test double keeps the contract of what it stands in for, and refuses what the platform refuses. The harness's `window.storage` and the webkit
+suite's now take text only, throw a TypeError on a non-string and count it on `window.__STORAGE_NONTEXT__`; `get` answers `{ key, value: <text> }`.
+The app writes `JSON.stringify(value)` and reads a string with a guard (unreadable text or a non-object reads as null); an object an older build saved
+still loads, and the harness seeds objects on purpose so every test that seeds state proves it.
+TEST: smoke `IOS27-04-the-app-writes-text-only-to-window-storage-and-reads-its-first-save-back` and its two webkit twins (`IOS27-04-storage-window-storage-...`,
+`IOS27-04-storage-localStorage-...`); ios `IOS27-04 shell A (strict text-only window.storage)`. With `store.set` passing the object again, smoke
+counts the refused writes and goes red.
+
+### E-136 · v110 · the dist storage shim reported success on a write that failed, and the app never looked at the result
+CAUSE: `build.cjs`'s shim wrapped `localStorage.setItem` in a `try` whose `catch` was empty and then resolved `true`; `store.set` returned that
+value, and the two save effects in `useBoot` ignored the promise altogether. A full store, Safari's private browsing and a sandboxed frame all throw
+on `setItem`, so the app lost every change and showed nothing. Measured on the shipped dist before this change: with `setItem` throwing
+QuotaExceededError, `await window.storage.set('k', {a: 1})` resolved `true`.
+CAUGHT: 27 Sep 2026 by the iOS 27 research (plan IOS27-05), measured on the shipped dist; fixed 28 Sep.
+RULE: a storage layer that can fail says so. The shim resolves `false` on a throw and keeps `{ name, message }` on `window.storage.__error`; `store.set`
+resolves `{ ok, reason, mode }`; the app shows "Last change not saved (<reason>). Export now." until the next good write of that key, and, when the first
+save of `mc_ui` does not come back on a read, "This copy is not saving on this device. Export before you close it." (`storeMode`, on `.mc-root` as
+`data-store`). `navigator.storage.persist()` is asked for once, after the first save that was read back in local mode, where it exists.
+TEST: ios `IOS27-05 dist shim: window.storage.set resolves false when localStorage.setItem throws QuotaExceededError`, `IOS27-05 a failed save shows
+'Last change not saved (<reason>). Export now.'`, `IOS27-05 navigator.storage.persist() is called exactly once after the first save`, and shells B and C of
+IOS27-04; with the shim's `catch` resolving `true` again the first two go red.
+
+### E-137 · v110 · the visually-hidden recipe put the status region one pixel outside the viewport, and its sibling recipe for a file input left an unseen control with no edge
+CAUSE: the one status region for IOS27-11 (`Announcer`) took its class from the recipe copied everywhere for screen-reader-only text:
+`position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0)`. The `margin:-1px` moves the box to x = -1 from the left edge
+of the page, so the element walk in qa/ios.cjs (the qa/browser.py walk, ported) read `div.vh[announce] left +1` as horizontal overflow on every
+tab of every context. The same first draft made the file picker for IOS27-14 a 1px clipped `<input type="file">` inside its 44px label; under forced
+colours the audit counted it as a control with no border or outline (2 of 231 controls), although nothing about it can be seen.
+CAUGHT: 28 Sep 2026, by the first ios run against the behaviour work (76/78; the two reds were exactly these). Not caught by a static gate: nothing
+read the rule.
+RULE: a node that has to stay in the accessibility tree and off the screen is `position:absolute;width:1px;height:1px;padding:0;border:0;overflow:hidden;
+clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap`, and never carries a negative margin or offset: the clip already hides it, and a negative
+offset only moves it out of the page. A control a person is meant to use is not made invisible by shrinking it: the file input is laid over its 44px
+label at full size with `opacity:0` (the label's border is the edge people see, `.filebtn:focus-within` its focus ring), so the tap lands on the input
+itself, a screen reader gets a full-size frame, and the audits, which skip a control with no opacity, do not see a control with no edge.
+TEST: components `IOS27-11-the-visually-hidden-rule-clips-to-one-pixel-and-has-no-negative-margin-or-offset-E-137` (red with `margin:-1px` restored,
+proved on a mutated build) and ios `IOS27-01 ... no horizontal overflow by document width, strip scroll box or element walk` and `IOS27-13 forced
+colours 'active' ... every control keeps a border or an outline` (78/78 after the change).
+
+### E-138 · v110 · the word gates were counted with innerText, which a WebKit release moves, and the harness's own visibleText had no caller
+CAUSE: Part G's landing (under 110) and tab (under 500) gates count words in `innerText`. Safari 27 changed `innerText` to keep the text of every
+`<option>` inside a `<select>` (WebKit 175006854), so a count taken with it can rise by a whole option list on a WebKit update with no change to
+what a person sees; measured here, appending a 200-option select moves Chromium's `innerText` count from 2890 to 3090 while the visible words move by
+the one selected value. `qa/harness.cjs` exported `visibleText(page)` for exactly this and returned `innerText`, and nothing called it: the suites
+that gate on words (qa/smoke.cjs at lines 182, 256, 310 and 1014-1039, qa/webkit.js at 164, 338, 408 and 958, qa/smoke_wk.cjs) each read `innerText`
+on their own.
+CAUGHT: 27 Sep 2026 by the iOS 27 research (plan IOS27-16), from the Safari 27 release notes; the ios suite already counts with a text-node walk.
+RULE: a word gate counts what a person can see, from a walk over text nodes that skips `<style>`, `<script>`, `<template>`, `[hidden]` and aria-hidden
+subtrees, nodes whose parent has no client rects or is not `visibility:visible`, and every unselected `<option>` (a visible select's selected option
+counts once). `harness.visibleText(page)` is now that walk (text in one block container joined, each new block a new line, so it splits into the
+same words) and `harness.visibleWords(page)` counts it. Measured through the harness in Chromium at 402x874 on the landing and all nine tabs,
+first paint and every section open (18 readings), it equals the ios suite's counter on every one, and the 200-option fixture moves it by +1 where
+`innerText` moves by +200. The thresholds are unchanged.
+NOT DONE HERE: the gates in qa/smoke.cjs, qa/webkit.js and qa/smoke_wk.cjs still count `innerText`; they are outside this change's file list and are
+named so they are switched to this walk (webkit.js has its own page shell and does not require the harness, so the walk has to be inlined there).
+TEST: components `IOS27-16-harness-visibleText-walks-text-nodes-and-never-reads-innerText-E-138` (red when the function returns `innerText` again,
+proved on a mutated copy) and ios `IOS27-16 parity` and `IOS27-16 stability`.

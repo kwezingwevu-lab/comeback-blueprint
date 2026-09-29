@@ -18,16 +18,21 @@
 <meta name="apple-mobile-web-app-title" content="FPL MC">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
-<style>html,body{margin:0;padding:0}#root{min-height:100vh}</style>
+<style>html,body{margin:0;padding:0}#root{min-height:100vh;min-height:100svh}</style>
 </head>
 <body>
 <div id="root"></div>
 <script>(function(){
   if (window.storage && typeof window.storage.get === 'function') return;
-  window.storage = {
-    get: function(k){ try { var v = localStorage.getItem(k); return Promise.resolve(v === null ? null : { value: JSON.parse(v) }); } catch (e) { return Promise.resolve(null); } },
-    set: function(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} return Promise.resolve(true); }
+  var api = {
+    __shim: 'localStorage', __error: null,
+    get: function(k){ try { var v = localStorage.getItem(k); return Promise.resolve(v === null ? null : { key: k, value: v }); } catch (e) { return Promise.resolve(null); } },
+    set: function(k, v){
+      try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); api.__error = null; return Promise.resolve(true); }
+      catch (e) { api.__error = { name: String(e && e.name ? e.name : 'Error'), message: String(e && e.message ? e.message : e).slice(0, 120) }; return Promise.resolve(false); }
+    }
   };
+  window.storage = api;
 })();</script>
 <script>(() => {
   var __create = Object.create;
@@ -32185,7 +32190,7 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
 textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 
 .card{background:var(--bg2);border:1px solid var(--line);border-radius:14px;margin:12px 0;overflow:hidden}
-.section{background:var(--bg2);border:1px solid var(--line);border-radius:12px;margin:10px 0;overflow:hidden}
+.section{background:var(--bg2);border:1px solid var(--line);border-radius:12px;margin:10px 0;overflow:hidden;scroll-margin-top:calc(73px + var(--sat))}
 .sec-h{min-height:48px;width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;
   padding:10px 12px;background:var(--bg2);border:0;border-bottom:1px solid var(--line);color:var(--text);font-size:14px;font-weight:600;text-align:left;cursor:pointer}
 .sec-h .cv{flex:none;color:var(--dim);transition:transform .15s ease}
@@ -32216,6 +32221,19 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 .note{font-size:11px;line-height:1.5;color:var(--dim);padding:8px 10px;background:var(--bg3);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:8px}
 .note-w{border-left-color:var(--warn)}
 .note-a{border-left-color:var(--pnk)}
+/* iOS 27 \xB7 the storage and update notes sit above every view (IOS27-04, -05, -07, -10) */
+.notes{margin-top:10px}
+.notes>*+*{margin-top:8px}
+.upd{width:100%;border-color:var(--warn)}
+/* iOS 27 \xB7 IOS27-08: a section a menu jump scrolls to stops below the pinned tab strip (65px: 6 + 52 + 6 + its 1px edge)
+   with 8px to spare, and below the status-bar inset in the Home Screen app. IOS27-11: .vh keeps a node in the accessibility
+   tree and off the screen (the one status region). IOS27-14: the file picker is a real input laid over its 44px label
+   button, invisible, so the tap lands on the input itself and a screen reader gets a full-size frame; the label's border
+   is the edge people see, and its focus ring shows when the input has focus. */
+.vh{position:absolute;width:1px;height:1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}
+.filebtn:focus-within{outline:2px solid var(--focus);outline-offset:2px}
 .err{font-size:12px;line-height:1.45;color:var(--text);padding:9px 10px;background:var(--pnk2);border:1px solid var(--pnk);border-radius:9px;word-break:break-word}
 .boundary{margin:12px;padding:14px;border:1px solid var(--pnk);background:var(--pnk2);border-radius:12px;font-size:13px}
 /* C2: --dim was never sized against --pnk2 (3.74 at 11px). On these three surfaces the
@@ -32325,35 +32343,346 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 .labn>div+div{margin-top:6px}
 /* v110 D6 \xB7 the Lab \u2014 END */
 /* v110 interface \u2014 END */
-`, STORE_KEYS = { state: "mc_state", ui: "mc_ui" }, store = {
+`, STORE_KEYS = { state: "mc_state", ui: "mc_ui" };
+  function decodeStored(v) {
+    if (v == null) return null;
+    if (typeof v == "string") {
+      let o;
+      try {
+        o = JSON.parse(v);
+      } catch {
+        return null;
+      }
+      if (typeof o == "string")
+        try {
+          o = JSON.parse(o);
+        } catch {
+          return null;
+        }
+      return o && typeof o == "object" ? o : null;
+    }
+    return typeof v == "object" ? v : null;
+  }
+  function sortedJson(v) {
+    try {
+      return JSON.stringify(v, function(k, x) {
+        if (x && typeof x == "object" && !Array.isArray(x)) {
+          let o = {};
+          return Object.keys(x).sort().forEach(function(q) {
+            o[q] = x[q];
+          }), o;
+        }
+        return x;
+      });
+    } catch {
+      return "";
+    }
+  }
+  function whyNot(e) {
+    let n = e && e.name ? String(e.name) : "", m = e && e.message ? String(e.message) : "";
+    return /quota/i.test(n + " " + m) ? "storage is full" : /security|denied|not allowed|blocked/i.test(n + " " + m) ? "storage is blocked here" : (m || n).replace(/\s+/g, " ").replace(/[.\s]+$/, "").slice(0, 60) || "storage refused the write";
+  }
+  var storeMode = "pending", storeQueue = Promise.resolve(), persistAsked = !1;
+  function windowStore() {
+    try {
+      return typeof window < "u" && window.storage ? window.storage : null;
+    } catch {
+      return null;
+    }
+  }
+  function askForPersistence() {
+    if (!persistAsked)
+      try {
+        if (typeof navigator < "u" && navigator.storage && typeof navigator.storage.persist == "function") {
+          persistAsked = !0;
+          let p = navigator.storage.persist();
+          p && typeof p.then == "function" && p.then(function() {
+          }, function() {
+          });
+        }
+      } catch {
+      }
+  }
+  async function readBack(key, via) {
+    try {
+      if (via === "window") {
+        let r2 = await windowStore().get(key);
+        return r2 == null ? null : decodeStored(r2 && typeof r2 == "object" && "value" in r2 ? r2.value : r2);
+      }
+      return decodeStored(window.localStorage.getItem(key));
+    } catch {
+      return null;
+    }
+  }
+  var store = {
     async get(key) {
       try {
-        if (typeof window < "u" && window.storage && typeof window.storage.get == "function") {
-          let r2 = await window.storage.get(key);
-          return r2 == null ? null : r2 && typeof r2 == "object" && "value" in r2 ? r2.value : r2;
+        let S = windowStore();
+        if (S && typeof S.get == "function") {
+          let r2 = await S.get(key);
+          return r2 == null ? null : decodeStored(r2 && typeof r2 == "object" && "value" in r2 ? r2.value : r2);
         }
       } catch {
       }
       try {
-        let s = window.localStorage.getItem(key);
-        return s === null ? null : JSON.parse(s);
+        return decodeStored(window.localStorage.getItem(key));
       } catch {
         return null;
       }
     },
-    async set(key, value) {
-      try {
-        if (typeof window < "u" && window.storage && typeof window.storage.set == "function")
-          return await window.storage.set(key, value), !0;
-      } catch {
-      }
-      try {
-        return window.localStorage.setItem(key, JSON.stringify(value)), !0;
-      } catch {
-        return !1;
-      }
+    /* resolves { ok, reason, mode } and never rejects: reason is empty on success, mode is storeMode after this write */
+    set(key, value) {
+      let run = async function() {
+        try {
+          let text;
+          try {
+            text = JSON.stringify(value);
+          } catch {
+            text = void 0;
+          }
+          if (typeof text != "string") return { ok: !1, reason: "the data could not be written as text", mode: storeMode };
+          let S = windowStore(), via = "", reason = "", tryLocal = !(S && typeof S.set == "function");
+          if (!tryLocal)
+            try {
+              await S.set(key, text) === !1 ? reason = whyNot(S.__error) : via = "window";
+            } catch (e) {
+              reason = whyNot(e), tryLocal = !0;
+            }
+          if (tryLocal)
+            try {
+              window.localStorage.setItem(key, text), via = "local", reason = "";
+            } catch (e) {
+              reason = whyNot(e);
+            }
+          let ok = via !== "";
+          if (ok && key === STORE_KEYS.ui && (storeMode === "pending" || storeMode === "none")) {
+            let back = await readBack(key, via);
+            storeMode = back && sortedJson(back) === sortedJson(value) ? via === "window" && !S.__shim ? "artifact" : "local" : "none";
+          } else !ok && storeMode === "pending" && (storeMode = "none");
+          return ok && storeMode === "local" && askForPersistence(), { ok, reason: ok ? "" : reason, mode: storeMode };
+        } catch (e) {
+          return { ok: !1, reason: whyNot(e), mode: storeMode };
+        }
+      }, p = storeQueue.then(run);
+      return storeQueue = p.then(function() {
+      }, function() {
+      }), p;
     }
   };
+  function hostIsDist() {
+    try {
+      return !!(typeof window < "u" && window.storage && window.storage.__shim);
+    } catch {
+      return !1;
+    }
+  }
+  function runsAsApp() {
+    try {
+      return typeof window > "u" ? !1 : typeof window.matchMedia == "function" && window.matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches ? !0 : typeof navigator < "u" && "standalone" in navigator && navigator.standalone === !0;
+    } catch {
+      return !1;
+    }
+  }
+  function pwaUpdated() {
+    try {
+      return !!(typeof window < "u" && window.__PWA__ && window.__PWA__.updated === !0);
+    } catch {
+      return !1;
+    }
+  }
+  function reloadIntoNewBuild() {
+    let go = function() {
+      try {
+        window.location.reload();
+      } catch {
+      }
+    };
+    try {
+      let sw = navigator.serviceWorker;
+      if (!sw || typeof sw.getRegistration != "function") {
+        go();
+        return;
+      }
+      sw.getRegistration().then(function(reg) {
+        let w = reg && reg.waiting;
+        if (!w) {
+          go();
+          return;
+        }
+        let done = !1, once = function() {
+          done || (done = !0, go());
+        };
+        try {
+          sw.addEventListener("controllerchange", once);
+        } catch {
+        }
+        try {
+          w.postMessage({ type: "SKIP_WAITING" });
+        } catch {
+          once();
+          return;
+        }
+        setTimeout(once, 2e3);
+      }, go);
+    } catch {
+      go();
+    }
+  }
+  async function checkForNewBuild() {
+    let sw = typeof navigator < "u" ? navigator.serviceWorker : null;
+    if (!sw || typeof sw.getRegistration != "function") return "reload";
+    let reg = await sw.getRegistration();
+    if (!reg || typeof reg.update != "function") return "reload";
+    let before = pwaUpdated(), timer = null;
+    return await Promise.race([
+      reg.update(),
+      new Promise(function(resolve, reject) {
+        timer = setTimeout(function() {
+          reject(new Error("the server did not answer in 15 seconds"));
+        }, 15e3);
+      })
+    ]).then(function() {
+      timer && clearTimeout(timer);
+    }, function(e) {
+      throw timer && clearTimeout(timer), e;
+    }), reg.installing || reg.waiting || pwaUpdated() && !before ? "new" : "same";
+  }
+  function landOn(sectionId) {
+    try {
+      if (typeof window > "u" || typeof document > "u") return;
+      let s = sectionId ? document.querySelector('[data-section="' + sectionId + '"]') : null;
+      if (!s) {
+        window.scrollTo(0, 0);
+        return;
+      }
+      typeof s.scrollIntoView == "function" && s.scrollIntoView({ block: "start" });
+      let h = s.querySelector(".sec-h");
+      h && typeof h.focus == "function" && h.focus({ preventScroll: !0 });
+    } catch {
+    }
+  }
+  function refreshMessage(err, dist, okMsg, gw) {
+    return err ? "Refresh failed: " + String(err).replace(/\s+/g, " ").trim().slice(0, 60) : dist ? okMsg ? "Nothing newer. GW" + gw + " data is the latest." : "A newer build was found." : "Refreshed, GW" + gw + " data";
+  }
+  function ariaSpeak(msg) {
+    try {
+      let b = typeof document < "u" ? document.body : null;
+      if (b && typeof b.ariaNotify == "function")
+        return b.ariaNotify(msg), !0;
+    } catch {
+    }
+    return !1;
+  }
+  function canShareFiles() {
+    try {
+      return typeof File != "function" || typeof navigator > "u" || typeof navigator.share != "function" || typeof navigator.canShare != "function" ? !1 : !!navigator.canShare({ files: [new File(["{}"], "mc_state.json", { type: "application/json" })] });
+    } catch {
+      return !1;
+    }
+  }
+  function tryShare(json, name) {
+    try {
+      if (typeof File != "function" || typeof navigator > "u" || typeof navigator.share != "function" || typeof navigator.canShare != "function") return null;
+      let f = new File([json], name, { type: "application/json" });
+      return navigator.canShare({ files: [f] }) ? navigator.share({ files: [f], title: "FPL MC state" }).then(function() {
+        return !0;
+      }, function(e) {
+        return !!(e && e.name === "AbortError");
+      }) : null;
+    } catch {
+      return null;
+    }
+  }
+  function saveAsFile(json, name) {
+    try {
+      let blob = new Blob([json], { type: "application/json" }), url = URL.createObjectURL(blob), a = document.createElement("a");
+      a.href = url, a.download = name, document.body.appendChild(a), a.click(), document.body.removeChild(a), setTimeout(function() {
+        URL.revokeObjectURL(url);
+      }, 0);
+    } catch {
+    }
+  }
+  function readFileText(file) {
+    return file && typeof file.text == "function" ? file.text() : new Promise(function(resolve, reject) {
+      try {
+        let r2 = new FileReader();
+        r2.onload = function() {
+          resolve(String(r2.result));
+        }, r2.onerror = function() {
+          reject(r2.error || new Error("the file could not be read"));
+        }, r2.readAsText(file);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+  function bytesText(n) {
+    let v = Number(n);
+    return !isFinite(v) || v < 0 ? "n/a" : v < 1e3 ? Math.round(v) + " B" : v < 1e6 ? Math.round(v / 1e3) + " kB" : v < 1e9 ? (v / 1e6).toFixed(1) + " MB" : (v / 1e9).toFixed(1) + " GB";
+  }
+  function readDevice(mode, mem) {
+    let w = typeof window < "u" && window ? window : null, nav = typeof navigator < "u" && navigator ? navigator : null, fin = function(v) {
+      return typeof v == "number" && isFinite(v);
+    }, size = function(a, b) {
+      return fin(a) && fin(b) ? a + "\xD7" + b : "n/a";
+    }, mq = function(q) {
+      try {
+        return w && typeof w.matchMedia == "function" ? !!w.matchMedia(q).matches : null;
+      } catch {
+        return null;
+      }
+    }, yn = function(v) {
+      return v === null ? "n/a" : v ? "yes" : "no";
+    }, has2 = function(f) {
+      try {
+        return f() ? "yes" : "no";
+      } catch {
+        return "no";
+      }
+    }, insets = "n/a";
+    try {
+      if (typeof document < "u" && document.body && w && typeof w.getComputedStyle == "function") {
+        let p = document.createElement("div");
+        p.setAttribute("aria-hidden", "true"), p.style.cssText = "position:absolute;visibility:hidden;width:0;height:0;padding:var(--sat) var(--sar) var(--sab) var(--sal)", document.body.appendChild(p);
+        let cs = w.getComputedStyle(p), v = [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft];
+        document.body.removeChild(p), v.every(function(x) {
+          return /^-?\d+(\.\d+)?px$/.test(x);
+        }) && (insets = "top " + v[0] + " \xB7 right " + v[1] + " \xB7 bottom " + v[2] + " \xB7 left " + v[3]);
+      }
+    } catch {
+      insets = "n/a";
+    }
+    let modes = ["standalone", "fullscreen", "browser"].map(function(m2) {
+      return m2 + " " + yn(mq("(display-mode: " + m2 + ")"));
+    }).join(" \xB7 "), pref = function(feature, values) {
+      for (let i = 0; i < values.length; i++) if (mq("(" + feature + ": " + values[i][0] + ")") === !0) return values[i][1];
+      return "n/a";
+    }, sw = w && w.__PWA__ && typeof w.__PWA__.sw == "string" && w.__PWA__.sw ? w.__PWA__.sw : "n/a", m = typeof mode == "string" && ["artifact", "local", "none", "pending"].indexOf(mode) >= 0 ? mode : "n/a", mm = mem && typeof mem == "object" ? mem : {};
+    return [
+      ["Window", w ? size(w.innerWidth, w.innerHeight) : "n/a"],
+      ["Screen", w && w.screen ? size(w.screen.width, w.screen.height) : "n/a"],
+      ["Pixel ratio", w && fin(w.devicePixelRatio) ? String(w.devicePixelRatio) : "n/a"],
+      ["Safe area", insets],
+      ["Display mode", modes],
+      ["navigator.standalone", nav && "standalone" in nav ? String(nav.standalone === !0) : "n/a"],
+      ["Storage mode", m],
+      ["Persistent storage", typeof mm.persisted == "string" ? mm.persisted : "n/a"],
+      ["Storage used", typeof mm.usage == "string" ? mm.usage : "n/a"],
+      ["Service worker", sw],
+      ["ariaNotify", has2(function() {
+        return typeof document < "u" && document.body && typeof document.body.ariaNotify == "function";
+      })],
+      ["Share sheet for files", canShareFiles() ? "yes" : has2(function() {
+        return typeof nav.share == "function";
+      }) === "yes" ? "share only" : "no"],
+      ["storage.persist()", has2(function() {
+        return typeof nav.storage.persist == "function";
+      })],
+      ["Contrast", pref("prefers-contrast", [["more", "more"], ["less", "less"], ["custom", "custom"], ["no-preference", "no preference"]])],
+      ["Reduced motion", pref("prefers-reduced-motion", [["reduce", "reduce"], ["no-preference", "no preference"]])],
+      ["Colour scheme", pref("prefers-color-scheme", [["dark", "dark"], ["light", "light"]])]
+    ];
+  }
   function nowISO() {
     try {
       if (typeof window < "u" && window.__NOW__) return String(window.__NOW__);
@@ -32622,13 +32951,13 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
   function useBoot(live) {
     let [ready, setReady] = import_react52.default.useState(!1), [state, setState] = import_react52.default.useState(function() {
       return seedState(live);
-    }), [ui, setUi] = import_react52.default.useState({ mode: "simple", tab: "command", open: {}, reveals: {} });
-    return import_react52.default.useEffect(function() {
+    }), [ui, setUi] = import_react52.default.useState({ mode: "simple", tab: "command", open: {}, reveals: {} }), [fresh, setFresh] = import_react52.default.useState(!1), [save, setSave] = import_react52.default.useState({ mode: storeMode, err: { ui: "", state: "" } });
+    import_react52.default.useEffect(function() {
       let dead = !1;
       return (async function() {
         let savedState = await store.get(STORE_KEYS.state), savedUi = await store.get(STORE_KEYS.ui);
         if (dead) return;
-        savedState && setState(sanitiseState(savedState));
+        savedState && setState(sanitiseState(savedState)), setFresh(!savedState);
         let base = sanitiseState(savedState || {}).ui, u = savedUi && typeof savedUi == "object" ? savedUi : base;
         setUi({
           mode: u.mode === "full" ? "full" : "simple",
@@ -32641,11 +32970,24 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
       })(), function() {
         dead = !0;
       };
-    }, []), import_react52.default.useEffect(function() {
-      ready && store.set(STORE_KEYS.ui, ui);
-    }, [ready, ui]), import_react52.default.useEffect(function() {
-      ready && store.set(STORE_KEYS.state, state);
-    }, [ready, state]), { ready, state, setState, ui, setUi };
+    }, []);
+    let noted = import_react52.default.useCallback(function(key, r2) {
+      setSave(function(s) {
+        let why = r2.ok ? "" : r2.reason;
+        if (s.mode === r2.mode && s.err[key] === why) return s;
+        let err = { ui: s.err.ui, state: s.err.state };
+        return err[key] = why, { mode: r2.mode, err };
+      });
+    }, []);
+    return import_react52.default.useEffect(function() {
+      ready && store.set(STORE_KEYS.ui, ui).then(function(r2) {
+        noted("ui", r2);
+      });
+    }, [ready, ui, noted]), import_react52.default.useEffect(function() {
+      ready && store.set(STORE_KEYS.state, state).then(function(r2) {
+        noted("state", r2);
+      });
+    }, [ready, state, noted]), { ready, state, setState, ui, setUi, fresh, save };
   }
   var Boundary = class extends import_react52.default.Component {
     constructor(props) {
@@ -33214,6 +33556,83 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
       ] })
     ] });
   }
+  function StoreNotes(props) {
+    let s = props.save && typeof props.save == "object" ? props.save : {}, err = s.err && typeof s.err == "object" ? s.err : {}, why = typeof err.state == "string" && err.state ? err.state : typeof err.ui == "string" ? err.ui : "", none = s.mode === "none", msg = typeof props.check == "string" ? props.check : "";
+    return !props.update && !none && !why && !props.fresh && !msg ? null : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "notes", children: [
+      props.update ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "btn upd", "data-testid": "update-ready", onClick: props.onReload, children: "New build ready. Tap to reload." }) : null,
+      none ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "note note-w", "data-testid": "store-none", children: "This copy is not saving on this device. Export before you close it." }) : null,
+      !none && why ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "note note-w", "data-testid": "store-err", children: [
+        "Last change not saved (",
+        why,
+        "). Export now."
+      ] }) : null,
+      props.fresh ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "btn upd", "data-testid": "new-here", onClick: props.onImport, children: "New here? Import the export from Safari." }) : null,
+      msg ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "note", "data-testid": "check-msg", children: msg }) : null
+    ] });
+  }
+  function Announcer(props) {
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "vh", role: "status", "data-testid": "announce", children: typeof props.text == "string" ? props.text : "" });
+  }
+  function DeviceReadout(props) {
+    let [, setTick] = import_react52.default.useState(0), [mem, setMem] = import_react52.default.useState({ persisted: "checking", usage: "checking" }), [said, setSaid] = import_react52.default.useState("");
+    import_react52.default.useEffect(function() {
+      let h = function() {
+        setTick(function(t) {
+          return t + 1;
+        });
+      };
+      try {
+        window.addEventListener("resize", h), window.addEventListener("orientationchange", h);
+      } catch {
+      }
+      return function() {
+        try {
+          window.removeEventListener("resize", h), window.removeEventListener("orientationchange", h);
+        } catch {
+        }
+      };
+    }, []), import_react52.default.useEffect(function() {
+      let dead = !1, put = function(k, v) {
+        dead || setMem(function(m) {
+          let o = { persisted: m.persisted, usage: m.usage };
+          return o[k] = v, o;
+        });
+      }, st = typeof navigator < "u" && navigator ? navigator.storage : null;
+      try {
+        st && typeof st.persisted == "function" ? st.persisted().then(function(v) {
+          put("persisted", v ? "granted" : "not granted");
+        }, function() {
+          put("persisted", "n/a");
+        }) : put("persisted", "n/a"), st && typeof st.estimate == "function" ? st.estimate().then(function(e) {
+          put("usage", bytesText(e && e.usage) + " of " + bytesText(e && e.quota));
+        }, function() {
+          put("usage", "n/a");
+        }) : put("usage", "n/a");
+      } catch {
+        put("persisted", "n/a"), put("usage", "n/a");
+      }
+      return function() {
+        dead = !0;
+      };
+    }, []);
+    let rows = readDevice(props.mode, mem), text = "FPL Mission Control " + APP_VERSION + `
+` + rows.map(function(r2) {
+      return r2[0] + ": " + r2[1];
+    }).join(`
+`);
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { "data-testid": "device-readout", children: [
+      rows.map(function(r2) {
+        return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KV, { k: r2[0], v: r2[1] }, r2[0]);
+      }),
+      canCopy() ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "btn", "data-testid": "device-copy", onClick: function() {
+        typeof props.onCopy == "function" && props.onCopy(text).then(function(ok) {
+          setSaid(ok ? "copied to the clipboard" : "the clipboard refused; select the lines above instead");
+        });
+      }, children: "Copy" }) : null,
+      said ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: said }) : null,
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: "Read from this device each time it draws. A field that reads n/a is one this browser does not offer." })
+    ] });
+  }
   function Header(props) {
     let ctx = props.ctx;
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "hdr", children: [
@@ -33226,11 +33645,11 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
             "FT ",
             ctx.ft
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+          props.busy ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Refreshing\u2026" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
             money(ctx.bank),
             " bank"
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: APP_VERSION })
+          props.busy ? null : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: APP_VERSION })
         ] })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "hdr-r", children: [
@@ -33239,7 +33658,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
           {
             className: "btn-sm btn-ic",
             "data-testid": "refresh",
-            "aria-label": "Refresh player data",
+            "aria-label": props.check ? "Check for new data" : "Refresh player data",
             onClick: props.onRefresh,
             "aria-busy": props.busy ? "true" : "false",
             children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefreshCw, { "aria-hidden": "true" })
@@ -35190,6 +35609,13 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
             value: txt,
             onChange: function(e) {
               setTxt(e.target.value);
+            },
+            autoCapitalize: "none",
+            autoCorrect: "off",
+            spellCheck: !1,
+            enterKeyHint: "done",
+            onKeyDown: function(e) {
+              e.key !== "Enter" || e.nativeEvent && e.nativeEvent.isComposing || (e.preventDefault(), changed && props.onLeague(typed === "" ? null : typed), e.currentTarget.blur());
             }
           }
         ),
@@ -35528,11 +35954,11 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
     }
   }
   function TabLab(props) {
-    let ctx = props.ctx, ui = props.ui, on = props.on, state = props.state, rf = props.refresh, sec = function(id) {
+    let ctx = props.ctx, ui = props.ui, on = props.on, state = props.state, rf = props.refresh, sharing = canShareFiles(), sec = function(id) {
       return openOf(ui, "lab", id);
     }, tour = sec("lab-tour") ? tournament(ctx.live) : null, mwf = sec("lab-minutes") ? minutesWalkForward(ctx.live, { bins: 5 }) : null, mfold = mwf && mwf.folds.filter(function(f) {
       return f.fitted;
-    }).slice(-1)[0] || null, mterms = mwf ? minutesFit(ctx.live, 0, {}).terms : [], tags = sec("lab-ts") ? overUnderTags(ctx.live) : null, [imp, setImp] = import_react52.default.useState(""), [copied, setCopied] = import_react52.default.useState(""), json = JSON.stringify(state, null, 2), bars = tour ? tour.models.slice().sort(function(a, b) {
+    }).slice(-1)[0] || null, mterms = mwf ? minutesFit(ctx.live, 0, {}).terms : [], tags = sec("lab-ts") ? overUnderTags(ctx.live) : null, [imp, setImp] = import_react52.default.useState(""), [copied, setCopied] = import_react52.default.useState(""), [fileErr, setFileErr] = import_react52.default.useState(""), json = JSON.stringify(state, null, 2), bars = tour ? tour.models.slice().sort(function(a, b) {
       return (b.spearman || 0) - (a.spearman || 0);
     }) : [], chart = bars.filter(function(m) {
       return m.spearman !== null;
@@ -35566,8 +35992,8 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
         ] })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Section, { id: "lab-refresh", title: "Refresh", open: sec("lab-refresh"), onToggle: on.sec, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: "Model and search pairing" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        rf.dist ? null : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: "Model and search pairing" }),
+        rf.dist ? null : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "select",
           {
             className: "inp",
@@ -35584,12 +36010,16 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
         ),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { className: "btn", "data-testid": "refresh-run", onClick: rf.onRefresh, disabled: rf.busy, children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefreshCw, { "aria-hidden": "true" }),
-          rf.busy ? "Checking" : "Check flags and prices"
+          rf.busy ? "Checking" : rf.dist ? "Check for new data" : "Check flags and prices"
         ] }),
         rf.busy ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "refbar", "data-testid": "refbar-lab", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}) }) : null,
         rf.err ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "err", "data-testid": "refresh-err", children: rf.err }) : null,
         rf.okMsg ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "note", children: rf.okMsg }) : null,
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dim", children: [
+        rf.dist ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dim", children: [
+          "Asks the server for a newer build of this page. The player snapshot travels inside the page, so a newer build brings newer flags and prices. Nothing is sent to Anthropic from here. ",
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tier, { k: "T0" }),
+          " once the new build loads"
+        ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dim", children: [
           "One search, one JSON reply, four thousand tokens so the search results cannot eat the answer. A failure leaves the snapshot exactly as it was. ",
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tier, { k: "T0" }),
           " after it lands"
@@ -35887,7 +36317,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
             props.onDownload(json);
           }, children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Download, { "aria-hidden": "true" }),
-            "Download"
+            sharing ? "Share or save" : "Download"
           ] }),
           canCopy() ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "btn", "data-testid": "export-copy", onClick: function() {
             props.onCopy(json).then(function(ok) {
@@ -35896,6 +36326,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
           }, children: "Copy" }) : null
         ] }),
         copied ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: copied }) : null,
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: "On an iPhone this opens the share sheet: choose Save to Files. Elsewhere the file downloads." }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: "The repository is the permanent store: commit the exported file as the state of record. The app's own storage is per device and not linked to any drive." })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Section, { id: "lab-import", title: "Import", open: sec("lab-import"), onToggle: on.sec, children: [
@@ -35906,18 +36337,41 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
             "data-testid": "import-text",
             placeholder: "Paste an exported state",
             "aria-label": "Exported state",
+            autoCapitalize: "none",
+            autoCorrect: "off",
+            spellCheck: !1,
             value: imp,
             onChange: function(e) {
               setImp(e.target.value);
             }
           }
         ),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "btn filebtn", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Upload, { "aria-hidden": "true" }),
+          "Import from a file",
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "file", accept: "application/json,.json", "data-testid": "import-file", "aria-label": "Import a state file", onChange: function(e) {
+            let el2 = e.target, f = el2.files && el2.files[0];
+            if (f) {
+              if (setFileErr(""), f.size > 5e6) {
+                setFileErr("That file is too large to be an export."), el2.value = "";
+                return;
+              }
+              readFileText(f).then(function(t) {
+                props.onImport(t);
+              }, function(err) {
+                setFileErr("That file could not be read: " + shortErr(err));
+              }), el2.value = "";
+            }
+          } })
+        ] }),
+        fileErr ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "err", children: fileErr }) : null,
         imp.trim() ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "btn btn-go", "data-testid": "import-apply", onClick: function() {
           props.onImport(imp), setImp("");
         }, children: "Apply" }) : null,
         props.importErr ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "err", children: props.importErr }) : null,
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: "Anything unreadable is dropped rather than trusted: the squad is capped at fifteen and de-duplicated on id." })
       ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, { id: "lab-device", title: "This device", open: sec("lab-device"), onToggle: on.sec, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DeviceReadout, { mode: props.storeMode, onCopy: props.onCopy }) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, { id: "lab-guide", title: "Guide", open: sec("lab-guide"), onToggle: on.sec, children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dim", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "The first tab is the only screen you need before a deadline: it says what to do, by when, and what could spoil it. Everything else is the working behind it." }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "Plan holds the transfer protocol, the wildcard fifteen, the captain table and the timing grid. Squad is your fifteen with selling prices and ownership. Rivals is the six leagues that can still be won. Draft is the other competition. Chips is what is left and when a window appears. Lab is the data, the models and the export." }),
@@ -35985,9 +36439,39 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
     }
   }
   function App() {
-    let now = useNow(), [live, setLive] = import_react52.default.useState(initialLive), boot = useBoot(live), state = boot.state, ui = boot.ui, [menuOpen, setMenuOpen] = import_react52.default.useState(!1), [busy, setBusy] = import_react52.default.useState(!1), [refErr, setRefErr] = import_react52.default.useState(null), [okMsg, setOkMsg] = import_react52.default.useState(""), [importErr, setImportErr] = import_react52.default.useState(null), [simLeague, setSimLeague] = import_react52.default.useState(0), ctx = import_react52.default.useMemo(function() {
+    let now = useNow(), [live, setLive] = import_react52.default.useState(initialLive), boot = useBoot(live), state = boot.state, ui = boot.ui, [menuOpen, setMenuOpen] = import_react52.default.useState(!1), [busy, setBusy] = import_react52.default.useState(!1), [refErr, setRefErr] = import_react52.default.useState(null), [okMsg, setOkMsg] = import_react52.default.useState(""), [importErr, setImportErr] = import_react52.default.useState(null), [simLeague, setSimLeague] = import_react52.default.useState(0), isDist = import_react52.default.useMemo(hostIsDist, []), isApp = import_react52.default.useMemo(runsAsApp, []), [swNew, setSwNew] = import_react52.default.useState(pwaUpdated), [checkMsg, setCheckMsg] = import_react52.default.useState(""), [imported, setImported] = import_react52.default.useState(!1), [said, setSaid] = import_react52.default.useState(""), wasBusy = import_react52.default.useRef(!1);
+    import_react52.default.useEffect(function() {
+      let h = function() {
+        setSwNew(!0);
+      };
+      return window.addEventListener("mc-sw-updated", h), function() {
+        window.removeEventListener("mc-sw-updated", h);
+      };
+    }, []), import_react52.default.useEffect(function() {
+      if (!checkMsg) return;
+      let h = setTimeout(function() {
+        setCheckMsg("");
+      }, 8e3);
+      return function() {
+        clearTimeout(h);
+      };
+    }, [checkMsg]);
+    let ctx = import_react52.default.useMemo(function() {
       return buildCtx(live, state, now);
-    }, [live, state, now]), premLocked = !!(boot.ui && boot.ui.reveals && boot.ui.reveals["wc-lock"]), plan = import_react52.default.useMemo(function() {
+    }, [live, state, now]);
+    import_react52.default.useEffect(function() {
+      if (busy) {
+        wasBusy.current = !0, setSaid(function(t) {
+          return t && "";
+        });
+        return;
+      }
+      if (!wasBusy.current) return;
+      wasBusy.current = !1;
+      let msg = refreshMessage(refErr, isDist, okMsg, ctx.nextEvent);
+      ariaSpeak(msg) || setSaid(msg);
+    }, [busy]);
+    let premLocked = !!(boot.ui && boot.ui.reveals && boot.ui.reveals["wc-lock"]), plan = import_react52.default.useMemo(function() {
       return buildPlan(ctx, premLocked);
     }, [ctx, premLocked]), mce = import_react52.default.useMemo(function() {
       return MCEngine.create(MC);
@@ -36038,8 +36522,14 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
           });
         }
       };
-    }, [setUi, setState, known]), goTab = import_react52.default.useCallback(function(tab) {
-      setUi(function(u) {
+    }, [setUi, setState, known]), [nav, setNav] = import_react52.default.useState({ n: 0, id: "" });
+    import_react52.default.useLayoutEffect(function() {
+      nav.n > 0 && landOn(nav.id);
+    }, [nav]);
+    let goTab = import_react52.default.useCallback(function(tab) {
+      setNav(function(v) {
+        return { n: v.n + 1, id: "" };
+      }), setUi(function(u) {
         return { mode: u.mode, tab, open: u.open, reveals: u.reveals };
       });
     }, [setUi]), setMode = import_react52.default.useCallback(function(mode) {
@@ -36047,7 +36537,9 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
         return { mode, tab: u.tab, open: u.open, reveals: u.reveals };
       });
     }, [setUi]), jump = import_react52.default.useCallback(function(sectionId) {
-      setMenuOpen(!1), setUi(function(u) {
+      setMenuOpen(!1), setNav(function(v) {
+        return { n: v.n + 1, id: sectionId };
+      }), setUi(function(u) {
         let o = {};
         return Object.keys(u.open).forEach(function(k) {
           o[k] = u.open[k];
@@ -36080,18 +36572,19 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
       try {
         let parsed = JSON.parse(text), clean = sanitiseState(parsed, known);
         if (!clean.squad.length) throw new Error("no squad in that file");
-        setState(clean);
+        setState(clean), setImported(!0);
       } catch (e) {
         setImportErr(shortErr(e));
       }
     }, [setState, known]), onDownload = import_react52.default.useCallback(function(json) {
-      try {
-        let blob = new Blob([json], { type: "application/json" }), url = URL.createObjectURL(blob), a = document.createElement("a");
-        a.href = url, a.download = "mc_state_gw" + ctx.nextEvent + ".json", document.body.appendChild(a), a.click(), document.body.removeChild(a), setTimeout(function() {
-          URL.revokeObjectURL(url);
-        }, 0);
-      } catch {
+      let name = "mc_state_gw" + ctx.nextEvent + ".json", p = tryShare(json, name);
+      if (!p) {
+        saveAsFile(json, name);
+        return;
       }
+      p.then(function(done) {
+        done || saveAsFile(json, name);
+      });
     }, [ctx.nextEvent]), onCopy = import_react52.default.useCallback(function(json) {
       try {
         return navigator.clipboard.writeText(json).then(function() {
@@ -36144,7 +36637,29 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
           setBusy(!1);
         }
       }
-    }, [busy, ctx, plan, live, state.refresh.pair, setState, known]), pct = gwProgress(ctx), showLanding = ui.mode === "simple" || ui.tab === "command", hist = live.history && live.history.current || [], lastRow = hist.length ? hist[hist.length - 1] : null, evNow = (ctx.events || []).filter(function(e) {
+    }, [busy, ctx, plan, live, state.refresh.pair, setState, known]), onCheck = import_react52.default.useCallback(async function() {
+      if (!busy) {
+        setBusy(!0), setRefErr(null), setOkMsg(""), setCheckMsg(""), setMenuOpen(!1);
+        try {
+          let r2 = await checkForNewBuild();
+          if (r2 === "reload") {
+            try {
+              window.location.reload();
+            } catch {
+            }
+            return;
+          }
+          if (r2 === "same") {
+            let at = sastText(live && live.fetched_at), m = "Nothing newer: this is the latest build" + (at ? ", with the snapshot taken " + at + " SAST" : "") + ".";
+            setCheckMsg(m), setOkMsg(m);
+          }
+        } catch (e) {
+          setRefErr("Could not check for a newer build: " + shortErr(e));
+        } finally {
+          setBusy(!1);
+        }
+      }
+    }, [busy, live]), pct = gwProgress(ctx), showLanding = ui.mode === "simple" || ui.tab === "command", hist = live.history && live.history.current || [], lastRow = hist.length ? hist[hist.length - 1] : null, evNow = (ctx.events || []).filter(function(e) {
       return Number(e.id) === ctx.currentEvent;
     })[0], body = function() {
       return ui.mode === "simple" ? null : ui.tab === "command" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabCommand, { ctx, ui, on, mc }) : ui.tab === "plan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabPlan, { ctx, ui, on, plan, onConfirm, mc }) : ui.tab === "squad" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabSquad, { ctx, ui, on, onConfirm, mc }) : ui.tab === "rivals" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabRivals, { ctx, ui, on, plan, simLeague, onSimLeague: setSimLeague, onConfirm, mc }) : ui.tab === "draft" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabDraft, { ctx, ui, on, state, onLeague, mc }) : ui.tab === "chips" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabChips, { ctx, ui, on, plan, onConfirm, mc }) : ui.tab === "odds" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabOdds, { ctx, ui, on, mc }) : ui.tab === "review" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabReview, { ctx, ui, on, mc }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -36158,14 +36673,16 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
           onCopy,
           onImport,
           importErr,
-          refresh: { busy, err: refErr, okMsg, onRefresh, onPair },
+          storeMode: boot.save.mode,
+          refresh: { busy, err: refErr, okMsg, onRefresh: isDist ? onCheck : onRefresh, onPair, dist: isDist },
           mc
         }
       );
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mc-root", "data-tokens": TOKENS.length, "data-mode": ui.mode, "data-view": ui.tab, "data-gw": ctx.nextEvent, children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mc-root", "data-tokens": TOKENS.length, "data-mode": ui.mode, "data-view": ui.tab, "data-gw": ctx.nextEvent, "data-store": boot.save.mode, children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("style", { children: STYLE }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Header, { ctx, onRefresh, onMenu: function() {
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Announcer, { text: said }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Header, { ctx, onRefresh: isDist ? onCheck : onRefresh, check: isDist, onMenu: function() {
         setMenuOpen(!menuOpen);
       }, menuOpen, busy }),
       busy ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "refbar", "data-testid": "refbar", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}) }) : null,
@@ -36173,6 +36690,19 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
       menuOpen ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Menu, { mode: ui.mode, onMode: setMode, onJump: jump }) : null,
       ui.mode === "full" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tabs, { tab: ui.tab, onTab: goTab }) : null,
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "wrap", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          StoreNotes,
+          {
+            save: boot.save,
+            update: swNew,
+            onReload: reloadIntoNewBuild,
+            fresh: isDist && isApp && boot.fresh && !imported && showLanding,
+            onImport: function() {
+              jump("lab-import");
+            },
+            check: isDist && !(ui.mode === "full" && ui.tab === "lab") ? checkMsg : ""
+          }
+        ),
         refErr ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "err", "data-testid": "err", children: refErr }) : null,
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Boundary, { children: [
           showLanding ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
@@ -36843,16 +37373,44 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 </script>
 <script>/* PWA — START */
 (function(){
-  var st = { protocol: '', sw: 'pending', cache: null, error: null };
+  var st = { protocol: '', sw: 'pending', cache: null, error: null, updated: false };
   try {
     window.__PWA__ = st;
     st.protocol = (location && location.protocol) || '';
     if (st.protocol !== 'http:' && st.protocol !== 'https:') { st.sw = 'skipped-not-http'; return; }
     if (!('serviceWorker' in navigator)) { st.sw = 'unsupported'; return; }
+    var announce = function(){
+      st.updated = true;
+      try { window.dispatchEvent(new Event('mc-sw-updated')); } catch (e) {}
+    };
+    var wire = function(reg){
+      try {
+        var sw = navigator.serviceWorker;
+        var had = !!sw.controller;
+        if (typeof sw.addEventListener === 'function') sw.addEventListener('controllerchange', function(){ if (had) announce(); had = true; });
+        if (had && reg.waiting) announce();
+        if (had && typeof reg.addEventListener === 'function') reg.addEventListener('updatefound', function(){
+          var w = reg.installing;
+          if (!w || typeof w.addEventListener !== 'function') return;
+          w.addEventListener('statechange', function(){
+            if (w.state === 'installed' && typeof setTimeout === 'function') setTimeout(function(){ if (reg.waiting) announce(); }, 1500);
+          });
+        });
+        var last = 0;
+        if (typeof reg.update === 'function' && typeof document.addEventListener === 'function') document.addEventListener('visibilitychange', function(){
+          if (document.visibilityState !== 'visible') return;
+          var now = Date.now();
+          if (last && now - last < 1800000) return;
+          last = now;
+          try { var p = reg.update(); if (p && typeof p.catch === 'function') p.catch(function(){}); } catch (e) {}
+        });
+      } catch (e) { st.error = String(e && e.message ? e.message : e).slice(0, 140); }
+    };
     var go = function(){
       try {
         navigator.serviceWorker.register('sw.js', { scope: './' }).then(function(reg){
           st.sw = 'registered'; st.cache = reg && reg.scope ? String(reg.scope) : '';
+          if (reg) wire(reg);
         }, function(err){
           st.sw = 'failed'; st.error = String(err && err.message ? err.message : err).slice(0, 140);
         });

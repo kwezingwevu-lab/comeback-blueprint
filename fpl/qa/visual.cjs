@@ -700,5 +700,42 @@ for (const cls of Object.keys(FLOORS)) {
     inTokens + " hex definitions for " + TOKEN_NAMES.length + " names");
 }
 
+/* IOS27-12 · Reduce Motion stops the press-scale. Every base `:active` rule that scales to .97 needs a `transform:none` twin
+   inside prefers-reduced-motion with the same selector (bar the .mc-root prefix) and equal or higher specificity: the plan's
+   first wording, `.btn:active{transform:none}`, has specificity [2,0] and loses to the base `.mc-root button:active` [2,1]
+   on every <button class="btn">, so a name-only check would pass a rule that does nothing. */
+{
+  const norm = (sel) => sel.replace(/^\.mc-root\s+/, "");
+  const ge = (a, b) => a[0] > b[0] || (a[0] === b[0] && a[1] >= b[1]);
+  const base = RULES.filter((r) => !r.media && r.comps && /:active\b/.test(r.sel) && /scale\(\s*\.97\s*\)/.test(r.decl.transform || ""));
+  const calm = RULES.filter((r) => r.media && r.comps && /prefers-reduced-motion\s*:\s*reduce/.test(r.media) && r.decl.transform === "none" && /:active\b/.test(r.sel));
+  const miss = base.filter((b) => !calm.some((c) => norm(c.sel) === norm(b.sel) && ge(specificity(c.comps), specificity(b.comps))));
+  ok("audit_layout · Reduce Motion: every :active press-scale rule has a transform:none twin of equal or higher specificity inside prefers-reduced-motion (Part G Feedback)",
+    base.length > 0 && miss.length === 0,
+    base.length + " press-scale selectors, " + calm.length + " twins" + (miss.length ? "; no twin for " + miss.map((b) => b.sel).join(", ") : ""));
+}
+
+/* IOS27-18 · height on the small viewport: every 100vh is followed, in the same rule, by 100svh, so a browser without svh keeps
+   the 100vh line. Read from the STYLE literal and from the shell's #root rule in build.cjs. */
+{
+  const shellSrc = (() => { try { return fs.readFileSync(path.join(ROOT, "build.cjs"), "utf8"); } catch (e) { return ""; } })();
+  const shell = (/#root\{[^}]*\}/.exec(shellSrc) || [""])[0];
+  const count = (t) => [(t.match(/100vh/g) || []).length, (t.match(/min-height:\s*100vh;\s*min-height:\s*100svh/g) || []).length];
+  const a = count(STYLE), b = count(shell);
+  ok("audit_layout · every shipped 100vh (the STYLE block and the build shell's #root) is followed by 100svh in the same rule",
+    a[0] > 0 && a[0] === a[1] && b[0] > 0 && b[0] === b[1], "STYLE " + a[1] + " of " + a[0] + ", shell " + b[1] + " of " + b[0] + (shell ? "" : " (the #root rule was not found in build.cjs)"));
+}
+
+/* IOS27-20 · one press feedback on iOS: no grey tap flash, and no callout or text selection on the controls. Panel text stays selectable.
+   CSS.supports is false for -webkit-touch-callout in the sandbox engine, so the source is what is read. */
+{
+  const root = RULES.find((r) => r.sel === ".mc-root" && !r.media);
+  const tap = !!root && /^transparent$/.test(root.decl["-webkit-tap-highlight-color"] || "");
+  const classes = [".tabi", ".btn", ".btn-sm", ".btn-ic", ".sec-h", ".menu-i", ".reveal"];
+  const miss = classes.filter((c) => !RULES.some((r) => !r.media && r.sel === c && r.decl["-webkit-touch-callout"] === "none" && r.decl["-webkit-user-select"] === "none" && r.decl["user-select"] === "none"));
+  ok("audit_layout · .mc-root turns the grey tap flash off and every control class removes the callout and the selection (-webkit-touch-callout, -webkit-user-select, user-select)",
+    tap && miss.length === 0, "tap highlight " + (root ? root.decl["-webkit-tap-highlight-color"] || "unset" : "no .mc-root rule") + (miss.length ? "; missing on " + miss.join(", ") : "; all " + classes.length + " classes"));
+}
+
 console.log("SUITE visual " + pass + "/" + (pass + fail));
 process.exit(fail ? 1 : 0);

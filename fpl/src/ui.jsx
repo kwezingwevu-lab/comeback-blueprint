@@ -73,7 +73,7 @@ const STYLE = `
 textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 
 .card{background:var(--bg2);border:1px solid var(--line);border-radius:14px;margin:12px 0;overflow:hidden}
-.section{background:var(--bg2);border:1px solid var(--line);border-radius:12px;margin:10px 0;overflow:hidden}
+.section{background:var(--bg2);border:1px solid var(--line);border-radius:12px;margin:10px 0;overflow:hidden;scroll-margin-top:calc(73px + var(--sat))}
 .sec-h{min-height:48px;width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;
   padding:10px 12px;background:var(--bg2);border:0;border-bottom:1px solid var(--line);color:var(--text);font-size:14px;font-weight:600;text-align:left;cursor:pointer}
 .sec-h .cv{flex:none;color:var(--dim);transition:transform .15s ease}
@@ -104,6 +104,19 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 .note{font-size:11px;line-height:1.5;color:var(--dim);padding:8px 10px;background:var(--bg3);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:8px}
 .note-w{border-left-color:var(--warn)}
 .note-a{border-left-color:var(--pnk)}
+/* iOS 27 · the storage and update notes sit above every view (IOS27-04, -05, -07, -10) */
+.notes{margin-top:10px}
+.notes>*+*{margin-top:8px}
+.upd{width:100%;border-color:var(--warn)}
+/* iOS 27 · IOS27-08: a section a menu jump scrolls to stops below the pinned tab strip (65px: 6 + 52 + 6 + its 1px edge)
+   with 8px to spare, and below the status-bar inset in the Home Screen app. IOS27-11: .vh keeps a node in the accessibility
+   tree and off the screen (the one status region). IOS27-14: the file picker is a real input laid over its 44px label
+   button, invisible, so the tap lands on the input itself and a screen reader gets a full-size frame; the label's border
+   is the edge people see, and its focus ring shows when the input has focus. */
+.vh{position:absolute;width:1px;height:1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}
+.filebtn:focus-within{outline:2px solid var(--focus);outline-offset:2px}
 .err{font-size:12px;line-height:1.45;color:var(--text);padding:9px 10px;background:var(--pnk2);border:1px solid var(--pnk);border-radius:9px;word-break:break-word}
 .boundary{margin:12px;padding:14px;border:1px solid var(--pnk);background:var(--pnk2);border-radius:12px;font-size:13px}
 /* C2: --dim was never sized against --pnk2 (3.74 at 11px). On these three surfaces the
@@ -216,35 +229,313 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 `;
 
 /* ------------------------------------------------------------------ storage adapter
-   window.storage in the artifact (async, {value} envelopes); localStorage everywhere
-   else. Both paths are total: a broken store degrades to an unsaved session. */
+   Anthropic documents artifact storage as text only, so the adapter writes JSON text and reads it back
+   (an object saved by an older build still loads). The dist shim over localStorage keeps the same text, byte for
+   byte what the plain-localStorage fallback writes. Every write is queued, so results arrive in the order the writes
+   were made, and the first save of mc_ui is read back and compared: that sets storeMode, "artifact" or "local" when the
+   copy came back and "none" when it did not (no new storage key). Both paths are total: a broken store degrades to an
+   unsaved session, and the app says so. */
 
 const STORE_KEYS = { state: "mc_state", ui: "mc_ui" };
+
+/* text → object; an unreadable value or anything that is not an object is null, so the app reseeds instead of crashing */
+function decodeStored(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "string") {
+    let o;
+    try { o = JSON.parse(v); } catch (e) { return null; }
+    if (typeof o === "string") { try { o = JSON.parse(o); } catch (e) { return null; } }   // text that was quoted once more
+    return o && typeof o === "object" ? o : null;
+  }
+  return typeof v === "object" ? v : null;
+}
+function sortedJson(v) {
+  try {
+    return JSON.stringify(v, function (k, x) {
+      if (x && typeof x === "object" && !Array.isArray(x)) { const o = {}; Object.keys(x).sort().forEach(function (q) { o[q] = x[q]; }); return o; }
+      return x;
+    });
+  } catch (e) { return ""; }
+}
+/* the short reason a write failed, in words a manager can act on; e is a DOMException, an Error or the shim's {name, message} */
+function whyNot(e) {
+  const n = e && e.name ? String(e.name) : "", m = e && e.message ? String(e.message) : "";
+  if (/quota/i.test(n + " " + m)) return "storage is full";
+  if (/security|denied|not allowed|blocked/i.test(n + " " + m)) return "storage is blocked here";
+  const t = (m || n).replace(/\s+/g, " ").replace(/[.\s]+$/, "").slice(0, 60);
+  return t || "storage refused the write";
+}
+/* "artifact" (the host's own window.storage), "local" (localStorage, directly or through the dist shim), "none", or "pending" */
+let storeMode = "pending";
+let storeQueue = Promise.resolve();
+let persistAsked = false;
+
+function windowStore() {
+  try { return typeof window !== "undefined" && window.storage ? window.storage : null; } catch (e) { return null; }
+}
+/* navigator.storage.persist() asks the browser to keep the copy through storage pressure; where it does not exist there is nothing to ask */
+function askForPersistence() {
+  if (persistAsked) return;
+  try {
+    if (typeof navigator !== "undefined" && navigator.storage && typeof navigator.storage.persist === "function") {
+      persistAsked = true;
+      const p = navigator.storage.persist();
+      if (p && typeof p.then === "function") p.then(function () {}, function () {});
+    }
+  } catch (e) { /* the request is a courtesy */ }
+}
+async function readBack(key, via) {
+  try {
+    if (via === "window") {
+      const r = await windowStore().get(key);
+      if (r === null || r === undefined) return null;
+      return decodeStored(r && typeof r === "object" && "value" in r ? r.value : r);
+    }
+    return decodeStored(window.localStorage.getItem(key));
+  } catch (e) { return null; }
+}
 
 const store = {
   async get(key) {
     try {
-      if (typeof window !== "undefined" && window.storage && typeof window.storage.get === "function") {
-        const r = await window.storage.get(key);
+      const S = windowStore();
+      if (S && typeof S.get === "function") {
+        const r = await S.get(key);
         if (r === null || r === undefined) return null;
-        return r && typeof r === "object" && "value" in r ? r.value : r;
+        return decodeStored(r && typeof r === "object" && "value" in r ? r.value : r);
       }
     } catch (e) { /* fall through to localStorage */ }
-    try {
-      const s = window.localStorage.getItem(key);
-      return s === null ? null : JSON.parse(s);
-    } catch (e) { return null; }
+    try { return decodeStored(window.localStorage.getItem(key)); } catch (e) { return null; }
   },
-  async set(key, value) {
-    try {
-      if (typeof window !== "undefined" && window.storage && typeof window.storage.set === "function") {
-        await window.storage.set(key, value);
-        return true;
-      }
-    } catch (e) { /* fall through */ }
-    try { window.localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; }
+  /* resolves { ok, reason, mode } and never rejects: reason is empty on success, mode is storeMode after this write */
+  set(key, value) {
+    const run = async function () {
+      try {
+        let text;
+        try { text = JSON.stringify(value); } catch (e) { text = undefined; }
+        if (typeof text !== "string") return { ok: false, reason: "the data could not be written as text", mode: storeMode };
+        const S = windowStore();
+        let via = "", reason = "", tryLocal = !(S && typeof S.set === "function");
+        if (!tryLocal) {
+          try {
+            const r = await S.set(key, text);
+            if (r === false) reason = whyNot(S.__error);   // the dist shim says no, and says why
+            else via = "window";
+          } catch (e) { reason = whyNot(e); tryLocal = true; }
+        }
+        if (tryLocal) {
+          try { window.localStorage.setItem(key, text); via = "local"; reason = ""; } catch (e) { reason = whyNot(e); }
+        }
+        const ok = via !== "";
+        if (ok && key === STORE_KEYS.ui && (storeMode === "pending" || storeMode === "none")) {
+          const back = await readBack(key, via);
+          storeMode = back && sortedJson(back) === sortedJson(value) ? (via === "window" && !S.__shim ? "artifact" : "local") : "none";
+        } else if (!ok && storeMode === "pending") storeMode = "none";
+        if (ok && storeMode === "local") askForPersistence();
+        return { ok: ok, reason: ok ? "" : reason, mode: storeMode };
+      } catch (e) { return { ok: false, reason: whyNot(e), mode: storeMode }; }
+    };
+    const p = storeQueue.then(run);
+    storeQueue = p.then(function () {}, function () {});
+    return p;
   }
 };
+
+/* Where the page came from, read from what the page has and never from the user agent. The dist build's shim marks
+   window.storage; the artifact host never does. */
+function hostIsDist() {
+  try { return !!(typeof window !== "undefined" && window.storage && window.storage.__shim); } catch (e) { return false; }
+}
+/* Installed to the Home Screen. iOS reports fullscreen where a manifest asks for standalone (WebKit bug 264218), so both
+   display modes count, and navigator.standalone is Apple's own flag. */
+function runsAsApp() {
+  try {
+    if (typeof window === "undefined") return false;
+    if (typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches) return true;
+    return typeof navigator !== "undefined" && "standalone" in navigator && navigator.standalone === true;
+  } catch (e) { return false; }
+}
+/* the registration script in the page sets this when a newer worker has taken over or is waiting */
+function pwaUpdated() {
+  try { return !!(typeof window !== "undefined" && window.__PWA__ && window.__PWA__.updated === true); } catch (e) { return false; }
+}
+/* Reload into the new build. A waiting worker is told to take over first and the reload follows its controllerchange
+   (or two seconds, whichever is first), so the old cache is gone when the new page asks for it. Nothing to reload
+   without a worker or a location: the state is saved on every change, so a reload loses nothing. */
+function reloadIntoNewBuild() {
+  const go = function () { try { window.location.reload(); } catch (e) { /* nothing to reload */ } };
+  try {
+    const sw = navigator.serviceWorker;
+    if (!sw || typeof sw.getRegistration !== "function") { go(); return; }
+    sw.getRegistration().then(function (reg) {
+      const w = reg && reg.waiting;
+      if (!w) { go(); return; }
+      let done = false;
+      const once = function () { if (done) return; done = true; go(); };
+      try { sw.addEventListener("controllerchange", once); } catch (e) { /* the timer below covers it */ }
+      try { w.postMessage({ type: "SKIP_WAITING" }); } catch (e) { once(); return; }
+      setTimeout(once, 2000);
+    }, go);
+  } catch (e) { go(); }
+}
+/* The dist build's refresh: ask the server for a newer worker. "reload" means there is no worker to ask (file://, an
+   engine without service workers), so the only way to pick up a replaced file is to load the page again. "new" means a
+   newer build was found (the note in the page offers the reload), "same" means the server has nothing newer. */
+async function checkForNewBuild() {
+  const sw = typeof navigator !== "undefined" ? navigator.serviceWorker : null;
+  if (!sw || typeof sw.getRegistration !== "function") return "reload";
+  const reg = await sw.getRegistration();
+  if (!reg || typeof reg.update !== "function") return "reload";
+  const before = pwaUpdated();
+  let timer = null;
+  await Promise.race([
+    reg.update(),
+    new Promise(function (resolve, reject) { timer = setTimeout(function () { reject(new Error("the server did not answer in 15 seconds")); }, 15000); })
+  ]).then(function () { if (timer) clearTimeout(timer); }, function (e) { if (timer) clearTimeout(timer); throw e; });
+  return reg.installing || reg.waiting || (pwaUpdated() && !before) ? "new" : "same";
+}
+
+/* iOS 27 · IOS27-08. Where a tab switch or a menu jump lands. With no section id the page goes back to the top, so the
+   new tab's first section sits just under the tab strip; with one, that section is scrolled to the top of the
+   viewport (STYLE .section{scroll-margin-top} keeps it clear of the pinned strip and the status-bar inset) and its
+   header takes focus without a second scroll. Window scrolling only. Ids are the app's own, so the selector is safe.
+   Older Safari that ignores scroll-margin lands the section under the strip by at most the strip's height; one that
+   ignores preventScroll finds the header already in view. Total: any failure leaves the page where it is. */
+function landOn(sectionId) {
+  try {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    const s = sectionId ? document.querySelector('[data-section="' + sectionId + '"]') : null;
+    if (!s) { window.scrollTo(0, 0); return; }
+    if (typeof s.scrollIntoView === "function") s.scrollIntoView({ block: "start" });
+    const h = s.querySelector(".sec-h");
+    if (h && typeof h.focus === "function") h.focus({ preventScroll: true });
+  } catch (e) { /* the page stays where it is */ }
+}
+
+/* iOS 27 · IOS27-11. What a settled refresh says out loud, built from the game week the app is on (never a typed one).
+   80 characters at most: "Refresh failed: " and the first 60 characters of the reason. In the dist build the refresh is a
+   check for a newer build, so its outcomes are worded for that: okMsg is the "Nothing newer" note the check leaves when
+   the server holds no newer build, and a check that ended with neither an error nor that note found one. */
+function refreshMessage(err, dist, okMsg, gw) {
+  if (err) return "Refresh failed: " + String(err).replace(/\s+/g, " ").trim().slice(0, 60);
+  if (dist) return okMsg ? "Nothing newer. GW" + gw + " data is the latest." : "A newer build was found.";
+  return "Refreshed, GW" + gw + " data";
+}
+/* Safari 27 speaks through ariaNotify; where it exists it is called once and the status region stays empty. The
+   caller writes the region only when this returns false, so exactly one path speaks. */
+function ariaSpeak(msg) {
+  try {
+    const b = typeof document !== "undefined" ? document.body : null;
+    if (b && typeof b.ariaNotify === "function") { b.ariaNotify(msg); return true; }
+  } catch (e) { /* the status region carries it */ }
+  return false;
+}
+
+/* iOS 27 · IOS27-14. The export as one file for the share sheet, where the platform will take it. canShareFiles() only
+   asks; tryShare() starts the share from the tap itself (share() needs the tap's transient activation, so it is called
+   before any await) and answers a promise, or null when there is no sheet to open, so the caller can download in the
+   same tick. A refused share falls back to the download; closing the sheet (AbortError) is an answer, not a failure. */
+function canShareFiles() {
+  try {
+    if (typeof File !== "function" || typeof navigator === "undefined" || typeof navigator.share !== "function" || typeof navigator.canShare !== "function") return false;
+    return !!navigator.canShare({ files: [new File(["{}"], "mc_state.json", { type: "application/json" })] });
+  } catch (e) { return false; }
+}
+function tryShare(json, name) {
+  try {
+    if (typeof File !== "function" || typeof navigator === "undefined" || typeof navigator.share !== "function" || typeof navigator.canShare !== "function") return null;
+    const f = new File([json], name, { type: "application/json" });
+    if (!navigator.canShare({ files: [f] })) return null;
+    return navigator.share({ files: [f], title: "FPL MC state" }).then(function () { return true; }, function (e) { return !!(e && e.name === "AbortError"); });
+  } catch (e) { return null; }
+}
+function saveAsFile(json, name) {
+  try {
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+  } catch (e) { /* a blocked download is not an error worth a panel */ }
+}
+/* File.text() where it exists (Safari 14 and later), a FileReader before that. */
+function readFileText(file) {
+  if (file && typeof file.text === "function") return file.text();
+  return new Promise(function (resolve, reject) {
+    try {
+      const r = new FileReader();
+      r.onload = function () { resolve(String(r.result)); };
+      r.onerror = function () { reject(r.error || new Error("the file could not be read")); };
+      r.readAsText(file);
+    } catch (e) { reject(e); }
+  });
+}
+
+/* iOS 27 · IOS27-15. What this device says about itself, read when the readout draws and never typed. Every field is a
+   feature read that answers "n/a" where its API is missing; nothing reads the user agent. The safe-area probe reads the
+   same custom properties the layout consumes (--sat and its three siblings, which hold env(safe-area-inset-*)), so it
+   shows what the layout got. The display-mode queries are asked one by one because this is a diagnostic: it shows which
+   of them the Home Screen app matches (iOS reports fullscreen where a manifest asks for standalone) and decides nothing;
+   runsAsApp() decides, and asks for standalone and fullscreen together. Rows are [label, text] pairs. */
+function bytesText(n) {
+  const v = Number(n);
+  if (!isFinite(v) || v < 0) return "n/a";
+  if (v < 1000) return Math.round(v) + " B";
+  if (v < 1e6) return Math.round(v / 1e3) + " kB";
+  if (v < 1e9) return (v / 1e6).toFixed(1) + " MB";
+  return (v / 1e9).toFixed(1) + " GB";
+}
+function readDevice(mode, mem) {
+  const NA = "n/a";
+  const w = typeof window !== "undefined" && window ? window : null;
+  const nav = typeof navigator !== "undefined" && navigator ? navigator : null;
+  const fin = function (v) { return typeof v === "number" && isFinite(v); };
+  const size = function (a, b) { return fin(a) && fin(b) ? a + "×" + b : NA; };
+  const mq = function (q) { try { return w && typeof w.matchMedia === "function" ? !!w.matchMedia(q).matches : null; } catch (e) { return null; } };
+  const yn = function (v) { return v === null ? NA : v ? "yes" : "no"; };
+  const has = function (f) { try { return f() ? "yes" : "no"; } catch (e) { return "no"; } };
+  let insets = NA;
+  try {
+    if (typeof document !== "undefined" && document.body && w && typeof w.getComputedStyle === "function") {
+      const p = document.createElement("div");
+      p.setAttribute("aria-hidden", "true");
+      p.style.cssText = "position:absolute;visibility:hidden;width:0;height:0;padding:var(--sat) var(--sar) var(--sab) var(--sal)";
+      document.body.appendChild(p);
+      const cs = w.getComputedStyle(p);
+      const v = [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft];
+      document.body.removeChild(p);
+      if (v.every(function (x) { return /^-?\d+(\.\d+)?px$/.test(x); })) insets = "top " + v[0] + " · right " + v[1] + " · bottom " + v[2] + " · left " + v[3];
+    }
+  } catch (e) { insets = NA; }
+  /* the modes are queried one by one, the string built here so no query stands alone in the source as a decision */
+  const modes = ["standalone", "fullscreen", "browser"].map(function (m) { return m + " " + yn(mq("(display-mode: " + m + ")")); }).join(" · ");
+  const pref = function (feature, values) {
+    for (let i = 0; i < values.length; i++) if (mq("(" + feature + ": " + values[i][0] + ")") === true) return values[i][1];
+    return NA;
+  };
+  const sw = w && w.__PWA__ && typeof w.__PWA__.sw === "string" && w.__PWA__.sw ? w.__PWA__.sw : NA;
+  const m = typeof mode === "string" && ["artifact", "local", "none", "pending"].indexOf(mode) >= 0 ? mode : NA;
+  const mm = mem && typeof mem === "object" ? mem : {};
+  return [
+    ["Window", w ? size(w.innerWidth, w.innerHeight) : NA],
+    ["Screen", w && w.screen ? size(w.screen.width, w.screen.height) : NA],
+    ["Pixel ratio", w && fin(w.devicePixelRatio) ? String(w.devicePixelRatio) : NA],
+    ["Safe area", insets],
+    ["Display mode", modes],
+    ["navigator.standalone", nav && "standalone" in nav ? String(nav.standalone === true) : NA],
+    ["Storage mode", m],
+    ["Persistent storage", typeof mm.persisted === "string" ? mm.persisted : NA],
+    ["Storage used", typeof mm.usage === "string" ? mm.usage : NA],
+    ["Service worker", sw],
+    ["ariaNotify", has(function () { return typeof document !== "undefined" && document.body && typeof document.body.ariaNotify === "function"; })],
+    ["Share sheet for files", canShareFiles() ? "yes" : has(function () { return typeof nav.share === "function"; }) === "yes" ? "share only" : "no"],
+    ["storage.persist()", has(function () { return typeof nav.storage.persist === "function"; })],
+    ["Contrast", pref("prefers-contrast", [["more", "more"], ["less", "less"], ["custom", "custom"], ["no-preference", "no preference"]])],
+    ["Reduced motion", pref("prefers-reduced-motion", [["reduce", "reduce"], ["no-preference", "no preference"]])],
+    ["Colour scheme", pref("prefers-color-scheme", [["dark", "dark"], ["light", "light"]])]
+  ];
+}
 
 /* ------------------------------------------------------------------ time helpers */
 
@@ -514,6 +805,10 @@ function useBoot(live) {
   const [ready, setReady] = React.useState(false);
   const [state, setState] = React.useState(function () { return seedState(live); });
   const [ui, setUi] = React.useState({ mode: "simple", tab: "command", open: {}, reveals: {} });
+  /* fresh: nothing was saved when the page opened. save: where the copy goes (storeMode) and why the last write of each
+     key failed, if it did. */
+  const [fresh, setFresh] = React.useState(false);
+  const [save, setSave] = React.useState({ mode: storeMode, err: { ui: "", state: "" } });
   React.useEffect(function () {
     let dead = false;
     (async function () {
@@ -521,6 +816,7 @@ function useBoot(live) {
       const savedUi = await store.get(STORE_KEYS.ui);
       if (dead) return;
       if (savedState) setState(sanitiseState(savedState));
+      setFresh(!savedState);
       const base = sanitiseState(savedState || {}).ui;
       const u = savedUi && typeof savedUi === "object" ? savedUi : base;
       setUi({
@@ -533,9 +829,20 @@ function useBoot(live) {
     })();
     return function () { dead = true; };
   }, []);
-  React.useEffect(function () { if (ready) store.set(STORE_KEYS.ui, ui); }, [ready, ui]);
-  React.useEffect(function () { if (ready) store.set(STORE_KEYS.state, state); }, [ready, state]);
-  return { ready: ready, state: state, setState: setState, ui: ui, setUi: setUi };
+  /* The result of each write lands here, in the order the writes were made (store.set queues them), so the note a manager
+     sees is always about the latest change. A failed write is named; a later good one clears it. */
+  const noted = React.useCallback(function (key, r) {
+    setSave(function (s) {
+      const why = r.ok ? "" : r.reason;
+      if (s.mode === r.mode && s.err[key] === why) return s;   // nothing changed: no render
+      const err = { ui: s.err.ui, state: s.err.state };
+      err[key] = why;
+      return { mode: r.mode, err: err };
+    });
+  }, []);
+  React.useEffect(function () { if (ready) store.set(STORE_KEYS.ui, ui).then(function (r) { noted("ui", r); }); }, [ready, ui, noted]);
+  React.useEffect(function () { if (ready) store.set(STORE_KEYS.state, state).then(function (r) { noted("state", r); }); }, [ready, state, noted]);
+  return { ready: ready, state: state, setState: setState, ui: ui, setUi: setUi, fresh: fresh, save: save };
 }
 
 /* ------------------------------------------------------------------ components */
@@ -1012,6 +1319,73 @@ function GwActionCard(props) {
   );
 }
 
+/* iOS 27 · the notes above every view, all of them about the copy of the app or of the data on this device: a newer build
+   waiting (IOS27-07), a copy that is not saving (IOS27-04), a change that did not save (IOS27-05), a first launch as an app
+   with nothing saved (IOS27-10) and what a check for new data found. Module-level, props only, total for any props. */
+function StoreNotes(props) {
+  const s = props.save && typeof props.save === "object" ? props.save : {};
+  const err = s.err && typeof s.err === "object" ? s.err : {};
+  const why = typeof err.state === "string" && err.state ? err.state : typeof err.ui === "string" ? err.ui : "";
+  const none = s.mode === "none";
+  const msg = typeof props.check === "string" ? props.check : "";
+  if (!props.update && !none && !why && !props.fresh && !msg) return null;
+  return (
+    <div className="notes">
+      {props.update ? <button className="btn upd" data-testid="update-ready" onClick={props.onReload}>New build ready. Tap to reload.</button> : null}
+      {none ? <div className="note note-w" data-testid="store-none">This copy is not saving on this device. Export before you close it.</div> : null}
+      {!none && why ? <div className="note note-w" data-testid="store-err">Last change not saved ({why}). Export now.</div> : null}
+      {props.fresh ? <button className="btn upd" data-testid="new-here" onClick={props.onImport}>New here? Import the export from Safari.</button> : null}
+      {msg ? <div className="note" data-testid="check-msg">{msg}</div> : null}
+    </div>
+  );
+}
+
+/* iOS 27 · IOS27-11. The one status region, mounted for good and never keyed: only its text changes. A screen reader
+   speaks a change to it. Where ariaNotify exists the app calls that instead and leaves this empty, so an outcome is
+   spoken once. */
+function Announcer(props) {
+  return <div className="vh" role="status" data-testid="announce">{typeof props.text === "string" ? props.text : ""}</div>;
+}
+
+/* iOS 27 · IOS27-15. The numbers the harness cannot know, read from the device when the section opens (and again when
+   the window is resized or turned) and printed as text that can be selected or copied. props.mode is the storage mode
+   App holds; persisted() and estimate() are asked once on mount. Total for any props. */
+function DeviceReadout(props) {
+  const [, setTick] = React.useState(0);
+  const [mem, setMem] = React.useState({ persisted: "checking", usage: "checking" });
+  const [said, setSaid] = React.useState("");
+  React.useEffect(function () {
+    const h = function () { setTick(function (t) { return t + 1; }); };
+    try { window.addEventListener("resize", h); window.addEventListener("orientationchange", h); } catch (e) { /* nothing to listen to */ }
+    return function () { try { window.removeEventListener("resize", h); window.removeEventListener("orientationchange", h); } catch (e) { /* noop */ } };
+  }, []);
+  React.useEffect(function () {
+    let dead = false;
+    const put = function (k, v) { if (!dead) setMem(function (m) { const o = { persisted: m.persisted, usage: m.usage }; o[k] = v; return o; }); };
+    const st = typeof navigator !== "undefined" && navigator ? navigator.storage : null;
+    try {
+      if (st && typeof st.persisted === "function") st.persisted().then(function (v) { put("persisted", v ? "granted" : "not granted"); }, function () { put("persisted", "n/a"); });
+      else put("persisted", "n/a");
+      if (st && typeof st.estimate === "function") st.estimate().then(function (e) { put("usage", bytesText(e && e.usage) + " of " + bytesText(e && e.quota)); }, function () { put("usage", "n/a"); });
+      else put("usage", "n/a");
+    } catch (e) { put("persisted", "n/a"); put("usage", "n/a"); }
+    return function () { dead = true; };
+  }, []);
+  const rows = readDevice(props.mode, mem);
+  const text = "FPL Mission Control " + APP_VERSION + "\n" + rows.map(function (r) { return r[0] + ": " + r[1]; }).join("\n");
+  return (
+    <div data-testid="device-readout">
+      {rows.map(function (r) { return <KV key={r[0]} k={r[0]} v={r[1]} />; })}
+      {canCopy() ? <button className="btn" data-testid="device-copy" onClick={function () {
+        if (typeof props.onCopy !== "function") return;
+        props.onCopy(text).then(function (ok) { setSaid(ok ? "copied to the clipboard" : "the clipboard refused; select the lines above instead"); });
+      }}>Copy</button> : null}
+      {said ? <div className="dim">{said}</div> : null}
+      <div className="dim">Read from this device each time it draws. A field that reads n/a is one this browser does not offer.</div>
+    </div>
+  );
+}
+
 function Header(props) {
   const ctx = props.ctx;
   return (
@@ -1022,12 +1396,12 @@ function Header(props) {
           <span><b>{"GW" + ctx.nextEvent}</b></span>
           <span>{deadlineLine(ctx.hoursToDeadline)}</span>
           <span>FT {ctx.ft}</span>
-          <span>{money(ctx.bank)} bank</span>
-          <span>{APP_VERSION}</span>
+          {props.busy ? <span>Refreshing…</span> : <span>{money(ctx.bank)} bank</span>}
+          {props.busy ? null : <span>{APP_VERSION}</span>}
         </div>
       </div>
       <div className="hdr-r">
-        <button className="btn-sm btn-ic" data-testid="refresh" aria-label="Refresh player data"
+        <button className="btn-sm btn-ic" data-testid="refresh" aria-label={props.check ? "Check for new data" : "Refresh player data"}
           onClick={props.onRefresh} aria-busy={props.busy ? "true" : "false"}>
           <RefreshCw aria-hidden="true" />
         </button>
@@ -2701,7 +3075,14 @@ function TabDraft(props) {
         {pool ? <KV k="Reading" v={((ctx.draft.league || {}).name || "league " + ctx.draft.leagueId) + ", " + ctx.draft.entries.length + " teams"} /> : null}
         {pool && ctx.draft.me ? <KV k="Your team" v={(ctx.draft.entryById[ctx.draft.me.leagueEntryId] || {}).name || ctx.draft.me.leagueEntryId} /> : null}
         <input className="inp" data-testid="draft-league" placeholder="League address, league id, or your entry id"
-          aria-label="Draft league" value={txt} onChange={function (e) { setTxt(e.target.value); }} />
+          aria-label="Draft league" value={txt} onChange={function (e) { setTxt(e.target.value); }}
+          autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="done"
+          onKeyDown={function (e) {
+            if (e.key !== "Enter" || (e.nativeEvent && e.nativeEvent.isComposing)) return;
+            e.preventDefault();
+            if (changed) props.onLeague(typed === "" ? null : typed);
+            e.currentTarget.blur();
+          }} />
         {typed && !parsed.ok ? <div className="note note-w">{parsed.note}</div> : null}
         {typed && parsed.ok ? <div className="dim">Read as {parsed.kind === "entry" ? "entry" : parsed.kind === "league" ? "league" : "number"} {parsed.id}: {parsed.note}</div> : null}
         {changed ? (
@@ -3095,6 +3476,7 @@ function labView(mc) {
 
 function TabLab(props) {
   const ctx = props.ctx, ui = props.ui, on = props.on, state = props.state, rf = props.refresh;
+  const sharing = canShareFiles();
   const sec = function (id) { return openOf(ui, "lab", id); };
   const tour = sec("lab-tour") ? tournament(ctx.live) : null;
   const mwf = sec("lab-minutes") ? minutesWalkForward(ctx.live, { bins: 5 }) : null;
@@ -3103,6 +3485,7 @@ function TabLab(props) {
   const tags = sec("lab-ts") ? overUnderTags(ctx.live) : null;
   const [imp, setImp] = React.useState("");
   const [copied, setCopied] = React.useState("");
+  const [fileErr, setFileErr] = React.useState("");
   const json = JSON.stringify(state, null, 2);
   const bars = tour ? tour.models.slice().sort(function (a, b) { return (b.spearman || 0) - (a.spearman || 0); }) : [];
   const chart = bars.filter(function (m) { return m.spearman !== null; }).map(function (m) { return { name: m.name, rho: Number((m.spearman || 0).toFixed(3)) }; });
@@ -3135,20 +3518,26 @@ function TabLab(props) {
       </Section>
 
       <Section id="lab-refresh" title="Refresh" open={sec("lab-refresh")} onToggle={on.sec}>
-        <div className="dim">Model and search pairing</div>
-        <select className="inp" data-testid="refresh-pair" value={state.refresh.pair} aria-label="Model and search tool"
-          onChange={function (e) { rf.onPair(e.target.value); }}>
-          {Object.keys(REFRESH_PAIRS).map(function (k) {
-            return <option key={k} value={k}>{REFRESH_PAIRS[k].model}</option>;
-          })}
-        </select>
+        {rf.dist ? null : <div className="dim">Model and search pairing</div>}
+        {rf.dist ? null : (
+          <select className="inp" data-testid="refresh-pair" value={state.refresh.pair} aria-label="Model and search tool"
+            onChange={function (e) { rf.onPair(e.target.value); }}>
+            {Object.keys(REFRESH_PAIRS).map(function (k) {
+              return <option key={k} value={k}>{REFRESH_PAIRS[k].model}</option>;
+            })}
+          </select>
+        )}
         <button className="btn" data-testid="refresh-run" onClick={rf.onRefresh} disabled={rf.busy}>
-          <RefreshCw aria-hidden="true" />{rf.busy ? "Checking" : "Check flags and prices"}
+          <RefreshCw aria-hidden="true" />{rf.busy ? "Checking" : rf.dist ? "Check for new data" : "Check flags and prices"}
         </button>
         {rf.busy ? <div className="refbar" data-testid="refbar-lab"><i /></div> : null}
         {rf.err ? <div className="err" data-testid="refresh-err">{rf.err}</div> : null}
         {rf.okMsg ? <div className="note">{rf.okMsg}</div> : null}
-        <div className="dim">One search, one JSON reply, four thousand tokens so the search results cannot eat the answer. A failure leaves the snapshot exactly as it was. <Tier k="T0" /> after it lands</div>
+        {rf.dist ? (
+          <div className="dim">Asks the server for a newer build of this page. The player snapshot travels inside the page, so a newer build brings newer flags and prices. Nothing is sent to Anthropic from here. <Tier k="T0" /> once the new build loads</div>
+        ) : (
+          <div className="dim">One search, one JSON reply, four thousand tokens so the search results cannot eat the answer. A failure leaves the snapshot exactly as it was. <Tier k="T0" /> after it lands</div>
+        )}
       </Section>
 
       <Section id="lab-method" title="How the numbers are made" open={sec("lab-method")} onToggle={on.sec}>
@@ -3388,19 +3777,37 @@ function TabLab(props) {
 
       <Section id="lab-export" title="Export" open={sec("lab-export")} onToggle={on.sec}>
         <div className="chips-r">
-          <button className="btn" data-testid="export-download" onClick={function () { props.onDownload(json); }}><Download aria-hidden="true" />Download</button>
+          <button className="btn" data-testid="export-download" onClick={function () { props.onDownload(json); }}><Download aria-hidden="true" />{sharing ? "Share or save" : "Download"}</button>
           {canCopy() ? <button className="btn" data-testid="export-copy" onClick={function () { props.onCopy(json).then(function (ok) { setCopied(ok ? "copied to the clipboard" : "the clipboard refused; use Download"); }); }}>Copy</button> : null}
         </div>
         {copied ? <div className="dim">{copied}</div> : null}
+        <div className="dim">On an iPhone this opens the share sheet: choose Save to Files. Elsewhere the file downloads.</div>
         <div className="dim">The repository is the permanent store: commit the exported file as the state of record. The app's own storage is per device and not linked to any drive.</div>
       </Section>
 
       <Section id="lab-import" title="Import" open={sec("lab-import")} onToggle={on.sec}>
         <textarea className="inp" data-testid="import-text" placeholder="Paste an exported state" aria-label="Exported state"
+          autoCapitalize="none" autoCorrect="off" spellCheck={false}
           value={imp} onChange={function (e) { setImp(e.target.value); }} />
+        <label className="btn filebtn">
+          <Upload aria-hidden="true" />Import from a file
+          <input type="file" accept="application/json,.json" data-testid="import-file" aria-label="Import a state file" onChange={function (e) {
+            const el = e.target, f = el.files && el.files[0];
+            if (!f) return;
+            setFileErr("");
+            if (f.size > 5000000) { setFileErr("That file is too large to be an export."); el.value = ""; return; }
+            readFileText(f).then(function (t) { props.onImport(t); }, function (err) { setFileErr("That file could not be read: " + shortErr(err)); });
+            el.value = "";
+          }} />
+        </label>
+        {fileErr ? <div className="err">{fileErr}</div> : null}
         {imp.trim() ? <button className="btn btn-go" data-testid="import-apply" onClick={function () { props.onImport(imp); setImp(""); }}>Apply</button> : null}
         {props.importErr ? <div className="err">{props.importErr}</div> : null}
         <div className="dim">Anything unreadable is dropped rather than trusted: the squad is capped at fifteen and de-duplicated on id.</div>
+      </Section>
+
+      <Section id="lab-device" title="This device" open={sec("lab-device")} onToggle={on.sec}>
+        <DeviceReadout mode={props.storeMode} onCopy={props.onCopy} />
       </Section>
 
       <Section id="lab-guide" title="Guide" open={sec("lab-guide")} onToggle={on.sec}>
@@ -3487,8 +3894,37 @@ export default function App() {
   const [okMsg, setOkMsg] = React.useState("");
   const [importErr, setImportErr] = React.useState(null);
   const [simLeague, setSimLeague] = React.useState(0);
+  /* iOS 27: the host and the mode come from what the page has (a marker on the dist shim, the display-mode media query,
+     navigator.standalone), never from the user agent. swNew: a newer build has taken over. checkMsg: what a check found. */
+  const isDist = React.useMemo(hostIsDist, []);
+  const isApp = React.useMemo(runsAsApp, []);
+  const [swNew, setSwNew] = React.useState(pwaUpdated);
+  const [checkMsg, setCheckMsg] = React.useState("");
+  const [imported, setImported] = React.useState(false);
+  /* IOS27-11: a settled refresh is spoken once, after .refbar has gone. Where ariaNotify exists it is called and the status
+     region stays empty; otherwise the region carries the text. The region is cleared when the next refresh starts, so an
+     outcome that repeats is still a change a screen reader speaks. */
+  const [said, setSaid] = React.useState("");
+  const wasBusy = React.useRef(false);
+  React.useEffect(function () {
+    const h = function () { setSwNew(true); };
+    window.addEventListener("mc-sw-updated", h);
+    return function () { window.removeEventListener("mc-sw-updated", h); };
+  }, []);
+  React.useEffect(function () {
+    if (!checkMsg) return undefined;
+    const h = setTimeout(function () { setCheckMsg(""); }, 8000);
+    return function () { clearTimeout(h); };
+  }, [checkMsg]);
 
   const ctx = React.useMemo(function () { return buildCtx(live, state, now); }, [live, state, now]);
+  React.useEffect(function () {
+    if (busy) { wasBusy.current = true; setSaid(function (t) { return t ? "" : t; }); return; }
+    if (!wasBusy.current) return;
+    wasBusy.current = false;
+    const msg = refreshMessage(refErr, isDist, okMsg, ctx.nextEvent);
+    if (!ariaSpeak(msg)) setSaid(msg);
+  }, [busy]);
   const premLocked = !!(boot.ui && boot.ui.reveals && boot.ui.reveals["wc-lock"]);
   const plan = React.useMemo(function () { return buildPlan(ctx, premLocked); }, [ctx, premLocked]);
 
@@ -3541,10 +3977,19 @@ export default function App() {
     };
   }, [setUi, setState, known]);
 
-  const goTab = React.useCallback(function (tab) { setUi(function (u) { return { mode: u.mode, tab: tab, open: u.open, reveals: u.reveals }; }); }, [setUi]);
+  /* IOS27-08: every tab switch and menu jump also bumps `nav`, and one layout effect (after the new view has drawn, before
+     it paints) lands the page: the top for a tab, the section for a jump. Nothing scrolls on the first render, so a
+     reload keeps the position the browser restored. */
+  const [nav, setNav] = React.useState({ n: 0, id: "" });
+  React.useLayoutEffect(function () { if (nav.n > 0) landOn(nav.id); }, [nav]);
+  const goTab = React.useCallback(function (tab) {
+    setNav(function (v) { return { n: v.n + 1, id: "" }; });
+    setUi(function (u) { return { mode: u.mode, tab: tab, open: u.open, reveals: u.reveals }; });
+  }, [setUi]);
   const setMode = React.useCallback(function (mode) { setMenuOpen(false); setUi(function (u) { return { mode: mode, tab: u.tab, open: u.open, reveals: u.reveals }; }); }, [setUi]);
   const jump = React.useCallback(function (sectionId) {
     setMenuOpen(false);
+    setNav(function (v) { return { n: v.n + 1, id: sectionId }; });
     setUi(function (u) {
       const o = {}; Object.keys(u.open).forEach(function (k) { o[k] = u.open[k]; });
       o[sectionId] = true;
@@ -3599,18 +4044,17 @@ export default function App() {
       const clean = sanitiseState(parsed, known);
       if (!clean.squad.length) throw new Error("no squad in that file");
       setState(clean);
+      setImported(true);
     } catch (e) { setImportErr(shortErr(e)); }
   }, [setState, known]);
 
+  /* IOS27-14: Export goes to the share sheet as one file where the platform allows it, and downloads otherwise (no sheet,
+     or a sheet that refused). The download happens in the tap's own tick when there is no sheet to open. */
   const onDownload = React.useCallback(function (json) {
-    try {
-      const blob = new Blob([json], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = "mc_state_gw" + ctx.nextEvent + ".json";
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(function () { URL.revokeObjectURL(url); }, 0);
-    } catch (e) { /* a blocked download is not an error worth a panel */ }
+    const name = "mc_state_gw" + ctx.nextEvent + ".json";
+    const p = tryShare(json, name);
+    if (!p) { saveAsFile(json, name); return; }
+    p.then(function (done) { if (!done) saveAsFile(json, name); });
   }, [ctx.nextEvent]);
 
   const onCopy = React.useCallback(function (json) {
@@ -3670,6 +4114,27 @@ export default function App() {
     }
   }, [busy, ctx, plan, live, state.refresh.pair, setState, known]);
 
+  /* The dist build has no Claude call to make (the keyless proxy exists only in the artifact), so its refresh asks the
+     server for a newer build; the artifact keeps the D4 request above. */
+  const onCheck = React.useCallback(async function () {
+    if (busy) return;
+    setBusy(true); setRefErr(null); setOkMsg(""); setCheckMsg("");
+    setMenuOpen(false);
+    try {
+      const r = await checkForNewBuild();
+      if (r === "reload") { try { window.location.reload(); } catch (e) { /* nothing to reload */ } return; }
+      if (r === "same") {
+        const at = sastText(live && live.fetched_at);
+        const m = "Nothing newer: this is the latest build" + (at ? ", with the snapshot taken " + at + " SAST" : "") + ".";
+        setCheckMsg(m); setOkMsg(m);
+      }
+    } catch (e) {
+      setRefErr("Could not check for a newer build: " + shortErr(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, live]);
+
   const pct = gwProgress(ctx);
   const showLanding = ui.mode === "simple" || ui.tab === "command";
   const hist = (live.history && live.history.current) || [];
@@ -3686,19 +4151,23 @@ export default function App() {
     if (ui.tab === "chips") return <TabChips ctx={ctx} ui={ui} on={on} plan={plan} onConfirm={onConfirm} mc={mc} />;
     if (ui.tab === "odds") return <TabOdds ctx={ctx} ui={ui} on={on} mc={mc} />;
     if (ui.tab === "review") return <TabReview ctx={ctx} ui={ui} on={on} mc={mc} />;
-    return <TabLab ctx={ctx} ui={ui} on={on} state={state} onDownload={onDownload} onCopy={onCopy} onImport={onImport} importErr={importErr}
-      refresh={{ busy: busy, err: refErr, okMsg: okMsg, onRefresh: onRefresh, onPair: onPair }} mc={mc} />;
+    return <TabLab ctx={ctx} ui={ui} on={on} state={state} onDownload={onDownload} onCopy={onCopy} onImport={onImport} importErr={importErr} storeMode={boot.save.mode}
+      refresh={{ busy: busy, err: refErr, okMsg: okMsg, onRefresh: isDist ? onCheck : onRefresh, onPair: onPair, dist: isDist }} mc={mc} />;
   };
 
   return (
-    <div className="mc-root" data-tokens={TOKENS.length} data-mode={ui.mode} data-view={ui.tab} data-gw={ctx.nextEvent}>
+    <div className="mc-root" data-tokens={TOKENS.length} data-mode={ui.mode} data-view={ui.tab} data-gw={ctx.nextEvent} data-store={boot.save.mode}>
       <style>{STYLE}</style>
-      <Header ctx={ctx} onRefresh={onRefresh} onMenu={function () { setMenuOpen(!menuOpen); }} menuOpen={menuOpen} busy={busy} />
+      <Announcer text={said} />
+      <Header ctx={ctx} onRefresh={isDist ? onCheck : onRefresh} check={isDist} onMenu={function () { setMenuOpen(!menuOpen); }} menuOpen={menuOpen} busy={busy} />
       {busy ? <div className="refbar" data-testid="refbar"><i /></div> : null}
       <div className="gwbar" data-testid="gwbar" data-pct={pct} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Gameweek progress"><i style={{ width: pct + "%" }} /></div>
       {menuOpen ? <Menu mode={ui.mode} onMode={setMode} onJump={jump} /> : null}
       {ui.mode === "full" ? <Tabs tab={ui.tab} onTab={goTab} /> : null}
       <div className="wrap">
+        <StoreNotes save={boot.save} update={swNew} onReload={reloadIntoNewBuild}
+          fresh={isDist && isApp && boot.fresh && !imported && showLanding} onImport={function () { jump("lab-import"); }}
+          check={isDist && !(ui.mode === "full" && ui.tab === "lab") ? checkMsg : ""} />
         {refErr ? <div className="err" data-testid="err">{refErr}</div> : null}
         <Boundary key={ui.mode + ui.tab}>
           {showLanding ? (

@@ -4,8 +4,10 @@
  * deploy. Nothing cross-origin and nothing that is not a GET is ever cached — the D4
  * refresh path is a POST to api.anthropic.com and must always hit the network. */
 "use strict";
-var CACHE = "fpl-mc-v89-6de4101d27c7";
+var CACHE = "fpl-mc-v89-68a8b4b5b1f5";
 var SHELL = ["./index.html","./manifest.webmanifest","./icon.svg","./icon-32.png","./icon-48.png","./icon-120.png","./icon-152.png","./icon-167.png","./icon-180.png","./icon-192.png","./icon-512.png","./icon-1024.png","./icon-maskable-192.png","./icon-maskable-512.png"];
+/* How long a navigation waits for the network before the cached shell answers (IOS27-17). */
+var RACE_MS = 3000;
 
 self.addEventListener('install', function (e) {
   e.waitUntil((async function () {
@@ -30,26 +32,41 @@ self.addEventListener('activate', function (e) {
   })());
 });
 
+/* The page asks a waiting worker to take over when the manager taps "New build ready" (IOS27-07). */
+self.addEventListener('message', function (e) {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET') return;
   var url = null;
   try { url = new URL(req.url); } catch (err) { return; }
   if (url.origin !== self.location.origin) return;
-  if (req.mode === 'navigate') { e.respondWith(navigateFirst(req)); return; }
+  if (req.mode === 'navigate') { e.respondWith(navigateFirst(req, e)); return; }
   e.respondWith(cacheFirst(req));
 });
 
-/* A navigation goes to the network first, so a fresh deploy is picked up on the next open;
-   the cached shell is the fallback, which is what makes the app work offline. */
-async function navigateFirst(req) {
-  try {
-    var fresh = await fetch(req);
-    if (fresh && fresh.ok) { var c = await caches.open(CACHE); await c.put('./index.html', fresh.clone()); return fresh; }
-    if (fresh) return fresh;
-  } catch (err) { /* offline */ }
+/* A navigation goes to the network first and is revalidated on every open (cache: 'no-cache'), so no max-age a
+   host sends can serve yesterday's page. If the network has not answered inside RACE_MS the cached shell answers
+   instead and the fetch is left to finish under waitUntil, so the cache holds the new copy for the next open.
+   redirect: 'manual' keeps a host's redirect a redirect: a followed one cannot answer a navigation. Offline, the
+   cached shell is the answer, which is what makes the app work with no signal. */
+async function navigateFirst(req, e) {
+  var net = fetch(new Request(req.url, { cache: 'no-cache', redirect: 'manual' })).then(async function (fresh) {
+    if (fresh && fresh.ok) { var c = await caches.open(CACHE); await c.put('./index.html', fresh.clone()); }
+    return fresh;
+  });
+  e.waitUntil(net.then(function () {}, function () {}));
+  var timer = null;
+  var late = new Promise(function (resolve) { timer = setTimeout(function () { resolve(null); }, RACE_MS); });
+  var first;
+  try { first = await Promise.race([net, late]); } catch (err) { first = undefined; }
+  if (timer) clearTimeout(timer);
+  if (first) return first;
   var hit = await caches.match('./index.html', { cacheName: CACHE });
   if (hit) return hit;
+  if (first === null) { try { var slow = await net; if (slow) return slow; } catch (err) { /* offline */ } }
   return new Response('FPL Mission Control is offline and the shell is not in the cache yet.',
     { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
 }

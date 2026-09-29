@@ -813,6 +813,20 @@ async function main() {
       "before " + snapBefore.mode + "/" + snapBefore.tab + " [" + snapBefore.secs.join(" ") + "] · after " + snapAfter.mode + "/" + snapAfter.tab + " [" + snapAfter.secs.join(" ") + "]");
     H.assert("reveals-survive-a-reload", revAfter === "true", "rev-ld-why aria-expanded after reload = " + revAfter);
 
+    /* iOS 27, IOS27-04 (E-135): the artifact's storage is text only, and the harness's window.storage now refuses anything
+       else with a TypeError and counts it. After a session of saves and a reload the count is 0, the first save was read back
+       (data-store names the copy an artifact's), and neither storage note is on screen. The seeds the harness writes are
+       objects, the copy an older build saved, so every test that seeds state also proves an old object still loads. */
+    {
+      const st = await page.evaluate(function () {
+        const r = document.querySelector(".mc-root");
+        return { refused: window.__STORAGE_NONTEXT__, store: r ? r.getAttribute("data-store") : null, notes: document.querySelectorAll('[data-testid="store-none"], [data-testid="store-err"]').length };
+      });
+      H.assert("IOS27-04-the-app-writes-text-only-to-window-storage-and-reads-its-first-save-back",
+        st.refused === 0 && st.store === "artifact" && st.notes === 0,
+        "non-string set() calls refused " + st.refused + ", data-store " + JSON.stringify(st.store) + ", storage notes on screen " + st.notes);
+    }
+
     // v110 D1 · the Command tab's dated checklist (cmd-next): a tap ticks an item, the tick is written with the state
     // through window.storage (state.done, "<gameweek>:<item>") and it survives a reload. The item is read off the page.
     {

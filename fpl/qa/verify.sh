@@ -671,28 +671,60 @@ if(a<0||b<0||b<a){ console.log("the bracketed PWA registration block is not in d
 if(html.split(A).length-1!==1||html.split(B).length-1!==1){ console.log("the PWA markers do not appear exactly once each"); process.exit(1); }
 const src=html.slice(a+A.length,b);
 if(!/serviceWorker/.test(src)){ console.log("the bracketed block does not mention serviceWorker"); process.exit(1); }
-function run(proto){
-  const calls=[]; const listeners=[];
-  const win={ addEventListener:function(t,f){ listeners.push(t); } };
-  const nav={ serviceWorker:{ register:function(u,o){ calls.push(String(u)); return { then:function(ok){ try{ok({scope:"/"});}catch(e){} return { then:function(){} }; } }; } } };
+function run(proto, controller){
+  const calls=[]; const opts=[]; const listeners=[]; const events=[]; const updates=[]; const timers=[];
+  const doc={ readyState:"complete", visibilityState:"visible", listeners:{} };
+  doc.addEventListener=function(t,f){ doc.listeners[t]=f; };
+  const sw={ controller:controller, listeners:{} };
+  sw.addEventListener=function(t,f){ sw.listeners[t]=f; };
+  let clock=1000000;
+  const reg={ scope:"/", waiting:null, installing:null };
+  reg.update=function(){ updates.push(clock); return Promise.resolve(); };
+  reg.addEventListener=function(){};
+  const win={ addEventListener:function(t,f){ listeners.push(t); }, dispatchEvent:function(e){ events.push(e && e.type); return true; } };
+  sw.register=function(u,o){ calls.push(String(u)); opts.push(o); return { then:function(ok){ try{ok(reg);}catch(e){} return { then:function(){} }; } }; };
+  const nav={ serviceWorker:sw };
   const loc={ protocol: proto };
-  const doc={ readyState:"complete" };
+  const FakeDate={ now:function(){ return clock; } };
   let err=null;
-  try { new Function("window","navigator","location","document",src)(win,nav,loc,doc); }
+  try { new Function("window","navigator","location","document","Date","setTimeout",src)(win,nav,loc,doc,FakeDate,function(f,ms){ timers.push(ms); return 1; }); }
   catch(e){ err = e && e.message ? e.message : String(e); }
-  return { st: win.__PWA__, calls: calls, listeners: listeners, err: err };
+  return { st: win.__PWA__, calls: calls, opts: opts, listeners: listeners, err: err, doc: doc, sw: sw, events: events, updates: updates, tick: function(ms){ clock+=ms; } };
 }
-const f=run("file:"), h=run("https:"), t=run("http:");
+const f=run("file:", {}), h=run("https:", {}), t=run("http:", {});
 const bad=[];
 if(f.err) bad.push("file: threw "+f.err);
 if(!f.st||f.st.sw!=="skipped-not-http") bad.push("file: __PWA__.sw is "+(f.st?f.st.sw:"undefined")+", expected skipped-not-http");
 if(f.calls.length) bad.push("file: called register("+f.calls.join(",")+")");
 if(f.listeners.length) bad.push("file: added a "+f.listeners.join(",")+" listener");
+if(Object.keys(f.doc.listeners).length||Object.keys(f.sw.listeners).length) bad.push("file: wired an update listener");
 if(h.err) bad.push("https: threw "+h.err);
 if(h.calls.length!==1||h.calls[0]!=="sw.js") bad.push("https: register calls "+JSON.stringify(h.calls));
+if(!h.opts[0]||h.opts[0].scope!=="./") bad.push("https: register options are "+JSON.stringify(h.opts[0])+", expected scope ./");
 if(t.calls.length!==1) bad.push("http: register calls "+JSON.stringify(t.calls));
+/* IOS27-07: update() on resume, throttled to once in 30 minutes, the throttle starting unarmed */
+const vc=h.doc.listeners.visibilitychange;
+if(typeof vc!=="function") bad.push("https: no visibilitychange listener, so a resumed page never asks for a newer worker");
+else {
+  vc(); if(h.updates.length!==1) bad.push("the first resume did not call update() ("+h.updates.length+" calls): the throttle must start unarmed");
+  vc(); if(h.updates.length!==1) bad.push("a second resume at once called update() again ("+h.updates.length+")");
+  h.tick(29*60000); vc(); if(h.updates.length!==1) bad.push("a resume 29 minutes later called update() again ("+h.updates.length+")");
+  h.doc.visibilityState="hidden"; h.tick(2*60000); vc(); if(h.updates.length!==1) bad.push("a hidden page called update()");
+  h.doc.visibilityState="visible"; vc(); if(h.updates.length!==2) bad.push("a resume 31 minutes after the first did not call update() ("+h.updates.length+")");
+}
+/* a controllerchange with a controller already in place is an update; the first claim is not */
+const cc=h.sw.listeners.controllerchange;
+if(typeof cc!=="function") bad.push("https: no controllerchange listener");
+else { cc(); if(h.events.indexOf("mc-sw-updated")<0||!h.st.updated) bad.push("a controllerchange over an existing controller did not announce mc-sw-updated"); }
+const n=run("https:", null);
+if(typeof n.sw.listeners.controllerchange==="function"){
+  n.sw.listeners.controllerchange();
+  if(n.events.length) bad.push("the first worker claiming an uncontrolled page was announced as an update");
+  n.sw.listeners.controllerchange();
+  if(n.events.indexOf("mc-sw-updated")<0) bad.push("the second controllerchange was not announced");
+}
 if(bad.length){ console.log(bad.join("; ")); process.exit(1); }
-console.log("executed the shipped block: file: → "+f.st.sw+", no register, no listener; https: → register(\"sw.js\") once; http: → once");
+console.log("executed the shipped block: file: → "+f.st.sw+", no register, no listener; https: → register(\"sw.js\", scope ./) once, update() on the first resume and then at most every 30 minutes, an update announced on a controllerchange over a controller and not on the first claim; http: → once");
 ' 2>&1)"
 if [ $? -eq 0 ]; then ok "pwa-service-worker-registers-only-over-http-s" "$guard_out"
 else bad "pwa-service-worker-registers-only-over-http-s" "$guard_out"; fi
@@ -726,6 +758,13 @@ shell.filter(u=>u!=="./").forEach(function(u){ if(!fs.existsSync(path.join(D,u.r
 if(!/req\.method !== .GET./.test(code)) bad.push("sw.js does not skip non-GET requests (the D4 refresh path is a POST)");
 if(!/url\.origin !== self\.location\.origin/.test(code)) bad.push("sw.js does not skip cross-origin requests");
 if(/api\.anthropic\.com/.test(code)) bad.push("sw.js code names api.anthropic.com — the refresh path is a cross-origin POST and is skipped by the two rules above, not by naming it");
+/* IOS27-07 and IOS27-17: a navigation is revalidated on every open, raced against a timer, and the network fetch is left to finish */
+if(!/cache: .no-cache./.test(code)) bad.push("sw.js does not revalidate navigations (no request with cache: no-cache), so a host max-age can serve an old page");
+const rm=code.match(/var RACE_MS = (\d+);/);
+if(!rm||Number(rm[1])!==3000) bad.push("sw.js RACE_MS is "+(rm?rm[1]:"missing")+", the plan says 3000");
+if(!/Promise\.race\(\[net, late\]\)/.test(code)) bad.push("sw.js does not race the network against the RACE_MS timer");
+if(!/e\.waitUntil\(net\./.test(code)) bad.push("sw.js does not leave the network fetch to finish under waitUntil after the timer wins");
+if(!/SKIP_WAITING/.test(code)||!/self\.skipWaiting\(\)/.test(code)) bad.push("sw.js does not take over on a SKIP_WAITING message");
 const h=crypto.createHash("sha256");
 h.update(fs.readFileSync(path.join(D,"index.html")));
 h.update(fs.readFileSync(path.join(D,"manifest.webmanifest")));
@@ -742,7 +781,7 @@ iconFiles.forEach(function(k){ h.update(k); h.update(fs.readFileSync(path.join(D
 const want="fpl-mc-"+ver+"-"+h.digest("hex").slice(0,12);
 if(cm[1]!==want) bad.push("cache name "+cm[1]+" is not the one this build derives ("+want+") — dist/ is a mix of two builds, or the name stopped being derived");
 if(bad.length){ console.log(bad.join("; ")); process.exit(1); }
-console.log("sw.js parses ("+code.split("\n").filter(l=>l.trim()).length+" code lines after comments are stripped), cache "+cm[1]+" recomputed from the shipped page+manifest+icons, "+shell.length+" shell entries, non-GET and cross-origin skipped");
+console.log("sw.js parses ("+code.split("\n").filter(l=>l.trim()).length+" code lines after comments are stripped), cache "+cm[1]+" recomputed from the shipped page+manifest+icons, "+shell.length+" shell entries, non-GET and cross-origin skipped, navigations revalidated (cache: no-cache) and raced against a "+rm[1]+" ms timer with the fetch left to finish under waitUntil, SKIP_WAITING handled");
 ' 2>&1)"
 if [ $? -eq 0 ]; then ok "pwa-service-worker-precaches-this-build-only" "$sw_out"
 else bad "pwa-service-worker-precaches-this-build-only" "$sw_out"; fi

@@ -57,15 +57,21 @@ const PAGE_URL = H.PAGE_URL;
 const SECURE_URL = "https://mc.test/";
 const VIEW = { width: 390, height: 844 };
 
-/* The same localStorage-backed shim dist/index.html ships. Backed by localStorage and
-   nothing else, so localStorage.clear() is a real wipe — the harness's own shim keeps an
-   in-memory copy that survives a clear, which would make the export/import check a lie. */
+/* The artifact's window.storage, for the flavour that has one: text only (set() refuses a non-string with a TypeError,
+   counted on window.__STORAGE_NONTEXT__; get() answers { key, value: <the text> }), backed by localStorage and nothing
+   else, so localStorage.clear() is a real wipe — the harness's own shim keeps an in-memory copy that survives a clear,
+   which would make the export/import check a lie. It carries no __shim marker, because the artifact never does: the
+   dist build's own shim (marker, failed writes resolve false) is what the loopback suite qa/ios.cjs runs. */
 const STORAGE_SHIM = [
   "(function(){",
   "  if (window.storage && typeof window.storage.get === 'function') return;",
+  "  window.__STORAGE_NONTEXT__ = 0;",
   "  window.storage = {",
-  "    get: function(k){ try { var v = localStorage.getItem(k); return Promise.resolve(v === null ? null : { value: JSON.parse(v) }); } catch (e) { return Promise.resolve(null); } },",
-  "    set: function(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} return Promise.resolve(true); }",
+  "    get: function(k){ try { var v = localStorage.getItem(k); return Promise.resolve(v === null ? null : { key: k, value: v }); } catch (e) { return Promise.resolve(null); } },",
+  "    set: function(k, v){",
+  "      if (typeof v !== 'string') { window.__STORAGE_NONTEXT__++; return Promise.reject(new TypeError('window.storage.set: the value must be a string (artifact storage is text only)')); }",
+  "      try { localStorage.setItem(k, v); } catch (e) {} return Promise.resolve({ key: k, value: v });",
+  "    }",
   "  };",
   "})();"
 ].join("\n");
@@ -699,10 +705,18 @@ async function main() {
         const r = document.querySelector(".mc-root");
         return {
           mode: r.getAttribute("data-mode"), tab: r.getAttribute("data-view"),
-          secs: Array.prototype.map.call(r.querySelectorAll(".section"), function (s) { return s.getAttribute("data-section") + ":" + s.querySelector(".sec-h").getAttribute("aria-expanded"); })
+          secs: Array.prototype.map.call(r.querySelectorAll(".section"), function (s) { return s.getAttribute("data-section") + ":" + s.querySelector(".sec-h").getAttribute("aria-expanded"); }),
+          refused: window.__STORAGE_NONTEXT__ === undefined ? null : window.__STORAGE_NONTEXT__, store: r.getAttribute("data-store"),
+          notes: document.querySelectorAll('[data-testid="store-none"], [data-testid="store-err"]').length
         };
       });
       storageResults[flavour] = { hasShim: hasShim, before: before, after: after };
+      /* iOS 27, IOS27-04 (E-135): the artifact's store takes text only and refuses a non-string with a TypeError (counted);
+         after a reload the app has read its first save back, so it names the copy an artifact's (window.storage) or a local
+         one (the localStorage fallback), and shows neither storage note. */
+      H.assert("IOS27-04-storage-" + flavour.replace(".", "-") + "-takes-text-only-and-the-first-save-is-read-back",
+        after.notes === 0 && (flavour === "window.storage" ? after.refused === 0 && after.store === "artifact" : after.store === "local"),
+        "non-string set() calls refused " + after.refused + ", data-store " + JSON.stringify(after.store) + ", storage notes on screen " + after.notes);
       H.assert("storage-" + flavour.replace(".", "-") + "-persists-mode-tab-and-open-sections-across-a-reload",
         (flavour === "window.storage" ? hasShim : !hasShim) &&
         after.mode === "full" && after.tab === "rivals" && after.secs.join(",") === before.secs.join(","),

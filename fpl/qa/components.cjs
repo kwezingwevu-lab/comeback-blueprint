@@ -385,7 +385,25 @@ const FIX = {
       { plan: PLAN, ctx: CTX_MKT, mode: "simple", reveals: {}, onReveal: noop, onConfirm: noop, mc: MCP }
     ]
   },
-  Header: { props: { ctx: CTX, onRefresh: noop, onMenu: noop, menuOpen: false, busy: false }, text: [] },
+  Header: { props: { ctx: CTX, onRefresh: noop, onMenu: noop, menuOpen: false, busy: false }, text: [],
+    /* IOS27-11: the same header while a refresh is in flight says "Refreshing…" in its status line, in both builds */
+    variants: [{ ctx: CTX, onRefresh: noop, check: true, onMenu: noop, menuOpen: false, busy: false },
+      { ctx: CTX, onRefresh: noop, onMenu: noop, menuOpen: false, busy: true },
+      { ctx: CTX, onRefresh: noop, check: true, onMenu: noop, menuOpen: true, busy: true }] },
+  /* IOS27-11: the one status region. `text` is what it is given to say; a value that is not text is not spoken. */
+  Announcer: { props: { text: "" }, text: ["text"], variants: [{ text: "Refreshed, GW" + CTX.nextEvent + " data" }] },
+  /* IOS27-15: the Lab device readout. `mode` is the storage mode App holds; a value that is not one of the four names
+     reads n/a. Under this suite's window (a clock and nothing else) every browser field reads n/a. */
+  DeviceReadout: { props: { mode: "local", onCopy: noop }, text: [], variants: [{ mode: "none", onCopy: noop }, { mode: "artifact", onCopy: noop }] },
+  /* iOS 27: the notes above every view. First paint shows the two that can sit together (a newer build waiting, a copy
+     that is not saving); the variants show a change that did not save with the reason, the first launch as an app with
+     what a check found, and the check's outcome alone. `check` is text the slot prints. */
+  StoreNotes: {
+    props: { save: { mode: "none", err: { ui: "", state: "" } }, update: true, onReload: noop, fresh: false, onImport: noop, check: "" }, text: ["check"],
+    variants: [
+      { save: { mode: "local", err: { ui: "storage is full", state: "" } }, update: false, onReload: noop, fresh: true, onImport: noop, check: "Nothing newer: this is the latest build." },
+      { save: { mode: "local", err: { ui: "", state: "storage is blocked here" } }, update: false, onReload: noop, fresh: false, onImport: noop, check: "Nothing newer: this is the latest build." }
+    ] },
   Tabs: { props: { tab: "command", onTab: noop }, text: ["tab"] },
   Menu: { props: { mode: "simple", onMode: noop, onJump: noop }, text: ["mode"] },
   /* v110 D1: TabCommand ticks the dated checklist through App's on.done(key); the variant carries one tick in
@@ -458,11 +476,14 @@ const FIX = {
     variants: [{ ctx: CTX, ui: uiFor("review", true), on: ON, mc: MCP ? { MC: MCP.MC, PLAN: MCP.PLAN, PRE: null, E: MCP.E } : MCP }]
   },
   TabLab: {
-    props: { ctx: CTX, ui: uiFor("lab", true), on: ON, state: baseState, onDownload: noop, onCopy: noop, onImport: noop, importErr: null,
+    props: { ctx: CTX, ui: uiFor("lab", true), on: ON, state: baseState, onDownload: noop, onCopy: noop, onImport: noop, importErr: null, storeMode: "local",
       refresh: { busy: false, err: null, okMsg: "", onRefresh: noop, onPair: noop }, mc: MCP },
     text: ["importErr"],
     variants: [{ ctx: CTX, ui: uiFor("lab", true), on: ON, state: baseState, onDownload: noop, onCopy: noop, onImport: noop, importErr: "that file had no squad in it",
-      refresh: { busy: true, err: "400 invalid_request_error", okMsg: "", onRefresh: noop, onPair: noop }, mc: MCP }]
+      refresh: { busy: true, err: "400 invalid_request_error", okMsg: "", onRefresh: noop, onPair: noop }, mc: MCP },
+      /* iOS 27: the dist build's refresh asks the server for a newer build and offers no Claude call */
+      { ctx: CTX, ui: uiFor("lab", true), on: ON, state: baseState, onDownload: noop, onCopy: noop, onImport: noop, importErr: null,
+        refresh: { busy: false, err: null, okMsg: "Nothing newer: this is the latest build.", onRefresh: noop, onPair: noop, dist: true }, mc: MCP }]
   },
   App: { props: {}, text: [] }
 };
@@ -577,6 +598,136 @@ assert("A-no-component-ships-an-empty-class-attribute-E070", knownEmptyClassSeen
   const badPaint = Object.keys(firstPaint).filter(function (k) { return firstPaint[k] !== "ok"; });
   assert("A-every-tab-first-paint-opens-exactly-its-PRIMARY-section", APP_TABS.length > 0 && badPaint.length === 0,
     badPaint.length ? badPaint.map(function (k) { return k + ": " + firstPaint[k]; }).join("; ") : APP_TABS.length + " tabs, each with exactly its PRIMARY open");
+})();
+
+/* ---------------------------------------------------------------- 6a. iOS 27 behaviour items (IOS27-11, -14, -15, -19)
+
+   What a static render can prove about them; the browser proofs are qa/ios.cjs (IOS27-08, -11, -14, -15). Every expectation
+   is read from the render or from the function under test, and the browser fields the readout prints are moved by
+   giving the suite's window different numbers and reading the same text back (a readout that typed its numbers
+   would not follow). */
+console.log("");
+console.log("--- iOS 27 · the behaviour items ---");
+(function () {
+  const html = function (name, p) { const r = tryRender(name, p); return r.ok ? r.html : ""; };
+  const plainOf = function (h) { return visibleText(h).replace(/&#x27;|&#39;/g, "'"); };
+
+  // IOS27-11 · the header line while a refresh is in flight, and the one status region
+  const idle = plainOf(html("Header", FIX.Header.props)), busy = plainOf(html("Header", FIX.Header.variants[1]));
+  assert("IOS27-11-the-header-status-reads-Refreshing-while-busy-and-the-version-otherwise",
+    /Refreshing…/.test(busy) && !/Refreshing/.test(idle) && /v\d+/.test(idle) && !/v\d+/.test(busy),
+    "idle «" + idle.slice(0, 90) + "» busy «" + busy.slice(0, 90) + "»");
+  const an0 = html("Announcer", FIX.Announcer.props), an1 = html("Announcer", FIX.Announcer.variants[0]);
+  const roles = function (h) { return (h.match(/role="status"/g) || []).length; };
+  assert("IOS27-11-the-announcer-is-one-role-status-node-empty-until-it-has-something-to-say",
+    roles(an0) === 1 && roles(an1) === 1 && /data-testid="announce"[^>]*><\/div>/.test(an0) && new RegExp(">Refreshed, GW" + CTX.nextEvent + " data<").test(an1),
+    an0 + " · " + an1);
+  const annJunk = html("Announcer", { text: { a: 1 } });
+  assert("IOS27-11-a-text-slot-that-is-not-text-is-not-spoken", roles(annJunk) === 1 && />\s*<\/div>/.test(annJunk) && annJunk.indexOf("[object") < 0, annJunk);
+  const appShell = html("App", {});
+  assert("IOS27-11-the-app-mounts-exactly-one-role-status-region-and-no-other-live-region",
+    roles(appShell) === 1 && (appShell.match(/aria-live=/g) || []).length === 0, roles(appShell) + " role=status, " + (appShell.match(/aria-live=/g) || []).length + " aria-live");
+  const RM = F("refreshMessage");
+  const long = "HTTP 400 " + new Array(200).join("word ");
+  const msgs = [RM(long, false, "", 7), RM("x\n\ny   z", false, "", 7), RM(null, false, "Applied 3 updates", 7), RM(null, true, "Nothing newer: …", 7), RM(null, true, "", 7), RM("Could not check for a newer build: " + long, true, "", 7)];
+  assert("IOS27-11-every-outcome-message-is-80-characters-or-fewer-and-built-from-the-game-week-it-is-given",
+    msgs.every(function (m) { return typeof m === "string" && m.length > 0 && m.length <= 80; }) && /GW7/.test(msgs[2]) && /GW7/.test(msgs[3]) && msgs[1] === "Refresh failed: x y z" &&
+      msgs[0].indexOf("Refresh failed: HTTP 400 word") === 0 && msgs[2] === "Refreshed, GW7 data" && RM(null, false, "", 12) === "Refreshed, GW12 data",
+    JSON.stringify(msgs.map(function (m) { return m.length + " " + m.slice(0, 40); })));
+
+  // E-137 · the visually-hidden rule must not sit outside the viewport: the widely copied recipe's margin:-1px put the node 1px past the
+  // left edge, which the element walk in qa/ios.cjs reads as horizontal overflow on every tab
+  const vhRule = /\.vh\{([^}]*)\}/.exec(SRC);
+  assert("IOS27-11-the-visually-hidden-rule-clips-to-one-pixel-and-has-no-negative-margin-or-offset-E-137",
+    !!vhRule && /(?:^|;)\s*width:1px/.test(vhRule[1]) && /(?:^|;)\s*height:1px/.test(vhRule[1]) && /clip/.test(vhRule[1]) &&
+      !/(?:^|;)\s*(?:margin[a-z-]*|top|left|right|bottom|inset[a-z-]*|text-indent)\s*:\s*-/.test(vhRule[1]),
+    vhRule ? ".vh{" + vhRule[1] + "}" : "no .vh rule in the style block");
+
+  // IOS27-15 · the readout reads the device it is on
+  const RD = F("readDevice"), BT = F("bytesText");
+  const rowsOf = function (rows) { const o = {}; rows.forEach(function (r) { o[r[0]] = r[1]; }); return o; };
+  const LABELS = ["Window", "Screen", "Pixel ratio", "Safe area", "Display mode", "navigator.standalone", "Storage mode", "Persistent storage", "Storage used",
+    "Service worker", "ariaNotify", "Share sheet for files", "storage.persist()", "Contrast", "Reduced motion", "Colour scheme"];
+  const bare = rowsOf(RD("local", { persisted: "granted", usage: "12 kB of 4.0 GB" }));
+  assert("IOS27-15-the-readout-lists-every-field-and-says-n/a-where-this-window-cannot-answer",
+    LABELS.every(function (k) { return typeof bare[k] === "string" && bare[k].length > 0; }) && bare.Window === "n/a" && bare.Screen === "n/a" && bare["Pixel ratio"] === "n/a" &&
+      bare["Safe area"] === "n/a" && bare["Service worker"] === "n/a" && bare["navigator.standalone"] === "n/a" && bare["Storage mode"] === "local" &&
+      bare["Persistent storage"] === "granted" && bare["Storage used"] === "12 kB of 4.0 GB" && Object.keys(bare).every(function (k) { return !/undefined|NaN|Infinity|\[object/.test(bare[k]); }),
+    JSON.stringify(bare));
+  const saveWin = global.window, saveNav = global.navigator;
+  let moved = {}, again = {};
+  try {
+    const mm = function (want) { return function (q) { return { matches: want.some(function (w) { return q.indexOf(w) >= 0; }) }; }; };
+    global.window = { innerWidth: 391, innerHeight: 702, screen: { width: 393, height: 852 }, devicePixelRatio: 2.5, matchMedia: mm(["display-mode: browser", "prefers-contrast: more", "prefers-color-scheme: dark"]), __PWA__: { sw: "registered" }, __NOW__: NOW };
+    Object.defineProperty(globalThis, "navigator", { value: { standalone: false, clipboard: saveNav.clipboard }, configurable: true, writable: true, enumerable: true });
+    moved = rowsOf(RD("artifact", { persisted: "not granted", usage: "n/a" }));
+    global.window = { innerWidth: 440, innerHeight: 800, screen: { width: 440, height: 956 }, devicePixelRatio: 3, matchMedia: mm(["display-mode: standalone", "prefers-reduced-motion: reduce", "prefers-color-scheme: light"]), __NOW__: NOW };
+    Object.defineProperty(globalThis, "navigator", { value: { standalone: true, share: noop, canShare: function () { return true; }, storage: { persist: noop }, clipboard: saveNav.clipboard }, configurable: true, writable: true, enumerable: true });
+    again = rowsOf(RD("none", {}));
+  } finally { global.window = saveWin; Object.defineProperty(globalThis, "navigator", { value: saveNav, configurable: true, writable: true, enumerable: true }); }
+  assert("IOS27-15-the-readout-follows-the-window-it-reads-never-typed-numbers",
+    moved.Window === "391×702" && moved.Screen === "393×852" && moved["Pixel ratio"] === "2.5" && /standalone no · fullscreen no · browser yes/.test(moved["Display mode"]) &&
+      moved["navigator.standalone"] === "false" && moved["Service worker"] === "registered" && moved.Contrast === "more" && moved["Colour scheme"] === "dark" && moved["Storage mode"] === "artifact" &&
+      again.Window === "440×800" && again.Screen === "440×956" && again["Pixel ratio"] === "3" && /standalone yes · fullscreen no · browser no/.test(again["Display mode"]) &&
+      again["navigator.standalone"] === "true" && again["Reduced motion"] === "reduce" && again["Colour scheme"] === "light" && again["storage.persist()"] === "yes" && again.ariaNotify === "no" &&
+      again["Share sheet for files"] !== "no" && again["Service worker"] === "n/a" && again["Storage mode"] === "none",
+    JSON.stringify(moved) + " · " + JSON.stringify(again));
+  assert("IOS27-15-a-storage-mode-that-is-not-one-of-the-four-names-reads-n/a",
+    [{ a: 1 }, 7, null, undefined, "junk", new Array(1000).join("z")].every(function (m) { return rowsOf(RD(m, {}))["Storage mode"] === "n/a"; }), "");
+  assert("IOS27-15-byte-sizes-are-read-as-kB-MB-GB-and-junk-reads-n/a",
+    BT(512) === "512 B" && BT(12345) === "12 kB" && BT(5.5e6) === "5.5 MB" && BT(4.2e9) === "4.2 GB" && BT(NaN) === "n/a" && BT(-1) === "n/a" && BT(undefined) === "n/a" && BT("x") === "n/a",
+    [BT(512), BT(12345), BT(5.5e6), BT(4.2e9), BT(NaN)].join(","));
+  const ro = html("DeviceReadout", FIX.DeviceReadout.props);
+  assert("IOS27-15-the-readout-markup-is-a-list-of-labelled-values-with-a-copy-button-and-no-hex",
+    LABELS.every(function (k) { return ro.indexOf(">" + k + "<") >= 0; }) && ro.indexOf('data-testid="device-copy"') >= 0 && !/#[0-9a-fA-F]{3,8}\b/.test(stripStyle(ro)), ro.length + " chars");
+  const labClosed = html("TabLab", Object.assign({}, FIX.TabLab.props, { ui: { mode: "full", tab: "lab", open: {}, reveals: {} } }));
+  const devSec = /data-section="lab-device"[\s\S]{0,400}?aria-expanded="(true|false)"/.exec(labClosed);
+  assert("IOS27-15-the-lab-device-section-exists-and-is-closed-on-first-paint",
+    !!devSec && devSec[1] === "false" && labClosed.indexOf('data-testid="device-readout"') < 0 && /data-testid="sec-lab-device"/.test(labClosed), devSec ? "aria-expanded " + devSec[1] : "no lab-device section");
+  const labOpen = html("TabLab", FIX.TabLab.props);
+  assert("IOS27-15-the-lab-device-section-is-listed-after-import-and-carries-the-readout-when-open",
+    labOpen.indexOf('data-section="lab-device"') > labOpen.indexOf('data-section="lab-import"') && labOpen.indexOf('data-testid="device-readout"') > labOpen.indexOf('data-section="lab-device"'), "");
+
+  // IOS27-16 (E-138) · the harness counts visible text from a walk over text nodes, never from innerText
+  (function () {
+    let hs = "";
+    try { hs = fs.readFileSync(path.join(ROOT, "qa", "harness.cjs"), "utf8"); } catch (e) { hs = ""; }
+    const a = hs.indexOf("async function visibleText(page)"), b = hs.indexOf("async function visibleWords(page)");
+    const body = a >= 0 && b > a ? hs.slice(a, b).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "") : "";
+    assert("IOS27-16-harness-visibleText-walks-text-nodes-and-never-reads-innerText-E-138",
+      body.length > 0 && /createTreeWalker/.test(body) && /SHOW_TEXT/.test(body) && /getClientRects/.test(body) && /aria-hidden/.test(body) && /option/.test(body) && !/innerText/.test(body) &&
+        /visibleWords/.test(hs.slice(hs.indexOf("module.exports"))),
+      body.length ? "innerText " + (/innerText/.test(body) ? "still read" : "not read") + ", walker " + /createTreeWalker/.test(body) : "visibleText not found in qa/harness.cjs");
+  })();
+
+  // IOS27-14 · export through the share sheet, import from a file
+  const tag = function (h, testid) { const k = h.indexOf('data-testid="' + testid + '"'); if (k < 0) return ""; return h.slice(h.lastIndexOf("<", k), h.indexOf(">", k) + 1); };
+  const fileIn = tag(labOpen, "import-file");
+  assert("IOS27-14-import-offers-a-file-input-for-json-behind-a-44px-label-button-and-paste-stays",
+    /type="file"/.test(fileIn) && /accept="application\/json,\.json"/.test(fileIn) && /<label class="btn filebtn"[^>]*>[\s\S]{0,900}Import from a file/.test(labOpen) && labOpen.indexOf('data-testid="import-text"') >= 0,
+    fileIn || "no file input");
+  assert("IOS27-14-the-export-button-says-Download-where-there-is-no-share-sheet-and-the-hint-names-Save-to-Files",
+    /export-download"[^>]*>[\s\S]{0,900}Download</.test(labOpen) && /Save to Files/.test(plainOf(labOpen)), "");
+  // the label follows the platform: with a share sheet for files it says so
+  const shareNav = { share: noop, canShare: function () { return true; }, clipboard: saveNav.clipboard };
+  let labShare = "", saveFile = global.File;
+  try {
+    Object.defineProperty(globalThis, "navigator", { value: shareNav, configurable: true, writable: true, enumerable: true });
+    global.File = global.File || function File() {};
+    labShare = html("TabLab", FIX.TabLab.props);
+  } finally { Object.defineProperty(globalThis, "navigator", { value: saveNav, configurable: true, writable: true, enumerable: true }); global.File = saveFile; }
+  assert("IOS27-14-with-a-share-sheet-for-files-the-export-button-says-Share-or-save", /export-download"[^>]*>[\s\S]{0,900}Share or save</.test(labShare), labShare ? "label not switched" : "TabLab did not render");
+  assert("IOS27-14-the-export-and-file-input-helpers-are-total",
+    F("canShareFiles")() === false && F("tryShare")("{}", "mc_state_gw1.json") === null && typeof F("readFileText") === "function", "");
+
+  // IOS27-19 · keyboard hints on the league field and the import box
+  const league = tag(html("TabDraft", FIX.TabDraft.props), "draft-league");
+  const importBox = tag(labOpen, "import-text");
+  assert("IOS27-19-the-league-field-carries-autocapitalize-none-autocorrect-off-spellcheck-false-and-enterkeyhint-done",
+    /autoCapitalize="none"|autocapitalize="none"/.test(league) && /autoCorrect="off"|autocorrect="off"/.test(league) && /spellCheck="false"|spellcheck="false"/.test(league) && /enterKeyHint="done"|enterkeyhint="done"/.test(league) && !/inputmode/i.test(league),
+    league || "no league input");
+  assert("IOS27-19-the-import-box-carries-autocapitalize-none-autocorrect-off-and-spellcheck-false",
+    /autocapitalize="none"/i.test(importBox) && /autocorrect="off"/i.test(importBox) && /spellcheck="false"/i.test(importBox), importBox || "no import box");
 })();
 
 /* ---------------------------------------------------------------- 6b. v110 §5 D2 — the Classic plan panel
