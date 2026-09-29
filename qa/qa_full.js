@@ -604,5 +604,29 @@ for(const [iso,title,brief] of [['2026-11-12','Pull B — Strength','Today: Pull
  const nav=p.waitForNavigation({waitUntil:'load',timeout:20000});await p.reload();await nav;await wait(3000);
  const nav2=p.waitForNavigation({waitUntil:'load',timeout:20000});await p.evaluate(()=>applyRestoreText(JSON.stringify({app:'ComebackBlueprint',version:2,cb2_profile:{weight:90,height:177,age:38,bf:18,goal:102.3,goalBf:24,act:1.55},cb2_sessions:[],cb2_weight:[{date:'2026-10-12',v:90}],cb2_measure:[],cb2_lifts:[]})));await nav2;await wait(4000);
  const rr=await p.evaluate(()=>DB.weight.map(x=>x.v).join());T('backup: a restore is the newest state, an older cloud copy does not win after the reload',rr==='90',rr);await done(p);}
+{const p=await pg(b,'2026-10-16',{cb2_weight:[{date:'2026-10-10',v:88},{date:'2026-10-30',v:91}]});
+ await p.evaluate(()=>{window.__toasts=[];const ot=window.toast;window.toast=function(m){window.__toasts.push(String(m));return ot.apply(this,arguments);};});
+ await p.click('.tab[data-view="track"]');await wait(400);
+ const tw=async(v,d)=>{await p.evaluate((v,d)=>{document.getElementById('wVal').value=v;if(d)document.getElementById('wDate').value=d;document.getElementById('wAdd').click();},v,d);await wait(350);};
+ const wl=()=>p.evaluate(()=>DB.weight.map(x=>x.v).join());
+ await tw('400');T('bounds: a 400 kg weigh-in is refused with the range',(await wl())==='88,91'&&/between 40 and 250/.test(await p.evaluate(()=>window.__toasts.join('|'))),await wl());
+ await tw('88.6','2026-10-25');T('bounds: a future date is refused',(await wl())==='88,91'&&/future/.test(await p.evaluate(()=>window.__toasts.join('|'))),await wl());
+ T('bounds: the date inputs cap at today',await p.evaluate(()=>document.getElementById('wDate').max===todayISO()&&document.getElementById('meDate').max===todayISO()));
+ await p.evaluate(()=>{document.getElementById('wDate').value=todayISO();});
+ const n0=p.__dialogs.length;await tw('97.5');T('bounds: a 5 kg+ jump asks first (then saves once confirmed)',p.__dialogs.length>n0&&/away from your weigh-in/.test(p.__dialogs[p.__dialogs.length-1])&&(await wl()).includes('97.5'),JSON.stringify(p.__dialogs.slice(-1)));
+ T('latest: a stray future-dated row never becomes the current weight',await p.evaluate(()=>+DB.profile.weight===97.5&&latestWeightRow().v===97.5),await p.evaluate(()=>String(DB.profile.weight)));
+ await p.evaluate(()=>{document.querySelector('.track-tabs button[data-tp="measure"]').click();document.getElementById('meNeck').value='5';document.getElementById('meAdd').click();});await wait(300);
+ T('bounds: a 5 cm neck is refused',await p.evaluate(()=>!DB.measure.some(x=>x.neck===5)&&/between 25 and 70/.test(window.__toasts.join('|'))));
+ await p.evaluate(()=>switchView('numbers'));await wait(400);
+ const pr=await p.evaluate(()=>{const before={h:DB.profile.height,a:DB.profile.age};document.getElementById('pHeight').value='';document.getElementById('pAge').value='150';document.getElementById('saveProfile').click();return before;});await wait(400);
+ const pa=await p.evaluate(()=>({h:DB.profile.height,a:DB.profile.age,t:window.__toasts.slice(-1)[0]}));
+ T('profile: blank or absurd fields keep the previous value and say so',pa.h===pr.h&&pa.a===pr.a&&/Kept your previous value/.test(pa.t),JSON.stringify({pr,pa}));
+ T('BB-1: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
+{const p=await pg(b,'2026-10-16');
+ const r=await p.evaluate(()=>{const a=importHealthText('2026-10-12,steps,4000\n2026-10-12,steps,3500\n2026-10-12,sleep,3.5\n2026-10-12,sleep,4\n2026-10-12,weight,88.0\n2026-10-12,weight,89.0\n2026-10-12,rhr,50\n2026-10-12,rhr,54\n2027-01-05,weight,88');return {a,d:{st:DB.steps.map(x=>x.n).join(),sl:DB.sleep.map(x=>x.h).join(),w:DB.weight.map(x=>x.v).join(),r:DB.rhr.map(x=>x.bpm).join()}};});
+ T('import: many samples a day add up (steps, sleep) or average (weight, resting rate); a future row is skipped and counted',r.d.st==='7500'&&r.d.sl==='7.5'&&r.d.w==='88.5'&&r.d.r==='52'&&r.a.n===4&&r.a.skipped===1,JSON.stringify(r));
+ const r2=await p.evaluate(()=>{const a=importHealthText('Date;Weight (lb);Total Steps\n2026-10-13;194,0;"12,345"\n2026-10-14;195,5;9000');return {a,w:DB.weight.filter(x=>x.date>='2026-10-13').map(x=>x.v).join(),st:DB.steps.filter(x=>x.date>='2026-10-13').map(x=>x.n).join()};});
+ T('import: pounds are converted, decimal commas and quoted thousands are read',r2.w==='88,88.7'&&r2.st==='12345,9000',JSON.stringify(r2));
+ T('BB-2: no errors',p.__errs.length===0,p.__errs.join('|'));await done(p);}
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+(x.detail||'')).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));})();

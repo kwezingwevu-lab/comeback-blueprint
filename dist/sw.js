@@ -2,7 +2,7 @@
    Strategy: the app page is network-first (so a new build arrives the moment you are online) with an
    offline fallback to the last cached copy; icons/manifest are cache-first; Google Fonts are
    stale-while-revalidate. Your logs never pass through here — they live in localStorage/IndexedDB. */
-const VERSION="0707a1a3da45";
+const VERSION="f11f52fdf0a7";
 const CACHE="cb-app-"+VERSION, FONTS="cb-fonts-v1";
 const CORE=["./ComebackBlueprint.html","./manifest.webmanifest","./icons/icon-180.png","./icons/icon-192.png","./icons/icon-512.png","./icons/icon-maskable-512.png"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE.map(u=>new Request(u,{cache:"reload"})))).then(()=>self.skipWaiting()));});

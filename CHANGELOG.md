@@ -1,5 +1,13 @@
 # CHANGELOG.md — what has shipped (newest first)
 
+## 2026-09-29 (week 3) — review fixes, batch 2: input limits and health import
+- Plausibility limits on every number you type: weight 40–250 kg, waist 50–200, neck 25–70, arm 15–70, chest 60–200, thigh 30–110, height 120–230, age 14–90, body fat 3–60%, goal body fat 5–45%. A refused value says the range.
+- Future dates are refused and the date pickers stop at today; a weigh-in more than 5 kg from the nearest one within 21 days asks first.
+- "Current weight" is the newest weigh-in dated today or earlier, so a stray future row can no longer drive the engine.
+- Profile Save keeps the previous value (and says so) when a field is blank or out of range, instead of silently substituting 88 / 177 / 38.
+- Health import: steps and sleep add up per day, weight and resting rate average, pounds convert (header or label says lb), decimal commas and quoted thousands ("12,345") are read, quote-aware CSV splitting, and the toast reports daily records stored and readings skipped.
+- Gates: Chromium 322/322 · PWA 17/17 · WebKit 29/29 · calendar helper 8/8.
+
 ## 2026-09-28 (week 3) — review fixes, batch 1: storage, restore, service worker
 From a 102-agent review of the whole app (39 findings confirmed by adversarial skeptics), the storage layer first:
 - Vault and account mirror can no longer overwrite your data before a restore: nothing is written to either until their boot read has finished, and a failed cloud read on an empty copy retries (2, 6, 15 s) and writes nothing.
