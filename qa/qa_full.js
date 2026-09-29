@@ -994,5 +994,239 @@ const nextT=async q=>q.evaluate(()=>[...document.querySelectorAll('#liftBody .ne
   const hi=document.querySelector('.head-inner'),first=hi&&hi.firstElementChild,card=document.querySelector('#view-home .card');startRest(90);await new Promise(r=>setTimeout(r,450));const rt=document.getElementById('restTimer').getBoundingClientRect();
   return {tb,sw:nav.scrollWidth,cw:nav.clientWidth,brandL:first?Math.round(first.getBoundingClientRect().left):-1,cardL:card?Math.round(card.getBoundingClientRect().left):-1,pb:parseFloat(getComputedStyle(document.body).paddingBottom),rtTop:Math.round(rt.top),vh:innerHeight,vw:innerWidth};});
  T('AC-ui landscape: at 844×390 with 59 px side insets the eight tabs are 36 px+ tall with their icon and label centred, clear of the insets, the nav does not scroll, header and cards start clear of the inset, and the page leaves room to scroll the last control above the rest timer',r.tb.length===8&&r.tb.every(t=>t.h>=36&&t.off<=3)&&r.tb[0].l>=59&&r.tb[7].r<=r.vw-59&&r.sw<=r.cw&&r.brandL>=59&&r.cardL>=59&&r.pb>=r.vh-r.rtTop,JSON.stringify(r));await done(q);}
+// ===== AD-S1. Round-3 fixes (28-29 Sep 2026): restore and boot safety, escaping + CSP, honest saves, mirrors, two open copies, copy =====
+{const {fontReply}=require('./fontroute');
+const tryEval=async(q,fn,arg)=>{try{return await q.evaluate(fn,arg);}catch(e){return {err:String(e&&e.message||e).slice(0,160)};}};
+const RAW=o=>'localStorage.clear();'+Object.entries(o).map(([k,v])=>'localStorage.setItem('+JSON.stringify(k)+','+JSON.stringify(v)+');').join('');
+const CSPWATCH="window.__csp=[];document.addEventListener('securitypolicyviolation',function(e){window.__csp.push(e.violatedDirective+' '+e.blockedURI);});";
+const DEMO_W=[{date:'2026-09-20',v:88.4},{date:'2026-09-21',v:88.9}];
+const VIEWS8=['home','lift','run','roadmap','fuel','numbers','track','guide'];
+const allViews=q=>tryEval(q,async(V)=>{const out=[];for(const v of V){try{switchView(v);await new Promise(r=>setTimeout(r,90));const e=document.getElementById('view-'+v);out.push(e&&e.innerHTML.length>500&&!/NaN|undefined|Infinity/.test(e.innerText)?1:0);}catch(err){out.push('E:'+String(err&&err.message||err).slice(0,60));}}return out;},VIEWS8);
+// A cloud mirror that survives reloads (kept in localStorage under non-cb2_ keys, so it also survives a tab that comes back with fresh session storage) and a clock that ticks, so "newer" means something. mode: ok | fail | hang.
+const CLOUDP=(seed,cloud,mode)=>"(function(){var K='__cloudmock';if(!localStorage.getItem('__seeded')&&window.name!=='__cbseeded'){window.name='__cbseeded';localStorage.clear();localStorage.setItem('__seeded','1');"
+ +Object.entries(Object.assign({cb2_pure:true},seed||{})).map(([k,v])=>"localStorage.setItem("+JSON.stringify(k)+","+JSON.stringify(JSON.stringify(v))+");").join('')
+ +(cloud?"localStorage.setItem(K,"+JSON.stringify(JSON.stringify({cb2_all:JSON.stringify(cloud)}))+");":"")+"}"
+ +"var store={};try{store=JSON.parse(localStorage.getItem(K)||'{}');}catch(e){}window.__cs=store;window.__setCalls=0;var sv=function(){try{localStorage.setItem(K,JSON.stringify(store));}catch(e){}};"
+ +(mode==='fail'?"window.storage={get:function(k){return Promise.reject(new Error('nf'));},set:function(k,v){window.__setCalls++;return Promise.reject(new Error('down'));}};"
+  :mode==='hang'?"window.storage={get:function(k){return new Promise(function(){});},set:function(k,v){window.__setCalls++;return Promise.resolve();}};"
+  :"window.storage={get:function(k){return k in store?Promise.resolve({key:k,value:store[k]}):Promise.reject(new Error('nf'));},set:function(k,v){window.__setCalls++;store[k]=String(v);sv();return Promise.resolve({key:k,value:v});},delete:function(k){delete store[k];sv();return Promise.resolve({key:k});},list:function(){return Promise.resolve({keys:Object.keys(store)});}};")
+ +"var base=new Date().getTime();Date.now=function(){var n=(+localStorage.getItem('__tick')||0)+1;localStorage.setItem('__tick',n);return base+n*1000;};})();";
+const ready=async q=>{for(let i=0;i<45;i++){const ok=await tryEval(q,()=>typeof _cloudReady!=='undefined'&&_cloudReady===true&&!!window.__cs.cb2_all);if(ok===true)return true;await wait(150);}return false;};
+const acct=q=>tryEval(q,()=>{try{return JSON.parse(window.__cs.cb2_all);}catch(e){return null;}});
+const cpage=async(seed,cloud,mode)=>{const c=await b.createBrowserContext();const q=await page(c,'2026-09-28',CLOUDP(seed,cloud,mode));q.__ctx=c;return q;};
+
+// ---- (a) Restore refuses a wrong-shaped or hostile file before anything is written
+{const q=await ctxPage('2026-09-28',{cb2_weight:DEMO_W,cb2_sleep:[{date:'2026-09-20',h:7}],cb2_lastbackup:1234});
+ const P=['{"cb2_weight":[null,{},{"date":5,"v":"x"}]}','{"cb2_sessions":"abc"}','{"cb2_sessions":{"a":1}}','{"cb2_weight":5}',
+  '{"cb2_weight":{"2026-09-27":88},"cb2_measure":[null,{"date":"2026-09-20","waist":90}],"cb2_profile":{"weight":90}}','{"cb2_sleep":"abc"}',
+  '{"cb2_weight":[{"date":"2026-09-21\\"><img src=x onerror=window.__pwn=1>","v":89}]}','{"cb2_profile":{"goal":"<img src=x onerror=window.__pwn=1>"}}',
+  '{"cb2_bulk":"<b>x</b>"}','{"cb2_evil":{"a":1}}','{"cb2_ceilbf":"18"}','{"cb2_sessions":[null,5,"x",{"entries":null}]}','{"cb2_weight":[{"date":"2026-09-20","v":1e999}]}'];
+ const r=await tryEval(q,async(P)=>{const snap=()=>{const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);o[k]=localStorage.getItem(k);}return JSON.stringify(o);};window.confirm=()=>true;const out=[];
+   for(const txt of P){const before=snap();doRestore();const ta=document.getElementById('dataTa');if(ta)ta.value=txt;const ap=document.getElementById('dataApply');if(ap)ap.click();const t=document.getElementById('toast');out.push({err:/^err/.test(t.className),msg:t.innerText.slice(0,80),same:snap()===before});await new Promise(r=>setTimeout(r,25));}
+   return out;},P);
+ T('AD-S1 restore: 13 wrong-shaped or hostile files are refused before anything is written, each with an error toast (real Restore box)',Array.isArray(r)&&r.length===P.length&&r.every(x=>x.err&&/valid backup/.test(x.msg)&&x.same),JSON.stringify(Array.isArray(r)?r.filter(x=>!(x.err&&x.same)):r).slice(0,300));
+ await done(q);}
+{const q=await ctxPage('2026-09-28',{cb2_weight:DEMO_W,cb2_lastbackup:1234,cb2_locmig:true});
+ const r=await tryEval(q,()=>{const ok=applyRestoreText(JSON.stringify({cb2_weight:[{date:'2026-09-22',v:87.7}],cb2_evil:{a:1},cb2_all:'zz',cb2_lastbackup:0,cb2_locmig:false,cb2_quarantine:{cb2_weight:'x'}}));return {ok,w:localStorage.getItem('cb2_weight'),evil:localStorage.getItem('cb2_evil'),all:localStorage.getItem('cb2_all'),lb:localStorage.getItem('cb2_lastbackup'),lm:localStorage.getItem('cb2_locmig'),qu:localStorage.getItem('cb2_quarantine')};});
+ T('AD-S1 restore: only BACKUP_KEYS are written (cb2_evil, cb2_all, cb2_lastbackup, cb2_locmig, cb2_quarantine in a file change nothing)',!!r&&r.ok===true&&/87\.7/.test(r.w||'')&&r.evil===null&&r.all===null&&r.lb==='1234'&&r.lm==='true'&&r.qu===null,JSON.stringify(r));
+ await done(q);}
+{const q=await ctxPage('2026-09-28',{cb2_weight:DEMO_W});
+ const r=await tryEval(q,()=>{window.confirm=()=>true;doRestore();const ta=document.getElementById('dataTa');if(ta)ta.value='\uFEFF'+JSON.stringify({cb2_weight:[{date:'2026-09-22',v:87.7}]})+'\r\n';const ap=document.getElementById('dataApply');if(ap)ap.click();const h=importHealthText('\uFEFF2026-09-20,weight,88.6');return {w:localStorage.getItem('cb2_weight'),t:document.getElementById('toast').innerText,h:h.n};});
+ T('AD-S1 restore: a pasted backup that starts with a byte-order mark restores like the file picker, and the watch import strips it too',!!r&&/87\.7/.test(r.w||'')&&/Restored/.test(r.t||'')&&r.h===1,JSON.stringify(r));
+ await done(q);}
+{const q=await ctxPage('2026-09-28',{cb2_weight:DEMO_W});
+ const r=await tryEval(q,async()=>{let asked=0;window.confirm=()=>{asked++;return true;};switchView('track');await new Promise(r=>setTimeout(r,200));const inp=document.getElementById('importFile');if(!inp)return {err:'no import input'};
+   const go=async txt=>{const dt=new DataTransfer();dt.items.add(new File([txt],'b.json',{type:'application/json'}));inp.files=dt.files;inp.dispatchEvent(new Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,200));const t=document.getElementById('toast');return {toast:t.innerText,cls:t.className};};
+   const bad=await go('{"cb2_weight":"abc"}');const askedBad=asked;const w1=localStorage.getItem('cb2_weight');const ok=await go(JSON.stringify({cb2_weight:[{date:'2026-09-22',v:87.7}]}));
+   return {bad,askedBad,asked,same:w1===JSON.stringify(JSON.parse(w1)),w:localStorage.getItem('cb2_weight'),okToast:ok.toast};});
+ T('AD-S1 restore: Track Import refuses a wrong-shaped file with an error toast before it even asks, and a good file still asks once and restores',!!r&&!!r.bad&&/^err/.test(r.bad.cls||'')&&/valid backup/.test(r.bad.toast||'')&&r.askedBad===0&&r.asked===1&&/87\.7/.test(r.w||'')&&/Restored/.test(r.okToast||''),JSON.stringify(r).slice(0,300));
+ await done(q);}
+{const q=await ctxPage('2026-09-28',{});
+ const r=await tryEval(q,()=>{const P=parseBackup(JSON.stringify({cb2_profile:{weight:90,height:177,age:38,bf:18}}));const V=parseBackup(JSON.stringify({app:'ComebackBlueprint',weight:[{date:'2026-09-01',v:87.5}]}));return {ok:P.ok,act:P.ok&&P.data.cb2_profile.act,goal:P.ok&&P.data.cb2_profile.goal,w:P.ok&&P.data.cb2_profile.weight,v1:V.ok&&Object.keys(V.data).join(',')};});
+ T('AD-S1 restore: a profile with missing fields is merged over the defaults (act, goal, goalBf never go missing); an old-format file still maps',!!r&&r.ok&&r.act===1.55&&r.goal===102.3&&r.w===90&&/cb2_weight/.test(r.v1||''),JSON.stringify(r));
+ await done(q);}
+{const c=await b.createBrowserContext();const q=await page(c,'2026-09-28',RAW({cb2_pure:'true',cb2_profile:'{"weight":90,"height":177,"age":38,"bf":18}'}));q.__ctx=c;
+ const v=await allViews(q);
+ T('AD-S1 boot: an old-style profile with fields missing renders Home, Fuel and Numbers with no NaN',Array.isArray(v)&&v.every(x=>x===1)&&q.__errs.length===0,JSON.stringify(v)+q.__errs.join('|').slice(0,200));
+ await done(q);}
+// the app's own data always passes its own check (demo log and the long history), so the guard never refuses or hides real logs
+{const DEMO=fs.readFileSync(path.join(__dirname,'fixtures/demo.setup.js'),'utf8').trim().split('\n').pop();const LONG=fs.readFileSync(path.join(__dirname,'fixtures/longseed.tmpl.js'),'utf8').replace('__END__','2027-03-06');
+ const out=[];for(const [n,iso,seed] of [['demo','2026-09-28',DEMO],['long','2027-03-06',LONG]]){const c=await b.createBrowserContext();const q=await page(c,iso,seed);q.__ctx=c;
+   const r=await tryEval(q,()=>{const P=parseBackup(backupJSON());const ban=document.getElementById('storageWarnAll');return {bad:Object.keys(_bad).length,ok:P.ok,n:P.ok?P.n:0,sess:DB.sessions.length,ban:ban.classList.contains('show'),q:localStorage.getItem('cb2_quarantine')};});
+   out.push({n,r});await done(q);}
+ T('AD-S1 shape check: the demo log and the 24-week long history load with nothing dropped, no banner, and their own backup passes the strict restore check',out.every(o=>o.r&&o.r.bad===0&&o.r.ok&&o.r.n>=5&&o.r.sess>10&&!o.r.ban&&o.r.q===null),JSON.stringify(out).slice(0,300));}
+
+{const q=await ctxPage('2026-09-28',{cb2_profile:{weight:88,height:177,age:38,bf:18,goal:102.3,goalBf:24,act:'1.375',goal10k:'55:00',phase:'hyper',day1bf:18},cb2_weight:DEMO_W});
+ const r=await tryEval(q,()=>{const P=parseBackup(backupJSON());const raw=JSON.parse(localStorage.getItem('cb2_profile'));return {bad:Object.keys(_bad).length,act:DB.profile.act,ok:P.ok&&parseBackup(JSON.stringify({cb2_profile:{act:'1.375'}})).ok,d1:DB.profile.day1bf,rawAct:raw.act};});
+ T('AD-S1 shape check: an activity level saved as text ("1.375", which is how the Numbers select saves it) is read as a number, not dropped, and does not raise the banner',!!r&&r.bad===0&&r.act===1.375&&r.ok===true&&r.d1===18,JSON.stringify(r));
+ await done(q);}
+
+// ---- (a) A corrupt store already on the device never bricks the app
+{const BAD={cb2_weight:'[null,{},{"date":5,"v":"x"}]',cb2_sessions:'"abc"',cb2_measure:'{"a":1}',cb2_lifts:'7',cb2_runs:'null',cb2_sleep:'"abc"',cb2_rhr:'[1,2]',cb2_steps:'{oops',cb2_profile:'[]',cb2_bulk:'"zzz"',cb2_march:'5',cb2_fuelq:'{}',cb2_loc:'"moon"',cb2_radius:'"far"',cb2_ceilbf:'1e999',cb2_focuslb:'"yes"',cb2_wakelock:'3',cb2_ts:'"now"',cb2_lastbackup:'"x"'};
+ const c=await b.createBrowserContext();const q=await page(c,'2026-09-28',RAW(BAD));q.__ctx=c;
+ const v=await allViews(q);
+ const r=await tryEval(q,()=>{const ban=document.getElementById('storageWarnAll');let qz={};try{qz=JSON.parse(localStorage.getItem('cb2_quarantine')||'{}');}catch(e){}return {bad:Object.keys(_bad).length,ban:ban.classList.contains('show')&&/could not be read/.test(ban.textContent)&&!!ban.querySelector('.warn-act'),w:DB.weight.length,s:DB.sessions.length,mode:bulkMode,pw:DB.profile.weight,qs:qz.cb2_sessions,qst:qz.cb2_steps};});
+ T('AD-S1 boot: 19 keys holding the wrong shape (strings, numbers, junk rows, broken JSON) still boot; all eight views render clean on the defaults',Array.isArray(v)&&v.every(x=>x===1)&&q.__errs.length===0&&!!r&&r.w===0&&r.s===0&&r.mode==='aggr'&&r.pw===88,JSON.stringify({v,r,e:q.__errs.join('|').slice(0,160)}));
+ T('AD-S1 boot: one banner says what could not be read, and the original text is set aside (not deleted) in the quarantine',!!r&&r.bad>=17&&r.ban&&r.qs==='"abc"'&&r.qst==='{oops',JSON.stringify(r));
+ const ex=await tryEval(q,async()=>{let cap=null,name='';const oc=URL.createObjectURL;URL.createObjectURL=bl=>{cap=bl;return oc.call(URL,bl);};const ac=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){name=this.download;};
+   const btn=document.querySelector('#storageWarnAll .warn-act button');if(btn)btn.click();HTMLAnchorElement.prototype.click=ac;URL.createObjectURL=oc;const txt=cap?await new Response(cap).text():'';let j=null;try{j=JSON.parse(txt);}catch(e){}
+   const refused=parseBackup(txt);return {name,app:j&&j.app,keys:j?Object.keys(j.keys||{}).length:0,sess:j&&j.keys&&j.keys.cb2_sessions,refused:refused.ok===false};});
+ T('AD-S1 boot: "Export what is there" saves the set-aside text to a file, and Restore refuses that file',!!ex&&/^comeback-unreadable-2026-09-28\.json$/.test(ex.name||'')&&ex.app==='ComebackBlueprint-unreadable'&&ex.keys>=17&&ex.sess==='"abc"'&&ex.refused===true,JSON.stringify(ex));
+ await done(q);}
+{const c=await b.createBrowserContext();const q=await page(c,'2026-09-28',RAW({cb2_weight:'[{"date":"2026-09-20","v":88.5},null,{"date":"2026-09-21","v":"x"}]'}));q.__ctx=c;
+ const r=await tryEval(q,async()=>{const out={n:DB.weight.length,ban:document.getElementById('storageWarnAll').textContent};const el=document.getElementById('qW');if(el){el.value='90,1';quickLogWeight();}await new Promise(r=>setTimeout(r,100));out.after=JSON.parse(localStorage.getItem('cb2_weight')||'[]').length;out.qz=(localStorage.getItem('cb2_quarantine')||'').includes('null');return out;});
+ T('AD-S1 boot: unreadable rows are left out and counted, the good rows stay, and the original is set aside before the next save overwrites it',!!r&&r.n===1&&/weigh-ins \(2 entries\)/.test(r.ban||'')&&r.after===2&&r.qz===true,JSON.stringify(r));
+ await done(q);}
+
+// ---- (b) Stored text is escaped where it is printed; a Content-Security-Policy forbids network access from the page
+{const HOST={cb2_lifts:JSON.stringify([{date:'2026-09-20',lift:'Squat<img src=x onerror=window.__pwn1=1>',w:100,r:5}]),cb2_measure:JSON.stringify([{date:'2026-09-20',waist:90,scanBf:22,scanKind:'DEXA<img src=x onerror=window.__pwn2=1>'}]),
+  cb2_runs:JSON.stringify([{date:'2026-09-20',type:'<img src=x onerror=window.__pwn3=1>',dist:5,time:1500}]),cb2_profile:JSON.stringify({weight:88,height:177,age:38,bf:18,goal:'<img src=x onerror=window.__pwn4=1>',goalBf:24,act:1.55,goal10k:'55:00',phase:'hyper'}),
+  cb2_bulk:'"<img src=x onerror=window.__pwn5=1>"',cb2_radius:'"<img src=x onerror=window.__pwn6=1>"',cb2_ceilbf:'"<img src=x onerror=window.__pwn7=1>"',cb2_rhr:'[{"date":"2026-09-20","bpm":"<img src=x onerror=window.__pwn8=1>"}]'};
+ const c=await b.createBrowserContext();const q=await page(c,'2026-09-28',RAW(HOST)+CSPWATCH);q.__ctx=c;
+ const r=await tryEval(q,async(V)=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const out={e:esc('<img src=x onerror=1>&"\''),lists:[]};
+   for(const v of V){switchView(v);await W(80);if(v==='track'){for(const tp of ['strength','measure','lifts','weight']){const bt=document.querySelector('.track-tabs button[data-tp="'+tp+'"]');if(bt)bt.click();await W(80);}}}
+   out.img=document.querySelectorAll('img[src="x"]').length;out.pwn=Object.keys(window).filter(k=>/^__pwn/.test(k));out.lift=(document.getElementById('liftList')||{}).innerText||'';out.opt=(document.getElementById('liftSel')||{}).innerText||'';out.tape=(document.getElementById('meList')||{}).innerText||'';out.run=(document.getElementById('runList')||{}).innerText||'';out.goal=(document.getElementById('pillarStrMeta')||{}).textContent||'';out.bad=Object.keys(_bad);out.goalv=DB.profile.goal;return out;},VIEWS8);
+ T('AD-S1 escape: esc() covers & < > " and the apostrophe',!!r&&r.e==='&lt;img src=x onerror=1&gt;&amp;&quot;&#39;',JSON.stringify(r&&r.e));
+ T('AD-S1 escape: hostile lift and run text prints as text on every view; hostile scan kind, goal, mode, radius and heart-rate values are dropped at ingest; no element is injected and no script runs',!!r&&r.img===0&&r.pwn.length===0&&/Squat<img/.test(r.lift+r.opt)&&r.tape.indexOf('DEXA<img')<0&&r.bad.includes('cb2_measure')&&r.bad.includes('cb2_profile')&&r.bad.includes('cb2_rhr')&&r.goalv===102.3,JSON.stringify({img:r&&r.img,pwn:r&&r.pwn,bad:r&&r.bad,goalv:r&&r.goalv,tape:r&&r.tape,lift:r&&r.lift}).slice(0,380));
+ await done(q);}
+{const q=await ctxPage('2026-09-28',{},CSPWATCH);
+ const r=await tryEval(q,async()=>{const m=document.querySelector('meta[http-equiv="Content-Security-Policy"]');const out={c:m?m.content:'',first:!!m&&document.head.querySelector('meta[http-equiv]')===m,boot:window.__csp.length};
+   try{await fetch('data:text/plain,hi');out.fetch='allowed';}catch(e){out.fetch='blocked';}
+   try{const x=new XMLHttpRequest();x.open('GET','data:text/plain,hi');x.send();out.xhr='sent';}catch(e){out.xhr='blocked';}
+   try{new WebSocket('ws://127.0.0.1:9/x');out.ws='made';}catch(e){out.ws='blocked';}
+   try{navigator.sendBeacon('data:text/plain,hi','x');out.beacon='sent';}catch(e){out.beacon='blocked';}
+   await new Promise(r=>setTimeout(r,250));out.viol=window.__csp.filter(v=>/^connect-src/.test(v)).length;return out;});
+ T('AD-S1 CSP: the page carries a policy with connect-src \'none\'; fetch, XHR, WebSocket and beacon are all refused and reported, and boot raised no violation',!!r&&/connect-src 'none'/.test(r.c||'')&&/script-src 'unsafe-inline'/.test(r.c||'')&&r.boot===0&&r.fetch==='blocked'&&r.viol>=3,JSON.stringify(r).slice(0,300));
+ await done(q);}
+{const c=await b.createBrowserContext();const q=await c.newPage();const errs=[];q.on('pageerror',e=>errs.push(e.message));q.on('console',m=>{if(m.type()==='error')errs.push(m.text());});
+ await q.setRequestInterception(true);q.on('request',r=>{const u=r.url();if(u.startsWith('file:')||u.startsWith('data:')||u.startsWith('blob:'))return r.continue();const f=fontReply(u);if(f)return r.respond(f);r.respond({status:200,contentType:'text/css',body:''});});
+ await q.evaluateOnNewDocument(MOCK,'2026-09-28');await q.evaluateOnNewDocument(STORAGE);await q.evaluateOnNewDocument(CSPWATCH);
+ await q.goto('file://'+path.resolve('ComebackBlueprint.html'),{waitUntil:'networkidle0'});await q.setViewport({width:390,height:844,deviceScaleFactor:1});
+ let r=null;for(let i=0;i<40&&!(r&&r.mano&&r.media==='all');i++){await wait(150);r=await tryEval(q,()=>{const L=[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/['"]/g,''));const lk=document.querySelector('link[rel=stylesheet][href*="fonts.googleapis"]');return {L:[...new Set(L)],mano:L.includes('Manrope'),csp:window.__csp.length,media:lk?lk.media:'none'};});}
+ T('AD-S1 CSP: with the policy on, the Google Fonts stylesheet (swapped in by its inline onload) and the font files still load in the shell, with no violation and no console error',!!r&&r.mano&&r.media==='all'&&r.csp===0&&errs.length===0,JSON.stringify(r)+errs.join('|').slice(0,160));
+ await c.close();}
+
+// ---- (c) A save that did not land is never reported as saved
+{const q=await ctxPage('2026-09-28',{cb2_weight:DEMO_W,cb2_sleep:[{date:'2026-09-20',h:7}]});
+ const r=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const out={};const orig=Storage.prototype.setItem;const before=localStorage.getItem('cb2_weight');
+   Storage.prototype.setItem=function(k,v){if(/^cb2_/.test(k))throw new DOMException('quota','QuotaExceededError');return orig.call(this,k,v);};
+   const el=document.getElementById('qW');if(el){el.value='90.5';quickLogWeight();}await W(60);let t=document.getElementById('toast');out.home=t.className+'|'+t.innerText;out.homeUndo=!!t.querySelector('.undo');
+   const ban=document.getElementById('storageWarnAll');out.ban=ban.classList.contains('show')&&/full or refusing/.test(ban.textContent);out.lives=(document.getElementById('dataLives')||{}).innerText||'';
+   switchView('track');await W(150);const wv=document.getElementById('wVal');if(wv){wv.value='91.2';const ad=document.getElementById('wAdd');if(ad)ad.click();}await W(60);t=document.getElementById('toast');out.track=t.className+'|'+t.innerText;out.trackUndo=!!t.querySelector('.undo');
+   out.restore=applyRestoreText(JSON.stringify({cb2_weight:[{date:'2026-09-22',v:87.7}]}));out.rtoast=document.getElementById('toast').innerText;out.same=localStorage.getItem('cb2_weight')===before;
+   Storage.prototype.setItem=orig;switchView('track');await W(150);const w2=document.getElementById('wVal');if(w2){w2.value='90.7';const ad2=document.getElementById('wAdd');if(ad2)ad2.click();}await W(60);t=document.getElementById('toast');out.ok=t.className+'|'+t.innerText+'|undo:'+!!t.querySelector('.undo');out.banGone=!document.getElementById('storageWarnAll').classList.contains('show');out.stored=/90\.7/.test(localStorage.getItem('cb2_weight')||'');return out;});
+ T('AD-S1 honest save: with storage full, a Home log and a Track log say "Not saved" in the warning style with no Undo, and the one banner and the Data card say the store is full',!!r&&/^err/.test(r.home||'')&&/Not saved/.test(r.home||'')&&r.homeUndo===false&&/^err/.test(r.track||'')&&/Not saved/.test(r.track||'')&&r.trackUndo===false&&r.ban===true&&/device store ✗ full/.test(r.lives||''),JSON.stringify(r).slice(0,400));
+ T('AD-S1 honest save: a Restore that cannot write every key changes nothing and says so; once storage works again the banner clears and the next log is a normal success',!!r&&r.restore===false&&/Not restored/.test(r.rtoast||'')&&r.same===true&&!/^err/.test(r.ok||'')&&/Weight logged[\s\S]*undo:true/.test(r.ok||'')&&r.banGone===true&&r.stored===true,JSON.stringify({restore:r&&r.restore,rtoast:r&&r.rtoast,same:r&&r.same,ok:r&&r.ok,banGone:r&&r.banGone,stored:r&&r.stored}).slice(0,380));
+ await done(q);}
+
+// ---- (d) Mirrors: the vault and the account copy follow a Restore, a setting counts as a change, the account copy is applied only when it is newer, and the Data card ticks only real writes
+{const q=await cpage({cb2_weight:[{date:'2026-09-20',v:88.4}]});let r={};
+ if(await ready(q)){
+   r.backup=await tryEval(q,()=>{DB.save();return backupJSON();});
+   await tryEval(q,()=>{DB.weight.push({date:'2026-09-21',v:89.1});DB.save();});
+   for(let i=0;i<30;i++){const a=await acct(q);if(a&&a.data&&a.data.cb2_weight&&a.data.cb2_weight.length===2)break;await wait(120);}
+   const nav=q.waitForNavigation({waitUntil:'load',timeout:15000}).catch(()=>null);
+   await tryEval(q,j=>{applyRestoreText(j);},r.backup);await nav;
+   await ready(q);await wait(300);
+   r.after=await tryEval(q,async()=>{const ac=JSON.parse(window.__cs.cb2_all);const raw=await idbLoad();let vw=-1;try{vw=JSON.parse(raw).data.cb2_weight.length;}catch(e){}return {w:DB.weight.length,ls:JSON.parse(localStorage.getItem('cb2_weight')||'[]').length,acct:ac.data.cb2_weight.length,vault:vw,toast:document.getElementById('toast').innerText};});}
+ T('AD-S1 mirrors: inside Claude, restoring an older backup is not undone at the next launch by the account copy, and the device vault holds the restored generation too',!!r.after&&r.after.w===1&&r.after.ls===1&&r.after.acct===1&&r.after.vault===1&&!/Cloud data loaded/.test(r.after.toast||''),JSON.stringify(r.after||r).slice(0,300));
+ await done(q);}
+{const q=await cpage({cb2_weight:[{date:'2026-09-20',v:88.4}],cb2_bulk:'aggr'});let r={};
+ if(await ready(q)){
+   await tryEval(q,async()=>{switchView('numbers');await new Promise(r=>setTimeout(r,250));const bt=document.querySelector('#bulkSeg button[data-bm="max"]');if(bt)bt.click();DB.weight.push({date:'2026-09-21',v:89.1});DB.save();});
+   for(let i=0;i<30;i++){const a=await acct(q);if(a&&a.data&&a.data.cb2_bulk==='max')break;await wait(120);}
+   await tryEval(q,()=>{const bt=document.querySelector('#bulkSeg button[data-bm="cut"]');if(bt)bt.click();});
+   for(let i=0;i<30;i++){const a=await acct(q);if(a&&a.data&&a.data.cb2_bulk==='cut')break;await wait(120);}
+   r.acct=(await acct(q)||{data:{}}).data.cb2_bulk;
+   const nav=q.waitForNavigation({waitUntil:'load',timeout:15000}).catch(()=>null);await tryEval(q,()=>{location.reload();});await nav;
+   await ready(q);await wait(300);
+   r.after=await tryEval(q,()=>({mode:bulkMode,ls:localStorage.getItem('cb2_bulk'),toast:document.getElementById('toast').innerText}));}
+ T('AD-S1 mirrors: a nutrition mode changed after the last log reaches the account copy and is not reverted at the next launch (a setting counts as a change)',r.acct==='cut'&&!!r.after&&r.after.mode==='cut'&&r.after.ls==='"cut"'&&!/Cloud data loaded/.test(r.after.toast||''),JSON.stringify(r).slice(0,300));
+ await done(q);}
+{const q=await cpage({cb2_measure:[{date:'2026-09-27',waist:90,neck:38}],cb2_ts:5000000000000},{ts:1000,data:{cb2_measure:[{date:'2026-09-01',waist:95}],cb2_weight:[{date:'2026-09-01',v:90}]}});let r={};
+ if(await ready(q))r=await tryEval(q,()=>({m:DB.measure.length,md:DB.measure[0]&&DB.measure[0].date,w:DB.weight.length,toast:document.getElementById('toast').innerText}));
+ T('AD-S1 mirrors: an older account copy does not overwrite newer local tapes (emptiness counts tapes, lifts and sleep, and the time stamp still decides)',!!r&&r.m===1&&r.md==='2026-09-27'&&r.w===0&&!/Cloud data loaded/.test(r.toast||''),JSON.stringify(r));
+ await done(q);}
+{const q=await cpage({},{ts:1000,data:{cb2_lifts:[{date:'2026-09-01',lift:'Squat',w:100,r:5}],cb2_evil:{a:1},cb2_weight:[{date:'2026-09-01',v:90},null]}});let r={};
+ if(await ready(q))r=await tryEval(q,()=>({l:DB.lifts.length,w:DB.weight.length,evil:localStorage.getItem('cb2_evil'),toast:document.getElementById('toast').innerText}));
+ T('AD-S1 mirrors: an empty device takes the account copy, keeping only the app\'s own keys and readable rows',!!r&&r.l===1&&r.w===1&&r.evil===null&&/Cloud data loaded/.test(r.toast||''),JSON.stringify(r));
+ await done(q);}
+{const q=await ctxPage('2026-09-28',{cb2_profile:{weight:88,height:177,age:38,bf:18,goal:102.3,goalBf:24,act:1.55,goal10k:'55:00',phase:'hyper'}});
+ const r=await tryEval(q,()=>{const a=liftPhase;localStorage.setItem('cb2_profile',JSON.stringify(Object.assign({},DB.profile,{phase:'build'})));reloadDB();const b2=liftPhase;localStorage.setItem('cb2_profile',JSON.stringify(Object.assign({},DB.profile,{phase:'hyper'})));reloadDB();return {a,b2,c:liftPhase};});
+ T('AD-S1 mirrors: reloadDB refreshes the Lift phase, so a vault or account restore never leaves the Lift on the wrong programme',!!r&&r.a==='hyper'&&r.b2==='build'&&r.c==='hyper',JSON.stringify(r));
+ await done(q);}
+{let ok1=null,bad=null,hang=null;
+ {const q=await cpage({cb2_weight:DEMO_W},null,'ok');if(await ready(q)){await wait(200);ok1=await tryEval(q,()=>{switchView('home');return {lives:document.getElementById('dataLives').innerText,ack:(document.getElementById('cloudAck')||{}).textContent,calls:window.__setCalls};});}await done(q);}
+ {const q=await cpage({cb2_weight:DEMO_W},null,'fail');await wait(1500);bad=await tryEval(q,async()=>{switchView('home');await new Promise(r=>setTimeout(r,150));return {lives:document.getElementById('dataLives').innerText,ack:(document.getElementById('cloudAck')||{}).textContent,err:_cloudErr,calls:window.__setCalls};});await done(q);}
+ {const q=await cpage({cb2_weight:DEMO_W},null,'hang');let g=null;for(let i=0;i<50&&!(g&&g.err);i++){await wait(150);g=await tryEval(q,()=>({err:_cloudErr,calls:window.__setCalls}));}
+   hang=await tryEval(q,async()=>{switchView('home');await new Promise(r=>setTimeout(r,150));return {lives:document.getElementById('dataLives').innerText,ack:(document.getElementById('cloudAck')||{}).textContent,err:_cloudErr,calls:window.__setCalls};});await done(q);}
+ T('AD-S1 Data card: "Claude account" ticks with the time only after a write has succeeded; a rejected write shows "last save failed" and never a tick',!!ok1&&/Claude account ✓ \d/.test(ok1.lives||'')&&/Saved .* ✓/.test(ok1.ack||'')&&!!bad&&bad.err==='save'&&/Claude account ✗ last save failed/.test(bad.lives||'')&&!/Claude account ✓/.test(bad.lives||'')&&/failed/.test(bad.ack||''),JSON.stringify({ok1,bad}).slice(0,400));
+ T('AD-S1 Data card: an account that never answers is marked "not reachable" after 5 seconds, nothing is written to it, and there is no tick',!!hang&&hang.err==='reach'&&hang.calls===0&&/Claude account ✗ not reachable/.test(hang.lives||'')&&!/Claude account ✓/.test(hang.lives||''),JSON.stringify(hang));}
+{const q=await ctxPage('2026-09-28',{cb2_weight:DEMO_W});
+ const r=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const opened=[];const oo=IDBFactory.prototype.open;IDBFactory.prototype.open=function(n){const rq=oo.apply(this,arguments);if(n==='cb2')rq.addEventListener('success',()=>{opened.push(rq.result);});return rq;};
+   const oc=IDBDatabase.prototype.close;IDBDatabase.prototype.close=function(){this.__closed=true;return oc.apply(this,arguments);};
+   for(let i=0;i<3;i++){DB.weight.push({date:'2026-09-2'+(2+i),v:89+i});DB.save();await W(80);}await _idbLast;await W(200);const stillOpen=opened.filter(d=>!d.__closed).length;
+   const del=await new Promise(res=>{const d=indexedDB.deleteDatabase('cb2');d.onsuccess=()=>res('deleted');d.onblocked=()=>res('blocked');d.onerror=()=>res('error');setTimeout(()=>res('timeout'),2500);});return {n:opened.length,stillOpen,del};});
+ T('AD-S1 vault: every save closes its IndexedDB connection (none left open after three saves, and the vault can be deleted or upgraded while the app is open)',!!r&&r.n>=3&&r.stillOpen===0&&r.del==='deleted',JSON.stringify(r));
+ await done(q);}
+
+// ---- (e) Two open copies reload from storage instead of overwriting each other
+{const c=await b.createBrowserContext();const A=await page(c,'2026-09-28',SEED({cb2_weight:DEMO_W}));A.__ctx=c;const B2=await page(c,'2026-09-28','');
+ await tryEval(B2,async()=>{const el=document.getElementById('qW');if(el){el.value='91,0';quickLogWeight();}await new Promise(r=>setTimeout(r,100));});
+ await A.bringToFront();let ra=null;for(let i=0;i<60&&!(ra&&ra.n===3);i++){await wait(150);ra=await tryEval(A,()=>({n:DB.weight.length,toast:document.getElementById('toast').innerText}));}
+ await tryEval(A,()=>{DB.weight.push({date:'2026-09-23',v:90.2});DB.save();});
+ const rb=await tryEval(A,()=>JSON.parse(localStorage.getItem('cb2_weight')||'[]').map(w=>w.date).join(','));
+ T('AD-S1 two copies: a second open copy takes the first one\'s new log and says so, so its next save keeps both entries (no last-write-wins)',!!ra&&ra.n===3&&/Another open copy/.test(ra.toast||'')&&/2026-09-23/.test(rb||'')&&(rb||'').split(',').length===4,JSON.stringify({ra,rb}));
+ await B2.close();await done(A);}
+
+// ---- (f) Copy: where the other data lives, and photos are not in the backup file
+{const q=await ctxPage('2026-09-28',{});
+ const r=await tryEval(q,()=>{const a=freshCopyNote('https:',true,true),b2=freshCopyNote('https:',false,true);switchView('home');const home=document.getElementById('view-home').innerHTML;switchView('track');const foot=(document.querySelector('#view-track .foot-note')||{}).innerText||'';
+   return {a,b2,n1:freshCopyNote('https:',true,false),n2:freshCopyNote('file:',true,true),home:/Progress photos are not in the file/.test(home),foot,std:isStandalone()};});
+ T('AD-S1 copy: an empty Home Screen copy says the Safari data lives elsewhere and how to move it; a Safari tab says the same the other way; a copy with data or a file: copy stays quiet',!!r&&/Home Screen app keeps its own copy, apart from Safari/.test(r.a)&&/Download there, then tap Restore here/.test(r.a)&&/Safari and the Home Screen app each keep their own copy/.test(r.b2)&&r.n1===''&&r.n2===''&&r.std===false,JSON.stringify(r).slice(0,300));
+ T('AD-S1 copy: the Data card and the Track footer both say progress photos are not in the backup file and where to save them',!!r&&r.home&&/not the progress photos/.test(r.foot||'')&&/Save photos/.test(r.foot||''),JSON.stringify(r).slice(0,300));
+ await done(q);}
+}
+
+// ===== AD-S1 review repairs (29 Sep 2026): legacy set text, hostile exercise keys, blocked storage, silent saves, complete banner =====
+{const tryEval=async(q,fn,arg)=>{try{return await q.evaluate(fn,arg);}catch(e){return {err:String(e&&e.message||e).slice(0,160)};}};
+ const W2=[{date:'2026-09-20',v:88.4},{date:'2026-09-21',v:88.9}];
+ // sets typed before the 28 Sep validation may hold free text; they keep their session, markup is still refused
+ {const LEG={id:'legacy1',dateISO:'2026-09-20',day:'pushA',loc:'home',entries:{pa1:[{r:'BW',w:'0'},{r:'8',w:'80kg',rpe:'8-9'}]}};
+  const q=await ctxPage('2026-09-28',{cb2_weight:W2,cb2_sessions:[LEG]});
+  const r=await tryEval(q,()=>({kept:DB.sessions.some(s=>s.id==='legacy1'),bad:Object.keys(_bad).length,ban:document.getElementById('storageWarnAll').classList.contains('show'),strict:parseBackup(backupJSON()).ok,
+    hostile:parseBackup(JSON.stringify({cb2_sessions:[{id:'x',dateISO:'2026-09-20',day:'pushA',entries:{pa1:[{r:'<img src=x onerror=1>',w:'5'}]}}]})).ok}));
+  T('AD-S1 shape check: sets typed before the 28 Sep validation ("BW", "80kg", "8-10") keep their session, raise no banner and pass the strict restore check; a set holding markup is still refused',!!r&&r.kept===true&&r.bad===0&&r.ban===false&&r.strict===true&&r.hostile===false,JSON.stringify(r));
+  await done(q);}
+ // a hostile exercise key inside a session never reaches the page (Track > Lifts printed it unescaped)
+ {const q=await ctxPage('2026-09-28',{cb2_weight:W2,cb2_sessions:[{id:'ok1',dateISO:'2026-09-27',day:'legsA',loc:'gym',entries:{'<img src=x onerror=window.__pwn9=1>':[{r:'5',w:'50'}],ga1:[{r:'8',w:'60'}]}},{id:'ok2',dateISO:'2026-09-26',day:'legsA',loc:'gym',entries:{ga1:[{r:'8',w:'60'}]}}]});
+  const r=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));for(const v of ['lift','track','guide','home']){switchView(v);await W(80);if(v==='track'){for(const t of document.querySelectorAll('[data-tp]')){t.click();await W(60);}}}
+    return {img:document.querySelectorAll('img[src="x"]').length,pwn:Object.keys(window).filter(k=>/^__pwn/.test(k)).length,bad:Object.keys(_bad),n:DB.sessions.length,ref:parseBackup(JSON.stringify({cb2_sessions:[{id:'x',dateISO:'2026-09-20',day:'legsA',entries:{'<b>':[{r:'5',w:'5'}]}}]})).ok};});
+  T('AD-S1 escape: a hostile exercise key inside a lift session is refused at ingest (and escaped where Track > Lifts prints it): no element injected, no script runs, the good session stays, Restore refuses it',!!r&&r.img===0&&r.pwn===0&&r.n===1&&(r.bad||[]).includes('cb2_sessions')&&r.ref===false,JSON.stringify(r));
+  await done(q);}
+ // storage blocked in the viewer: the vault (or the account copy) is the only store, so it must still fill the app for the session
+ {const q=await ctxPage('2026-09-28',{cb2_weight:W2,cb2_sleep:[{date:'2026-09-20',h:7}]});
+  await tryEval(q,()=>{DB.save();});
+  let vn=0;for(let i=0;i<40&&vn<2;i++){await wait(150);const v=await tryEval(q,()=>new Promise(res=>{const o=indexedDB.open('cb2',1);o.onsuccess=()=>{try{const g=o.result.transaction('kv').objectStore('kv').get('cb2_all');g.onsuccess=()=>{let n=0;try{n=JSON.parse(g.result).data.cb2_weight.length;}catch(e){}o.result.close();res(n);};}catch(e){res(0);}};o.onerror=()=>res(0);}));vn=typeof v==='number'?v:0;}
+  const BLOCK="try{Object.defineProperty(window,'localStorage',{get:function(){throw new DOMException('denied','SecurityError');}});}catch(e){}";
+  const p2=await page(q.__ctx,'2026-09-28',BLOCK);
+  const r=await tryEval(p2,()=>({ok:STORAGE_OK,w:DB.weight.length,toast:document.getElementById('toast').innerText.slice(0,60)}));
+  T('AD-S1 mirrors: in a viewer that blocks localStorage the device vault still fills the app for the session (Restored from the device vault)',vn===2&&!!r&&r.ok===false&&r.w===2&&/device vault/.test(r.toast||''),JSON.stringify({vn,r}));
+  await p2.close();await done(q);}
+ // a save that nobody toasts about (typing a set in Lift) still says Not saved, once, not on every keystroke
+ {const q=await ctxPage('2026-09-28',{cb2_weight:W2});
+  const r=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const o=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(/^cb2_/.test(k))throw new DOMException('quota','QuotaExceededError');return o.call(this,k,v);};
+    switchView('lift');await W(300);const t=document.getElementById('toast');t.className='';const c=document.querySelector('#liftBody input.cell[data-f="r"]');if(!c){Storage.prototype.setItem=o;return {err:'no cell'};}
+    c.value='8';c.dispatchEvent(new Event('input',{bubbles:true}));await W(60);const first={cls:t.className,txt:t.innerText};t.className='';
+    c.value='9';c.dispatchEvent(new Event('input',{bubbles:true}));await W(60);const second=t.className;Storage.prototype.setItem=o;return {first,second};});
+  T('AD-S1 honest save: typing a set in Lift with storage full raises one Not saved warning, not one per keystroke',!!r&&!!r.first&&/^err/.test(r.first.cls)&&/Not saved/.test(r.first.txt)&&r.second==='',JSON.stringify(r));
+  await done(q);}
+ // the banner is complete once every boot-time read has run: a setting that could not be read is listed too
+ {const q=await ctxPage('2026-09-28',{cb2_weight:W2,cb2_bulk:'zzz'});
+  const r=await tryEval(q,()=>{const b=document.getElementById('storageWarnAll');return {show:b.classList.contains('show'),txt:b.textContent.slice(0,200),mode:bulkMode};});
+  T('AD-S1 boot: the banner lists a setting that could not be read (nutrition mode) and the app falls back to its default',!!r&&r.show===true&&/nutrition mode/.test(r.txt||'')&&r.mode==='aggr',JSON.stringify(r));
+  await done(q);}
+}
+
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+String(x.detail||'').replace(/\s+/g,' ').slice(0,400)).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));process.exit(pass===R.length?0:1);})().catch(e=>{console.error('QA CRASH:',e&&e.stack||e);process.exit(2);});

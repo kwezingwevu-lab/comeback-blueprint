@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'none'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>The Comeback Blueprint — Pure Muscle · FFMI 25</title>
 <meta name="theme-color" content="#0A0D14">
@@ -358,6 +359,9 @@ svg[data-tip]:focus-visible{outline:2px solid var(--gold);outline-offset:4px;bor
 #toast .undo{background:none;border:0;border-left:1px solid var(--line-2);margin-left:6px;padding:6px 2px 6px 14px;color:var(--gold);font:inherit;font-weight:800;cursor:pointer;min-height:36px}
 .storage-warn{display:none;background:rgba(240,136,62,.1);border:1px solid rgba(240,136,62,.3);border-radius:var(--r);padding:12px 14px;margin-bottom:16px;font-size:13px;color:#f3c393}
 .storage-warn.show{display:block}
+.storage-warn div+div{margin-top:6px}
+.storage-warn .warn-act{display:flex;gap:8px;margin-top:10px}
+.storage-warn .warn-act button{flex:none;min-height:40px;padding:8px 14px;border-radius:10px;border:1px solid rgba(240,136,62,.5);background:rgba(240,136,62,.14);color:#f8d2ac;font:inherit;font-weight:700;cursor:pointer}
 .foot-note{text-align:center;color:var(--text-3);font-size:11.5px;padding:22px 0 8px;line-height:1.6}
 
 @media(min-width:760px){
