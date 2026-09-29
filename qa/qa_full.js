@@ -1172,11 +1172,11 @@ const cpage=async(seed,cloud,mode)=>{const c=await b.createBrowserContext();cons
 
 // ---- (e) Two open copies reload from storage instead of overwriting each other
 {const c=await b.createBrowserContext();const A=await page(c,'2026-09-28',SEED({cb2_weight:DEMO_W}));A.__ctx=c;const B2=await page(c,'2026-09-28','');
- await tryEval(B2,async()=>{const el=document.getElementById('qW');if(el){el.value='91,0';quickLogWeight();}await new Promise(r=>setTimeout(r,100));});
+ const wrote=await tryEval(B2,async()=>{let el=null;for(let i=0;i<50&&!(el=document.getElementById('qW'));i++)await new Promise(r=>setTimeout(r,100));if(el){el.value='91,0';quickLogWeight();}await new Promise(r=>setTimeout(r,100));return !!el;});
  await A.bringToFront();let ra=null;for(let i=0;i<60&&!(ra&&ra.n===3);i++){await wait(150);ra=await tryEval(A,()=>({n:DB.weight.length,toast:document.getElementById('toast').innerText}));}
  await tryEval(A,()=>{DB.weight.push({date:'2026-09-23',v:90.2});DB.save();});
  const rb=await tryEval(A,()=>JSON.parse(localStorage.getItem('cb2_weight')||'[]').map(w=>w.date).join(','));
- T('AD-S1 two copies: a second open copy takes the first one\'s new log and says so, so its next save keeps both entries (no last-write-wins)',!!ra&&ra.n===3&&/Another open copy/.test(ra.toast||'')&&/2026-09-23/.test(rb||'')&&(rb||'').split(',').length===4,JSON.stringify({ra,rb}));
+ T('AD-S1 two copies: a second open copy takes the first one\'s new log and says so, so its next save keeps both entries (no last-write-wins)',wrote===true&&!!ra&&ra.n===3&&/Another open copy/.test(ra.toast||'')&&/2026-09-23/.test(rb||'')&&(rb||'').split(',').length===4,JSON.stringify({wrote,ra,rb}));
  await B2.close();await done(A);}
 
 // ---- (f) Copy: where the other data lives, and photos are not in the backup file
