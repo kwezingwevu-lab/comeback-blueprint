@@ -125,6 +125,47 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
   let ra=null;for(let i=0;i<30&&!(ra&&ra.n===2);i++){await wait(120);ra=await safe(A,()=>({n:DB.weight.length,toast:document.getElementById('toast').innerText}));}
   T('webkit two copies: a second open copy in Safari takes the first one\'s new log and says so instead of overwriting it',!!ra&&ra.n===2&&/Another open copy/.test(ra.toast||''),JSON.stringify(ra));await c.close();}
 }
+// Round-3 stage S2 (29 Sep 2026): the Lift's logging states as Safari runs them -- Fill is a suggestion until the tick, a tap selects the cell (iOS ignores a synchronous select), gym and home sets are two records in localStorage, the Lift tab keeps its place, a resumed page redraws Home.
+{const MOCKS=iso=>"(function(){var R=Date;var base=new R('"+iso+"T09:00:00+02:00').getTime();window.__off=0;class M extends R{constructor(...a){if(a.length===0)super(base+window.__off);else super(...a);}static now(){return base+window.__off;}}window.Date=M;})();";
+ const SEEDW='localStorage.clear();localStorage.setItem("cb2_pure","true");localStorage.setItem("cb2_sessions",JSON.stringify([{id:"w1",dateISO:"2026-09-21",day:"pullA",loc:"gym",entries:{la1:[{r:"10",w:"80"},{r:"10",w:"80"},{r:"9",w:"80"}]}}]));';
+ const safe=async(pg,fn,arg)=>{try{return await pg.evaluate(fn,arg);}catch(e){return {err:String(e&&e.message||e).slice(0,140)};}};
+ const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
+ await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
+ await c.addInitScript(MOCKS('2026-09-28')+SEEDW);
+ const pg=await c.newPage();const perr=[];pg.on('pageerror',e=>perr.push(e.message));pg.on('console',m=>{if(m.type()==='error')perr.push(m.text());});
+ await pg.goto('file://'+file,{waitUntil:'load'});await wait(1200);
+ const cell=(ex,i,f)=>'input[data-ex="'+ex+'"][data-i="'+i+'"][data-f="'+f+'"]';
+ await safe(pg,()=>goToLift());await wait(300);
+ await safe(pg,()=>fillFromLast('la1'));await wait(200);
+ const f0=await safe(pg,()=>{const raw=JSON.parse(localStorage.getItem('cb2_sessions')||'[]');return {today:raw.filter(x=>x.dateISO==='2026-09-28').length,pend:document.querySelectorAll('#liftBody tr.set-row.pending').length,on:document.querySelectorAll('#liftBody .chk.on').length};});
+ await safe(pg,()=>document.querySelector('#liftBody .chk[data-chk="la1"][data-i="0"]').click());await wait(250);
+ const f1=await safe(pg,()=>{const raw=JSON.parse(localStorage.getItem('cb2_sessions')||'[]').filter(x=>x.dateISO==='2026-09-28');return {n:raw.length,la:raw[0]&&raw[0].entries.la1?JSON.stringify(raw[0].entries.la1):null,pend:document.querySelectorAll('#liftBody tr.set-row.pending').length};});
+ T('webkit lift: Fill prefills dashed rows that are not in localStorage; the tick writes exactly that set',!!f0&&f0.today===0&&f0.pend===3&&f0.on===0&&!!f1&&f1.n===1&&f1.la==='[{"r":"10","w":"80"}]'&&f1.pend===2,JSON.stringify({f0,f1}));
+ // a tap on a filled cell selects it (iOS ignores a synchronous select, so the handler also selects on a timer)
+ await pg.click(cell('la1',0,'w'));let sel=null;for(let i=0;i<20;i++){await wait(60);sel=await safe(pg,()=>{const e=document.activeElement;return {f:e&&e.dataset&&e.dataset.f,a:e&&e.selectionStart,b:e&&e.selectionEnd,n:e&&e.value.length};});if(sel&&sel.n===2&&sel.a===0&&sel.b===2)break;}
+ T('webkit lift: tapping a filled cell selects its contents in Safari, so typing replaces it',!!sel&&sel.f==='w'&&sel.a===0&&sel.b===sel.n&&sel.n===2,JSON.stringify(sel));
+ // gym set, switch to home, home set: two records, each with its own loc, in localStorage
+ await safe(pg,()=>{const e=document.querySelector('input[data-ex="la1"][data-i="1"][data-f="r"]');e.value='9';e.dispatchEvent(new Event('input',{bubbles:true}));const w=document.querySelector('input[data-ex="la1"][data-i="1"][data-f="w"]');w.value='82.5';w.dispatchEvent(new Event('input',{bubbles:true}));});
+ await safe(pg,()=>document.querySelector('#locSeg button[data-loc="home"]').click());await wait(300);
+ const h0=await safe(pg,()=>({r0:document.querySelector('input[data-ex="la1"][data-i="0"][data-f="r"]').value,toast:document.getElementById('toast').innerText}));
+ await safe(pg,()=>{const e=document.querySelector('input[data-ex="la1"][data-i="0"][data-f="r"]');e.value='12';e.dispatchEvent(new Event('input',{bubbles:true}));const w=document.querySelector('input[data-ex="la1"][data-i="0"][data-f="w"]');w.value='15';w.dispatchEvent(new Event('input',{bubbles:true}));});await wait(200);
+ const h1=await safe(pg,()=>{const raw=JSON.parse(localStorage.getItem('cb2_sessions')||'[]').filter(x=>x.dateISO==='2026-09-28');return raw.map(x=>x.loc+':'+x.entries.la1.map(q=>q.r+'x'+q.w).join('/')).sort().join(' | ');});
+ T('webkit lift: after gym sets, Home opens its own empty grid and its own record; localStorage holds one record per place',!!h0&&h0.r0===''&&/Commercial Gym log/.test(h0.toast||'')&&h1==='gym:10x80/9x82.5 | home:12x15',JSON.stringify({h0,h1}));
+ // the Lift tab: a re-tap changes nothing, and a round trip through Fuel comes back to the same place
+ await safe(pg,()=>document.querySelector('#locSeg button[data-loc="gym"]').click());await wait(300);
+ const y=await safe(pg,()=>{const x=document.querySelectorAll('#liftBody .ex')[3];const y=Math.round(x.getBoundingClientRect().top+scrollY-120);window.scrollTo(0,y);document.getElementById('liftBody').dataset.mark='1';return y;});await wait(150);
+ await pg.click('.tab[data-view="lift"]');await wait(300);
+ const t1=await safe(pg,()=>({sy:Math.round(scrollY),mark:document.getElementById('liftBody').dataset.mark}));
+ await pg.click('.tab[data-view="fuel"]');await wait(300);await pg.click('.tab[data-view="lift"]');await wait(400);
+ const t2=await safe(pg,()=>Math.round(scrollY));
+ T('webkit lift: tapping the Lift tab on Lift keeps the place and the page; Fuel and back returns to the same place',typeof y==='number'&&y>1000&&!!t1&&Math.abs(t1.sy-y)<=3&&t1.mark==='1'&&Math.abs(t2-y)<=3,JSON.stringify({y,t1,t2}));
+ // a page restored after midnight (pageshow) redraws Home
+ await safe(pg,()=>switchView('home'));await wait(250);
+ await safe(pg,()=>{window.__off=20*60*1000+15*3600*1000;window.dispatchEvent(new Event('pageshow'));});await wait(300);
+ const d1=await safe(pg,()=>({today:todayISO(),cta:(document.querySelector('#view-home .cta')||{}).textContent}));
+ T('webkit home: a resumed page (pageshow) after the date has moved redraws Home for the new day',!!d1&&d1.today==='2026-09-29'&&/Legs B/.test(d1.cta||''),JSON.stringify(d1));
+ T('webkit S2: no page errors in these steps',perr.length===0,perr.join('|').slice(0,200));
+ await c.close();}
 T('webkit: no page/console errors',errs.length===0,errs.join('|').slice(0,300));
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+String(x.detail||'').replace(/\s+/g,' ').slice(0,400)).join('\n')||'WEBKIT ALL PASS');console.log('WEBKIT RESULT:',pass+'/'+R.length);process.exit(pass===R.length?0:1);})().catch(e=>{console.error('WEBKIT CRASH:',e.message);process.exit(2);});

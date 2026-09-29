@@ -1,10 +1,10 @@
 /* Service worker for The Comeback Blueprint (installed only when the app is served over http/https, e.g. GitHub Pages).
-   Build stamp: 5e384640efe7 — build.py replaces it with a hash of the app, manifest, icons and this file, so any change
+   Build stamp: f7f38c667649 — build.py replaces it with a hash of the app, manifest, icons and this file, so any change
    to any of them installs a fresh worker and cache.
    Page strategy: network first, bypassing the HTTP cache, with a 3.5-second budget. If the network is slow, fails or
    answers with an error (404/503), the cached app is served instead; a late network answer still refreshes the cache.
    Icons and the manifest are cache-first. Google Fonts are cached separately (stale-while-revalidate) so the typography survives offline; other cross-origin requests are left alone. */
-const CACHE="comeback-5e384640efe7";
+const CACHE="comeback-f7f38c667649";
 const APP="./ComebackBlueprint.html";
 const CORE=[APP,"./manifest.webmanifest","./icon-192.png","./icon-512.png","./maskable-512.png","./apple-touch-icon.png"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE.map(u=>new Request(u,{cache:"reload"})))).then(()=>self.skipWaiting()));});

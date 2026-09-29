@@ -149,8 +149,8 @@ const d5=await tt('2027-01-05');T('time: Jan = Posterior specialization block',/
  await q.evaluate(()=>switchView('lift'));await wait(300);await q.evaluate(()=>{[...document.querySelectorAll('#dayPills .pill')].find(x=>x.textContent==='Legs A').click();});await wait(300);
  T('fill: button shown when last-time exists',await q.evaluate(()=>!!document.querySelector('button[onclick="fillFromLast(\'ga1\')"]')));
  await q.evaluate(()=>fillFromLast('ga1'));await wait(400);
- const ff=await q.evaluate(()=>{const s=DB.sessions.find(x=>x.dateISO===todayISO());const r0=document.querySelector('input[data-ex="ga1"][data-i="0"][data-f="r"]').value;return {rows:s&&s.entries&&s.entries.ga1?s.entries.ga1.filter(x=>x&&x.r&&x.w).length:0,r0};});
- T('fill: three rows filled and saved as today\'s session',ff.rows===3&&ff.r0==='12',JSON.stringify(ff));
+ const ff=await q.evaluate(async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const cnt=()=>{const s=DB.sessions.find(x=>x.dateISO===todayISO());return s&&s.entries&&s.entries.ga1?s.entries.ga1.filter(x=>x&&x.r&&x.w).length:0;};const r0=document.querySelector('input[data-ex="ga1"][data-i="0"][data-f="r"]').value;const saved0=cnt(),pend=document.querySelectorAll('#liftBody tr.set-row.pending').length,on0=document.querySelectorAll('#liftBody .chk.on').length;document.querySelectorAll('#liftBody .chk[data-chk="ga1"]').forEach((c,i)=>{if(i<3)c.click();});await W(100);return {r0,saved0,pend,on0,rows:cnt(),on1:document.querySelectorAll('#liftBody .chk.on').length,pend1:document.querySelectorAll('#liftBody tr.set-row.pending').length};});
+ T('fill: three rows are prefilled without being logged; each tick then logs its row as today\'s session',ff.r0==='12'&&ff.saved0===0&&ff.pend===3&&ff.on0===0&&ff.rows===3&&ff.on1===3&&ff.pend1===0,JSON.stringify(ff));
  T('O: no errors',q.__errs.length===0,q.__errs.join('|'));await q.close();}
 
 // ===== P. Pre-start day (11 Sep) =====
@@ -814,11 +814,11 @@ const nextT=async q=>q.evaluate(()=>[...document.querySelectorAll('#liftBody .ne
  T('AC coach: no page or console errors across the section',ERR.length===0,ERR.join('|').slice(0,300));}
 // ===== AC-lift. Round-2 audit fixes (27 Sep 2026) =====
 {const q=await ctxPage('2026-10-24',{cb2_sessions:[S('2026-10-10','legsA',{ga1:sets([[7,100],[7,100],[7,100],[7,100]])}),S('2026-10-17','legsA',{ga1:sets([[8,65],[8,65],[8,65],[8,65]])})]});await q.evaluate(()=>goToLift());await wait(400);
- const a=await q.evaluate(()=>{const l=document.querySelector('#liftBody .lastt');const ph=document.querySelector('input[data-ex="ga1"][data-i="0"][data-f="w"]');const b=l&&[...l.querySelectorAll('button')].find(x=>/Fill/.test(x.textContent));if(b)b.click();const s=DB.sessions.find(x=>x.dateISO===todayISO());return {l:l?l.innerText.replace(/\s+/g,' '):'',ph:ph?ph.placeholder:'',w:s&&s.entries&&s.entries.ga1?s.entries.ga1.map(x=>x.w+'x'+x.r).join(','):''};});
- T('AC lift-01: the week after a deload, Last time, the placeholders and Fill read the last full week (100 kg), the same history as the Next target',/^Last time: 100 kg × 7, 7, 7, 7 — beat it/.test(a.l)&&a.ph==='100'&&a.w==='100x7,100x7,100x7,100x7',JSON.stringify(a));await done(q);}
+ const a=await q.evaluate(()=>{const l=document.querySelector('#liftBody .lastt');const ph=document.querySelector('input[data-ex="ga1"][data-i="0"][data-f="w"]');const b=l&&[...l.querySelectorAll('button')].find(x=>/Fill/.test(x.textContent));if(b)b.click();const pre=DB.sessions.some(x=>x.dateISO===todayISO()&&x.entries&&x.entries.ga1&&x.entries.ga1.length);document.querySelectorAll('#liftBody .chk[data-chk="ga1"]').forEach(c=>c.click());const s=DB.sessions.find(x=>x.dateISO===todayISO());return {l:l?l.innerText.replace(/\s+/g,' '):'',ph:ph?ph.placeholder:'',pre,w:s&&s.entries&&s.entries.ga1?s.entries.ga1.map(x=>x.w+'x'+x.r).join(','):''};});
+ T('AC lift-01: the week after a deload, Last time, the placeholders and Fill read the last full week (100 kg), the same history as the Next target',/^Last time: 100 kg × 7, 7, 7, 7 — beat it/.test(a.l)&&a.ph==='100'&&a.pre===false&&a.w==='100x7,100x7,100x7,100x7',JSON.stringify(a));await done(q);}
 {const q=await ctxPage('2026-10-17',{cb2_sessions:[S('2026-10-10','legsA',{ga1:sets([[8,100],[8,100],[7,100],[7,100]])})]});await q.evaluate(()=>goToLift());await wait(400);
- const a=await q.evaluate(()=>{const l=document.querySelector('#liftBody .lastt'),n=document.querySelector('#liftBody .nextt');const ph=document.querySelector('input[data-ex="ga1"][data-i="0"][data-f="w"]');const b=l&&[...l.querySelectorAll('button')].find(x=>/Fill/.test(x.textContent));if(b)b.click();const s=DB.sessions.find(x=>x.dateISO===todayISO());return {l:l?l.innerText.replace(/\s+/g,' '):'',n:n?n.innerText:'',ph:ph?ph.placeholder:'',w:s&&s.entries&&s.entries.ga1?s.entries.ga1.map(x=>x.w+'x'+x.r).join(','):'',toast:document.getElementById('toast').innerText};});
- T('AC lift-01: in a deload week the card reads "Last full week" without "beat it", and Fill writes the deload load (65 kg × 5), not last week\'s 100 kg',/^Last full week: 100 kg × 8, 8, 7, 7 — deload week/.test(a.l)&&!/beat it/.test(a.l)&&/Next target: 65 kg × 5–8/.test(a.n)&&a.ph==='65'&&a.w==='65x5,65x5,65x5,65x5'&&/deload set/.test(a.toast),JSON.stringify(a));await done(q);}
+ const a=await q.evaluate(()=>{const l=document.querySelector('#liftBody .lastt'),n=document.querySelector('#liftBody .nextt');const ph=document.querySelector('input[data-ex="ga1"][data-i="0"][data-f="w"]');const b=l&&[...l.querySelectorAll('button')].find(x=>/Fill/.test(x.textContent));if(b)b.click();const toast=document.getElementById('toast').innerText;const pre=DB.sessions.some(x=>x.dateISO===todayISO()&&x.entries&&x.entries.ga1&&x.entries.ga1.length);document.querySelectorAll('#liftBody .chk[data-chk="ga1"]').forEach(c=>c.click());const s=DB.sessions.find(x=>x.dateISO===todayISO());return {l:l?l.innerText.replace(/\s+/g,' '):'',n:n?n.innerText:'',ph:ph?ph.placeholder:'',pre,w:s&&s.entries&&s.entries.ga1?s.entries.ga1.map(x=>x.w+'x'+x.r).join(','):'',toast};});
+ T('AC lift-01: in a deload week the card reads "Last full week" without "beat it", and Fill writes the deload load (65 kg × 5), not last week\'s 100 kg',/^Last full week: 100 kg × 8, 8, 7, 7 — deload week/.test(a.l)&&!/beat it/.test(a.l)&&/Next target: 65 kg × 5–8/.test(a.n)&&a.ph==='65'&&a.pre===false&&a.w==='65x5,65x5,65x5,65x5'&&/deload set/.test(a.toast),JSON.stringify(a));await done(q);}
 {const q=await ctxPage('2026-09-26',{cb2_sessions:[S('2026-09-19','legsA',{ga1:sets([[6,80],[6,80],[5,80],[4,80]]),ga3:sets([[14,197.5],[14,197.5],[13,195]])})]});await q.evaluate(()=>goToLift());await wait(400);
  const a=await q.evaluate(()=>{const L=[...document.querySelectorAll('#liftBody .lastt:not(.nextt) b')],S=[...document.querySelectorAll('#liftBody .lastt:not(.nextt) b span')];return {t:L.map(b=>b.innerText),spans:S.length,broken:S.filter(s=>s.getClientRects().length>1).map(s=>s.innerText)};});
  T('AC lift-03: Last time prints a repeated load once ("80 kg × 6, 6, 5, 4") and never splits one set across two lines',a.t[0]==='80 kg × 6, 6, 5, 4'&&a.t.includes('197.5 kg × 14, 197.5 kg × 14, 195 kg × 13')&&a.spans>=4&&a.broken.length===0,JSON.stringify(a));await done(q);}
@@ -1227,6 +1227,203 @@ const cpage=async(seed,cloud,mode)=>{const c=await b.createBrowserContext();cons
  {const q=await ctxPage('2026-09-28',{cb2_weight:W2,cb2_bulk:'zzz'});
   const r=await tryEval(q,()=>{const b=document.getElementById('storageWarnAll');return {show:b.classList.contains('show'),txt:b.textContent.slice(0,200),mode:bulkMode};});
   T('AD-S1 boot: the banner lists a setting that could not be read (nutrition mode) and the app falls back to its default',!!r&&r.show===true&&/nutrition mode/.test(r.txt||'')&&r.mode==='aggr',JSON.stringify(r));
+  await done(q);}
+}
+
+// ===== AD-S2. Round-3 fixes (28-29 Sep 2026): logging correctness in the gym and the session states around it =====
+{const tryEval=async(q,fn,arg)=>{try{return await q.evaluate(fn,arg);}catch(e){return {err:String(e&&e.message||e).slice(0,160)};}};
+ const cell=(ex,i,f)=>'input[data-ex="'+ex+'"][data-i="'+i+'"][data-f="'+f+'"]';
+ const put=(q,ex,i,f,v)=>tryEval(q,a=>{const e=document.querySelector(a[0]);if(!e)return false;e.value=a[1];e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));return true;},[cell(ex,i,f),v]);
+ const putSet=async(q,ex,i,r,w)=>{await put(q,ex,i,'r',r);await put(q,ex,i,'w',w);};
+ const clickSel=(q,sel)=>tryEval(q,s=>{const e=document.querySelector(s);if(!e)return false;e.click();return true;},sel);
+ const LONGJS=fs.readFileSync(path.join(__dirname,'fixtures/longseed.tmpl.js'),'utf8');
+ const longAt=iso=>LONGJS.replace('__END__',iso);
+ // erg-01: gym and home sets of one workout stay in their own records
+ {const q=await ctxPage('2026-09-28',{});await tryEval(q,()=>goToLift());await wait(300);
+  await putSet(q,'la1',0,'10','82.5');await putSet(q,'la1',1,'9','82.5');
+  await clickSel(q,'#locSeg button[data-loc="home"]');await wait(300);
+  const a=await tryEval(q,()=>({n:DB.sessions.length,loc:LOC,r0:(document.querySelector('input[data-ex="la1"][data-i="0"][data-f="r"]')||{}).value,w0:(document.querySelector('input[data-ex="la1"][data-i="0"][data-f="w"]')||{}).value,toast:document.getElementById('toast').innerText,nm:(document.querySelector('#liftBody .ex-nm')||{}).textContent}));
+  T('AD-S2 erg-01: after gym sets, switching to Home opens an empty Home grid (the gym sets are not shown under the home exercise) and a toast says the sets stay in the Commercial Gym log',!!a&&a.n===1&&a.loc==='home'&&a.r0===''&&a.w0===''&&/Commercial Gym log/.test(a.toast||'')&&/Power-Bag/.test(a.nm||''),JSON.stringify(a));
+  await putSet(q,'la1',0,'12','15');
+  const b2=await tryEval(q,()=>{const g=DB.sessions.find(x=>x.loc==='gym'),h=DB.sessions.find(x=>x.loc==='home');const cta=(document.querySelector('#view-home .cta')||{}).textContent;return {n:DB.sessions.length,g:g&&g.entries.la1.map(x=>x.r+'x'+x.w).join(','),h:h&&h.entries.la1.map(x=>x.r+'x'+x.w).join(','),lifts:sessionsThisWeek().lifts,rev:weeklyReview().lifts};});
+  T('AD-S2 erg-01: a home set lands in its own record; one workout counts once in the week meter and the review',!!b2&&b2.n===2&&b2.g==='10x82.5,9x82.5'&&b2.h==='12x15'&&b2.lifts===1&&b2.rev===1,JSON.stringify(b2));
+  await clickSel(q,'#locSeg button[data-loc="gym"]');await wait(300);
+  const c2=await tryEval(q,()=>({r0:document.querySelector('input[data-ex="la1"][data-i="0"][data-f="r"]').value,w1:document.querySelector('input[data-ex="la1"][data-i="1"][data-f="w"]').value,toast:document.getElementById('toast').innerText,sess:JSON.stringify(DB.sessions)}));
+  T('AD-S2 erg-01: back at the gym the gym rows show the gym sets',!!c2&&c2.r0==='10'&&c2.w1==='82.5',JSON.stringify(c2).slice(0,200));
+  T('AD-S2 review: switching back to the gym, which already has its own log, says the gym keeps its own and does not claim it starts a new one',!!c2&&/Home Gym log/.test(c2.toast||'')&&/Commercial Gym keeps its own/.test(c2.toast||'')&&!/starts its own/.test(c2.toast||''),JSON.stringify(c2&&c2.toast));
+  const sess=JSON.parse((c2&&c2.sess)||'[]');await done(q);
+  // the following Monday: the gym history is the gym sets only, and the target is a barbell target
+  const q2=await ctxPage('2026-10-05',{cb2_sessions:sess});await tryEval(q2,()=>goToLift());await wait(300);
+  const d=await tryEval(q2,()=>{const x=document.querySelector('#liftBody .ex'),lt=x&&x.querySelector('.lastt'),nt=x&&x.querySelector('.nextt');return {lt:lt?lt.innerText.replace(/\s+/g,' '):'',nt:nt?nt.innerText.replace(/\s+/g,' '):''};});
+  T('AD-S2 erg-01: next Monday at the gym, Last time is the gym sets only and the next target is not built on home sets',!!d&&/82\.5 kg × 10, 9/.test(d.lt)&&!/15 kg/.test(d.lt)&&!/17\.5/.test(d.nt),JSON.stringify(d));
+  await clickSel(q2,'#locSeg button[data-loc="home"]');await wait(300);
+  const e2=await tryEval(q2,()=>{const x=document.querySelector('#liftBody .ex'),lt=x&&x.querySelector('.lastt');return {lt:lt?lt.innerText.replace(/\s+/g,' '):''};});
+  T('AD-S2 erg-01: next Monday at home, Last time is the home set only',!!e2&&/15 kg × 12/.test(e2.lt)&&!/82\.5/.test(e2.lt),JSON.stringify(e2));
+  await done(q2);}
+ // erg-02: Fill prefills; only a tick or an edit makes a row a logged set
+ {const q=await ctxPage('2026-10-03',{cb2_sessions:[S('2026-09-26','legsA',{ga1:sets([[8,100],[8,100],[7,100],[7,100]])})]});await tryEval(q,()=>goToLift());await wait(300);
+  await tryEval(q,()=>fillFromLast('ga1'));await wait(200);
+  const a=await tryEval(q,()=>({n:DB.sessions.filter(x=>x.dateISO===todayISO()).length,pend:document.querySelectorAll('#liftBody tr.set-row.pending').length,on:document.querySelectorAll('#liftBody .chk.on').length,rev:weeklyReview().lifts,reg:JSON.stringify(regionDone()),cta:(document.querySelector('#view-home .cta')||{}).textContent,r0:document.querySelector('input[data-ex="ga1"][data-i="0"][data-f="r"]').value,toast:document.getElementById('toast').innerText}));
+  T('AD-S2 erg-02: Fill prefills four rows without logging any of them: no session, no green ticks, no count in the week, the regions or the review',!!a&&a.n===0&&a.pend===4&&a.on===0&&a.rev===0&&!/[1-9]/.test(a.reg||'')&&a.r0==='8'&&/tick each one/.test(a.toast||''),JSON.stringify(a));
+  await clickSel(q,'[data-add="ga1"]');await wait(200);
+  const b2=await tryEval(q,()=>({pend:document.querySelectorAll('#liftBody tr.set-row.pending').length,rows:document.querySelectorAll('#liftBody .ex')[0].querySelectorAll('.set-row').length}));
+  T('AD-S2 erg-02: a prefilled row survives Add set (it is still a suggestion, still not logged)',!!b2&&b2.pend===4&&b2.rows>=5,JSON.stringify(b2));
+  await clickSel(q,'#liftBody .chk[data-chk="ga1"][data-i="0"]');await wait(150);
+  const c2=await tryEval(q,()=>{const s=DB.sessions.find(x=>x.dateISO===todayISO());return {ga:s&&s.entries.ga1?JSON.stringify(s.entries.ga1):null,pend:document.querySelectorAll('#liftBody tr.set-row.pending').length,on:document.querySelectorAll('#liftBody .chk.on').length,rest:document.getElementById('restTimer')?document.getElementById('restTimer').classList.contains('show'):null,rev:weeklyReview().lifts,reg:regionDone().hamstrings+'/'+regionDone().quads};});
+  T('AD-S2 erg-02: ticking a prefilled row logs exactly that set and starts the rest timer',!!c2&&c2.ga==='[{"r":"8","w":"100"}]'&&c2.pend===3&&c2.on===1&&c2.rest===true&&c2.rev===1,JSON.stringify(c2));
+  await put(q,'ga1',1,'r','9');await wait(100);
+  const d2=await tryEval(q,()=>{const s=DB.sessions.find(x=>x.dateISO===todayISO());return {r:s.entries.ga1[1]&&s.entries.ga1[1].r,w:s.entries.ga1[1]&&s.entries.ga1[1].w,pend:document.querySelectorAll('#liftBody tr.set-row.pending').length};});
+  T('AD-S2 erg-02: editing one cell of a prefilled row saves the whole row (reps 9, the prefilled 100 kg)',!!d2&&d2.r==='9'&&d2.w==='100'&&d2.pend===2,JSON.stringify(d2));
+  await done(q);}
+ // review: a suggestion that sat in an extra row does not come back when the row is removed and added again
+ {const q=await ctxPage('2026-10-03',{cb2_sessions:[S('2026-09-26','legsA',{ga1:sets([[8,100],[8,100],[8,100],[8,100],[8,100],[8,100],[8,100],[8,100],[8,100]])})]});await tryEval(q,()=>goToLift());await wait(300);
+  const rows=()=>tryEval(q,()=>{const x=document.querySelectorAll('#liftBody .ex')[0];return {rows:x.querySelectorAll('.set-row').length,pend:x.querySelectorAll('.set-row.pending').length};});
+  const r0=await rows();let n=(r0&&r0.rows)||9;for(let i=0;i<12&&n<9;i++){await clickSel(q,'[data-add="ga1"]');await wait(80);const r=await rows();n=(r&&r.rows)||9;}
+  await tryEval(q,()=>fillFromLast('ga1'));await wait(150);const r1=await rows();
+  await clickSel(q,'#liftBody [data-del="ga1"]');await wait(150);const r2=await rows();
+  await clickSel(q,'[data-add="ga1"]');await wait(150);const r3=await rows();
+  T('AD-S2 review: Remove takes an extra row with the suggestion in it, and Add set does not bring the suggestion back',!!r1&&!!r2&&!!r3&&r1.rows===9&&r1.pend===9&&r2.rows===8&&r3.rows===9&&r3.pend===8,JSON.stringify({r0,r1,r2,r3}));
+  await done(q);}
+ // review: the Guide states the rules the Weekly Review now applies, so the page and the review do not disagree
+ {const q=await ctxPage('2026-10-03',{});const g=await tryEval(q,()=>{switchView('guide');return document.getElementById('view-guide').innerText.replace(/\s+/g,' ');});
+  T('AD-S2 review: the Guide says the stall check waits for the third session or Thursday, compares like with like, and reads a new phase from its own weigh-ins',!!g&&/judged from the third session of the week, or on Thursday/.test(g)&&/same lift at the same place/.test(g)&&/first five weeks of a mini-cut or of a new growth phase/.test(g),JSON.stringify(g&&g.slice(0,80)));await done(q);}
+ // erg-04: the stall verdict needs a week's worth of evidence
+ {const q=await ctxPage('2026-10-03',{},longAt('2026-10-03'));await tryEval(q,()=>goToLift());await wait(300);
+  const v0=await tryEval(q,()=>{const r=weeklyReview();return {v:r.verdict,rule:r.rule,lifts:r.lifts};});
+  await putSet(q,'ga1',0,'7','100');await wait(150);
+  const v1=await tryEval(q,()=>{switchView('home');const r=weeklyReview();return {v:r.verdict,rule:r.rule,cls:r.cls,lifts:r.lifts,stalls:r.stalls,prs:r.prs,card:(document.getElementById('reviewCard')||{}).innerText||''};});
+  T('AD-S2 erg-04: one logged set in week 4 no longer turns "On track" into "No e1RM improved ... add 2-3 sets or deload": it says it is too early',!!v0&&/^On track/.test(v0.v)&&!!v1&&v1.lifts===1&&v1.stalls>0&&v1.prs===0&&v1.rule==='wait'&&v1.cls==='ok'&&/Too early to judge strength/.test(v1.v)&&/Too early to judge strength/.test(v1.card)&&!/No e1RM improved/.test(v1.card),JSON.stringify({v0,v1}).slice(0,500));
+  await done(q);}
+ {const last=[S('2026-09-26','legsA',{ga1:sets([[8,100],[8,100]])}),S('2026-09-27','pushA',{pa1:sets([[8,80],[8,80]])}),S('2026-09-28','pullA',{la1:sets([[8,80],[8,80]])})];
+  const weak=[S('2026-10-03','legsA',{ga1:sets([[7,100],[7,100]])}),S('2026-10-04','pushA',{pa1:sets([[7,80],[7,80]])}),S('2026-10-05','pullA',{la1:sets([[7,80],[7,80]])})];
+  const two=await ctxPage('2026-10-05',{cb2_sessions:last.concat(weak.slice(0,2))});const r2=await tryEval(two,()=>{const r=weeklyReview();return {rule:r.rule,lifts:r.lifts,v:r.verdict.slice(0,60)};});await done(two);
+  const three=await ctxPage('2026-10-06',{cb2_sessions:last.concat(weak)});const r3=await tryEval(three,()=>{const r=weeklyReview();return {rule:r.rule,lifts:r.lifts,v:r.verdict.slice(0,60)};});await done(three);
+  T('AD-S2 erg-04: with two sessions logged before Thursday the check waits; from the third session the same stall reads as a stall',!!r2&&!!r3&&r2.lifts===2&&r2.rule==='wait'&&r3.lifts===3&&r3.rule==='stall',JSON.stringify({r2,r3}));}
+ // vis3-01: the first weeks of a phase read only the phase's own weigh-ins
+ {const days=['2027-03-20','2027-03-27','2027-05-01'];const out=[];
+  for(const iso of days){const q=await ctxPage(iso,{},longAt(iso));out.push(await tryEval(q,()=>{const r=weeklyReview();switchView('home');return {wk:r.wk,rule:r.rule,src:r.rateSrc,rate:r.rate,cls:r.cls,v:r.verdict.slice(0,110),tile:((document.getElementById('reviewCard')||{}).innerText||'').replace(/\s+/g,' ').slice(0,160)};}));await done(q);}
+  T('AD-S2 vis3-01: day 1 of Mini-Cut I and of New Growth no longer say "Weight is not coming down ... trim 200 kcal" or "add 250 kcal"; they say the first reading needs two weigh-ins a week apart',out.every(o=>o&&!/not coming down|trim 200|add 250|Losing 0\.|Gaining only/.test(o.v)&&o.rule!=='rate')&&/Mini-Cut I started/.test(out[0].v)&&/New Growth/.test(out[2].v)&&out[0].rate==null&&out[0].src==null,JSON.stringify(out).slice(0,700));
+  const q=await ctxPage('2027-04-10',{},longAt('2027-04-10'));const m=await tryEval(q,()=>{const r=weeklyReview();return {src:r.rateSrc,rate:r.rate==null?null:+r.rate.toFixed(2),rule:r.rule,v:r.verdict.slice(0,50)};});await done(q);
+  T('AD-S2 vis3-01: three weeks into the cut with a real loss the rate reads from the cut\'s own weigh-ins and the verdict is On track',!!m&&m.src==='phase'&&m.rate<-0.25&&m.rate>-0.8&&m.rule===''&&/^On track/.test(m.v),JSON.stringify(m));
+  const flat="localStorage.setItem('cb2_weight',JSON.stringify([{date:'2027-02-20',v:98.0},{date:'2027-03-06',v:99.0},{date:'2027-03-19',v:99.6},{date:'2027-03-20',v:99.6},{date:'2027-03-24',v:99.7},{date:'2027-03-28',v:99.6},{date:'2027-04-01',v:99.7},{date:'2027-04-03',v:99.6}]));";
+  const q2=await ctxPage('2027-04-04',{},longAt('2027-04-04')+flat);const f=await tryEval(q2,()=>{const r=weeklyReview();return {src:r.rateSrc,rate:r.rate==null?null:+r.rate.toFixed(2),rule:r.rule,v:r.verdict.slice(0,60)};});await done(q2);
+  T('AD-S2 vis3-01: a cut that really is not moving still gets the "not coming down" verdict once the cut has two weigh-ins a week apart',!!f&&f.src==='phase'&&f.rule==='rate'&&/not coming down/.test(f.v),JSON.stringify(f));}
+ // erg-06 / logic-02: Home follows the date
+ {const OFF="(()=>{const R=Date;const base=new R('2026-09-28T23:50:00+02:00').getTime();window.__off=0;class M extends R{constructor(...a){if(a.length===0)super(base+window.__off);else super(...a);}static now(){return base+window.__off;}}window.Date=M;})();";
+  const q=await ctxPage('2026-09-28',{},OFF);
+  const h0=await tryEval(q,()=>({t:document.getElementById('view-home').innerText,cta:(document.querySelector('#view-home .cta')||{}).textContent}));
+  await tryEval(q,()=>{window.__off=20*60*1000;document.dispatchEvent(new Event('visibilitychange'));});await wait(250);
+  const h1=await tryEval(q,()=>({t:document.getElementById('view-home').innerText,cta:(document.querySelector('#view-home .cta')||{}).textContent,today:todayISO()}));
+  await clickSel(q,'#view-home .cta');await wait(300);
+  const h2=await tryEval(q,()=>({day:curDay,lift:!!document.querySelector('#view-lift.active')}));
+  T('AD-S2 erg-06 / logic-02: an app resumed after midnight redraws Home (Tuesday, Legs B) and the button opens the session it names',!!h0&&/monday, september 28/i.test(h0.t)&&/Pull A/.test(h0.cta)&&!!h1&&h1.today==='2026-09-29'&&/tuesday, september 29/i.test(h1.t)&&/Legs B/.test(h1.cta)&&!!h2&&h2.day==='legsB'&&h2.lift,JSON.stringify({h0:[h0&&h0.cta],h1:[h1&&h1.cta],h2}));
+  await done(q);
+  const q2=await ctxPage('2026-09-28',{},OFF);
+  await tryEval(q2,()=>{window.__off=20*60*1000;window.dispatchEvent(new Event('pageshow'));});await wait(250);
+  const p1=await tryEval(q2,()=>(document.querySelector('#view-home .cta')||{}).textContent);
+  T('AD-S2 erg-06: a page restored from the back-forward cache (pageshow) also redraws Home',/Legs B/.test(p1||''),String(p1));
+  await done(q2);
+  const q3=await ctxPage('2026-09-28',{},OFF);
+  await tryEval(q3,()=>{window.__off=20*60*1000;});
+  await clickSel(q3,'#view-home .cta');await wait(300);
+  const s3=await tryEval(q3,()=>({lift:!!document.querySelector('#view-lift.active'),cta:(document.querySelector('#view-home .cta')||{}).textContent,toast:document.getElementById('toast').innerText}));
+  T('AD-S2 erg-06: a tap on a stale Home button (the clock passed midnight, no redraw yet) redraws Home and says so instead of opening a different session from the one it named',!!s3&&s3.lift===false&&/Legs B/.test(s3.cta||'')&&/new day has started/.test(s3.toast||''),JSON.stringify(s3));
+  await done(q3);
+  const q4=await ctxPage('2026-09-28',{},OFF);
+  await tryEval(q4,()=>{const i=document.getElementById('qW');if(i){i.focus();i.value='88.1';}window.__off=20*60*1000;document.dispatchEvent(new Event('visibilitychange'));});await wait(250);
+  const k1=await tryEval(q4,()=>({cta:(document.querySelector('#view-home .cta')||{}).textContent,val:(document.getElementById('qW')||{}).value,focus:document.activeElement&&document.activeElement.id}));
+  await tryEval(q4,()=>{document.activeElement.blur();dayRoll();});await wait(200);
+  const k2=await tryEval(q4,()=>(document.querySelector('#view-home .cta')||{}).textContent);
+  T('AD-S2 erg-06: while a field has the keyboard nothing is redrawn under the typing; once it is released the day rolls',!!k1&&/Pull A/.test(k1.cta||'')&&k1.val==='88.1'&&k1.focus==='qW'&&/Legs B/.test(k2||''),JSON.stringify({k1,k2}));
+  await done(q4);
+  const q5=await ctxPage('2026-09-28',{},OFF);await tryEval(q5,()=>goToLift());await wait(300);await putSet(q5,'la1',0,'10','80');
+  await tryEval(q5,()=>{document.getElementById('liftBody').dataset.mark='1';window.__off=20*60*1000;document.dispatchEvent(new Event('visibilitychange'));});await wait(250);
+  const l5=await tryEval(q5,()=>({mark:document.getElementById('liftBody').dataset.mark,lift:!!document.querySelector('#view-lift.active'),iso:liftISO()}));
+  T('AD-S2 erg-06: a Lift session that runs past midnight is left alone (the Lift keeps it for its 3 hours)',!!l5&&l5.mark==='1'&&l5.lift&&l5.iso==='2026-09-28',JSON.stringify(l5));
+  await done(q5);}
+ // erg-07: the Lift tab does not throw the lifter to the top of the page
+ {const q=await ctxPage('2026-09-28',{});await tryEval(q,()=>goToLift());await wait(300);
+  const y=await tryEval(q,()=>{const x=document.querySelectorAll('#liftBody .ex')[3];const y=Math.round(x.getBoundingClientRect().top+scrollY-120);window.scrollTo(0,y);document.getElementById('liftBody').dataset.mark='1';return {y,h:document.documentElement.scrollHeight};});
+  await wait(150);
+  await q.click('.tab[data-view="lift"]');await wait(300);
+  const a=await tryEval(q,()=>({sy:Math.round(scrollY),mark:document.getElementById('liftBody').dataset.mark}));
+  T('AD-S2 erg-07: tapping the Lift tab while on Lift changes nothing (same place on the page, no re-render)',!!y&&y.h>3000&&!!a&&Math.abs(a.sy-y.y)<=3&&a.mark==='1',JSON.stringify({y,a}));
+  await q.click('.tab[data-view="fuel"]');await wait(300);await q.click('.tab[data-view="lift"]');await wait(400);
+  const b2=await tryEval(q,()=>({sy:Math.round(scrollY)}));
+  T('AD-S2 erg-07: leaving Lift for another tab and coming back returns to the same place on the page',!!b2&&Math.abs(b2.sy-y.y)<=3,JSON.stringify({y,b2}));
+  await done(q);}
+ // erg-08: Add set and Remove keep the open panels and the place under the finger
+ {const q=await ctxPage('2026-09-28',{});await tryEval(q,()=>goToLift());await wait(300);
+  await clickSel(q,'#rulesTool .tool-h');await clickSel(q,'.hw-tog[data-tg="la2"]');await wait(150);
+  const t0=await tryEval(q,()=>{const b=document.querySelector('#liftBody [data-add="la2"]');window.scrollTo(0,Math.max(0,b.getBoundingClientRect().top+scrollY-500));return {top:Math.round(document.querySelector('#liftBody [data-add="la2"]').getBoundingClientRect().top),sy:Math.round(scrollY),rows:document.querySelector('#liftBody [data-add="la2"]').closest('.ex').querySelectorAll('.set-row').length};});
+  await clickSel(q,'#liftBody [data-add="la2"]');await wait(200);
+  const t1=await tryEval(q,()=>({top:Math.round(document.querySelector('#liftBody [data-add="la2"]').getBoundingClientRect().top),hw:document.getElementById('hw-la2').classList.contains('open'),tog:document.querySelector('.hw-tog[data-tg="la2"]').classList.contains('open'),rules:document.getElementById('rulesTool').classList.contains('open'),rows:document.querySelector('#liftBody [data-add="la2"]').closest('.ex').querySelectorAll('.set-row').length}));
+  T('AD-S2 erg-08: Add set keeps "How to do it" and "Today\'s rules" open and the button stays under the finger (within 3 px)',!!t0&&!!t1&&t1.hw&&t1.tog&&t1.rules&&Math.abs(t1.top-t0.top)<=3&&t1.rows===t0.rows+1,JSON.stringify({t0,t1}));
+  await clickSel(q,'#liftBody [data-del="la2"]');await wait(200);
+  const t2=await tryEval(q,()=>({top:Math.round(document.querySelector('#liftBody [data-add="la2"]').getBoundingClientRect().top),hw:document.getElementById('hw-la2').classList.contains('open'),rows:document.querySelector('#liftBody [data-add="la2"]').closest('.ex').querySelectorAll('.set-row').length}));
+  T('AD-S2 erg-08: Remove does the same',!!t2&&t2.hw&&Math.abs(t2.top-t0.top)<=3&&t2.rows===t0.rows,JSON.stringify({t0,t2}));
+  await done(q);}
+ // erg-14: the guided card follows the day
+ {const q=await ctxPage('2026-09-28',{cb2_loc:'home'});await tryEval(q,()=>goToLift());await wait(300);
+  await tryEval(q,()=>{[...document.querySelectorAll('#liftBody button')].find(x=>x.textContent.includes('Guide me')).click();});await wait(250);
+  for(let i=0;i<4;i++){await tryEval(q,()=>{const n=[...document.querySelectorAll('#liftBody button')].find(x=>/^Next/.test(x.textContent.trim()));if(n)n.click();});await wait(120);}
+  const g4=await tryEval(q,()=>/Exercise 5 of 9/.test(document.body.innerText));
+  await tryEval(q,()=>{[...document.querySelectorAll('#dayPills .pill')].find(x=>x.textContent==='Legs A').click();});await wait(200);
+  const pl=await tryEval(q,()=>/Exercise 1 of/.test(document.body.innerText));
+  T('AD-S2 erg-14: switching the day pill in guided mode starts that day at its first exercise (not the index left over from the other day)',g4===true&&pl===true,JSON.stringify({g4,pl}));
+  await tryEval(q,()=>{[...document.querySelectorAll('#dayPills .pill')].find(x=>x.textContent==='Pull A').click();});await wait(200);
+  await putSet(q,'la1',0,'12','15');await tryEval(q,()=>switchView('home'));await wait(250);
+  const cta=await tryEval(q,()=>(document.querySelector('#view-home .cta')||{}).textContent);
+  await clickSel(q,'#view-home .cta');await wait(400);
+  const c=await tryEval(q,()=>{const x=document.querySelector('#liftBody .ex'),h=document.querySelector('header.app').getBoundingClientRect().bottom;return {ex:/Exercise 2 of 9/.test(document.body.innerText),gap:x?Math.round(x.getBoundingClientRect().top-h):null,sy:Math.round(scrollY)};});
+  T('AD-S2 erg-14: Continue from Home in guided mode lands on the current exercise, not at the top of the page',/Continue Pull A/.test(cta||'')&&!!c&&c.ex&&c.sy>0&&c.gap>=-10&&c.gap<=200,JSON.stringify({cta,c}));
+  await done(q);}
+ // erg-10: a tap selects the filled value; Enter moves on
+ {const q=await ctxPage('2026-09-28',{});await tryEval(q,()=>goToLift());await wait(300);
+  await putSet(q,'la1',0,'10','82.5');
+  await q.click(cell('la1',0,'w'));let sel=null;for(let i=0;i<20;i++){await wait(50);sel=await tryEval(q,()=>{const e=document.activeElement;return {f:e&&e.dataset&&e.dataset.f,a:e&&e.selectionStart,b:e&&e.selectionEnd,n:e&&e.value.length};});if(sel&&sel.n===4&&sel.a===0&&sel.b===4)break;}
+  T('AD-S2 erg-10: tapping a filled cell selects its contents, so typing replaces it',!!sel&&sel.f==='w'&&sel.a===0&&sel.b===sel.n&&sel.n===4,JSON.stringify(sel));
+  await q.keyboard.type('85');await wait(100);const typed=await tryEval(q,()=>document.querySelector('input[data-ex="la1"][data-i="0"][data-f="w"]').value);
+  await q.keyboard.press('Enter');await wait(100);const nxt=await tryEval(q,()=>{const e=document.activeElement;return e&&e.dataset?e.dataset.f+e.dataset.i:'';});
+  T('AD-S2 erg-10: typing replaces the selected value (85, not 82.585) and Enter moves to the next cell',typed==='85'&&nxt==='rpe0',JSON.stringify({typed,nxt}));
+  await done(q);}
+ // erg-15: a reps-only bodyweight set
+ {const q=await ctxPage('2026-09-29',{cb2_sessions:[S('2026-09-22','legsB',{gb8:sets([[10,0],[10,0],[10,0]])})]});await tryEval(q,()=>goToLift());await wait(300);
+  await put(q,'gb8',0,'r','12');await clickSel(q,'#liftBody .chk[data-chk="gb8"][data-i="0"]');await wait(150);
+  const a=await tryEval(q,()=>{const s=DB.sessions.find(x=>x.dateISO===todayISO()&&x.day==='legsB');const e=s&&s.entries.gb8&&s.entries.gb8[0];return {w:e&&e.w,ok:!!e&&okSet(e),n:sessionToday('legsB')&&sessionToday('legsB').n,toast:document.getElementById('toast').innerText};});
+  T('AD-S2 erg-15: reps typed and Kg left blank where last time was bodyweight logs the set as 0 kg on the tick (it counts)',!!a&&a.w==='0'&&a.ok&&a.n===1&&/Set done/.test(a.toast||''),JSON.stringify(a));
+  await put(q,'gb1',0,'r','8');await clickSel(q,'#liftBody .chk[data-chk="gb1"][data-i="0"]');await wait(150);
+  const b2=await tryEval(q,()=>({toast:document.getElementById('toast').innerText,cls:document.getElementById('toast').className}));
+  T('AD-S2 erg-15: with no bodyweight history the refusal tells the lifter to type 0 for bodyweight',!!b2&&/type 0 for bodyweight/.test(b2.toast||'')&&/err/.test(b2.cls||''),JSON.stringify(b2));
+  await done(q);}
+ // erg-18: a double tap on Log
+ {const q=await ctxPage('2026-09-28',{});await tryEval(q,()=>switchView('track'));await wait(300);
+  const a=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const i=document.getElementById('wVal'),b=document.getElementById('wAdd');i.value='89,3';b.click();await W(60);b.click();await W(120);const t=document.getElementById('toast');return {n:DB.weight.length,cls:t.className,txt:t.innerText,undo:!!t.querySelector('.undo')};});
+  T('AD-S2 erg-18: a quick second tap on Track > Weight Log leaves the success toast with its Undo (no false "nothing saved")',!!a&&a.n===1&&/Weight logged/.test(a.txt)&&!/nothing saved/.test(a.txt)&&a.undo&&!/err/.test(a.cls),JSON.stringify(a));
+  const b2=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const tb=document.querySelector('.track-tabs button[data-tp="strength"]');if(tb)tb.click();await W(200);document.getElementById('lW').value='100';document.getElementById('lR').value='5';const b=document.getElementById('lAdd');b.click();await W(60);b.click();await W(120);const t=document.getElementById('toast');return {n:DB.lifts.length,cls:t.className,txt:t.innerText};});
+  T('AD-S2 erg-18: the same for the lift Log (one entry, success message kept)',!!b2&&b2.n===1&&/Logged/.test(b2.txt)&&!/nothing saved/.test(b2.txt)&&!/err/.test(b2.cls),JSON.stringify(b2));
+  const c2=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const tb=document.querySelector('.track-tabs button[data-tp="measure"]');if(tb)tb.click();await W(200);document.getElementById('meWaist').value='90';const b=document.getElementById('meAdd');b.click();await W(60);b.click();await W(120);const t=document.getElementById('toast');return {n:DB.measure.length,cls:t.className,txt:t.innerText};});
+  T('AD-S2 erg-18: the same for the tape Add',!!c2&&c2.n===1&&/Tapes saved/.test(c2.txt)&&!/nothing saved/.test(c2.txt)&&!/err/.test(c2.cls),JSON.stringify(c2));
+  const d2=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('track');await W(200);document.getElementById('wVal').value='';const b=document.getElementById('wAdd');await W(1700);b.click();await W(100);const t=document.getElementById('toast');return {cls:t.className,txt:t.innerText};});
+  T('AD-S2 erg-18: an empty Log tap long after a save still gets the honest "needs a number" refusal',!!d2&&/err/.test(d2.cls||'')&&/needs a number/.test(d2.txt||''),JSON.stringify(d2));
+  {const q3=await ctxPage('2026-09-28',{});await q3.reload({waitUntil:'domcontentloaded'});
+   const e3=await tryEval(q3,async()=>{await new Promise(r=>setTimeout(r,150));switchView('track');document.getElementById('wVal').value='';document.getElementById('wAdd').click();const t=document.getElementById('toast');return {pn:Math.round(performance.now()),cls:t.className,txt:t.innerText};});
+   T('AD-S2 review: an empty Log tap in the first second after a page load still gets the honest "needs a number" refusal (the double-tap guard starts idle)',!!e3&&(e3.pn>=1400||(/err/.test(e3.cls||'')&&/needs a number/.test(e3.txt||''))),JSON.stringify(e3));await done(q3);}
+  await done(q);}
+ // logic-03: Undo goes back to the day and place it came from
+ {const q=await ctxPage('2026-09-28',{});await tryEval(q,()=>goToLift());await wait(300);
+  await putSet(q,'la1',0,'8','60');await putSet(q,'la1',1,'7','60');
+  await clickSel(q,'#liftBody [data-del="la1"]');await wait(200);
+  const u0=await tryEval(q,()=>({undo:!!document.querySelector('#toast .undo'),txt:document.getElementById('toast').innerText}));
+  await tryEval(q,()=>{[...document.querySelectorAll('#dayPills .pill')].find(x=>x.textContent==='Legs A').click();});await wait(200);
+  await putSet(q,'ga1',0,'10','40');
+  await tryEval(q,()=>{const u=document.querySelector('#toast .undo');if(u)u.click();});await wait(200);
+  const r=await tryEval(q,()=>{const pa=DB.sessions.find(x=>x.day==='pullA'),la=DB.sessions.find(x=>x.day==='legsA');return {pull:pa&&pa.entries.la1.map(x=>x.r+'x'+x.w).join(','),legsKeys:la?Object.keys(la.entries).join(','):null,toast:document.getElementById('toast').innerText};});
+  T('AD-S2 logic-03: Undo of "Set 2 cleared" after switching the day restores Pull A\'s set and writes nothing into Legs A',!!u0&&u0.undo&&/Set 2 cleared/.test(u0.txt)&&!!r&&r.pull==='8x60,7x60'&&r.legsKeys==='ga1'&&/Restored/.test(r.toast||''),JSON.stringify({u0,r}));
+  await clickSel(q,'#liftBody [data-del="ga1"]');await wait(150);
+  await tryEval(q,()=>{DB.sessions=[];const u=document.querySelector('#toast .undo');if(u)u.click();});await wait(150);
+  const g=await tryEval(q,()=>({toast:document.getElementById('toast').innerText,cls:document.getElementById('toast').className,n:DB.sessions.length}));
+  T('AD-S2 logic-03: if the session is gone Undo says "Nothing to restore" and restores nothing, instead of "Restored"',!!g&&/Nothing to restore/.test(g.toast||'')&&!/Restored/.test(g.toast||'')&&g.n===0,JSON.stringify(g));
   await done(q);}
 }
 
