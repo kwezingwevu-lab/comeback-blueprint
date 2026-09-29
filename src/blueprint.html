@@ -18,10 +18,10 @@
 <style>
 :root{
   --ink:#0A0D14;--ink-2:#0E121B;--panel:#141925;--panel-2:#1A2030;--panel-3:#222A3D;
-  --line:#2A3346;--line-2:#374257;--text:#F3F6FC;--text-2:#9FAAC0;--text-3:#7D89A5;
+  --line:#2A3346;--line-2:#374257;--text:#F3F6FC;--text-2:#9FAAC0;--text-3:#8E99B4;
   --gold:#FFC53D;--gold-2:#FFD970;--gold-deep:#E0A012;          /* STRENGTH pillar */
   --cyan:#3FD8C8;--cyan-2:#6FE9DC;--cyan-deep:#23A99B;          /* ENDURANCE pillar */
-  --go:#42D77D;--warn:#F0883E;--danger:#F65B5B;--bad:#FF6B7A;--violet:#9D8CFF;
+  --go:#42D77D;--warn:#F0883E;--danger:#F65B5B;--bad:#FF6B7A;--bad-2:#FF7A88;--violet:#9D8CFF;
   --f-display:'Space Grotesk',-apple-system,system-ui,sans-serif;
   --f-body:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
   --f-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
@@ -33,7 +33,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:calc(96px + env(safe-area-inset-top,0px));scroll-padding-bottom:calc(148px + env(safe-area-inset-bottom,0px))}
 body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;font-feature-settings:"tnum" 0}
 .chart-svg text{font-variant-numeric:tabular-nums}
 body{font-family:var(--f-body);background:var(--ink);color:var(--text);line-height:1.55;font-size:15px;-webkit-font-smoothing:antialiased;padding-bottom:96px;overflow-x:hidden}
@@ -54,6 +54,7 @@ header.app{position:sticky;top:0;z-index:50;padding-top:env(safe-area-inset-top,
 
 nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:60;background:linear-gradient(0deg,var(--ink-2),rgba(14,18,27,.95));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--line);display:flex;justify-content:flex-start;gap:2px;padding:8px 2px calc(8px + env(safe-area-inset-bottom));overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;scroll-behavior:smooth}
 nav.tabs::-webkit-scrollbar{display:none}
+.tabs-in{display:flex;flex:1 1 auto;min-width:0;gap:inherit;justify-content:inherit}
 nav.tabs .tab{flex:1 0 12.5%}
 .tab{flex:1;background:none;border:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 1px;border-radius:10px;color:var(--text-3);font-family:var(--f-body);transition:color .15s}
 .tab svg{width:21px;height:21px;stroke-width:2;fill:none;stroke:currentColor}
@@ -196,7 +197,7 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .cell:focus{outline:none;border-color:var(--gold);background:var(--ink-2);box-shadow:0 0 0 3px rgba(255,197,61,.14)}
 .cell.filled{border-color:var(--line-2)}
-.cell.pending{color:var(--text-2);opacity:.78;border-style:dashed}
+.cell.pending{color:var(--text-2);opacity:.85;border-style:dashed}
 .set-row.pending .set-no{color:var(--text-3)}
 .e1{font-family:var(--f-mono);font-size:10.5px;color:var(--text-2);text-align:center;white-space:nowrap}
 .chk{width:28px;height:28px;border-radius:8px;border:1.5px solid var(--line-2);background:var(--panel-3);cursor:pointer;display:grid;place-items:center;color:transparent;margin:0 auto;position:relative}
@@ -447,8 +448,8 @@ nav.tabs .tab{padding:6px 0}
 .wu-set .wu-w{color:var(--gold);font-weight:600;flex:1}
 .wu-set .wu-r{color:var(--text-2)}
 /* ---- rest timer ---- */
-#restTimer{position:fixed;left:50%;transform:translateX(-50%) translateY(200px);bottom:calc(72px + env(safe-area-inset-bottom));z-index:120;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,var(--panel-2),var(--ink-2));border:1px solid var(--cyan-deep);border-radius:999px;padding:10px 14px;box-shadow:var(--sh-lg);transition:transform .3s;min-width:230px;justify-content:space-between}
-#restTimer.show{transform:translateX(-50%) translateY(0)}
+#restTimer{position:fixed;left:50%;transform:translateX(-50%) translateY(200px);bottom:calc(72px + env(safe-area-inset-bottom));z-index:120;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,var(--panel-2),var(--ink-2));border:1px solid var(--cyan-deep);border-radius:999px;padding:10px 14px;box-shadow:var(--sh-lg);transition:transform .3s;min-width:230px;justify-content:space-between;visibility:hidden;transition:transform .3s,visibility 0s linear .3s}
+#restTimer.show{transform:translateX(-50%) translateY(0);visibility:visible;transition:transform .3s,visibility 0s}
 #restTimer button{background:var(--panel-3);border:1px solid var(--line-2);color:var(--text);border-radius:999px;padding:7px 12px;font-family:var(--f-body);font-weight:700;font-size:12px;cursor:pointer;min-height:40px;min-width:40px}
 #restTimer #restEnd{width:40px;padding:7px 0;color:var(--text-2)}
 .rt-mid{display:flex;align-items:center;gap:9px}
@@ -501,11 +502,11 @@ nav.tabs .tab{padding:6px 0}
 .skip-row:first-child{border-top:0}
 .skip-n{flex:none;width:104px;font-size:13px;font-weight:700;color:#ff9d9d}
 .skip-w{flex:1;font-size:12.5px;color:var(--text-2);line-height:1.5}
-.price-tbl{margin-top:12px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-.pt-head{display:grid;grid-template-columns:1fr auto auto;gap:10px;padding:9px 12px;background:var(--panel-3);font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-3);font-weight:700}
+.price-tbl{margin-top:12px;border:1px solid var(--line);border-radius:var(--r);overflow-x:auto}
+.pt-head{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;padding:9px 12px;background:var(--panel-3);font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-3);font-weight:700}
 .pt-head span:nth-child(2),.pt-head span:nth-child(3){text-align:right;min-width:62px}
-.pt-row{display:grid;grid-template-columns:1fr auto auto;gap:10px;padding:11px 12px;border-top:1px solid var(--line);align-items:center}
-.pt-n{font-size:13px;font-weight:600}
+.pt-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;padding:11px 12px;border-top:1px solid var(--line);align-items:center}
+.pt-n{font-size:13px;font-weight:600;min-width:0;overflow-wrap:anywhere}
 .pt-n small{display:block;font-size:11px;color:var(--text-3);font-weight:400;margin-top:2px}
 .pt-p{font-family:var(--f-mono);font-size:13px;color:var(--text);text-align:right;min-width:62px}
 .pt-g{font-family:var(--f-mono);font-size:13px;color:var(--go);text-align:right;min-width:62px}
@@ -583,7 +584,7 @@ button:active,.pill:active,.tab:active{transform:scale(.97)}
 .brand-txt{min-width:0}
 .brand-txt h1{font-size:15px!important;line-height:1.08!important;letter-spacing:-.2px}
 .brand-txt span{font-size:10px;letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:100%}
-.cell::placeholder{color:var(--text-2);opacity:.7}
+.cell::placeholder{color:var(--text-2);opacity:.85}
 .set-row td{vertical-align:middle}
 
 .hero-top{flex-wrap:nowrap!important;align-items:center}
@@ -598,9 +599,20 @@ input.bad,textarea.bad{border-color:var(--bad)!important;box-shadow:0 0 0 3px rg
 input[type=text][inputmode]{-webkit-appearance:none;appearance:none}
 #dataTa:focus,#healthTa:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,197,61,.14)}
 #phCard .mini:disabled{opacity:.45;cursor:not-allowed}
+/* ===== Round-3 accessibility (28-29 Sep 2026): one visible focus ring on every kind of control (gold, 12:1 on the panels, 2 px), a skip link, hidden text ===== */
+button:focus-visible,select:focus-visible,summary:focus-visible,a:focus-visible,[role=button]:focus-visible,[role=link]:focus-visible,[role=tab]:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+input:focus-visible,textarea:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+.cell:focus-visible{outline:none}
+input::placeholder,textarea::placeholder{color:var(--text-3);opacity:1}
+.tool-h:focus-visible,.rweek-h:focus-visible,.supp-h:focus-visible,.hw-tog:focus-visible{outline-offset:-3px;border-radius:8px}
+#main:focus,#main:focus-visible{outline:none}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.skip-link{position:fixed;left:12px;top:-120px;z-index:300;background:var(--gold);color:#1a1407;font-weight:800;font-size:14px;padding:12px 18px;border-radius:12px;text-decoration:none;box-shadow:var(--sh-lg)}
+.skip-link:focus{top:calc(10px + env(safe-area-inset-top,0px));outline:2px solid var(--text);outline-offset:2px}
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main" id="skipLink">Skip to content</a>
 <header class="app">
   <div class="head-inner">
     <div class="brand">
@@ -614,30 +626,30 @@ input[type=text][inputmode]{-webkit-appearance:none;appearance:none}
   </div>
 </header>
 
-<nav class="tabs" role="tablist">
-  <button class="tab active" data-view="home" role="tab"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg><span>Home</span></button>
-  <button class="tab" data-view="lift" role="tab"><svg viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M5 8l-2 2 3 3 2-2M16 5l3 3-2 2-3-3"/></svg><span>Lift</span></button>
-  <button class="tab run" data-view="run" role="tab"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Events</span></button>
-  <button class="tab" data-view="roadmap" role="tab"><svg viewBox="0 0 24 24"><path d="M9 5l-5 2v12l5-2 6 2 5-2V5l-5 2-6-2z"/><path d="M9 5v12M15 7v12"/></svg><span>Roadmap</span></button>
-  <button class="tab" data-view="fuel" role="tab"><svg viewBox="0 0 24 24"><path d="M3 11h18a9 9 0 01-18 0z"/><path d="M9 4c0 1.5 1 2 1 3.5M13 3c0 1.5 1 2 1 3.5"/></svg><span>Fuel</span></button>
-  <button class="tab" data-view="numbers" role="tab"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg><span>Numbers</span></button>
-  <button class="tab" data-view="track" role="tab"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg><span>Track</span></button>
-  <button class="tab" data-view="guide" role="tab"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg><span>Guide</span></button>
-</nav>
+<nav class="tabs" aria-label="Main"><div class="tabs-in" role="tablist" aria-label="Sections">
+  <button class="tab active" data-view="home" role="tab" id="tab-home" aria-controls="view-home" aria-selected="true" tabindex="0"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg><span>Home</span></button>
+  <button class="tab" data-view="lift" role="tab" id="tab-lift" aria-controls="view-lift" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M5 8l-2 2 3 3 2-2M16 5l3 3-2 2-3-3"/></svg><span>Lift</span></button>
+  <button class="tab run" data-view="run" role="tab" id="tab-run" aria-controls="view-run" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Events</span></button>
+  <button class="tab" data-view="roadmap" role="tab" id="tab-roadmap" aria-controls="view-roadmap" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M9 5l-5 2v12l5-2 6 2 5-2V5l-5 2-6-2z"/><path d="M9 5v12M15 7v12"/></svg><span>Roadmap</span></button>
+  <button class="tab" data-view="fuel" role="tab" id="tab-fuel" aria-controls="view-fuel" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M3 11h18a9 9 0 01-18 0z"/><path d="M9 4c0 1.5 1 2 1 3.5M13 3c0 1.5 1 2 1 3.5"/></svg><span>Fuel</span></button>
+  <button class="tab" data-view="numbers" role="tab" id="tab-numbers" aria-controls="view-numbers" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg><span>Numbers</span></button>
+  <button class="tab" data-view="track" role="tab" id="tab-track" aria-controls="view-track" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg><span>Track</span></button>
+  <button class="tab" data-view="guide" role="tab" id="tab-guide" aria-controls="view-guide" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg><span>Guide</span></button>
+</div></nav>
 
-<main class="wrap">
+<main class="wrap" id="main" tabindex="-1">
   <div class="storage-warn" id="storageWarnAll" role="alert"></div>
-  <section class="view active" id="view-home"></section>
-  <section class="view" id="view-lift"></section>
-  <section class="view" id="view-run"></section>
-  <section class="view" id="view-numbers"></section>
-  <section class="view" id="view-track"></section>
-  <section class="view" id="view-roadmap"></section>
-  <section class="view" id="view-fuel"></section>
-  <section class="view" id="view-guide"></section>
+  <section class="view active" id="view-home" role="tabpanel" aria-labelledby="tab-home"></section>
+  <section class="view" id="view-lift" role="tabpanel" aria-labelledby="tab-lift"></section>
+  <section class="view" id="view-run" role="tabpanel" aria-labelledby="tab-run"></section>
+  <section class="view" id="view-numbers" role="tabpanel" aria-labelledby="tab-numbers"></section>
+  <section class="view" id="view-track" role="tabpanel" aria-labelledby="tab-track"></section>
+  <section class="view" id="view-roadmap" role="tabpanel" aria-labelledby="tab-roadmap"></section>
+  <section class="view" id="view-fuel" role="tabpanel" aria-labelledby="tab-fuel"></section>
+  <section class="view" id="view-guide" role="tabpanel" aria-labelledby="tab-guide"></section>
 </main>
-<div id="restTimer"><button id="restEnd" aria-label="End rest">✕</button><div class="rt-mid"><span class="rt-lab">REST</span><b id="restTime">1:30</b></div><button id="restPlus" aria-label="Add 15 seconds">+15s</button></div>
-<div id="toast"></div>
+<div id="restTimer" role="group" aria-label="Rest timer"><button id="restEnd" aria-label="End rest">✕</button><div class="rt-mid"><span class="rt-lab">REST</span><b id="restTime">1:30</b></div><button id="restPlus" aria-label="Add 15 seconds">+15s</button></div>
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <script>/* APP LOGIC LOADED SEPARATELY BELOW */</script>
 </body>
 </html>

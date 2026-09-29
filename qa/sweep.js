@@ -10,6 +10,7 @@ const puppeteer = require('puppeteer');
 const { fontReply } = require('./fontroute');
 const fs = require('fs');
 const path = require('path');
+const GUARD_SRC = require('./a11yguard').toString(); // accessible-name / focusable / boolean-state guard, evaluated inside the page
 
 const APP = path.resolve(process.argv[2] || path.join(__dirname, 'ComebackBlueprint.html'));
 const VW = +(process.argv[3] || 390);
@@ -61,12 +62,15 @@ const JUNK = /\bNaN\b|\bundefined\b|Infinity|\$\{|\[object|\+-|−−|\bnull\b/;
     await new Promise((r) => setTimeout(r, 700));
     for (const v of VIEWS) {
       try {
-        const r = await p.evaluate(async (v) => {
+        const r = await p.evaluate(async (v, gsrc) => {
           const W = (ms) => new Promise((r) => setTimeout(r, ms));
+          const G = new Function('return ' + gsrc)(); const a11y = [];
+          // round 3 (a11y): every visible control has a name, custom buttons are focusable, aria-expanded/pressed are booleans
+          const scan = () => { document.querySelectorAll('#view-' + v + ' .rweek').forEach((x) => x.classList.add('open')); a11y.push(...G('#view-' + v)); };
           switchView(v); await W(60);
           document.querySelectorAll('#view-' + v + ' .tool').forEach((t) => t.classList.add('open'));
           let acc = '';
-          if (v === 'track') for (const t of document.querySelectorAll('[data-tp]')) { t.click(); await W(40); acc += document.getElementById('view-track').innerText + '\n'; }
+          if (v === 'track') for (const t of document.querySelectorAll('[data-tp]')) { t.click(); await W(40); acc += document.getElementById('view-track').innerText + '\n'; scan(); }
           const el = document.getElementById('view-' + v);
           const txt = v === 'track' ? acc : el.innerText;
           const over = []; const w = document.documentElement.clientWidth;
@@ -74,12 +78,14 @@ const JUNK = /\bNaN\b|\bundefined\b|Infinity|\$\{|\[object|\+-|−−|\bnull\b/;
             const r = e.getBoundingClientRect();
             if (r.width > 0 && r.height > 0 && (r.right > w + 1 || r.left < -1) && getComputedStyle(e).position !== 'fixed' && !e.closest('#dayPills,.pills,.tabs,.track-tabs,.seg,svg')) over.push((e.tagName + '.' + String(e.className).replace(/\s+/g, '.')).slice(0, 50) + ' r=' + Math.round(r.right));
           });
-          return { txt, over: over.slice(0, 3), sw: document.documentElement.scrollWidth, w };
-        }, v);
+          if (v !== 'track') scan();
+          return { txt, over: over.slice(0, 3), sw: document.documentElement.scrollWidth, w, a11y };
+        }, v, GUARD_SRC);
         renders++;
         const m = r.txt.match(new RegExp('.{0,40}(' + JUNK.source + ').{0,40}'));
         if (m) fails.push(`${c.d} ${c.n} ${v}: junk "${m[0].replace(/\s+/g, ' ')}"`);
         if (r.over.length || r.sw > r.w + 1) fails.push(`${c.d} ${c.n} ${v}: overflow sw=${r.sw} ${r.over.join(' | ')}`);
+        for (const a of [...new Set(r.a11y)]) fails.push(`${v}: a11y ${a}`);
       } catch (e) { fails.push(`${c.d} ${c.n} ${v}: threw ${String(e.message).slice(0, 100)}`); }
     }
     if (errs.length) fails.push(`${c.d} ${c.n}: page errors ${[...new Set(errs)].slice(0, 3).join(' || ').slice(0, 240)}`);

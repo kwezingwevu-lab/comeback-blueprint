@@ -166,6 +166,49 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  T('webkit home: a resumed page (pageshow) after the date has moved redraws Home for the new day',!!d1&&d1.today==='2026-09-29'&&/Legs B/.test(d1.cta||''),JSON.stringify(d1));
  T('webkit S2: no page errors in these steps',perr.length===0,perr.join('|').slice(0,200));
  await c.close();}
+// Round-3 stage S3 (29 Sep 2026): accessibility as Safari runs it -- the keyboard pattern on the tab bar and the custom accordion buttons, the focus ring (Safari's own default ring was 2.94:1 on the segment buttons), the toast live region, the Lift toggles keeping the page in place, and the tab bar's layout unchanged by the new tablist wrapper.
+{const MOCKS=iso=>"(function(){var R=Date;var base=new R('"+iso+"T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(base);else super(...a);}static now(){return base;}}window.Date=M;})();";
+ const DEMO=fs.readFileSync(path.join(__dirname,'fixtures/demo.setup.js'),'utf8').trim().split('\n').pop();
+ const safe=async(pg,fn,arg)=>{try{return await pg.evaluate(fn,arg);}catch(e){return {err:String(e&&e.message||e).slice(0,140)};}};
+ const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
+ await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
+ await c.addInitScript(MOCKS('2026-09-28')+'try{localStorage.clear();}catch(e){}'+DEMO);
+ const pg=await c.newPage();const perr=[];pg.on('pageerror',e=>perr.push(e.message));pg.on('console',m=>{if(m.type()==='error')perr.push(m.text());});
+ await pg.goto('file://'+file,{waitUntil:'load'});await wait(1200);
+ // tab bar layout: eight equal columns edge to edge (the tablist wrapper must not change the layout)
+ const lay=await safe(pg,()=>{const r=[...document.querySelectorAll('nav.tabs .tab')].map(t=>t.getBoundingClientRect());return {n:r.length,w:r.map(x=>Math.round(x.width*10)/10),first:Math.round(r[0].left),last:Math.round(r[r.length-1].right),navH:Math.round(document.querySelector('nav.tabs').getBoundingClientRect().height)};});
+ T('webkit a11y: the tab bar is still eight equal columns across the full width',!!lay&&lay.n===8&&lay.w.every(x=>Math.abs(x-lay.w[0])<=1)&&lay.first<=1&&lay.last>=389,JSON.stringify(lay));
+ // keyboard on the tab bar
+ await safe(pg,()=>document.getElementById('tab-home').focus());await pg.keyboard.press('ArrowRight');await wait(300);
+ const k1=await safe(pg,()=>({ae:document.activeElement.id,act:(document.querySelector('.view.active')||{}).id,sel:(document.querySelector('[role=tab][aria-selected=true]')||{}).id,title:document.title}));
+ await pg.keyboard.press('End');await wait(300);const k2=await safe(pg,()=>({ae:document.activeElement.id,act:(document.querySelector('.view.active')||{}).id}));
+ T('webkit a11y: Right and End move along the tab bar (focus, selection and view together) and the title follows',!!k1&&k1.ae==='tab-lift'&&k1.act==='view-lift'&&k1.sel==='tab-lift'&&/^Lift/.test(k1.title)&&!!k2&&k2.ae==='tab-guide'&&k2.act==='view-guide',JSON.stringify({k1,k2}));
+ // a custom accordion button from the keyboard
+ await safe(pg,()=>switchView('fuel'));await wait(400);
+ await safe(pg,()=>document.querySelector('.supp-h').focus());await pg.keyboard.press('Enter');await wait(150);
+ const a1=await safe(pg,()=>{const h=document.querySelector('.supp-h');return {exp:h.getAttribute('aria-expanded'),open:document.getElementById(h.getAttribute('aria-controls')).classList.contains('open'),kept:document.activeElement===h};});
+ await pg.keyboard.press('Space');await wait(150);
+ const a2=await safe(pg,()=>{const h=document.querySelector('.supp-h');return {exp:h.getAttribute('aria-expanded'),kept:document.activeElement===h};});
+ T('webkit a11y: Enter opens and Space closes a supplement accordion (role=button div), aria-expanded in step, focus kept',!!a1&&a1.exp==='true'&&a1.open&&a1.kept&&!!a2&&a2.exp==='false'&&a2.kept,JSON.stringify({a1,a2}));
+ // the focus ring in Safari
+ await pg.keyboard.press('Tab');
+ const ring=await safe(pg,async()=>{const out=[],W=ms=>new Promise(r=>setTimeout(r,ms));const chk=async(v,sel)=>{switchView(v);await W(250);const e=[...document.querySelectorAll(sel)].find(x=>x.getClientRects().length);if(!e){out.push('missing '+sel);return;}e.focus();await W(320);const cs=getComputedStyle(e);if(cs.outlineStyle!=='solid'||parseFloat(cs.outlineWidth)<2||cs.outlineColor!=='rgb(255, 197, 61)')out.push(sel+' '+cs.outlineStyle+' '+cs.outlineWidth+' '+cs.outlineColor);};
+   await chk('lift','#locSeg button');await chk('lift','#liftBody .chk');await chk('lift','#dayPills .pill');await chk('fuel','.supp-h');await chk('track','#tp-weight .del');await chk('track','.track-tabs button');await chk('home','.card[role=link]');return out;});
+ T('webkit a11y: segment buttons, ticks, pills, accordions, deletes and links show a 2 px gold focus ring in Safari (not the default 2.94:1 one)',Array.isArray(ring)&&ring.length===0,JSON.stringify(ring));
+ // the Lift toggles keep the page in place when tapped
+ await safe(pg,()=>switchView('lift'));await wait(400);
+ const s0=await safe(pg,()=>{const e=document.querySelector('#locSeg');e.scrollIntoView({block:'center'});return {y:Math.round(scrollY),top:Math.round(e.getBoundingClientRect().top)};});await wait(150);
+ await pg.click('#locSeg button[data-loc="home"]');await wait(500);
+ const s1=await safe(pg,()=>({y:Math.round(scrollY),top:Math.round(document.querySelector('#locSeg').getBoundingClientRect().top),pressed:document.querySelector('#locSeg button[data-loc="home"]').getAttribute('aria-pressed')}));
+ T('webkit a11y: tapping the Lift Home/Gym toggle leaves the page and the toggle where they were, and the new choice is aria-pressed',!!s0&&!!s1&&s0.y>50&&Math.abs(s1.y-s0.y)<=2&&Math.abs(s1.top-s0.top)<=2&&s1.pressed==='true',JSON.stringify({s0,s1}));
+ // toast live region
+ const t0=await safe(pg,()=>{const t=document.getElementById('toast');const a=[t.getAttribute('role'),t.getAttribute('aria-live')].join('/');toast('That did not save',false,true);return {fresh:a,bad:[t.getAttribute('role'),t.getAttribute('aria-live')].join('/')};});
+ await safe(pg,()=>{window.__u=0;undoToast('Deleted',()=>{window.__u++;});window.__ub=document.querySelector('#toast .undo');});
+ let gone=false;for(let i=0;i<45&&!gone;i++){await wait(200);gone=(await safe(pg,()=>document.getElementById('toast').className===''&&document.getElementById('toast').innerHTML===''))===true;}
+ const t1=await safe(pg,()=>{const b=window.__ub;if(b)b.click();return {u:window.__u,btns:document.querySelectorAll('#toast button').length};});
+ T('webkit a11y: the toast is a live region from first paint (alert for errors); a faded toast leaves no words or Undo, and a stale Undo runs nothing',!!t0&&t0.fresh==='status/polite'&&t0.bad==='alert/assertive'&&gone&&!!t1&&t1.u===0&&t1.btns===0,JSON.stringify({t0,gone,t1}));
+ T('webkit a11y: no page errors in these steps',perr.length===0,perr.join('|').slice(0,200));
+ await c.close();}
 T('webkit: no page/console errors',errs.length===0,errs.join('|').slice(0,300));
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+String(x.detail||'').replace(/\s+/g,' ').slice(0,400)).join('\n')||'WEBKIT ALL PASS');console.log('WEBKIT RESULT:',pass+'/'+R.length);process.exit(pass===R.length?0:1);})().catch(e=>{console.error('WEBKIT CRASH:',e.message);process.exit(2);});

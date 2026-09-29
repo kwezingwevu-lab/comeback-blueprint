@@ -334,7 +334,7 @@ for(const [iso,lab] of [['2026-09-27','Push A'],['2026-09-29','Legs B'],['2026-1
 // X3 Deload Friday: Brief says full rest, Today card has no pump buttons; X4 week strip labels
 {const q=await ctxPage('2026-10-23');const h=await q.evaluate(()=>({t:document.getElementById('view-home').innerText,h:document.getElementById('view-home').innerHTML}));
  T('deload Friday: Brief = full rest, no Extras Pump button',/Today: Full rest — deload week/.test(h.t)&&!/goToExtras\(\)">[^<]*<svg[\s\S]{0,400}Extras Pump/.test(h.h)&&!/Main day instead/.test(h.t),h.t.match(/Today:[^\n]*/)+'');
- T('strip: deload-week Friday reads Rest',/FRI\s*\n?\s*Rest/i.test(h.t.replace(/\n+/g,'\n')),'');await done(q);}
+ T('strip: deload-week Friday reads Rest',/FRI(\s+TODAY)?\s*\n?\s*Rest/i.test(h.t.replace(/\n+/g,'\n')),'');await done(q);}
 {const q=await ctxPage('2026-09-26');const h=await q.evaluate(()=>document.getElementById('view-home').innerText);
  T('strip: normal Friday reads Pump; Jump In says Events, not Run Plan',/FRI\s*\n?\s*Pump/i.test(h.replace(/\n+/g,'\n'))&&/Events/.test(h)&&!/Run Plan/.test(h));
  T('pillar: ceiling states both fat levels',/ceiling ~\d+ kg @ 18%\s+~\d+ kg @ 24%/.test(h));await done(q);}
@@ -746,7 +746,7 @@ const nextT=async q=>q.evaluate(()=>[...document.querySelectorAll('#liftBody .ne
  {const q=await ctxPage('2026-09-27',{},DEMO+"localStorage.setItem('cb2_measure',JSON.stringify([{date:'2026-09-11',waist:92},{date:'2026-09-26',waist:97.5}]));");const a=await H(q);
   T('AC coach-02 a red verdict: the Brief points at the Weekly Review instead of saying "All engines fed"',/Waist is \+5\.5/.test(a.review)&&/Weekly Review below has one correction/.test(a.brief)&&!/All engines fed/.test(a.brief),JSON.stringify({b:(a.brief||'').slice(-260),r:(a.review||'').slice(0,200)}));await fin(q);}
  {const sl=[];for(let i=1;i<=6;i++)sl.push({date:addD('2026-10-02',-i),h:6});const q=await ctxPage('2026-10-02',{cb2_sessions:week('2026-09-26',ORD.slice(0,6)),cb2_sleep:sl});const a=await H(q);
-  T('AC coach-02 sleep verdict on a Friday: Today card, CTA, week strip and Brief all say full rest (no gold pump button)',/^Full Rest/.test(a.title)&&/^Full rest today/.test(a.cta)&&!/Extras pump/.test(a.cta)&&/FriRest/.test(a.strip)&&/Today: Full rest/.test(a.brief)&&/Sleep averaged 6\.0/.test(a.review),JSON.stringify({t:a.title,c:a.cta,s:a.strip,b:(a.brief||'').slice(0,160)}));
+  T('AC coach-02 sleep verdict on a Friday: Today card, CTA, week strip and Brief all say full rest (no gold pump button)',/^Full Rest/.test(a.title)&&/^Full rest today/.test(a.cta)&&!/Extras pump/.test(a.cta)&&/Fri( today)?Rest/.test(a.strip)&&/Today: Full rest/.test(a.brief)&&/Sleep averaged 6\.0/.test(a.review),JSON.stringify({t:a.title,c:a.cta,s:a.strip,b:(a.brief||'').slice(0,160)}));
   await q.evaluate(()=>{window.scrollTo(0,0);const c=document.querySelector('#view-home .cta');if(c)c.click();});await wait(900);const y=await q.evaluate(()=>{const r=document.getElementById('reviewCard');return r?Math.round(r.getBoundingClientRect().top):null;});
   T('AC coach-02 the full-rest CTA scrolls to the Weekly Review',y!==null&&y>=-5&&y<220,String(y));await fin(q);}
  // coach-03 / cal-02: the waist brake in a cut, after the check and after the cut
@@ -1424,6 +1424,200 @@ const cpage=async(seed,cloud,mode)=>{const c=await b.createBrowserContext();cons
   await tryEval(q,()=>{DB.sessions=[];const u=document.querySelector('#toast .undo');if(u)u.click();});await wait(150);
   const g=await tryEval(q,()=>({toast:document.getElementById('toast').innerText,cls:document.getElementById('toast').className,n:DB.sessions.length}));
   T('AD-S2 logic-03: if the session is gone Undo says "Nothing to restore" and restores nothing, instead of "Restored"',!!g&&/Nothing to restore/.test(g.toast||'')&&!/Restored/.test(g.toast||'')&&g.n===0,JSON.stringify(g));
+  await done(q);}
+}
+
+// ===== AD-S3. Round-3 fixes (28-29 Sep 2026): accessibility semantics, focus and contrast =====
+{const tryEval=async(q,fn,arg)=>{try{return await q.evaluate(fn,arg);}catch(e){return {err:String(e&&e.message||e).slice(0,160)};}};
+ const DEMO=fs.readFileSync(path.join(__dirname,'fixtures/demo.setup.js'),'utf8').trim().split('\n').pop();
+ const GUARD=require('./a11yguard');
+ const key=(q,k)=>q.keyboard.press(k).catch(()=>{});
+ const focusEl=(q,sel)=>tryEval(q,s=>{const e=document.querySelector(s);if(!e)return false;e.focus();return document.activeElement===e;},sel);
+ const clickSel=(q,sel)=>tryEval(q,s=>{const e=document.querySelector(s);if(!e)return false;e.click();return true;},sel);
+ // ---- one demo page carries the keyboard, tab, name, group, focus and heading checks ----
+ {const q=await ctxPage('2026-09-28',{},DEMO);
+  // a11y-01 accordions
+  const acc=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const out={};
+    for(const [v,sel] of [['home','.tool-h'],['lift','.tool-h'],['roadmap','.rweek-h'],['fuel','.supp-h'],['guide','.tool-h']]){switchView(v);await W(150);
+      const hs=[...document.querySelectorAll('#view-'+v+' '+sel)].filter(h=>h.getClientRects().length>0);
+      out[v]={n:hs.length,bad:hs.filter(h=>h.getAttribute('role')!=='button'||h.tabIndex!==0||!/^(true|false)$/.test(h.getAttribute('aria-expanded'))).length,noctl:hs.filter(h=>{const id=h.getAttribute('aria-controls');return !id||!document.getElementById(id);}).length};}
+    return out;});
+  for(const v of ['home','lift','roadmap','fuel','guide'])T('AD-S3 a11y-01: every '+v+' accordion header is a focusable button with aria-expanded and a real aria-controls',!!acc&&!!acc[v]&&acc[v].n>0&&acc[v].bad===0&&acc[v].noctl===0,JSON.stringify(acc&&acc[v]));
+  await tryEval(q,()=>switchView('fuel'));await wait(250);
+  const f0=await focusEl(q,'.supp-h');await key(q,'Enter');await wait(90);
+  const k1=await tryEval(q,()=>{const h=document.querySelector('.supp-h'),b=h&&document.getElementById(h.getAttribute('aria-controls'));return {exp:h&&h.getAttribute('aria-expanded'),open:!!b&&b.classList.contains('open'),kept:document.activeElement===h};});
+  await key(q,'Space');await wait(90);
+  const k2=await tryEval(q,()=>{const h=document.querySelector('.supp-h'),b=h&&document.getElementById(h.getAttribute('aria-controls'));return {exp:h&&h.getAttribute('aria-expanded'),open:!!b&&b.classList.contains('open'),kept:document.activeElement===h};});
+  T('AD-S3 a11y-01: Enter opens a Fuel supplement (aria-expanded true, body open, focus stays); Space closes it again',f0===true&&!!k1&&k1.exp==='true'&&k1.open&&k1.kept&&!!k2&&k2.exp==='false'&&!k2.open&&k2.kept,JSON.stringify({f0,k1,k2}));
+  await tryEval(q,()=>switchView('lift'));await wait(400);
+  await focusEl(q,'#toolWarm .tool-h');await key(q,'Enter');await wait(120);
+  const l1=await tryEval(q,()=>{const h=document.querySelector('#toolWarm .tool-h');return {open:document.getElementById('toolWarm').classList.contains('open'),exp:h.getAttribute('aria-expanded'),kept:document.activeElement===h};});
+  await clickSel(q,'#toolWarm .tool-h');await wait(90);
+  const l2=await tryEval(q,()=>({open:document.getElementById('toolWarm').classList.contains('open'),exp:document.querySelector('#toolWarm .tool-h').getAttribute('aria-expanded')}));
+  T('AD-S3 a11y-01: a Lift tool opens on ONE Enter (no double toggle), and a plain click closes it with aria-expanded in step',!!l1&&l1.open&&l1.exp==='true'&&l1.kept&&!!l2&&!l2.open&&l2.exp==='false',JSON.stringify({l1,l2}));
+  await tryEval(q,()=>switchView('roadmap'));await wait(250);
+  await tryEval(q,()=>{const h=[...document.querySelectorAll('.rweek-h')].find(x=>!x.parentElement.classList.contains('open'));if(h)h.setAttribute('data-ax3','1');});
+  await focusEl(q,'[data-ax3="1"]');await key(q,'Enter');await wait(90);
+  const rw=await tryEval(q,()=>{const h=document.querySelector('[data-ax3="1"]');return {open:!!h&&h.parentElement.classList.contains('open'),exp:h&&h.getAttribute('aria-expanded')};});
+  T('AD-S3 a11y-01: a Roadmap phase opens from the keyboard',!!rw&&rw.open&&rw.exp==='true',JSON.stringify(rw));
+  await tryEval(q,()=>switchView('home'));await wait(250);
+  const mc=await tryEval(q,()=>{const c=[...document.querySelectorAll('#view-home .card[role=link]')][0];if(c)c.setAttribute('data-ax3','1');return !!c&&c.tabIndex===0;});
+  await focusEl(q,'#view-home [data-ax3="1"]');await key(q,'Enter');await wait(250);
+  T('AD-S3 a11y-01: the Home Next Milestone card is a link the keyboard can reach and Enter opens the Roadmap',mc===true&&await tryEval(q,()=>!!document.querySelector('#view-roadmap.active')),String(mc));
+  // a11y-05 / a11y-17 tab pattern, title, landmarks, skip link
+  await tryEval(q,()=>switchView('home'));await wait(200);
+  const tp=await tryEval(q,()=>{const nav=document.querySelector('nav.tabs'),tl=nav&&nav.querySelector('[role=tablist]'),tabs=[...document.querySelectorAll('[role=tab]')];
+    return {navLabel:nav&&nav.getAttribute('aria-label'),tlLabel:tl&&tl.getAttribute('aria-label'),n:tabs.length,sel:tabs.filter(t=>t.getAttribute('aria-selected')==='true').length,rove:tabs.filter(t=>t.tabIndex===0).length,
+      panels:[...document.querySelectorAll('.view')].every(v=>{const t=document.getElementById(v.getAttribute('aria-labelledby')||'');return v.getAttribute('role')==='tabpanel'&&!!t&&t.getAttribute('aria-controls')===v.id;}),main:document.querySelector('main#main[tabindex="-1"]')?1:0,h1:document.querySelectorAll('h1').length,title:document.title};});
+  T('AD-S3 a11y-05: the tab bar is a labelled navigation with a real tablist (one selected, one tab stop) and eight labelled tabpanels inside <main>',!!tp&&/Main/i.test(tp.navLabel||'')&&!!tp.tlLabel&&tp.n===8&&tp.sel===1&&tp.rove===1&&tp.panels&&tp.main===1&&tp.h1===1,JSON.stringify(tp));
+  await focusEl(q,'#tab-home');await key(q,'ArrowRight');await wait(250);
+  const t1=await tryEval(q,()=>({ae:document.activeElement.id,act:(document.querySelector('.view.active')||{}).id,title:document.title,sel:(document.querySelector('[role=tab][aria-selected=true]')||{}).id,rove:[...document.querySelectorAll('[role=tab]')].filter(t=>t.tabIndex===0).map(t=>t.id).join()}));
+  await key(q,'End');await wait(250);const t2=await tryEval(q,()=>({ae:document.activeElement.id,act:(document.querySelector('.view.active')||{}).id}));
+  await key(q,'ArrowRight');await wait(250);const t3=await tryEval(q,()=>({ae:document.activeElement.id,act:(document.querySelector('.view.active')||{}).id}));
+  await key(q,'Home');await wait(250);const t4=await tryEval(q,()=>({ae:document.activeElement.id,act:(document.querySelector('.view.active')||{}).id}));
+  await key(q,'ArrowLeft');await wait(250);const t5=await tryEval(q,()=>({ae:document.activeElement.id,act:(document.querySelector('.view.active')||{}).id}));
+  T('AD-S3 a11y-05: Left/Right/Home/End move along the tab bar (focus and view together, wrapping), the selected tab is the only tab stop, and document.title names the view',!!t1&&t1.ae==='tab-lift'&&t1.act==='view-lift'&&/^Lift/.test(t1.title)&&t1.sel==='tab-lift'&&t1.rove==='tab-lift'&&!!t2&&t2.ae==='tab-guide'&&t2.act==='view-guide'&&!!t3&&t3.ae==='tab-home'&&!!t4&&t4.ae==='tab-home'&&!!t5&&t5.ae==='tab-guide'&&t5.act==='view-guide',JSON.stringify({t1,t2,t3,t4,t5}));
+  await tryEval(q,()=>switchView('home'));await wait(200);
+  const sk=await tryEval(q,()=>{const first=document.querySelector('a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])'),s=document.getElementById('skipLink'),r0=s.getBoundingClientRect().bottom;s.focus();const r1=s.getBoundingClientRect();return {first:first&&first.id,hiddenAtRest:r0<=0,shown:r1.top>=0&&r1.bottom>0&&r1.height>20,txt:s.textContent};});
+  await key(q,'Enter');await wait(150);
+  const sk2=await tryEval(q,()=>({ae:document.activeElement.id,y:scrollY}));
+  T('AD-S3 a11y-17: a "Skip to content" link is the first tab stop, off-screen until focused, and Enter puts focus on <main>',!!sk&&sk.first==='skipLink'&&sk.hiddenAtRest&&sk.shown&&/Skip to content/i.test(sk.txt)&&!!sk2&&sk2.ae==='main',JSON.stringify({sk,sk2}));
+  // a11y-02 the set grid
+  await tryEval(q,()=>switchView('lift'));await wait(400);
+  const sg=await tryEval(q,()=>{const cells=[...document.querySelectorAll('#liftBody .cell')],chk=[...document.querySelectorAll('#liftBody .chk')],th=[...document.querySelectorAll('#liftBody .set-grid th')].filter(x=>x.textContent.trim()==='✓');
+    return {cells:cells.length,chk:chk.length,noCell:cells.filter(c=>!/^Set \d+ (reps|weight in kg|RPE), \S/.test(c.getAttribute('aria-label')||'')).length,noChk:chk.filter(c=>!/^Set \d+ done, \S/.test(c.getAttribute('aria-label')||'')||!/^(true|false)$/.test(c.getAttribute('aria-pressed'))).length,th:th.length&&th.every(x=>x.getAttribute('aria-label')==='Done'),sample:cells[0]&&cells[0].getAttribute('aria-label')};});
+  T('AD-S3 a11y-02: every Lift set field is named (set number, field, exercise) and every tick is a named toggle button; the header tick says "Done"',!!sg&&sg.cells>20&&sg.chk>5&&sg.noCell===0&&sg.noChk===0&&sg.th===true,JSON.stringify(sg));
+  await tryEval(q,()=>{const r=document.querySelector('input[data-ex="la1"][data-i="0"][data-f="r"]'),w=document.querySelector('input[data-ex="la1"][data-i="0"][data-f="w"]');for(const [e,v] of [[r,'10'],[w,'60']]){if(!e)return;e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));}});await wait(200);
+  const pr=await tryEval(q,()=>{const c=document.querySelector('#liftBody .chk[data-chk="la1"][data-i="0"]');return c&&c.getAttribute('aria-pressed');});
+  T('AD-S3 a11y-02: the set tick reports "pressed" once reps and weight are in (kept in step with the done state)',pr==='true',String(pr));
+  // a11y-03 delete names + labels
+  await tryEval(q,()=>switchView('track'));await wait(300);
+  const dl=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const out={dels:0,bad:0,sample:''};for(const t of ['weight','lifts','measure']){const tb=document.querySelector('.track-tabs [data-tp="'+t+'"]');if(tb)tb.click();await W(80);document.querySelectorAll('#view-track .del').forEach(d=>{if(!d.getClientRects().length)return;out.dels++;const a=d.getAttribute('aria-label')||'';if(!/^Delete .+, \d+ \w{3}/.test(a))out.bad++;out.sample=out.sample||a;});}return out;});
+  T('AD-S3 a11y-03: every Track delete icon says what it deletes and which day ("Delete weigh-in, 25 Sep")',!!dl&&dl.dels>=3&&dl.bad===0,JSON.stringify(dl));
+  const lab=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const bad=[];let n=0;for(const v of ['home','numbers','track']){switchView(v);await W(150);for(const t of (v==='track'?['weight','lifts','measure']:[null])){if(t){document.querySelector('.track-tabs [data-tp="'+t+'"]').click();await W(60);}
+     document.querySelectorAll('#view-'+v+' label').forEach(l=>{if(!l.getClientRects().length||!l.textContent.trim()||l.classList.contains('btn'))return;n++;if(!l.control)bad.push(v+': '+l.textContent.trim().slice(0,24));});}}return {n,bad};});
+  T('AD-S3 a11y-03: every visible form label is tied to its field (Numbers, Track, Home)',!!lab&&lab.n>=12&&lab.bad.length===0,JSON.stringify(lab));
+  const gd=await tryEval(q,async(gsrc)=>{const G=new Function('return '+gsrc)();const W=ms=>new Promise(r=>setTimeout(r,ms));const out=[];
+    for(const v of ['home','lift','run','roadmap','fuel','numbers','track','guide']){switchView(v);await W(150);document.querySelectorAll('#view-'+v+' .tool,#view-'+v+' .rweek').forEach(t=>t.classList.add('open'));await W(30);
+      for(const t of (v==='track'?['weight','lifts','regions','strength','measure']:[null])){if(t){document.querySelector('.track-tabs [data-tp="'+t+'"]').click();await W(60);}out.push(...G('#view-'+v).map(x=>v+': '+x));}}
+    return [...new Set(out)];},GUARD.toString());
+  T('AD-S3 guard: on all eight views (every Track pane) every visible control has an accessible name, custom buttons are focusable, and aria-expanded / aria-pressed are booleans',Array.isArray(gd)&&gd.length===0,JSON.stringify(gd).slice(0,400));
+  // a11y-04 segmented groups
+  const SEGS={home:['marchSeg'],lift:['liftPhaseSeg','locSeg','focusSeg','wakeSeg','dayPills'],run:['radiusSeg'],numbers:['phaseSeg','bulkSeg','ceilBfSeg'],fuel:['fuelQSeg']};
+  const sgr=await tryEval(q,async(S)=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const out={};for(const v of Object.keys(S)){switchView(v);await W(200);for(const id of S[v]){const g=document.getElementById(id);if(!g){out[id]='missing';continue;}const bs=[...g.querySelectorAll('button')];out[id]=(g.getAttribute('role')==='group'&&!!g.getAttribute('aria-label')&&bs.length>1&&bs.every(b=>/^(true|false)$/.test(b.getAttribute('aria-pressed')))&&bs.filter(b=>b.getAttribute('aria-pressed')==='true').length===1&&bs.every(b=>(b.getAttribute('aria-pressed')==='true')===b.classList.contains('on')))?'ok':'BAD '+g.outerHTML.slice(0,140);}}
+    switchView('track');await W(150);const tt=document.querySelector('.track-tabs'),tb=[...tt.querySelectorAll('button')];out.trackTabs=(tt.getAttribute('role')==='group'&&tb.length===5&&tb.filter(b=>b.getAttribute('aria-pressed')==='true').length===1)?'ok':'BAD';tb[2].click();await W(60);out.trackMoved=(tb[2].getAttribute('aria-pressed')==='true'&&tb[0].getAttribute('aria-pressed')==='false')?'ok':'BAD';return out;},SEGS);
+  T('AD-S3 a11y-04: all twelve segmented groups are named groups whose buttons carry aria-pressed in step with the .on class (and it follows a click on the Track tabs)',!!sgr&&Object.values(sgr).length>=12&&Object.values(sgr).every(x=>x==='ok'),JSON.stringify(sgr));
+  await done(q);}
+ // ---- a11y-06 focus goes back to the equivalent control, and the Lift toggles keep the page where it is ----
+ {const q=await ctxPage('2026-09-28',{},DEMO);
+  const press=async(sel,view,pre)=>{await tryEval(q,v=>switchView(v),view);await wait(350);if(pre)await tryEval(q,pre);
+    const r0=await tryEval(q,s=>{const e=document.querySelector(s);if(!e)return null;e.scrollIntoView({block:'center'});return {y:Math.round(scrollY),top:Math.round(e.getBoundingClientRect().top)};},sel);await wait(150);
+    const got=await focusEl(q,sel);await key(q,'Enter');await wait(450);
+    const r1=await tryEval(q,s=>{const e=document.querySelector(s),a=document.activeElement;return {y:Math.round(scrollY),top:e?Math.round(e.getBoundingClientRect().top):null,ae:a&&a!==document.body?(a.tagName.toLowerCase()+(a.id?'#'+a.id:'')+[...a.attributes].filter(x=>/^data-/.test(x.name)).map(x=>'['+x.name+'='+x.value+']').join('')):'BODY',same:!!e&&a===e};},sel);
+    return {got,r0,r1};};
+  {await tryEval(q,()=>switchView('lift'));await wait(350);
+   const FS='#liftBody button[onclick*="fillFromLast(\'la2\')"]';
+   const got=await focusEl(q,FS);await key(q,'Shift');await tryEval(q,()=>{renderLiftDay();});await wait(250);
+   const r=await tryEval(q,fs=>{const a=document.activeElement;return {ae:a&&a.getAttribute&&a.getAttribute('onclick'),same:a===document.querySelector(fs)};},FS);
+   T('AD-S3 a11y-06: a redraw after a key press puts focus back on the second exercise\'s Fill button (no id, no data attributes: found by its inline handler), not the first one',got===true&&!!r&&r.same===true,JSON.stringify({got,r}));}
+  for(const [sel,view,lab] of [['#locSeg button[data-loc="home"]','lift','Lift Home/Gym toggle'],['#focusSeg button[data-fx="off"]','lift','Legs & Back focus toggle'],['#wakeSeg button[data-wk="off"]','lift','screen-awake toggle']]){
+    const r=await press(sel,view);
+    T('AD-S3 a11y-06: the '+lab+' keeps the page in place (no jump to the top) and focus returns to the same control',!!r.got&&!!r.r0&&!!r.r1&&r.r1.same&&Math.abs(r.r1.y-r.r0.y)<=2&&Math.abs(r.r1.top-r.r0.top)<=2&&r.r0.y>50,JSON.stringify(r));}
+  for(const [sel,view,lab,pre] of [['#dayPills .pill[data-d="legsB"]','lift','a Lift day pill'],['#liftBody [data-add]','lift','Add set'],['#radiusSeg button[data-r="45"]','run','the Events radius'],['#marchSeg button[data-mk="edge"]','home','the Home route toggle'],['#liftPhaseSeg button[data-ph="build"]','lift','the programme toggle']]){
+    const r=await press(sel,view);
+    T('AD-S3 a11y-06: after Enter on '+lab+' (which redraws its view) focus is back on the equivalent control',!!r.got&&!!r.r1&&r.r1.same&&r.r1.ae!=='BODY',JSON.stringify(r));}
+  {await tryEval(q,()=>{switchView('lift');});await wait(300);await tryEval(q,()=>{const b=document.querySelector('#liftBody [data-add]');if(b)b.click();});await wait(300);
+   const r=await press('#liftBody [data-del]','lift');
+   T('AD-S3 a11y-06: after Enter on Remove set focus is back on a Remove-set control, not on the page',!!r.got&&!!r.r1&&r.r1.ae!=='BODY'&&/\[data-del=/.test(r.r1.ae||''),JSON.stringify(r));}
+  {await tryEval(q,()=>switchView('track'));await wait(300);
+   const r=await press('#wList .del','track');
+   T('AD-S3 a11y-06: after Enter on a Track delete icon (Undo offered) focus stays in the list, on a delete icon',!!r.got&&!!r.r1&&/^button/.test(r.r1.ae||'')&&/\[data-delw=/.test(r.r1.ae||''),JSON.stringify(r));}
+  await done(q);}
+ // ---- a11y-08 / a11y-09 toast ----
+ {const q=await ctxPage('2026-09-28',{},DEMO);
+  const f=await tryEval(q,()=>{const t=document.getElementById('toast');return {role:t.getAttribute('role'),live:t.getAttribute('aria-live'),atomic:t.getAttribute('aria-atomic')};});
+  T('AD-S3 a11y-08: the toast is a polite live region from first paint, before any message',!!f&&f.role==='status'&&f.live==='polite'&&f.atomic==='true',JSON.stringify(f));
+  const s1=await tryEval(q,()=>{toast('Saved');const t=document.getElementById('toast');const a=[t.getAttribute('role'),t.getAttribute('aria-live')];toast('That did not save',false,true);return {ok:a.join('/'),bad:t.getAttribute('role')+'/'+t.getAttribute('aria-live')};});
+  T('AD-S3 a11y-08: a normal toast is role=status/polite, an error toast is role=alert/assertive, set together with its text',!!s1&&s1.ok==='status/polite'&&s1.bad==='alert/assertive',JSON.stringify(s1));
+  await tryEval(q,()=>{window.__u=0;undoToast('Weigh-in deleted',()=>{window.__u++;});window.__ub=document.querySelector('#toast .undo');});
+  const u1=await tryEval(q,()=>({role:document.getElementById('toast').getAttribute('role'),live:document.getElementById('toast').getAttribute('aria-live'),undo:!!document.querySelector('#toast .undo')}));
+  T('AD-S3 a11y-08: the Undo toast announces itself politely and has a working Undo while it shows',!!u1&&u1.role==='status'&&u1.live==='polite'&&u1.undo,JSON.stringify(u1));
+  let gone=false;for(let i=0;i<40&&!gone;i++){await wait(200);gone=await tryEval(q,()=>document.getElementById('toast').className===''&&document.getElementById('toast').innerHTML==='')===true;}
+  const u2=await tryEval(q,()=>{const b=window.__ub;if(b)b.click();return {n:window.__u,btns:document.querySelectorAll('#toast button').length,txt:document.getElementById('toast').textContent,focusable:!!document.querySelector('#toast [tabindex],#toast button:not([disabled])')};});
+  T('AD-S3 a11y-09: once the toast has faded nothing is left behind (no words, no Undo button) and a stale Undo click runs nothing',gone&&!!u2&&u2.n===0&&u2.btns===0&&u2.txt===''&&!u2.focusable,JSON.stringify({gone,u2}));
+  await done(q);}
+ // ---- a11y-14 focus ring on every kind of control ----
+ {const q=await ctxPage('2026-09-28',{},DEMO);
+  const kinds=[['lift','#liftBody .chk'],['lift','#liftBody .mini'],['lift','#liftBody .hw-tog'],['lift','#locSeg button'],['lift','#dayPills .pill'],['lift','#toolWarm .tool-h'],['lift','#liftBody .btn'],['fuel','.supp-h'],['fuel','#fuelQSeg button'],['numbers','#pAct'],['roadmap','.rweek-h'],['track','.track-tabs button'],['track','#tp-weight .del'],['track','#wAdd'],['home','.card[role=link]'],['home','.cta']];
+  const bad=[];
+  for(const [v,sel] of kinds){await tryEval(q,x=>switchView(x),v);await wait(220);await key(q,'Shift');
+    if(v==='track')await tryEval(q,()=>document.querySelector('.track-tabs [data-tp="weight"]').click());
+    const r=await tryEval(q,s=>{const e=[...document.querySelectorAll(s)].find(x=>x.getClientRects().length);if(!e)return {miss:1};e.focus();return new Promise(res=>setTimeout(()=>{const cs=getComputedStyle(e);res({style:cs.outlineStyle,w:parseFloat(cs.outlineWidth),c:cs.outlineColor,b:cs.borderColor});},300));},sel);
+    const fld=/^(select|input|textarea)$/i.test(sel.split(' ').pop())||sel==='#pAct';
+    if(!r||r.miss||(fld?r.b!=='rgb(255, 197, 61)':(r.style!=='solid'||!(r.w>=2)||r.c!=='rgb(255, 197, 61)')))bad.push(v+' '+sel+' '+JSON.stringify(r));}
+  {const r=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));toast('x');undoToast('Deleted',()=>{});await W(50);const u=document.querySelector('#toast .undo');u.focus();await W(300);const cs=getComputedStyle(u);return {style:cs.outlineStyle,w:parseFloat(cs.outlineWidth),c:cs.outlineColor};});
+   if(!r||r.style!=='solid'||!(r.w>=2)||r.c!=='rgb(255, 197, 61)')bad.push('toast .undo '+JSON.stringify(r));}
+  {const r=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('numbers');await W(200);const i=document.getElementById('pWeight');i.focus();await W(300);const cs=getComputedStyle(i);return {b:cs.borderColor,o:cs.outlineStyle};});
+   if(!r||r.b!=='rgb(255, 197, 61)')bad.push('numbers input '+JSON.stringify(r));}
+  T('AD-S3 a11y-14: every kind of control (ticks, deletes, mini buttons, segments, pills, accordions, links, Undo) draws a 2 px gold focus ring; fields and selects keep the gold border',bad.length===0,bad.join(' | ').slice(0,500));
+  const rt=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const el=document.getElementById('restTimer'),hid=getComputedStyle(el).visibility;startRest(30);await W(500);const shown=getComputedStyle(el).visibility;return {hid,shown};});
+  T('AD-S3 a11y-14: the slid-away rest timer is out of the tab order (visibility hidden) and comes back when a rest starts',!!rt&&rt.hid==='hidden'&&rt.shown==='visible',JSON.stringify(rt));
+  await done(q);}
+ // ---- a11y-15 headings, a11y-18 today, a11y-07 scroll padding ----
+ {const q=await ctxPage('2026-09-28',{},DEMO);
+  const hd=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const out={};for(const v of ['home','lift','run','roadmap','fuel','numbers','track','guide']){switchView(v);await W(180);document.querySelectorAll('#view-'+v+' .tool').forEach(t=>t.classList.add('open'));
+      const hs=[...document.querySelectorAll('#view-'+v+' h1,#view-'+v+' h2,#view-'+v+' h3,#view-'+v+' h4,#view-'+v+' [role=heading]')].filter(h=>h.getClientRects().length);
+      let prev=1,jump=0,titles=0;const lv=[];hs.forEach(h=>{const l=parseInt(h.getAttribute('aria-level')||h.tagName.slice(1),10);lv.push(l);if(l>prev+1)jump++;prev=l;});
+      titles=document.querySelectorAll('#view-'+v+' .card-t').length;const untitled=[...document.querySelectorAll('#view-'+v+' .card-t')].filter(c=>c.getAttribute('role')!=='heading'||!c.getAttribute('aria-level')).length;
+      out[v]={n:hs.length,first:lv[0],jump,untitled,titles};}return out;});
+  T('AD-S3 a11y-15: on all eight views the headings start at level 2 and never skip a level, and every card title is a heading (Home has its own h2)',!!hd&&Object.values(hd).every(x=>x.n>0&&x.first===2&&x.jump===0&&x.untitled===0),JSON.stringify(hd));
+  await tryEval(q,()=>switchView('home'));await wait(250);
+  const wd=await tryEval(q,()=>{const t=[...document.querySelectorAll('.weekstrip .wd')],cur=t.filter(x=>x.getAttribute('aria-current')==='date');return {n:t.length,cur:cur.length,curToday:cur.length===1&&cur[0].classList.contains('today'),sr:cur.length===1&&!!cur[0].querySelector('.sr-only')&&/today/i.test(cur[0].querySelector('.sr-only').textContent),others:t.filter(x=>x.getAttribute('aria-current')).length};});
+  T('AD-S3 a11y-18: the current day in the week strip carries aria-current=date and the word "today" for a screen reader',!!wd&&wd.n===7&&wd.cur===1&&wd.curToday&&wd.sr&&wd.others===1,JSON.stringify(wd));
+  const sp=await tryEval(q,()=>{const cs=getComputedStyle(document.documentElement);return {top:parseFloat(cs.scrollPaddingTop),bottom:parseFloat(cs.scrollPaddingBottom),hdr:document.querySelector('header.app').getBoundingClientRect().bottom};});
+  T('AD-S3 a11y-07: scroll-padding keeps a focused or scrolled-to control clear of the sticky header (top) and the tab bar / rest timer (bottom)',!!sp&&sp.top>=sp.hdr+8&&sp.bottom>=140&&sp.top<=120,JSON.stringify(sp));
+  await q.emulateMediaFeatures([{name:'prefers-reduced-motion',value:'reduce'}]).catch(()=>{});
+  const rm=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('home');await W(250);const calls=[];const o=Element.prototype.scrollIntoView;Element.prototype.scrollIntoView=function(a){calls.push(a&&a.behavior);return o.call(this,{block:a&&a.block||'start'});};goToReview();await W(300);
+      switchView('home');await W(250);const b=[...document.querySelectorAll('button')].find(x=>/Open the full plan/.test(x.textContent));if(b)b.click();await W(500);Element.prototype.scrollIntoView=o;
+      return {calls,nav:getComputedStyle(document.querySelector('nav.tabs')).scrollBehavior,hdr:document.querySelector('header.app').getBoundingClientRect().bottom};});
+  T('AD-S3 a11y-16: with Reduce Motion on, both programmatic scrolls (review, full plan) use behavior auto and the tab bar does not glide',!!rm&&rm.calls.filter(x=>x!=null).length>=2&&rm.calls.filter(x=>x!=null).every(x=>x==='auto')&&rm.nav==='auto',JSON.stringify(rm));
+  await q.emulateMediaFeatures([{name:'prefers-reduced-motion',value:'no-preference'}]).catch(()=>{});
+  const nm=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('home');await W(250);const calls=[];const o=Element.prototype.scrollIntoView;Element.prototype.scrollIntoView=function(a){calls.push(a&&a.behavior);return o.call(this,{block:a&&a.block||'start'});};goToReview();await W(300);Element.prototype.scrollIntoView=o;return calls;});
+  T('AD-S3 a11y-16: without Reduce Motion the review scroll still glides (smooth)',Array.isArray(nm)&&nm.filter(x=>x!=null)[0]==='smooth',JSON.stringify(nm));
+  const land=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('home');await W(250);const c=document.getElementById('reviewCard');if(!c)return null;const t=c.querySelector('.card-t');document.getElementById('reviewCard').scrollIntoView({block:'start'});await W(250);return {hdr:Math.round(document.querySelector('header.app').getBoundingClientRect().bottom),card:Math.round(c.getBoundingClientRect().top),title:t?Math.round(t.getBoundingClientRect().top):null};});
+  T('AD-S3 a11y-07: a card scrolled to the top lands below the sticky header, its title fully visible',!!land&&land.card>=land.hdr&&land.title!==null&&land.title>=land.hdr,JSON.stringify(land));
+  await done(q);}
+ // ---- a11y-11 price table at 320 px ----
+ {const q=await ctxPage('2026-09-28',{},DEMO);
+  const out={};for(const w of [320,300]){await q.setViewport({width:w,height:844});await tryEval(q,()=>switchView('fuel'));await wait(300);
+    out[w]=await tryEval(q,()=>{document.querySelectorAll('#view-fuel .tool').forEach(t=>t.classList.add('open'));const tb=document.querySelector('.price-tbl');if(!tb)return null;const cut=[...tb.querySelectorAll('.pt-row')].filter(r=>{const a=r.lastElementChild.getBoundingClientRect(),b=tb.getBoundingClientRect();return a.right>b.right+0.5||a.left<b.left-0.5;}).length;return {sw:tb.scrollWidth,cw:tb.clientWidth,rows:tb.querySelectorAll('.pt-row').length,cut};});}
+  await q.setViewport({width:390,height:844});
+  T('AD-S3 a11y-11: the price table never cuts its cost column at 320 px or 300 px (Safari page zoom)',!!out[320]&&!!out[300]&&out[320].rows>3&&out[320].sw<=out[320].cw+1&&out[300].sw<=out[300].cw+1&&out[320].cut===0&&out[300].cut===0,JSON.stringify(out));
+  await done(q);}
+ // ---- a11y-12 / a11y-13 contrast ----
+ {const q=await ctxPage('2026-09-28',{});
+  const ct=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const lin=v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);},Lm=c=>0.2126*lin(c[0])+0.7152*lin(c[1])+0.0722*lin(c[2]),cr=(a,b)=>{const x=Lm(a),y=Lm(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);},hex=h=>[1,3,5].map(i=>parseInt(h.trim().slice(i,i+2),16)),over=(f,a,b)=>f.map((v,i)=>v*a+b[i]*(1-a)),num=s=>String(s).match(/[\d.]+/g).map(Number);
+     const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n),t3=hex(css('--text-3')),p3=hex(css('--panel-3')),panel=hex(css('--panel'));
+     const out={t3panel3:cr(t3,p3),t3panel:cr(t3,panel),t3band:cr(t3,over([255,197,61],.14*(1-70/356),panel)),t3rest:cr(t3,over([157,140,255],.12*(1-70/356),panel))};
+     switchView('lift');await W(400);const cell=document.querySelector('#liftBody .cell:not(.filled)'),ph=getComputedStyle(cell,'::placeholder'),bg=num(getComputedStyle(cell).backgroundColor).slice(0,3),fg=num(ph.color).slice(0,3);out.placeholder=cr(over(fg,parseFloat(ph.opacity),bg),bg);
+     switchView('home');await W(300);const chip=[...document.querySelectorAll('#view-home span')].find(x=>/^!\s*waist/.test(x.textContent.trim()));if(chip){const fgc=num(getComputedStyle(chip).color).slice(0,3),bgc=num(chip.style.background||getComputedStyle(chip).backgroundColor);out.chip=cr(fgc,over(bgc.slice(0,3),bgc[3]==null?1:bgc[3],p3));}return out;});
+  T('AD-S3 a11y-13: --text-3 reaches 4.5:1 on --panel-3, on the panels and on the tinted Today bands',!!ct&&ct.t3panel3>=4.5&&ct.t3panel>=4.5&&ct.t3band>=4.5&&ct.t3rest>=4.5,JSON.stringify(ct));
+  T('AD-S3 a11y-12: the progression target in an empty set cell (the placeholder) reaches 4.5:1',!!ct&&ct.placeholder>=4.5,JSON.stringify(ct&&ct.placeholder));
+  // review repair: the dashed "Fill" suggestion (.cell.pending) is the same progression target as the placeholder and must reach 4.5:1 too
+  const pn=await tryEval(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('lift');await W(400);const cell=document.querySelector('#liftBody input.cell');if(!cell)return null;cell.value='82.5';cell.classList.add('pending');await W(50);
+     const lin=v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);},Lm=c=>0.2126*lin(c[0])+0.7152*lin(c[1])+0.0722*lin(c[2]),cr=(a,b)=>{const x=Lm(a),y=Lm(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);},num=s=>String(s).match(/[\d.]+/g).map(Number),over=(f,a,b)=>f.map((v,i)=>v*a+b[i]*(1-a));
+     const cs=getComputedStyle(cell),op=parseFloat(cs.opacity),tray=num(getComputedStyle(cell.closest('.ex')).backgroundColor).slice(0,3),cbg=num(cs.backgroundColor).slice(0,3),fg=num(cs.color).slice(0,3);
+     const bg=over(cbg,op,tray);return {op,ratio:cr(over(fg,op,tray),bg)};});
+  T('AD-S3 review: the dashed Fill suggestion (.cell.pending) reaches 4.5:1 on its tray and is still dimmer than a typed value',!!pn&&pn.ratio>=4.5&&pn.op<1,JSON.stringify(pn));
+  T('AD-S3 pw-a11y-05: the red baseline-tape chip text reaches 4.5:1 on its own tint (it stays red)',!!ct&&ct.chip>=4.5,JSON.stringify(ct&&ct.chip));
+  await done(q);}
+ // ---- found while naming the field: the Quick log Edit button threw a syntax error ----
+ {const q=await ctxPage('2026-09-28',{cb2_weight:[{date:'2026-09-28',v:88.4}]});
+  await tryEval(q,()=>switchView('home'));await wait(300);
+  const ed=await tryEval(q,()=>{const b=[...document.querySelectorAll('#view-home button')].find(x=>x.textContent==='Edit');if(!b)return {nobtn:1};b.click();const i=document.getElementById('qW');return {input:!!i&&i.tagName==='INPUT',label:i&&i.getAttribute('aria-label'),btn:b.textContent};});
+  T('AD-S3 (found on the way): the Quick log Edit button turns the logged value into a named field and its button into Save (it used to throw)',!!ed&&ed.input===true&&ed.label==='Weight (kg)'&&ed.btn==='Save'&&q.__errs.filter(e=>!/localStorage/.test(e)).length===0,JSON.stringify({ed,errs:q.__errs.slice(0,2)}));
+  const ql=await tryEval(q,()=>{const a=document.getElementById('qWa');return a&&a.getAttribute('aria-label');});
+  T('AD-S3 a11y-03: the Quick log waist field is named too',ql==='Waist (cm)',String(ql));
   await done(q);}
 }
 
