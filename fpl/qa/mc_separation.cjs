@@ -60,7 +60,7 @@ const ok = (name, cond, detail, show) => {
   fail++; console.log("FAIL " + name + (detail ? " — " + detail : ""));
   return false;
 };
-const redLine = (name, cond, detail) => (cond ? null : "FAIL " + name + (detail ? " — " + detail : ""));
+const redLine = (name, cond, detail) => (cond ? null : "RED " + name + (detail ? " — " + detail : ""));
 const finish = () => { console.log("SUITE mc_separation " + pass + "/" + (pass + fail)); process.exit(fail ? 1 : 0); };
 const readJson = (rel) => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, rel), "utf8")); } catch (e) { return null; } };
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -98,8 +98,8 @@ try {
 const appRequire = Module.createRequire(path.join(ROOT, "package.json"));
 const React = appRequire("react"), RDS = appRequire("react-dom/server");
 const FNS = MOD.exports.__FNS__ || {}, B = MOD.exports.__MC__ || {}, LIVE = MOD.exports.__LIVE__, TABS = MOD.exports.__TABS__ || [];
-const NEED = ["GwActionCard", "TabCommand", "TabPlan", "TabDraft", "buildPlan", "buildCtx", "sanitiseState"];
-ok("the assembled app evaluates under the real React and exposes the four surfaces and their props builders",
+const NEED = ["GwActionCard", "TabCommand", "TabPlan", "TabDraft", "TabSquad", "TabRivals", "TabChips", "buildPlan", "buildCtx", "sanitiseState"];
+ok("the assembled app evaluates under the real React and exposes the seven surfaces and their props builders",
   !loadErr && NEED.every((n) => typeof FNS[n] === "function") && !!LIVE && !!B.MC && !!B.MCEngine, loadErr || NEED.filter((n) => typeof FNS[n] !== "function").join(","));
 if (loadErr || !NEED.every((n) => typeof FNS[n] === "function") || !B.MCEngine) finish();
 
@@ -116,7 +116,11 @@ const SURFACES = [
   { name: "landing card", tab: null, el: "GwActionCard", props: (o) => ({ plan: PLAN_C, ctx: CTX, mode: o ? "full" : "simple", reveals: o ? allOpenExcept([]) : {}, onReveal: noop, onConfirm: noop, mc: MCP }) },
   { name: "Command tab", tab: "command", el: "TabCommand", props: (o) => ({ ctx: CTX, ui: ui("command", o), on: ON, mc: MCP }) },
   { name: "Plan tab", tab: "plan", el: "TabPlan", props: (o) => ({ ctx: CTX, ui: ui("plan", o), on: ON, plan: PLAN_C, onConfirm: noop, mc: MCP }) },
-  { name: "Draft tab", tab: "draft", el: "TabDraft", props: (o) => ({ ctx: CTX, ui: ui("draft", o), on: ON, state: STATE, onLeague: noop, mc: MCP }) }
+  { name: "Draft tab", tab: "draft", el: "TabDraft", props: (o) => ({ ctx: CTX, ui: ui("draft", o), on: ON, state: STATE, onLeague: noop, mc: MCP }) },
+  /* Audit F-06: the three Classic-only tabs are rendered too, so the unlabelled count is armed over them as well. */
+  { name: "Squad tab", tab: "squad", el: "TabSquad", props: (o) => ({ ctx: CTX, ui: ui("squad", o), on: ON, onConfirm: noop, mc: MCP }) },
+  { name: "Rivals tab", tab: "rivals", el: "TabRivals", props: (o) => ({ ctx: CTX, ui: ui("rivals", o), on: ON, plan: PLAN_C, simLeague: 0, onSimLeague: noop, onConfirm: noop, mc: MCP }) },
+  { name: "Chips tab", tab: "chips", el: "TabChips", props: (o) => ({ ctx: CTX, ui: ui("chips", o), on: ON, plan: PLAN_C, onConfirm: noop, mc: MCP }) }
 ];
 const RENDERS = [];
 SURFACES.forEach((s) => [false, true].forEach((o) => {
@@ -125,7 +129,7 @@ SURFACES.forEach((s) => [false, true].forEach((o) => {
   RENDERS.push({ s: s, open: o, label: s.name + (o ? ", everything open" : ", first paint"), html: html, err: err });
 }));
 const broken = RENDERS.filter((r) => !r.html);
-ok("the four surfaces render at first paint and with everything open (" + RENDERS.length + " renders, " + RENDERS.reduce((a, r) => a + (r.html ? r.html.length : 0), 0) + " characters)",
+ok("the seven surfaces render at first paint and with everything open (" + RENDERS.length + " renders, " + RENDERS.reduce((a, r) => a + (r.html ? r.html.length : 0), 0) + " characters)",
   broken.length === 0, broken.map((r) => r.label + ": " + r.err).join("; "));
 
 /* ---- a small HTML reader for react-dom/server's well-formed output ---- */

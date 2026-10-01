@@ -12,7 +12,7 @@
 #   A    cheap and deterministic  privacy · no_frozen · visual
 #   B    data                     validate_live · waiver_log · prices · verify.sh · pull_guard
 #   C    engine and render        unit_engine · components          (node, no browser)
-#   D    browser                  smoke · smoke_wk · realistic · buttons · webkit · browser.py
+#   D    browser                  smoke · smoke_wk · realistic · buttons · webkit · ios · browser.py
 #   E    million-iteration        mc_full · mc_all
 #
 # Cheapest and most deterministic first: measured on the dev machine 26 September 2026, group A
@@ -233,6 +233,9 @@ jobs:
       - name: webkit (Safari-engine acceptance)
         run: node qa/webkit.js 2>&1 | tee -a "$GATE_LOG"
 
+      - name: ios (iOS 27 acceptance on iPhone 17 profiles, WebKit)
+        run: IOS_SHOTS="$RUNNER_TEMP/ios-shots" node qa/ios.cjs 2>&1 | tee -a "$GATE_LOG"
+
       # E5 phone render, 390x844 in light and dark. Python, so its exit code is captured and
       # reported explicitly; a missing interpreter or a missing Playwright is a named FAIL and
       # never a silent skip. qa/browser.py takes no arguments.
@@ -259,11 +262,10 @@ jobs:
 
       # ---------------------------------------------------------------- verdict
 
-      - name: No "FAIL" in the combined log
+      - name: No line starting FAIL in the combined log
         if: always()
         run: |
           if [ ! -s "$GATE_LOG" ]; then echo "gate log missing or empty"; exit 1; fi
-          if grep -n "FAIL" "$GATE_LOG"; then
-            echo "literal FAIL found in the combined suite log"; exit 1
-          fi
-          echo "no FAIL in combined log"
+          # Anchored at line start (E-141): mutation proofs quote the check they turned red and must not count.
+          bash qa/fail_scan.sh --self-test
+          bash qa/fail_scan.sh "$GATE_LOG"

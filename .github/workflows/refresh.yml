@@ -420,11 +420,12 @@ jobs:
       - name: No "FAIL" in any gate log
         if: steps.diff.outputs.changed == '1'
         run: |
-          if grep -rn "FAIL" "$RF_LOGS/gate"; then
+          bash qa/fail_scan.sh --self-test
+          if ! bash qa/fail_scan.sh "$RF_LOGS/gate"; then
             echo "::error title=A gate log printed FAIL::nothing was pushed"
             exit 1
           fi
-          echo "no FAIL in $(find "$RF_LOGS/gate" -name '*.log' | wc -l) gate logs"
+          echo "swept $(find "$RF_LOGS/gate" -name '*.log' | wc -l) gate logs"
 
       # ------------------------------------------------------------------ 8. the note, the branch, the pull request
       - name: Write the note (pipeline/refresh_note.cjs)

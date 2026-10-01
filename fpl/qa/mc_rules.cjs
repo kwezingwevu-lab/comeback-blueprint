@@ -75,7 +75,7 @@ const ok = (name, cond, detail, show) => {
   fail++; console.log("FAIL " + name + (detail ? " — " + detail : ""));
   return false;
 };
-const redLine = (name, cond, detail) => (cond ? null : "FAIL " + name + (detail ? " — " + detail : ""));
+const redLine = (name, cond, detail) => (cond ? null : "RED " + name + (detail ? " — " + detail : ""));
 const finish = () => { console.log("SUITE mc_rules " + pass + "/" + (pass + fail)); process.exit(fail ? 1 : 0); };
 const readJson = (rel) => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, rel), "utf8")); } catch (e) { return null; } };
 const clone = (o) => JSON.parse(JSON.stringify(o));

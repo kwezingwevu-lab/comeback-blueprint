@@ -19,7 +19,7 @@
 #   A  cheap + deterministic   privacy · no_frozen · visual
 #   B  data                    validate_live · waiver_log · prices · verify.sh · pull_guard
 #   C  engine + render         unit_engine · components        (node, no browser)
-#   D  browser                 smoke · smoke_wk · realistic · buttons · webkit · browser.py
+#   D  browser                 smoke · smoke_wk · realistic · buttons · webkit · ios · browser.py
 #   E  million-iteration       mc_full · mc_all
 #
 # WHAT THE ORDER COSTS, measured on this machine on 26 September 2026 — twice, because the two
@@ -137,7 +137,7 @@ suite order
     A privacy · no_frozen · visual
     B validate_live · waiver_log · prices · verify.sh · pull_guard
     C unit_engine · components
-    D smoke · smoke_wk · realistic · buttons · webkit · browser.py
+    D smoke · smoke_wk · realistic · buttons · webkit · ios · browser.py
     E mc_full · mc_all
 USAGE
 }
@@ -670,6 +670,7 @@ node_suite qa/smoke_wk.cjs
 node_suite qa/realistic.cjs
 node_suite qa/buttons.cjs
 node_suite qa/webkit.js
+node_suite qa/ios.cjs             # iOS 27 acceptance: iPhone 17 profiles in WebKit, light and dark, both orientations (G-03)
 py_suite   qa/browser.py          # E5 phone render: 390×844, light and dark, every tab
 
 # ---------------------------------------------------------------- E. the million-iteration suites

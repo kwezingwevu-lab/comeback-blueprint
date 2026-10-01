@@ -60,7 +60,7 @@ const ok = (name, cond, detail, show) => {
   return false;
 };
 /* The line ok() would print for a failing check, without counting it: how a mutation quotes its red line. */
-const redLine = (name, cond, detail) => (cond ? null : "FAIL " + name + (detail ? " — " + detail : ""));
+const redLine = (name, cond, detail) => (cond ? null : "RED " + name + (detail ? " — " + detail : ""));
 const finish = () => { console.log("SUITE mc_data " + pass + "/" + (pass + fail)); process.exit(fail ? 1 : 0); };
 const readJson = (rel) => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, rel), "utf8")); } catch (e) { return null; } };
 const clone = (o) => JSON.parse(JSON.stringify(o));
