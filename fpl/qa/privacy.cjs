@@ -260,5 +260,56 @@ if (scrub && typeof scrub.scrubNames === "function") {
     innocentHits === 0, "found " + innocentHits);
 }
 
+/* BY VALUE (E-141). The key scan above cannot see a name typed into prose: one rival's full name sat in CLAUDE.md for
+   weeks (audit P-04). When the raw feeds are present (pipeline/feeds, ignored by git), every rival's first and last
+   name pair is read from them at run time and every tracked text file is searched for it. The names are never written
+   anywhere. The manager's own two entries are left out, since his name is his. On a clean checkout (CI) the feeds are
+   absent, and the suite says the by-value scan did not run instead of passing it. */
+{
+  const FEEDS = path.join(ROOT, "pipeline", "feeds");
+  const OWN = new Set([279275, 3546875]);
+  const names = new Set(), ownNames = new Set(), teamNames = [];
+  /* A full name is two or more words of two or more letters each: an initial ("J Smith") or a nickname with one
+     word is not searched, because short tokens match ordinary English. */
+  const full = (x) => { const t = String(x || "").trim().replace(/\s+/g, " "); return t.split(" ").length >= 2 && t.split(" ").every((w) => w.length >= 2) ? t.toLowerCase() : null; };
+  function harvest(o) {
+    if (!o || typeof o !== "object") return;
+    if (Array.isArray(o)) { o.forEach(harvest); return; }
+    const own = OWN.has(o.entry) || OWN.has(o.entry_id) || OWN.has(o.id);
+    const got = [];
+    if (typeof o.player_first_name === "string" && typeof o.player_last_name === "string") got.push(full(o.player_first_name + " " + o.player_last_name));
+    if (typeof o.player_name === "string") got.push(full(o.player_name));
+    got.filter(Boolean).forEach((n) => (own ? ownNames : names).add(n));
+    if (typeof o.entry_name === "string") teamNames.push(o.entry_name.toLowerCase());
+    for (const k in o) if (o[k] && typeof o[k] === "object") harvest(o[k]);
+  }
+  let feedFiles = [];
+  try { feedFiles = fs.readdirSync(FEEDS).filter((f) => /\.json$/.test(f)); } catch (e) { feedFiles = []; }
+  feedFiles.forEach((f) => { try { harvest(JSON.parse(fs.readFileSync(path.join(FEEDS, f), "utf8"))); } catch (e) { /* unreadable feed */ } });
+  ownNames.forEach((n) => names.delete(n));   // the manager's own name appears in other leagues' tables too
+  // A "name" that is part of a team name ("PEF League" on "Team PEF League") is a team label, which may be committed.
+  names.forEach((n) => { if (teamNames.some((t) => t.indexOf(n) !== -1)) names.delete(n); });
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const scanText = (text, set) => { const low = text.toLowerCase(); let n = 0; set.forEach((nm) => { if (low.indexOf(nm) !== -1 && new RegExp("(^|[^a-z])" + esc(nm) + "($|[^a-z])").test(low)) n++; }); return n; };
+  if (!feedFiles.length || !names.size) {
+    console.log("NOTE privacy by-value scan did not run: no raw feeds in pipeline/feeds (run pipeline/pull.sh); the key scan above still ran");
+  } else {
+    const textFiles = (tracked || []).filter((rel) => !/\.(png|jpg|jpeg|gif|ico|woff2?|pdf|zip|pyc)$/i.test(rel) && !/^node_modules\//.test(rel));
+    const found = [];
+    let read = 0;
+    textFiles.forEach((rel) => {
+      let t; try { t = fs.readFileSync(path.join(ROOT, rel), "utf8"); } catch (e) { return; }
+      read++;
+      const n = scanText(t, names);
+      if (n) found.push(rel + " (" + n + ")");
+    });
+    ok("no rival manager's full name, read from the raw feeds, appears in any tracked file (prose and code included)",
+      found.length === 0, names.size + " names from " + feedFiles.length + " feeds over " + read + " files" + (found.length ? "; found in " + found.join(", ") : ""));
+    const first = names.values().next().value;
+    ok("mutation: a name from the feeds planted in prose is found by the by-value scan",
+      scanText("notes: the admin is " + first.toUpperCase() + ".", names) === 1, "planted one, the scan must see one");
+  }
+}
+
 console.log("SUITE privacy " + pass + "/" + (pass + fail) + " · " + scanned.length + " files · " + totalBytes + " bytes");
 process.exit(fail ? 1 : 0);
