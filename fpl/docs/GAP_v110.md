@@ -41,8 +41,11 @@ walked the working tree, where tracked and untracked look identical. Closed agai
 scope is `git ls-files`, the ignore rule is proved with `git check-ignore`, and the offending commit
 was rewritten rather than followed by a deletion. `qa/privacy.cjs` **25/25**.
 
-Still open, and the manager's call: the 84 rival names in `data/live.json` in commits **before**
-`baac4bc`. Removing those means rewriting further back than my own work.
+Still open, and the manager's call (measured 1 Oct 2026): the repository is public and rival names
+remain fetchable in its history, not only the 84 in `data/live.json` before `baac4bc` but also in
+`dist/`, `app/`, the Draft fixtures and qa files (`2f419d5`..`cd5bdb1`), PR #2's head ref, the
+pre-rewrite commit `9261b148` (API answers 200 by SHA) and the v87 page Pages serves from `main`.
+The scope table and the three routes are in RETEST_v110.md under E-091.
 
 ### P0 · The baseline gate is red — **closed**
 

@@ -781,6 +781,20 @@ check("REFRESH-applyRefresh-applies-a-good-payload-without-mutating-the-input", 
   const applied = ns.live.elements[0].status === "d" && ns.live.elements[0].chance === 75;
   return { ok: untouched && applied && ns !== st, detail: "input untouched=" + untouched + " applied=" + applied };
 });
+/* Audit SEC-02: a web-search reply cannot move the official deadline or swing a price; the rest of it still applies,
+   and every patched player is marked as coming from the model. */
+check("REFRESH-applyRefresh-keeps-the-official-deadline-and-bounds-a-price-move-SEC-02", function () {
+  const st = refreshState(), DL = st.live.events[0].deadline_time, C1 = st.live.elements[0].now_cost, C2 = st.live.elements[1].now_cost;
+  const at = function (ms) { return new Date(Date.parse(DL) + ms).toISOString(); };
+  const ns = E.applyRefresh(st, { deadline_time: at(2 * 3600000), elements: [{ id: 1, status: "i", chance: 0, now_cost: C1 }, { id: 2, now_cost: C2 + 6 }] });
+  const dl = ns.live.events[0].deadline_time, p1 = ns.live.elements[0], p2 = ns.live.elements[1];
+  const okDl = dl === DL && ns.live.refreshed.skipped.some(function (x) { return /deadline/.test(x); });
+  const okPrice = p2.now_cost === C2 && ns.live.refreshed.skipped.some(function (x) { return /price for id 2/.test(x); });
+  const okRest = p1.status === "i" && p1.chance === 0 && p1.refresh_src === "model" && ns.live.refreshed.src === "model";
+  const near = E.applyRefresh(refreshState(), { deadline_time: at(5 * 60000), elements: [{ id: 1, now_cost: C1 + 2 }] });
+  const okNear = near.live.events[0].deadline_time === DL && near.live.elements[0].now_cost === C1 + 2 && near.live.refreshed.skipped.length === 0;
+  return { ok: okDl && okPrice && okRest && okNear, detail: "deadline " + dl + " · price " + p2.now_cost + " · status " + p1.status + " · near-confirmation clean " + okNear };
+});
 check("REFRESH-applyRefresh-never-mutates-on-a-bad-status", function () {
   const st = refreshState(), before = JSON.stringify(st);
   let threw = false, msg = "";
@@ -3266,7 +3280,17 @@ if (!LIVE) {
       t.ok === (t.max <= t.limit) && t.max >= t.maxAdjusted &&
       Math.abs(t.margin - (t.limit - t.max)) < 1e-9 &&
       (!t.worst || (t.worst.p === t.max && t.worst.pAdjusted <= t.worst.p));
-    return { ok: ok, detail: t.thin + " players at the incumbent floor · worst raw " +
+    /* Audit G-11: the fields above can only agree with each other. An independent oracle: the worst thin row's raw
+       probability must equal what the production path (minutesModel, on a context built from the same snapshot)
+       gives the same player, the limit must be the 0.50 the ledger names, and the flag can only lower it. */
+    let oracle = "no thin row", oracleOk = true;
+    if (t.worst) {
+      const mm = E.minutesModel(LCTX.els[t.worst.id], LCTX, {});
+      oracleOk = !!mm && mm.fitted === true && Math.abs(mm.pModel - t.worst.p) < 1e-9;
+      oracle = "minutesModel gives " + (mm && isFinite(mm.pModel) ? r4(mm.pModel) : "nothing") + " for the same row";
+    }
+    const okAll = ok && oracleOk && t.limit === 0.5 && t.ok === (t.max <= 0.5);
+    return { ok: okAll, detail: oracle + " · " + t.thin + " players at the incumbent floor · worst raw " +
       (t.worst ? t.worst.name + " " + r4(t.worst.p) : "none") + " against a limit of " + t.limit +
       " (margin " + r4(t.margin) + ") · flag-adjusted maximum " + r4(t.maxAdjusted) +
       " → the condition " + (t.ok ? "holds" : "fails") };

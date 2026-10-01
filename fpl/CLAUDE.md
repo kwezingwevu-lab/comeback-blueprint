@@ -18,7 +18,7 @@
 |---|---|
 | Manager | **Kwezi Ngwevu**, Noordhang, Randburg, South Africa · SAST = UTC+2 |
 | Classic | entry **3546875**, "Kwezi's Team" · ~10.66m managers |
-| Draft | "**Yoh-Nited**", Champions League Draft Pool B · 7 teams · H2H · no captain · admin Vince Mahloko |
+| Draft | "**Yoh-Nited**", Champions League Draft Pool B · 7 teams · H2H · no captain · admin: the league's own admin entry (no name, §1.5) |
 | Objective | **Win the overall competition, every mini-league, and the draft pool.** Not top 10k. First. |
 | Winnable leagues (≤40) | Forecast to Glory 7 (rank 5) · Nineteen45 11 (4) · Marvelous Matchups 17 (15) · Champions League Mini 23 (22) · Gentlemen's Sport Bar 24 (20) · Champions League!! 2026/27 28 (25) |
 | Record to v86 | GW1 58 (field 50) · GW2 70 (81, captain error −8) · GW3 50 (51, transfers not made) · 21 bench points wasted · rank 5,081,397 · −4 vs field cumulative |
@@ -362,23 +362,25 @@ A recurrence is a new entry referencing the old one, and the RULE is strengthene
 
 ---
 
-# PART M — CURRENT PLAN (v110 · 2026-09-28 · verify before trusting)
+# PART M — CURRENT PLAN (v110 · 2026-10-01 · verify before trusting)
 > The plan of record is `data/plan.json` (the optimiser's, replayed from the rules) and `data/weekly.js`, which
 > `pipeline/weekly.cjs` writes from it. Nothing here is an input: this block is the human-readable copy, generated
 > from those files at the moment of writing, dated, and it carries the record of the plan it replaced.
 
-**What happened to the v89 plan.** It recommended Wildcard 1 in GW6 with a heuristic fifteen (captain Groß)
-and was superseded on 27 Sep, before the deadline, by the solved plan; never played. Held unchanged to GW19
-with its best eleven and captain each week, the v89 fifteen is worth 805.4 Classic expected points by the ported engine,
-the solved fifteen 856.1 (both measured on 27 Sep's block).
+**What happened to the plans before this one.** The v89 plan (Wildcard 1 in GW6 with a heuristic fifteen, captain Groß) was
+superseded on 27 Sep by the solved plan, never played; held unchanged to GW19 its fifteen is worth 805.4 against the solved fifteen's 856.1
+(27 Sep's block). The 28 Sep solved plan (903.39; Wildcard GW6, Bench Boost GW7, Triple Captain GW8, captain Saka; buys included Trafford
+and Mykolenko, £0.6m in the bank) was superseded on 1 Oct, before the deadline, when prices and flags moved the export hash; never played.
+Today's plan keeps the GW6 wildcard and the captain, buys Leno with Benitez and Branthwaite where it bought Trafford and Mykolenko, and moves
+the Triple Captain to GW7 and the Bench Boost to GW9.
 
-**Classic GW6: play Wildcard 1** (deadline Sat 10 Oct 12:00 SAST). 12 of fifteen change. Sell Diop, Shaw, Rogers, Brobbey, Semenyo, Verbruggen, van Ewijk, Kinsky, Szoboszlai, Hughes, Calvert-Lewin, Konsa; buy Janelt, Groß, Thomas, Tarkowski, Mykolenko, Barry, Leno, Stach, Trafford, Mbeumo, Hall, Gonzalo. Gabriel, Saka, Haaland stay. Captain **Saka**, vice **Gabriel**. £0.6m in the bank, 4 free transfers kept (a wildcard week keeps the count). Then **Bench Boost GW7** on Haaland and **Triple Captain GW8** on Haaland; the free hit is held (best week GW14, +4.09). The plan is worth 903.39 Classic expected points to GW19, proved within 0.18% of the best possible (certified by the wildcard now's bound). Wildcard in GW7 instead: 901.52 (-1.87, a difference inside the tolerance of about 4 points, so tie-breakers decide: the injury news lands before the deadline and the 4 free transfers survive the chip). Never: 889.69 (-13.70). Haaland is the one declared lock (over the C1.6 rival-ownership gate). **Fallback without the chip** is the app's own C2 protocol, because the optimiser's no-wildcard week sells Shaw, whom the Konsa rule protects.
+**Classic GW6: play Wildcard 1** (deadline Sat 10 Oct 12:00 SAST). 12 of fifteen change. Sell Diop, Shaw, Rogers, Brobbey, Semenyo, Verbruggen, van Ewijk, Kinsky, Szoboszlai, Hughes, Calvert-Lewin, Konsa; buy Janelt, Groß, Thomas, Benitez, Tarkowski, Branthwaite, Barry, Leno, Stach, Mbeumo, Hall, Gonzalo. Gabriel, Saka, Haaland stay. Captain **Saka**, vice **Gabriel**. £0.1m in the bank, 4 free transfers kept (a wildcard week keeps the count). Then **Triple Captain GW7** on Haaland and **Bench Boost GW9** on Haaland; the free hit is held (best week GW8, +4.11). The plan is worth 904.07 Classic expected points to GW19, proved within 0.38% of the best possible (certified by the wildcard now's bound). Wildcard in GW7 instead: 899.87 (-4.20, a gap larger than the proof's tolerance of 3.6 points, so playing it now is proved better, though only just; the injury news landing before the deadline and the 4 free transfers surviving the chip point the same way). Never: 889.86 (-14.21). Haaland is the one declared lock (over the C1.6 rival-ownership gate). Benitez is bought under CLAUDE.md B3's floor (2 of 3 starts, P(start) 0.35): the solver's choice, flagged rather than hidden. **Fallback without the chip** is the app's own C2 protocol, because the optimiser's no-wildcard week sells Shaw, whom the Konsa rule protects.
 
-**Draft GW6: 12 claims** (waivers settle Fri 9 Oct 12:00 SAST; trades close Thu 8 Oct 12:00 SAST). Lodge in this order: Silva for Dunk, Evanilson for Isidor, Mukiele for Davis, E.Le Fée for Belloumi, Hill for Bogle, McBurnie for Igor Jesus, Cunha for King; then the backups Schuster (Dunk), Fernandez-Pardo (Isidor), Justin (Davis), Buendía (Belloumi), Thomas (Bogle). Mainoo for Janelt (d 75%) is held back as flagged; re-check after Thursday's pressers. Worth 637.6 Draft expected points to GW20 under the stress test, a mean of 640.6 over 1500 simulated waiver runs, against 596.2 today.
+**Draft GW6: 12 claims** (waivers settle Fri 9 Oct 12:00 SAST; trades close Thu 8 Oct 12:00 SAST). Lodge in this order: Silva for Dunk, Evanilson for Isidor, Mukiele for Davis, E.Le Fée for Belloumi, Hill for Bogle, McBurnie for Igor Jesus, Cunha for King; then the backups Schuster (Dunk), Fernandez-Pardo (Isidor), Justin (Davis), Buendía (Belloumi), Thomas (Bogle). Mainoo for Janelt (d 75%) is held back as flagged; re-check after Thursday's pressers. Worth 637.7 Draft expected points to GW20 under the stress test, a mean of 640.6 over 1500 simulated waiver runs, against 596.2 today.
 
-**Flags on both fifteens (2026-09-28):** Classic — Semenyo d 75%, Brobbey d 75%, van Ewijk d 75%. Draft — Dunk d 75%. The plan's fifteen carries no flagged player.
+**Flags on both fifteens (2026-10-01):** Classic — Semenyo d 75%, Brobbey d 75%, van Ewijk d 75%. Draft — Dunk d 75%. The plan's fifteen carries no flagged player.
 
-**Chips:** all four of both sets unused. Set 1 expires at the GW19 deadline. **Tournament:** `player_xg` leads and drives nothing until its hold-out reaches two gameweeks. **F4:** the minutes logistic has passed the shared gate on Brier and the app has not been promoted onto it (ERRORS.md E-087, open, deliberate).
+**Chips:** all four of both sets unused. Set 1 expires at the GW19 deadline. **Tournament:** `player_xg` leads and drives nothing until its hold-out reaches two gameweeks. **F4:** the minutes logistic clears the shared gate on Brier but fails the tail condition once its thin rows are scored for the real next gameweek (Fatawu 0.627 against a 0.50 limit), so it is not eligible and P(start) stays the Laplace rate (ERRORS.md E-143, which corrects E-087).
 
 ---
 

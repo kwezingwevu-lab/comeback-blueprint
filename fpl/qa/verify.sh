@@ -344,10 +344,14 @@ if(!fs.existsSync(f)){console.log(f+" does not exist");process.exit(1);}
 const s=fs.readFileSync(f,"utf8");
 const m=s.match(/const APP_VERSION = "(v[0-9]+)";/);
 if(!m){console.log("no APP_VERSION stamp in "+f);process.exit(1);}
-const distOk=!fs.existsSync("dist/index.html")||fs.readFileSync("dist/index.html","utf8").includes(want);
-console.log("APP_VERSION "+m[1]+", package.json "+pkg.version+" → "+want+(distOk?", dist stamped":", dist NOT stamped"));
-process.exit(m[1]===want&&distOk?0:1);' 2>&1 | tail -1)"
-if printf '%s' "$ver_out" | grep -q "dist stamped"; then ok "app-version-stamped-and-equals-package-major" "$ver_out"
+const distOk=!fs.existsSync("dist/index.html")||fs.readFileSync("dist/index.html","utf8").includes("<title>FPL Mission Control "+want+"</title>");
+/* Audit F-08: package.json and the stamp read the same number, so they cannot disagree. The weekly block names the
+   version it was written for, independently; the shipped major must equal it. */
+let wk=null;try{const t=fs.readFileSync("data/weekly.js","utf8");const w=t.match(/version:\s*([0-9]+),\s*gw:/);wk=w?"v"+w[1]:null;}catch(e){}
+const okAll=m[1]===want&&distOk&&wk===want;
+console.log("APP_VERSION "+m[1]+", package.json "+pkg.version+" → "+want+", weekly block "+(wk||"none")+(distOk?", dist title stamped":", dist title NOT stamped")+(okAll?" · agree":" · DISAGREE"));
+process.exit(okAll?0:1);' 2>&1 | tail -1)"
+if printf '%s' "$ver_out" | grep -q " · agree$"; then ok "app-version-stamped-and-equals-package-major" "$ver_out"
 else bad "app-version-stamped-and-equals-package-major" "$ver_out"; fi
 
 # I7 · every suite named by CONTRACT §1 is present in qa/ (E-014: a workspace reset once wiped them)

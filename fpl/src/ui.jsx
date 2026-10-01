@@ -145,6 +145,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 .blut{color:var(--blu)}
 .tag{display:inline-block;max-width:100%;padding:1px 6px;border-radius:6px;font-size:11px;border:1px solid var(--line);background:var(--bg);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row>.tag{text-align:center}
+.sec-game{margin-left:8px;vertical-align:1px}
 .tag-e{border-color:var(--grn2);color:var(--grn)}
 .tag-s{border-color:var(--line);color:var(--blu)}
 .tag-d{border-color:var(--pnk2);color:var(--pnk)}
@@ -417,9 +418,12 @@ function landOn(sectionId) {
    check for a newer build, so its outcomes are worded for that: okMsg is the "Nothing newer" note the check leaves when
    the server holds no newer build, and a check that ended with neither an error nor that note found one. */
 function refreshMessage(err, dist, okMsg, gw) {
-  if (err) return "Refresh failed: " + String(err).replace(/\s+/g, " ").trim().slice(0, 60);
-  if (dist) return okMsg ? "Nothing newer. GW" + gw + " data is the latest." : "A newer build was found.";
-  return "Refreshed, GW" + gw + " data";
+  /* Only a string or an Error is said aloud as the reason, and only a whole gameweek number is named (mc_full P07). */
+  const why = typeof err === "string" ? err : err instanceof Error ? err.message : "";
+  const g = typeof gw === "number" && isFinite(gw) && gw === Math.floor(gw) && gw > 0 ? "GW" + gw + " " : "";
+  if (err) return "Refresh failed" + (why.trim() ? ": " + why.replace(/\s+/g, " ").trim().slice(0, 60) : ".");
+  if (dist) return okMsg ? "Nothing newer. " + (g ? g + "data is" : "This data is") + " the latest." : "A newer build was found.";
+  return "Refreshed" + (g ? ", " + g + "data" : "");
 }
 /* Safari 27 speaks through ariaNotify; where it exists it is called once and the status region stays empty. The
    caller writes the region only when this returns false, so exactly one path speaks. */
@@ -863,13 +867,34 @@ class Boundary extends React.Component {
   }
 }
 
+/* Audit F-02 / F-03: wherever the app's own quick model shows a fifteen, a captain or a chip verdict, and the solved
+   plan stands on the landing card (same test, landingPlanView), one line says what the plan of record is and that the
+   figures below are a second opinion. With the plan set aside, nothing is added: the app's own model is the plan. */
+function solvedChipsText(mc) {
+  try {
+    const CHIP = { wildcard: "Wildcard", freehit: "Free Hit", bboost: "Bench Boost", "3xc": "Triple Captain" };
+    const ws = mc && mc.PLAN && mc.PLAN.plan && Array.isArray(mc.PLAN.plan.weeks) ? mc.PLAN.plan.weeks : [];
+    const xs = ws.filter(function (w) { return w && CHIP[w.chip]; }).map(function (w) { return CHIP[w.chip] + " GW" + w.gw; });
+    return xs.length ? xs.join(", ") : "no chip before the chip stop";
+  } catch (e) { return ""; }
+}
+function SolvedNote(props) {
+  const lv = landingPlanView(props.mc, props.ctx, { locked: !!(props.reveals || {})["wc-lock"], overrides: overrideCount(props.ctx) });
+  if (lv.state !== "solved") return null;
+  return (
+    <div className="note" data-testid={"solved-note-" + (props.where || "x")}>
+      <span className="tag tag-s">Classic</span> {"The solved plan: " + solvedChipsText(props.mc) + "; GW" + lv.gw + " captain " + lv.cap + ", vice " + lv.vice + ". " + (props.text || "What follows is the app's own quick model, a second opinion; where it disagrees, the solved plan stands.")}
+    </div>
+  );
+}
+
 function Section(props) {
   const open = !!props.open;
   return (
-    <div className="section" data-section={props.id}>
+    <div className="section" data-section={props.id} data-game={props.game ? String(props.game).toLowerCase() : undefined}>
       <button className="sec-h" data-testid={"sec-" + (props.id === undefined || props.id === null ? "?" : props.id)} aria-expanded={open ? "true" : "false"}
         onClick={function () { props.onToggle(props.id); }}>
-        <span>{props.title}</span>
+        <span>{props.title}{props.game ? <span className="tag tag-s sec-game">{props.game}</span> : null}</span>
         <ChevronRight className="cv" aria-hidden="true" />
       </button>
       <div className="sec-b" hidden={!open}>{open ? props.children : null}</div>
@@ -1020,7 +1045,7 @@ function draftClaimsView(mc, now, overrides) {
       view.count = lines.length;
       view.first = lines[0].add + " for " + lines[0].drop;
       view.line = lines.length + (lines.length === 1 ? " claim" : " claims") + ", first " + view.first +
-        (fin(all) && fin(C.valueNow) ? ": " + sgn(all - C.valueNow) + " Draft points if all land" : "") +
+        (fin(all) && fin(C.valueNow) ? ": " + sgn(all - C.valueNow) + " Draft points if every first choice lands" : "") +
         (fin(C.valueStress) && fin(C.valueNow) ? ", " + sgn(C.valueStress - C.valueNow) + " under the stress test." : ".") +
         (view.wv ? " Waivers settle " + view.wv + " SAST." : "");
     } else if (view.state === "stale") {
@@ -1955,7 +1980,10 @@ function TabPlan(props) {
   const tp = plan.tp || transferProtocol(null, ctx);
   const hidden = plan.kind === "live";
   const wc = sec("plan-wc") ? (plan.wc && plan.wc.ok ? plan.wc : wildcardSolver(ctx, {})) : null;
-  const bx = sec("plan-xi") ? bestXI(ctx.squadIds, ctx) : null;
+  /* Audit F-04: the eleven of the fifteen the caption names. On a wildcard plan that is the app's wildcard fifteen, not
+     the squad it sells. */
+  const bxWc = plan.kind === "wildcard" && Array.isArray(plan.ids) && plan.ids.length === 15;
+  const bx = sec("plan-xi") ? bestXI(bxWc ? plan.ids : ctx.squadIds, ctx) : null;
   const wcXi = plan.kind === "wildcard" && plan.wc && plan.wc.ok && plan.wc.xi ? plan.wc.xi.ids : null;
   const capIds = wcXi || bestXI(ctx.squadIds, ctx).ids;
   const cap = sec("plan-cap") ? captainPick(capIds, ctx) : null;
@@ -2098,6 +2126,7 @@ function TabPlan(props) {
       </Section>
 
       <Section id="plan-wc" title="Wildcard fifteen" open={sec("plan-wc")} onToggle={on.sec}>
+        <SolvedNote mc={props.mc} ctx={ctx} reveals={ui.reveals} where="plan-wc" />
         <div className="dim"><span className="tag tag-s">Classic</span> The wildcard fifteen, priced at today's selling values.</div>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="plan-wc">
         {hidden ? <div className="note note-w">Matches are running. Transfer panels come back when the last whistle goes.</div> : wc && wc.ok ? (
@@ -2128,6 +2157,7 @@ function TabPlan(props) {
       </Section>
 
       <Section id="plan-opts" title="Three fifteens, priced" open={sec("plan-opts")} onToggle={on.sec}>
+        <SolvedNote mc={props.mc} ctx={ctx} reveals={ui.reveals} where="plan-opts" />
         <div className="dim"><span className="tag tag-s">Classic</span> Three ways to build the wildcard fifteen, priced under one objective.</div>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="plan-opts">
         {hidden ? <div className="note note-w">Matches are running. Transfer panels come back when the last whistle goes.</div> : optRows.length ? (
@@ -2203,7 +2233,8 @@ function TabPlan(props) {
       </Section>
 
       <Section id="plan-xi" title="Best XI and bench" open={sec("plan-xi")} onToggle={on.sec}>
-        <div className="dim"><span className="tag tag-s">Classic</span> The eleven and the bench of the wildcard fifteen.</div>
+        <SolvedNote mc={props.mc} ctx={ctx} reveals={ui.reveals} where="plan-xi" />
+        <div className="dim"><span className="tag tag-s">Classic</span> {bxWc ? "The eleven and the bench of the app's own wildcard fifteen." : "The eleven and the bench of your current fifteen."}</div>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="plan-xi">
         {bx ? (
           <div>
@@ -2226,6 +2257,7 @@ function TabPlan(props) {
       </Section>
 
       <Section id="plan-time" title="Wildcard timing" open={sec("plan-time")} onToggle={on.sec}>
+        <SolvedNote mc={props.mc} ctx={ctx} reveals={ui.reveals} where="plan-time" />
         <div className="dim"><span className="tag tag-s">Classic</span> When to play the wildcard, judged by the weekly gap it closes.</div>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="plan-time">
         {tim ? (
@@ -2298,7 +2330,7 @@ function TabSquad(props) {
   const moved = ids.filter(function (id) { return Number(ctx.els[id].cost_change_event) !== 0; });
   return (
     <div>
-      <Section id="sq-fifteen" title="The fifteen" open={sec("sq-fifteen")} onToggle={on.sec}>
+      <Section id="sq-fifteen" game="Classic" title="The fifteen" open={sec("sq-fifteen")} onToggle={on.sec}>
         {ids.map(function (id) {
           const el = ctx.els[id], x = ctx.xp[id], gs = ctx.gwStats[id] || { starts_last3: 0 }, fl = ctx.flags[id];
           const cls = classify(el, ctx);
@@ -2322,7 +2354,7 @@ function TabSquad(props) {
         <div className="dim">EDGE is under a quarter of your rivals owning him, SHARED is seven in ten or more, DEAD is no start in three. <Tier k="model" /> xP · <Tier k="T0" /> prices</div>
       </Section>
 
-      <Section id="sq-price" title="Price watch" open={sec("sq-price")} onToggle={on.sec}>
+      <Section id="sq-price" game="Classic" title="Price watch" open={sec("sq-price")} onToggle={on.sec}>
         {moved.length ? moved.map(function (id) {
           const el = ctx.els[id];
           const d = Number(el.cost_change_event);
@@ -2341,7 +2373,7 @@ function TabSquad(props) {
         <div className="dim">Prices change overnight on net transfers. Selling price is what you paid plus half of any rise. <Tier k="T0" /></div>
       </Section>
 
-      <Section id="sq-confirm" title="Squad check" open={sec("sq-confirm")} onToggle={on.sec}>
+      <Section id="sq-confirm" game="Classic" title="Squad check" open={sec("sq-confirm")} onToggle={on.sec}>
         {ctx.block.block ? (
           <div>
             <BlockNote ctx={ctx} onConfirm={props.onConfirm} where="squad" />
@@ -2365,13 +2397,21 @@ function TabRivals(props) {
   const ctx = props.ctx, ui = props.ui, on = props.on, plan = props.plan;
   const sec = function (id) { return openOf(ui, "rivals", id); };
   const me = ctx.live.entry ? Number(ctx.live.entry.id) : 0;
-  const buys = (plan.kind === "wildcard" ? plan.ids.filter(function (id) { return ctx.squadIds.indexOf(id) < 0; }) : (plan.tp ? plan.tp.moves.map(function (m) { return m.in; }) : [])).slice(0, 8);
+  /* Audit F-03: when the solved plan stands on the landing card, the rival checks read the plan of record (its fifteen,
+     its buys, its captain and vice), so this tab and the landing never name two captains. Otherwise the app's own
+     plan stands, as on the landing. */
+  const lv = landingPlanView(props.mc, ctx, { locked: !!(ui.reveals || {})["wc-lock"], overrides: overrideCount(ctx) });
+  const solvedW = lv.state === "solved" && props.mc && props.mc.PLAN && props.mc.PLAN.plan ? props.mc.PLAN.plan.weeks[0] : null;
+  const rp = solvedW ? { solved: true, capId: lv.capId, viceId: lv.viceId, ids: lv.squadIds,
+    buys: (Array.isArray(solvedW.in) ? solvedW.in : []).filter(function (id) { return !!ctx.els[id]; }) } : null;
+  const buys = (rp ? rp.buys : plan.kind === "wildcard" ? plan.ids.filter(function (id) { return ctx.squadIds.indexOf(id) < 0; }) : (plan.tp ? plan.tp.moves.map(function (m) { return m.in; }) : [])).slice(0, rp ? 15 : 8);
+  const capId = rp ? rp.capId : plan.capId, viceId = rp ? rp.viceId : plan.viceId;
   const simId = props.simLeague || (ctx.leagues[0] ? ctx.leagues[0].id : 0);
-  const simIds = plan.kind === "wildcard" && plan.ids.length === 15 ? plan.ids : null;
-  const sim = sec("rv-sim") ? mcLeague(ctx, simId, { iters: 300, ids: simIds, capId: plan.capId, viceId: plan.viceId }) : null;
+  const simIds = rp ? (rp.ids.length === 15 ? rp.ids : null) : plan.kind === "wildcard" && plan.ids.length === 15 ? plan.ids : null;
+  const sim = sec("rv-sim") ? mcLeague(ctx, simId, { iters: 300, ids: simIds, capId: capId, viceId: viceId }) : null;
   return (
     <div>
-      <Section id="rv-table" title="The six leagues" open={sec("rv-table")} onToggle={on.sec}>
+      <Section id="rv-table" game="Classic" title="The six leagues" open={sec("rv-table")} onToggle={on.sec}>
         <div className="tbl">
           <Row head cols="minmax(0,1fr) 34px 40px 46px">
             <span>League</span><span className="rt">Size</span><span className="rt">Rank</span><span className="rt">Gap</span>
@@ -2380,13 +2420,15 @@ function TabRivals(props) {
             const st = L.standings || [];
             const first = st[0] ? Number(st[0].total) : 0;
             const mine = st.filter(function (r) { return Number(r.entry) === me; })[0];
-            const gap = mine ? first - Number(mine.total) : null;
-            const dir = mine && Number(L.last_rank) ? Number(L.last_rank) - Number(mine.rank || L.rank) : 0;
+            /* Audit F-09: a league whose table has not started (rank 0, every total 0) has no rank, no gap and no move. */
+            const unstarted = !Number(mine ? mine.rank : L.rank) || (st.length > 0 && st.every(function (r) { return !Number(r.total); }));
+            const gap = mine && !unstarted ? first - Number(mine.total) : null;
+            const dir = !unstarted && mine && Number(L.last_rank) ? Number(L.last_rank) - Number(mine.rank || L.rank) : 0;
             return (
               <Row key={L.id} cols="minmax(0,1fr) 34px 40px 46px">
-                <span className="nm">{L.name}</span>
+                <span className="nm">{L.name}{unstarted ? <span className="dim"> · no scores yet</span> : null}</span>
                 <span className="rt dim">{L.size}</span>
-                <span className={"rt " + (dir > 0 ? "go" : dir < 0 ? "out" : "")}>{mine ? mine.rank : L.rank}</span>
+                <span className={"rt " + (dir > 0 ? "go" : dir < 0 ? "out" : "dim")}>{unstarted ? "—" : mine ? mine.rank : L.rank}</span>
                 <span className="rt dim">{gap === null ? "—" : gap}</span>
               </Row>
             );
@@ -2395,7 +2437,7 @@ function TabRivals(props) {
         <div className="dim">Gap is points behind the leader. Rank colour is the move since last gameweek. <Tier k="T0" /> standings</div>
       </Section>
 
-      <Section id="rv-own" title="Ownership of your fifteen" open={sec("rv-own")} onToggle={on.sec}>
+      <Section id="rv-own" game="Classic" title="Ownership of your fifteen" open={sec("rv-own")} onToggle={on.sec}>
         {ctx.squadIds.slice().sort(function (a, b) { return rivalOwnMax(b, ctx).max - rivalOwnMax(a, ctx).max; }).map(function (id) {
           const r = rivalOwnMax(id, ctx), cls = classify(ctx.els[id], ctx);
           const tagc = cls === "EDGE" ? "tag-e" : cls === "DEAD" ? "tag-d" : cls === "SHARED" ? "tag-s" : "";
@@ -2410,7 +2452,7 @@ function TabRivals(props) {
         <div className="dim">The highest share across your six leagues. <Tier k="T0" /> rival picks</div>
       </Section>
 
-      <Section id="rv-buys" title="Convergence on the buys" open={sec("rv-buys")} onToggle={on.sec}>
+      <Section id="rv-buys" game="Classic" title="Convergence on the buys" open={sec("rv-buys")} onToggle={on.sec}>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="rv-buys">
         {buys.length ? buys.map(function (id) {
           const c = convergenceRisk(id, ctx);
@@ -2426,13 +2468,13 @@ function TabRivals(props) {
         </Guard>
       </Section>
 
-      <Section id="rv-cap" title="Captaincy against rivals" open={sec("rv-cap")} onToggle={on.sec}>
+      <Section id="rv-cap" game="Classic" title="Captaincy against rivals" open={sec("rv-cap")} onToggle={on.sec}>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="rv-cap">
-        {plan.capId ? (
+        {capId ? (
           <div>
-            <KV k="Your captain" v={nameOf(ctx, plan.capId)} />
+            <KV k="Your captain" v={nameOf(ctx, capId)} />
             {ctx.leagues.map(function (L) {
-              const share = (ctx.capShare[L.id] || {})[plan.capId] || 0;
+              const share = (ctx.capShare[L.id] || {})[capId] || 0;
               return (
                 <Row key={L.id} cols="minmax(0,1fr) 50px">
                   <span className="nm">{L.name}</span>
@@ -2446,20 +2488,22 @@ function TabRivals(props) {
         </Guard>
       </Section>
 
-      <Section id="rv-sim" title="Simulation" open={sec("rv-sim")} onToggle={on.sec}>
+      <Section id="rv-sim" game="Classic" title="Simulation" open={sec("rv-sim")} onToggle={on.sec}>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="rv-sim">
         <select className="inp" data-testid="sim-league" value={String(simId)} aria-label="League to simulate"
           onChange={function (e) { props.onSimLeague(Number(e.target.value)); }}>
           {ctx.leagues.map(function (L) { return <option key={L.id} value={String(L.id)}>{L.name}</option>; })}
         </select>
-        {sim ? (
+        {sim && sim.medianRank === null ? (
+          <div className="dim">{sim.note}</div>
+        ) : sim ? (
           <div>
             <KV k="Rank now" v={sim.currentRank === null ? "—" : sim.currentRank} />
             <KV k="Median rank after the gameweek" v={one(sim.medianRank)} tone={sim.direction === "up" ? "go" : sim.direction === "down" ? "out" : ""} />
             <KV k="Band, one in ten either way" v={one(sim.rankBand[0]) + " to " + one(sim.rankBand[1])} />
             <KV k="Rivals simulated" v={sim.rivalsSimulated + " of " + sim.entries} />
             <div className="note">{sim.pWinNote}</div>
-            <div className="dim">{simIds ? "The wildcard fifteen is simulated, not the one you own today. " : ""}{sim.note} <Tier k="model" /> Monte Carlo</div>
+            <div className="dim">{simIds ? (rp ? "The solved plan's fifteen is simulated, with its captain, not the one you own today. " : "The app's own wildcard fifteen is simulated, not the one you own today. ") : ""}{sim.note} <Tier k="model" /> Monte Carlo</div>
           </div>
         ) : null}
         </Guard>
@@ -2602,7 +2646,7 @@ function draftTabView(mc, now, overrides) {
       const runs = fin(C.runs) && C.runs > 0 ? C.runs : null;
       view.claims.runs = runs ? grp(runs) : "";
       view.claims.head = "Lodge them in exactly this order. Gain: Draft points to " + toHz + "." +
-        (runs ? " Chance: how often it lands in " + grp(runs) + " simulated waiver runs." : "") + " Label: the stress test's worst case.";
+        (runs ? " Chance: how often it lands in " + grp(runs) + " simulated waiver runs." : "") + " Label: what happens under the stress test, every rival lodging the moves the model rates best for them.";
       let nL = 0, nT = 0, nR = 0;
       view.claims.lines = sheet.map(function (q, i) {
         const worst = landed.indexOf(q.add) >= 0 ? "lands" : lost.indexOf(q.add) >= 0 ? "taken first" : "not reached";
@@ -2614,7 +2658,7 @@ function draftTabView(mc, now, overrides) {
       const s0 = [];
       if (fin(C.valueNow)) s0.push({ k: "Roster today", v: f0(C.valueNow), sub: "Draft points to " + toHz });
       if (fin(C.meanValue)) s0.push({ k: "Expected after claims", v: f0(C.meanValue), sub: (fin(C.valueNow) ? sgn(C.meanValue - C.valueNow) + ", " : "") + (fin(C.p10) && fin(C.p90) ? f0(C.p10) + " to " + f0(C.p90) : "") });
-      if (fin(C.valueStress)) s0.push({ k: "Worst case", v: f0(C.valueStress), sub: "the stress test" });
+      if (fin(C.valueStress)) s0.push({ k: "Stress scenario", v: f0(C.valueStress), sub: "every rival's best moves" });
       const all = fin(C.valueAll) ? C.valueAll : C.allFirst;
       if (fin(all)) s0.push({ k: "Every first choice", v: f0(all), sub: "the ceiling" });
       view.claims.strip = s0;
@@ -2917,8 +2961,9 @@ function TabDraft(props) {
               <div className="note">Written claims to re-check: {checked.filter(function (c) { return c.issues.length; }).map(function (c) { return c.inName + " for " + c.outName + " (" + c.issues.join("; ") + ")"; }).join(" · ")}.</div>
             ) : null}
             <Reveal id="df-written" label="The written claims, checked" open={!!ui.reveals["df-written"]} onToggle={on.rev}>
+              <div className="dim">A five-week check on the app's own engine. The claims sheet above is measured to the re-draft, so a claim can lose points here and gain them there.</div>
               {checked.map(function (c) {
-                return <div key={c.key}>{c.priority}. {c.outName} to {c.inName}, {one(c.gain)}{c.issues.length ? " — " + c.issues.join("; ") : " — valid"}</div>;
+                return <div key={c.key}>{c.priority}. {c.outName} to {c.inName}, {one(c.gain)} over five weeks{c.issues.length ? " — " + c.issues.join("; ") : c.gain < 0 ? " — available, but loses points over five weeks" : " — available"}</div>;
               })}
             </Reveal>
           </div>
@@ -2933,7 +2978,7 @@ function TabDraft(props) {
                   <span className="mini" style={{ gridColumn: "1 / -1" }}>
                     <span className={c.forced ? "out" : "dim"}>{c.forced ? "forced" : "upgrade"}</span>
                     {c.priority === c.written ? null : <span>written {c.written}</span>}
-                    {c.issues.length ? <span className="warnt">{c.issues.join("; ")}</span> : <span>valid</span>}
+                    {c.issues.length ? <span className="warnt">{c.issues.join("; ")}</span> : <span>{c.gain < 0 ? "available, loses points over five weeks" : "available"}</span>}
                   </span>
                 </Row>
               );
@@ -3012,7 +3057,33 @@ function TabDraft(props) {
 
 
       <Section id="df-h2h" title="Head to head" open={sec("df-h2h")} onToggle={on.sec}>
-        {h2h && h2h.ok ? (
+        {(function () {
+          /* Audit F-05: the build-time head-to-head (the ported engine, tens of thousands of draws) is the figure of record
+             when it was made on this build's data and for this gameweek; the phone's 400-draw check sits behind a reveal. */
+          const PRE = mc && mc.PRE, PL = mc && mc.PLAN;
+          const ph = PRE && PL && typeof PRE.hash === "string" && PRE.hash === PL.hash && PRE.h2h && typeof PRE.h2h === "object" &&
+            Number(PRE.h2h.gw) === Number(ctx.nextEvent) && PRE.h2h.me && PRE.h2h.them ? PRE.h2h : null;
+          if (!ph) return null;
+          const pct = function (x) { const v = Number(x); return isFinite(v) ? Math.round(v * 100) + "%" : "—"; };
+          return (
+            <div data-testid="df-h2h-pre">
+              <div className="dim"><span className="tag tag-d">Draft</span> {"GW" + ph.gw + ", worked out when the app was built."}</div>
+              {h2h && h2h.ok && h2h.opponent ? <KV k="Opponent" v={h2h.opponent.name} /> : null}
+              <KV k="Projected" v={one(ph.me.mean) + " against " + one(ph.them.mean)} />
+              <KV k="Win, draw, lose" v={pct(ph.win) + ", " + pct(ph.draw) + ", " + pct(ph.lose)} tone={ph.win >= ph.lose ? "go" : "out"} />
+              <div className="dim">{"Your score: tenth to ninetieth " + ph.me.p10 + " to " + ph.me.p90 + "; theirs " + ph.them.p10 + " to " + ph.them.p90 + ", over " + Number(ph.draws || ph.n).toLocaleString("en-GB") + " draws."} <Tier k="model" /> Monte Carlo</div>
+              <div className="note">{ph.me.mean < ph.them.mean ? "Behind on the projection: the eleven takes the higher ceiling." : ph.me.mean > ph.them.mean ? "Ahead on the projection: the eleven takes the steadier floor." : "Level: the eleven is simply the highest expected points."}</div>
+            </div>
+          );
+        })()}
+        {h2h && h2h.ok && mc && mc.PRE && mc.PRE.h2h && mc.PLAN && mc.PRE.hash === mc.PLAN.hash && Number(mc.PRE.h2h.gw) === Number(ctx.nextEvent) ? (
+          <Reveal id="df-h2h-quick" label={"The phone's quick check, " + h2h.iters + " draws"} open={!!dRev["df-h2h-quick"]} onToggle={on.rev}>
+            <KV k={"GW" + h2h.gw + " opponent"} v={h2h.opponent.name} />
+            <KV k="Projected" v={one(h2h.mine.mean) + " against " + one(h2h.theirs.mean)} />
+            <KV k="Margin" v={(h2h.margin >= 0 ? "+" : "") + one(h2h.margin)} tone={h2h.margin >= 0 ? "go" : "out"} />
+            <div className="dim">The older engine, run on the phone; where it disagrees with the figures above, those stand. <Tier k="model" /> Monte Carlo</div>
+          </Reveal>
+        ) : h2h && h2h.ok ? (
           <div>
             <KV k={"GW" + h2h.gw + " opponent"} v={h2h.opponent.name} />
             <KV k="Projected" v={one(h2h.mine.mean) + " against " + one(h2h.theirs.mean)} />
@@ -3110,19 +3181,20 @@ function TabChips(props) {
   const solve = sec("ch-solver") ? chipSolver(ctx, {}) : null;
   return (
     <div>
-      <Section id="ch-now" title="Chips" open={sec("ch-now")} onToggle={on.sec}>
+      <Section id="ch-now" game="Classic" title="Chips" open={sec("ch-now")} onToggle={on.sec}>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="ch-now">
+        <SolvedNote mc={props.mc} ctx={ctx} reveals={ui.reveals} where="chips" text="The windows, the table and the regret figures below are the app's own quick model, which does not know the solver's weeks; where they disagree, the solved plan stands." />
         <KV k="Set one expires" v={"GW" + expiry + " deadline"} />
         <KV k="Used so far" v={used.length ? used.map(function (c) { return c.name + " GW" + c.event; }).join(", ") : "none"} />
         <KV k="Doubles confirmed" v={w.doubles.length ? w.doubles.map(function (d) { return "GW" + d.event; }).join(", ") : "none"} />
         <KV k="Blanks confirmed" v={w.blanks.length ? w.blanks.map(function (b) { return "GW" + b.event; }).join(", ") : "none"} />
-        <KV k="This week" v={plan.kind === "wildcard" ? "Wildcard 1" : "no chip"} tone={plan.kind === "wildcard" ? "go" : ""} />
+        <KV k={"This week, the app's own model"} v={plan.kind === "wildcard" ? "Wildcard 1" : "no chip"} tone={plan.kind === "wildcard" ? "go" : ""} />
         <div className="note">{w.recommendation.note}</div>
         <div className="dim">Windows are counted from the published fixture list, never assumed. <Tier k="T0" /> fixtures</div>
         </Guard>
       </Section>
 
-      <Section id="ch-solver" title="Chip solver" open={sec("ch-solver")} onToggle={on.sec}>
+      <Section id="ch-solver" game="Classic" title="Chip solver" open={sec("ch-solver")} onToggle={on.sec}>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="ch-solver">
         {solve ? (
           <div>
@@ -3160,7 +3232,7 @@ function TabChips(props) {
         </Guard>
       </Section>
 
-      <Section id="ch-regret" title="Regret, chip by chip" open={sec("ch-regret")} onToggle={on.sec}>
+      <Section id="ch-regret" game="Classic" title="Regret, chip by chip" open={sec("ch-regret")} onToggle={on.sec}>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="ch-regret">
         <div className="tbl">
           <Row head cols="44px 52px 52px minmax(0,1fr)">
@@ -4105,7 +4177,7 @@ export default function App() {
       const nextLive = applyRefresh(live, parsed);
       setLive(nextLive);
       const r = nextLive.refreshed || { applied: 0, skipped: [] };
-      setOkMsg("Applied " + r.applied + " update" + (r.applied === 1 ? "" : "s") + (r.skipped.length ? ", skipped " + r.skipped.length : "") + (truncated ? ". The reply hit the token ceiling and was cut short." : ""));
+      setOkMsg("Applied " + r.applied + " update" + (r.applied === 1 ? "" : "s") + " from a Claude web search, unverified" + (r.skipped.length ? "; skipped " + r.skipped.length + " (" + r.skipped.slice(0, 2).join("; ") + ")" : "") + (truncated ? ". The reply hit the token ceiling and was cut short." : "") + ". The official deadline is never changed by a refresh.");
       setState(function (s) { const n = JSON.parse(JSON.stringify(s)); n.refresh.last = nowISO(); return sanitiseState(n, known); });
     } catch (e) {
       setRefErr(shortErr(e));

@@ -287,10 +287,16 @@ tracked, so a file is checked before it is committed and a tracked file is check
 is still on disk; and the ignore rule is proved with `git check-ignore --no-index` rather than read,
 because a pattern that looks right and matches nothing is the whole defect. `qa/privacy.cjs` is
 **25/25**. The commit that introduced the leak was **rewritten and force-pushed**, because a name
-that has been pushed is not un-shipped by a later deletion. Honest limit: the rewritten commit
-object may survive in the remote's unreachable objects until GitHub garbage-collects, and the 84
-rival names in `data/live.json` in commits **before** `baac4bc` are still there — removing those
-means rewriting further back, which is the manager's call, not mine.
+that has been pushed is not un-shipped by a later deletion. Honest limit, measured on 1 Oct 2026 rather than
+supposed: the pre-rewrite commit `9261b148` is still publicly fetchable by its SHA (the GitHub API
+answers 200), the repository is public with Pages on, and rival names remain in earlier pushed
+commits in five file families (`data/live.json`, `dist/index.html`, `app/FPL_Mission_Control.jsx`,
+the Draft fixtures and some qa files, commits `2f419d5`..`cd5bdb1`), in PR #2's head ref, and on
+`main` (the v87 page Pages serves). A later deletion does not remove any of that. The routes are a
+GitHub support purge request, a history rewrite of `main` plus the pull refs, or making the repo
+private (which takes the Pages app offline on a free plan). Each is the manager's call; none is
+taken here. Recheck: `curl -s -o /dev/null -w '%{http_code}' https://api.github.com/repos/kwezingwevu-lab/comeback-blueprint/commits/9261b148d74889bc95864638f8363f9140890130`
+must print 404 before E-091 counts as closed.
 
 ### A3 · selling prices, against the reference's own recorded numbers
 
@@ -527,8 +533,54 @@ realistic 8/8, buttons 10/10, webkit 34/34.
 
 ---
 
+### The refresh on 1 October, the audit's fixes, and the iOS 27 work (v110 ship)
+
+**Feeds and solve.** `pipeline/pull.sh` fetched 53 feeds at 18:19 UTC; the export hash moved from 681ecb778aa48846 to
+**1c1af4c2c40b1b26** (prices and flags), so the plan was re-solved on an idle machine. Main plan (240 s): optimal within
+0.50% at 232.4 s, **904.07**. The three timing scenarios ran side by side with `solve_scenario.py … 900 --gap 0.004`:
+now 904.00 (gap 0.38%, 311 s), later 899.87 (wildcard GW7, 0.40%, 394 s), never 889.86 (0.40%, 622 s). `plan.cjs` kept the
+main plan and certified its gap at **0.38%** from the "now" bound (E-128). **Wildcard GW6, captain Saka, vice Gabriel;
+Triple Captain GW7 and Bench Boost GW9 on Haaland; no hits; £0.1m in the bank.** Holding the wildcard to GW7 costs 4.20,
+more than the proof's 3.6-point tolerance, so playing it now is proved better, though only just. `data/live.json` was
+re-fetched too (18:40 UTC), which the 28 Sep refresh had done and this one nearly missed: the price check reads it.
+The Draft sheet is unchanged in order (twelve claims, Mainoo held back as flagged); stress 637.7, mean 640.6 against 596.2.
+
+**The audit (28 Sep, 105 findings, 79 confirmed by a sceptic).** Fixed here, each with a ledger entry and a check that
+can fail: the CI sweep that could never pass (E-141, `qa/fail_scan.sh`, both workflows); a rival's name in CLAUDE.md
+and a privacy suite that could not see prose (E-142, by-value scan from the raw feeds); the minutes tail condition
+scored against gameweek zero, which had reported the logistic eligible (E-143, independent oracle, mutation-proved);
+the Chips, Rivals and older Plan panels speaking for the app's own fifteen while the landing spoke for the solved plan,
+the Draft head-to-head showing the phone's 400 draws instead of the baked 30,000, and three tabs naming no game
+(E-144); the refresh moving the official deadline and any price (E-145); every screen saying v89 and a version check
+that could not disagree (E-146); a league with no scores shown as rank 0 in green; "Worst case" on a stress scenario;
+"+69.9 if all land" where all twelve cannot land; "valid" beside a negative five-week gain; the "Best XI" caption
+naming a fifteen it did not show; solver dependencies unpinned. Recorded, not fixed, and the manager's call: the
+repository is public, Pages serves `main` (the v87 page with rival names), and earlier commits remain fetchable by SHA
+(measured above under E-091); merging this branch would replace the served copy, and purging history needs a GitHub
+request or a rewrite of `main`.
+
+**iOS 27.** Stages one to four landed (safe areas, 44 pt floors, 16 px controls, contrast, Reduce Motion; text-only
+storage with a visible not-saving notice; update on resume and a 3 s race to the cached shell; the tab jump, one
+status region, share and import, the Lab device readout). `qa/ios.cjs` is wired into `qa/run.sh` and `gate.yml`
+(G-03) and reads **78/78** on iPhone 17, 17 Pro and 17 Pro Max profiles in WebKit. Not proved here: real safe-area
+insets, focus zoom and the Home Screen app on a real iPhone (the WebKit build is Playwright's on Linux).
+
+**The gate.** First full run on this tree: 35 of 39 steps green; the four reds (no_frozen on two literals in the new
+refresh test, components on the new note's missing fixture and a source scan the new attribute order broke,
+smoke_wk on the head-to-head check that still expected the phone's margin, mc_full P07, E-147) were fixed and each
+re-run green: no_frozen 6/6, components 292/292, smoke_wk 37/37, mc_full 302/302. The release-count run is recorded
+below.
+
+---
+
 ## 4. What has not been done yet
 
-Everything in §5 A1–E7 beyond the item above. `docs/GAP_v110.md` marks each one present, partial
-or absent with its target file, the failing test to write first and the effort, and gives the
-order of work. The two P0 items come before A1.
+- The merge to `main` and the protection of `main` (audit F02, SEC-05): both are the manager's to do or approve. The tag
+  `fpl-v110` marks the shipped commit on this branch.
+- History purge of rival names (P-01 to P-03): the manager's decision; the routes are listed under E-091.
+- Audit findings left open, each a refinement rather than a wrong number on screen: trades and claims computed
+  independently (F-15), hard-coded figures in copy (F-16), the waiver log's live leg skipped silently on CI (F08),
+  the A7 date predicate (F10), sellPrices wired on the bake side only (F11), four cannot-fail checks (G-04 to G-06,
+  G-08, G-09), the live price check making a pushed gate perishable (F14), refresh.yml's write token on disk (SEC-04's
+  second half).
+- Device-only checks: safe-area insets, focus zoom, Increase Contrast and the Home Screen app on a real iPhone 17.

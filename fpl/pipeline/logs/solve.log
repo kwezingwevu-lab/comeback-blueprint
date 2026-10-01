@@ -1,7 +1,6 @@
-plan Time limit reached. (HiGHS Status 13: Time limit reached) 240.1 s · gap 0.04431624830004515 · total 895.56
-no-wildcard 168.1 s · gap 0.15573061479186795 · total 883.78
-free hit [(6, 4.04), (7, 1.84), (8, 7.11), (9, 3.39), (10, 4.49), (11, 3.18), (12, 4.9), (13, 3.44), (14, 4.58), (15, 3.86), (16, 2.43), (17, 1.9), (18, 4.26), (19, 3.58)]
-draft 0.0 s · value 667.24 base 596.17 [('Silva', 'Dunk'), ('Mukiele', 'Davis'), ('Hill', 'Bogle'), ('E.Le Fée', 'Belloumi'), ('Cunha', 'King'), ('Mainoo', 'Janelt'), ('Evanilson', 'Isidor'), ('McBurnie', 'Igor Jesus')]
-draft if taken 650.99 [('Hill', 'Dunk'), ('Schuster', 'Davis'), ('Justin', 'Bogle'), ('Cunha', 'Belloumi'), ('Mainoo', 'King'), ('Evanilson', 'Isidor'), ('McBurnie', 'Igor Jesus')]
-undecayed 897.1
-done in 553.9 s · /home/user/comeback-blueprint/fpl/data/solver_out.json
+plan Optimization terminated successfully. (HiGHS Status 7: Optimal) 232.4 s · gap 0.004966185037851317 · total 904.07
+no-wildcard 168.3 s · gap 0.1636218301081152 · total 884.1
+free hit [(6, 2.87), (7, 1.72), (8, 4.11), (9, 5.13), (10, 3.87), (11, 3.24), (12, 3.19), (13, 2.16), (14, 4.09), (15, 2.87), (16, 2.76), (17, 1.73), (18, 3.75), (19, 3.93)]
+draft 0.1 s · value 667.29 base 596.17 [('Silva', 'Dunk'), ('Mukiele', 'Davis'), ('Hill', 'Bogle'), ('E.Le Fée', 'Belloumi'), ('Cunha', 'King'), ('Mainoo', 'Janelt'), ('Evanilson', 'Isidor'), ('McBurnie', 'Igor Jesus')]
+draft if taken 651.01 [('Hill', 'Dunk'), ('Schuster', 'Davis'), ('Justin', 'Bogle'), ('Cunha', 'Belloumi'), ('Mainoo', 'King'), ('Evanilson', 'Isidor'), ('McBurnie', 'Igor Jesus')]
+done in 402.7 s · /home/user/comeback-blueprint/fpl/data/solver_out.json

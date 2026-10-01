@@ -892,7 +892,15 @@ async function main() {
     if (!proj.ok) bad.push("no projection: " + proj.note);
     if (!orderLine || dui.waiverText.indexOf(orderLine) < 0) bad.push("the waivers panel does not say you claim " + (orderLine || "anything"));
     if (!oppName || dui.h2hText.indexOf(oppName) < 0) bad.push("the head-to-head panel does not name " + (oppName || "an opponent"));
-    if (!margin || dui.h2hText.indexOf(margin) < 0) bad.push("the margin " + (margin || "(none computed)") + " is not on screen");
+    /* Audit F-05: when the build-time head-to-head was made on this build's data for this gameweek, it is the figure of
+       record and the phone's 400-draw margin sits behind a closed reveal; the panel must show the baked means and win
+       chance. Otherwise the phone's margin must be on screen, as before. */
+    const PREJ = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "pre.json"), "utf8")), PLJ = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "plan.json"), "utf8"));
+    const baked = PREJ.h2h && PREJ.hash === PLJ.hash && Number(PREJ.h2h.gw) === Number(LCTX.nextEvent) ? PREJ.h2h : null;
+    if (baked) {
+      const want = baked.me.mean.toFixed(1) + " against " + baked.them.mean.toFixed(1), win = Math.round(baked.win * 100) + "%";
+      if (dui.h2hText.indexOf(want) < 0 || dui.h2hText.indexOf(win) < 0) bad.push("the baked head-to-head (" + want + ", win " + win + ") is not on screen");
+    } else if (!margin || dui.h2hText.indexOf(margin) < 0) bad.push("the margin " + (margin || "(none computed)") + " is not on screen");
     if (!/(ceiling|floor|highest expected points)/.test(dui.h2hText)) bad.push("the panel does not say which way the eleven leans");
     assert("draft-tab-shows-the-claim-order-and-the-head-to-head",
       dui.ok && !bad.length,

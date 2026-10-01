@@ -1797,3 +1797,84 @@ NOT DONE HERE: the gates in qa/smoke.cjs, qa/webkit.js and qa/smoke_wk.cjs still
 named so they are switched to this walk (webkit.js has its own page shell and does not require the harness, so the walk has to be inlined there).
 TEST: components `IOS27-16-harness-visibleText-walks-text-nodes-and-never-reads-innerText-E-138` (red when the function returns `innerText` again,
 proved on a mutated copy) and ios `IOS27-16 parity` and `IOS27-16 stability`.
+
+### E-141 · v110 · the "no FAIL" sweeps matched the word anywhere in a line, so the mutation proofs made CI red on every run
+CAUSE: gate.yml's last step ran `grep -n "FAIL"` over the combined log, and refresh.yml's sweep did the same over its gate logs. The E1 suites prove
+each check by mutation and print the check they turned red, `PASS mutation: … — red: FAIL <check> …`, so ten PASS lines carried the word. Every
+suite step of fpl-gate runs #25 to #34 was green and the run was red on this step alone; refresh.yml could therefore never open its pull request.
+qa/run.sh decides by exit codes, so it printed ALL PASS on the same tree: the two runners disagreed about what red means. The ledger described the
+refresh sweep as `^FAIL ` while the shipped file was unanchored (a recurrence of E-081's sweep-scope lesson).
+CAUGHT: 28 Sep 2026 by the v110 audit (findings F01, G-01, SEC-01), from the GitHub job log of run 36489278425.
+RULE: one sweep, in one file: `qa/fail_scan.sh` matches only a line that starts with FAIL or TDZ FAIL, which is how every suite prints a failure, and
+both workflows call it. A mutation proof prints `RED <check>`, never the word FAIL. The sweep proves itself before it runs.
+TEST: `bash qa/fail_scan.sh --self-test` (a quoted FAIL inside a PASS line must not count; a line-start FAIL and a TDZ FAIL must), run by both
+workflows before their sweep.
+
+### E-142 · v110 · a rival manager's full name sat in fpl/CLAUDE.md, and the privacy suite only looked for key names
+CAUSE: the Draft league row in CLAUDE.md named the league admin. qa/privacy.cjs scanned data, built files and fixtures for the personal-name KEYS
+(`player_first_name` and the rest), never for name VALUES, and never prose, so a name typed into markdown passed it. The repository is public and
+the file is served, so the name is in the history of `main` and the branch from the commit that added it; removing the line does not remove that.
+CAUGHT: 28 Sep 2026 by the v110 audit (P-04, F-01, SEC-03).
+RULE: no rival's name in any tracked file, prose included. The line now says "the league's own admin entry". The privacy suite reads every rival's
+first and last name from the raw feeds at run time (they are ignored by git, and the names are never written down) and searches every tracked text
+file for each full name, word-bounded; the manager's own name and names that are part of a team label are left out. On a checkout without the
+feeds (CI) it says plainly that the by-value scan did not run. Purging the name from history (a rewrite of a public `main`, or a GitHub support
+request) is the manager's decision and is not done here.
+TEST: privacy `no rival manager's full name, read from the raw feeds, appears in any tracked file` (red on the old CLAUDE.md line: it found it there
+and, before the word-boundary and team-label rules, in 70 more files) and `mutation: a name from the feeds planted in prose is found`.
+
+### E-143 · v110 · the minutes tail condition scored every thin row against gameweek zero, and its test could only agree with itself
+CAUSE: minutesPromotion built each thin row's features with `intOf(panel.nextEvent, 0)`, but minutesPanel carries no nextEvent, so the target
+gameweek was 0 and the days-since-last-start feature was wrong. On the 1 Oct snapshot the worst thin row (Fatawu) read 0.4967, under the 0.50 limit,
+so the logistic was reported ELIGIBLE; scored for the real next gameweek it is 0.6273 and the tail condition fails. Nothing in production moved:
+MINUTES_PRODUCTION_ROUTED is false, so P(start) was and is the Laplace rate. The unit check compared the function's fields with each other
+(`t.ok === (t.max <= t.limit)` and so on), so it held whatever the function computed. E-087's wording ("eligible") rested on the wrong number.
+CAUGHT: 28 Sep 2026 by the v110 audit (G-11).
+RULE: the target gameweek comes from the snapshot's next_event (or the event marked is_next), as minutesModel uses ctx.nextEvent. A check on a
+derived figure needs an oracle outside the function: the worst row's raw probability must equal minutesModel's pModel for the same player on a
+context built from the same snapshot, and the limit is the literal 0.50 the ledger names. E-087 stands corrected by this entry: the logistic is not
+eligible on this snapshot.
+TEST: unit_engine `LIVE-F4-the-tail-condition-binds-on-the-raw-probability-of-a-thin-row` (with the gameweek-zero line restored the promotion reads
+0.4967 against minutesModel's 0.6273 and the oracle disagrees, proved on a scratch copy).
+
+### E-144 · v110 · the Chips, Rivals and older Plan panels spoke for the app's own fifteen while the landing spoke for the solved plan
+CAUSE: the landing card shows the solved plan when its hash matches (D1), but the Chips tab, the Rivals tab and the Plan tab's wildcard fifteen,
+priced options, best eleven and timing sections were built on buildPlan, the app's own quick model. On 28 Sep the phone named Saka as captain on
+the landing and Groß on Rivals, gave the wildcard's worth as 13.7, 1.9 and 136.4 in three places, and said Bench Boost and Triple Captain "wait for a
+confirmed window" while the plan played them in GW7 and GW8. The Draft head-to-head showed the phone's 400-draw check, not the 30 000-draw result baked
+into the build. Squad, Rivals and Chips named no game on their figures, and the separation suite never rendered them.
+CAUGHT: 28 Sep 2026 by the v110 audit (F-02, F-03, F-05, F-06).
+RULE: one test decides whether the solved plan stands (landingPlanView), and every surface that shows a fifteen, a captain or a chip verdict follows
+it. Where the plan stands, the Rivals checks read its fifteen, buys, captain and vice; the Chips tab and the four older Plan sections open with one
+line naming the plan's chips and captain and calling what follows the app's own quick model; the Draft head-to-head shows the baked result when it
+was made on this build's data for the next gameweek, with the phone's check behind a reveal. Each section on Squad, Rivals and Chips carries a
+Classic tag in its header.
+TEST: mc_separation renders Squad, Rivals and Chips (seven surfaces) with the unlabelled count armed over all of them.
+
+### E-145 · v110 · the in-app refresh let a web-search reply move the official deadline and any price, and showed it as fact
+CAUSE: applyRefresh accepted any now_cost from 30 to 250 and replaced the next event's deadline_time with any string Date.parse read. Run in memory
+on the 1 Oct snapshot, a reply two hours out moved the deadline the whole app counts down to, and a reply cutting a premium by £6.0m was applied;
+the message said only "Applied 1 update". The refresh's job (D4) is flags and prices; the deadline belongs to the official snapshot.
+CAUGHT: 28 Sep 2026 by the v110 audit (SEC-02).
+RULE: a refresh never changes the deadline: a reply within 15 minutes of the official one is a confirmation, anything further is skipped with its
+reason. A price may move at most £0.3m per refresh; a larger move skips that one field and the rest of the reply still applies. Every patched
+player carries refresh_src "model", the refresh record carries src "model", and the message says the values came from a Claude web search,
+unverified, and that the deadline is never changed.
+TEST: unit_engine `REFRESH-applyRefresh-keeps-the-official-deadline-and-bounds-a-price-move-SEC-02` (red on the old function: the deadline moved
+to 14:30 and the price to 56).
+
+### E-146 · v110 · every screen said v89, and the version check compared two readings of the same number
+CAUSE: package.json stayed at 89.0.0 through the v110 work, so the header, the page title and the service-worker cache name said v89. verify.sh
+I6 compared APP_VERSION with package.json, which build.cjs derives it from, so it could not disagree; and it decided by grepping "dist stamped",
+which it printed whether or not the versions matched.
+CAUGHT: 28 Sep 2026 by the v110 audit (F05, F-08).
+RULE: the version a build ships is checked against an independent source, the version the weekly block was written for (data/weekly.js), and
+the check decides on its own verdict, not on a phrase it always prints. package.json is 110.0.0.
+TEST: verify.sh `app-version-stamped-and-equals-package-major` (red with package.json at 89.0.0 against weekly version 110).
+
+### E-147 · v110 · the spoken refresh message printed "[object Object]" when handed a value that was not text
+CAUSE: refreshMessage (IOS27-11, the status line a screen reader speaks) built its text with String(err) and "GW" + gw, so an error object or a
+non-numeric gameweek came out as "[object Object]" or "GWundefined". Nothing in App passes such values today; the fuzzer does, by design.
+CAUGHT: 1 Oct 2026 by mc_full P07 in the first gate run on the v110 tree (3 of 3000 cases).
+RULE: a message slot accepts a string or an Error as its reason and a whole positive number as a gameweek, and leaves out what it cannot say.
+TEST: mc_full P07 (302/302 at 3000 after the fix).

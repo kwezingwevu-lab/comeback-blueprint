@@ -371,6 +371,8 @@ const FIX = {
   Row: { props: { cols: "22px minmax(0,1fr) auto", head: false, children: KID }, text: ["cols", "children"], passthrough: true },
   KV: { props: { k: "Overall rank", v: "5,081,388", tone: "go" }, text: ["k", "v", "tone"], passthrough: true },
   Meter: { props: { pct: 62, label: "Gameweek progress" }, text: ["label"], passthrough: true },
+  /* Audit F-02/F-03: the line naming the solved plan above the app's own quick model; it renders only while the plan stands. */
+  SolvedNote: { props: { mc: MCP, ctx: CTX, reveals: {}, where: "chips", text: "What follows is the app's own quick model." }, text: ["where", "text"] },
   GwActionCard: {
     props: { plan: PLAN, ctx: CTX, mode: "simple", reveals: {}, onReveal: noop, onConfirm: noop, mc: MCP }, text: ["mode"],
     variants: [
@@ -1129,7 +1131,7 @@ console.log("--- v110 D3 · the Draft tab ---");
   {
     const st = part(h1, "df-strip");
     const want = ["Roster today " + f0(C.valueNow) + " Draft points to GW" + hz, "Expected after claims " + f0(C.meanValue) + " " + sgn(C.meanValue - C.valueNow) + ", " + f0(C.p10) + " to " + f0(C.p90),
-      "Worst case " + f0(C.valueStress), "Every first choice " + f0(C.valueAll) + " the ceiling"];
+      "Stress scenario " + f0(C.valueStress), "Every first choice " + f0(C.valueAll) + " the ceiling"];
     const miss = want.filter(function (s) { return st.indexOf(s) < 0; });
     assert("D3-the-strip-reads-roster-today-expected-after-claims-worst-case-and-the-ceiling-from-the-sheet", miss.length === 0, (miss.length ? "missing «" + miss.join("» «") + "» · " : "") + "«" + st + "»");
     const ss = part(h1, "df-stress");
@@ -1407,7 +1409,7 @@ console.log("--- v110 D1 · Today: the landing card and the Command tab ---");
     const sheet = C.sheet.filter(function (q) { return EN.P[q.add] && EN.P[q.drop] && EN.P[q.add].p === EN.P[q.drop].p; });
     const all = isFinite(C.valueAll) ? C.valueAll : C.allFirst;
     const want = [sheet.length + (sheet.length === 1 ? " claim" : " claims") + ", first " + nmE(sheet[0].add) + " for " + nmE(sheet[0].drop) + ": " +
-      sgn(all - C.valueNow) + " Draft points if all land, " + sgn(C.valueStress - C.valueNow) + " under the stress test.", "Waivers settle " + sastAt(dev.wv).wd + " SAST."];
+      sgn(all - C.valueNow) + " Draft points if every first choice lands, " + sgn(C.valueStress - C.valueNow) + " under the stress test.", "Waivers settle " + sastAt(dev.wv).wd + " SAST."];
     const miss = want.filter(function (s) { return dr.indexOf(s) < 0; });
     assert("D1-the-landing-Draft-line-reads-the-claims-sheet-from-PRE-and-the-settle-time-from-the-league",
       miss.length === 0 && /^Draft\b/.test(dr) && !/Classic/.test(dr), (miss.length ? "missing «" + miss.join("» «") + "» · " : "") + "«" + dr + "»");

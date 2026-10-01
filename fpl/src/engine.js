@@ -2700,6 +2700,8 @@ function refreshRequest(cfg) {
     "Use the element id as the key, never the name. Leave a field out if you could not verify it. No prose, no code fences.");
   return { model: pair.model, max_tokens: REFRESH_MAX_TOKENS, tools: [{ type: pair.tool, name: "web_search" }], messages: [{ role: "user", content: prompt }], pair: key, ids: ids, warning: REFRESH_PAIRS[c.pair] ? null : "unknown pair " + (typeof c.pair === "string" && c.pair ? "'" + c.pair + "'" : "(none given)") + ", using sonnet46" };
 }
+var REFRESH_PRICE_STEP = 3;            // tenths of a million: the most a refresh may move a price (SEC-02)
+var REFRESH_DEADLINE_MS = 15 * 60000;   // a reply's deadline within this of the official one is a confirmation, not a change
 function applyRefresh(state, parsed) {
   if (!isObj(parsed)) throw new Error("applyRefresh: refresh payload is not an object");
   if (parsed.type === "error" || isObj(parsed.error)) throw new Error("applyRefresh: " + (isObj(parsed.error) && parsed.error.message ? parsed.error.message : "the reply was an error object"));
@@ -2718,8 +2720,15 @@ function applyRefresh(state, parsed) {
     if (u.status !== undefined && u.status !== null) { var st = String(u.status).toLowerCase(); if (st.length !== 1 || "adisun".indexOf(st) < 0) throw new Error("applyRefresh: bad status \"" + String(u.status) + "\" for id " + id); patch.status = st; }
     if (u.chance !== undefined) { if (u.chance === null) patch.chance = null; else { var ch = num(u.chance, NaN); if (!isFinite(ch)) throw new Error("applyRefresh: bad chance \"" + String(u.chance) + "\" for id " + id); patch.chance = clamp(Math.round(ch), 0, 100); } }
     if (u.news !== undefined && u.news !== null) patch.news = String(u.news).slice(0, 300);
-    if (u.now_cost !== undefined && u.now_cost !== null) { var nc = num(u.now_cost, NaN); if (!isFinite(nc) || nc < 30 || nc > 250) throw new Error("applyRefresh: bad now_cost \"" + String(u.now_cost) + "\" for id " + id); patch.now_cost = Math.round(nc); }
-    if (Object.keys(patch).length) { updates[id] = patch; applied++; } else skipped.push("nothing verifiable for id " + id);
+    if (u.now_cost !== undefined && u.now_cost !== null) {
+      var nc = num(u.now_cost, NaN); if (!isFinite(nc) || nc < 30 || nc > 250) throw new Error("applyRefresh: bad now_cost \"" + String(u.now_cost) + "\" for id " + id);
+      /* Audit SEC-02: a price moves by at most £0.1m a day, so a reply more than £0.3m from the snapshot is not believed;
+         that one field is skipped with its reason, and the rest of the reply still applies. */
+      var was = num(byId[id].now_cost, NaN);
+      if (isFinite(was) && Math.abs(Math.round(nc) - was) > REFRESH_PRICE_STEP) skipped.push("price for id " + id + " moved " + (Math.round(nc) - was) / 10 + "m, more than the £0.3m a refresh may move it; kept " + was / 10 + "m");
+      else patch.now_cost = Math.round(nc);
+    }
+    if (Object.keys(patch).length) { patch.refresh_src = "model"; updates[id] = patch; applied++; } else skipped.push("nothing verifiable for id " + id);
   });
   if (!applied) throw new Error("applyRefresh: nothing applied (" + (skipped.slice(0, 3).join("; ") || "empty elements") + ")");
   var newElements = live.elements.map(function (el) {
@@ -2734,11 +2743,15 @@ function applyRefresh(state, parsed) {
   Object.keys(live).forEach(function (k) { newLive[k] = live[k]; });
   newLive.elements = newElements;
   if (typeof parsed.fetched_at === "string" && isFinite(Date.parse(parsed.fetched_at))) newLive.fetched_at = parsed.fetched_at;
+  /* Audit SEC-02: the deadline belongs to the official snapshot. A reply may confirm it to within a quarter of an hour
+     (and then nothing changes); a reply further out is skipped with its reason and the built-in deadline stands. */
   if (typeof parsed.deadline_time === "string" && isFinite(Date.parse(parsed.deadline_time)) && Array.isArray(live.events)) {
     var nextId = intOf(live.next_event, 0);
-    newLive.events = live.events.map(function (e) { if (!isObj(e) || intOf(e.id, -1) !== nextId) return e; var ne = {}; Object.keys(e).forEach(function (k) { ne[k] = e[k]; }); ne.deadline_time = parsed.deadline_time; return ne; });
+    var evN = live.events.filter(function (e) { return isObj(e) && intOf(e.id, -1) === nextId; })[0];
+    var have = evN ? Date.parse(evN.deadline_time) : NaN, got = Date.parse(parsed.deadline_time);
+    if (isFinite(have) && Math.abs(got - have) > REFRESH_DEADLINE_MS) skipped.push("deadline " + parsed.deadline_time + " differs from the official " + evN.deadline_time + " by " + Math.round(Math.abs(got - have) / 60000) + " minutes; kept the official one");
   }
-  newLive.refreshed = { applied: applied, skipped: skipped, at: newLive.fetched_at || null, salvaged: parsed.__salvaged === true };
+  newLive.refreshed = { applied: applied, skipped: skipped, at: newLive.fetched_at || null, salvaged: parsed.__salvaged === true, src: "model" };
   if (live === state) return newLive;
   var ns = {}; Object.keys(state).forEach(function (k) { ns[k] = state[k]; }); ns.live = newLive;
   return ns;
@@ -2920,6 +2933,11 @@ function mcLeague(ctx, leagueId, opts) {
     if (!entries.some(function (e) { return e.me; })) entries.push({ entry: me, total: num(ctx.live.entry && ctx.live.entry.summary_overall_points, 0), rank: entries.length + 1, me: true, xi: mine.xi, bench: mine.bench, cap: mine.cap });
     res.entries = entries.length; res.rivalsSimulated = entries.filter(function (e) { return !e.me && e.xi; }).length; res.missingPicks = entries.filter(function (e) { return !e.xi; }).length;
     var meRow = entries.filter(function (e) { return e.me; })[0]; res.currentRank = meRow.rank || null;
+    /* Audit F-09: a table that has not started (every total 0, or no rank of my own) has nothing to rank against. */
+    if (!meRow.rank || entries.every(function (e) { return !e.total; })) {
+      res.note = res.name + " has no scores yet, so there is no rank to simulate.";
+      return res;
+    }
     var n = clamp(intOf(o.iters, 500), 1, 20000), R = mulberry32(intOf(o.seed, 7));
     var union = {}; entries.forEach(function (e) { if (e.xi) e.xi.concat(e.bench).forEach(function (id) { union[id] = true; }); });
     var unionIds = Object.keys(union).map(Number);
@@ -3652,6 +3670,8 @@ function minutesPromotion(live, opts) {
     var fit = minutesFit(live, 0, opts);
     var gwStats = elementGwStats(live);
     var THIN_INCUMBENT = 0.10;
+    var targetGw = intOf(isObj(live) ? live.next_event : 0, 0);
+    if (!targetGw) arr(isObj(live) ? live.events : null).forEach(function (e) { if (isObj(e) && e.is_next) targetGw = intOf(e.id, 0); });
 
     var els = arr(isObj(live) ? live.elements : null);
     var worst = null, maxP = 0, maxAdj = 0, thin = 0, checked = 0;
@@ -3669,7 +3689,9 @@ function minutesPromotion(live, opts) {
           hist.push({ gw: g, games: Math.max(clubN, Array.isArray(row) ? num(row[1], 0) : 0, Array.isArray(row) ? 1 : 0),
             min: Array.isArray(row) ? num(row[0], 0) : 0, starts: Array.isArray(row) ? num(row[1], 0) : 0 });
         });
-        var x = minutesFeatureVector(hist, intOf(panel.nextEvent, 0) || 0, panel.deadlines);
+        /* Audit G-11: the target gameweek is the next deadline's, as minutesModel uses (ctx.nextEvent). The panel
+           carries no nextEvent, so this read 0 and every thin row was scored against gameweek zero. */
+        var x = minutesFeatureVector(hist, targetGw, panel.deadlines);
         var z = 0;
         for (var i = 0; i < x.length && i < fit.beta.length; i++) z += num(fit.beta[i], 0) * x[i];
         /* The RAW model probability binds the condition, not the flag-adjusted one. A flag is
