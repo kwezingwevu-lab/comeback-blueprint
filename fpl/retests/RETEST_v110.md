@@ -568,8 +568,17 @@ insets, focus zoom and the Home Screen app on a real iPhone (the WebKit build is
 **The gate.** First full run on this tree: 35 of 39 steps green; the four reds (no_frozen on two literals in the new
 refresh test, components on the new note's missing fixture and a source scan the new attribute order broke,
 smoke_wk on the head-to-head check that still expected the phone's margin, mc_full P07, E-147) were fixed and each
-re-run green: no_frozen 6/6, components 292/292, smoke_wk 37/37, mc_full 302/302. The release-count run is recorded
-below.
+re-run green: no_frozen 6/6, components 292/292, smoke_wk 37/37, mc_full 302/302. The first release-count run
+(`qa/run.sh --release`) found two more: mc_full P05 at 25,000 iterations (truncateElements handed junk input back) and
+IOS27-17's mount bound, 0.21 s over a fixed slack under load (E-148). Both fixed in a7b915b.
+
+**The release gate on a7b915b: ALL PASS, 39 of 39 steps, 1,275 s.** privacy 27/27, no_frozen 6/6, visual 56/56,
+validate_live 88/88, waiver_log 13/13 (74/74 claims), prices 12/12, parity 51/51, bake 42/42, export_hash 36/36,
+calibration 25/25, plan_legality 43/43 and 59/59, verify 34/34, pull_guard 22/22, solver_smoke 7/7, unit_engine 273/273,
+components 292/292, mc_render 65/65, the eight mc suites 27, 19, 15, 42, 43, 12, 15 and 37 of the same, smoke 69/69,
+smoke_wk 37/37, realistic 8/8, buttons 10/10, webkit 58/58, ios 78/78, browser 185/185, mc_full 302/302 at 25,000
+iterations (950,013 assertions), mc_all 136 invariants over 1,000,000 iterations, 0 failures. `qa/fail_scan.sh` on that
+log: no line starts with FAIL. On GitHub, fpl-gate run #36 (4286e46) is the first green CI run of this branch.
 
 ---
 
