@@ -4521,7 +4521,7 @@ function leakBacktest(live, opts) {
  */
 function truncateElements(live, uptoGw) {
   try {
-    if (!isObj(live)) return live;
+    if (!isObj(live)) return null;   // nothing to truncate; never hand junk input back as if it were a snapshot (mc_full P05, E-147)
     var upto = intOf(uptoGw, 0);
     var gw = isObj(live.gw) ? live.gw : {};
     var keys = Object.keys(gw).map(function (k) { return num(k, NaN); }).filter(isFinite).filter(function (k) { return k <= upto; }).sort(sortNum);

@@ -1878,3 +1878,14 @@ non-numeric gameweek came out as "[object Object]" or "GWundefined". Nothing in 
 CAUGHT: 1 Oct 2026 by mc_full P07 in the first gate run on the v110 tree (3 of 3000 cases).
 RULE: a message slot accepts a string or an Error as its reason and a whole positive number as a gameweek, and leaves out what it cannot say.
 TEST: mc_full P07 (302/302 at 3000 after the fix).
+
+### E-148 · v110 · the slow-network mount bound used a fixed 1 s slack over boot readings that vary by more than that
+CAUSE: IOS27-17 bounds the mount from the cached shell at race + the largest of four controlled-reload boot readings + 1 s. The held reload's own boot
+is not one of the readings. On the 1 Oct release run it mounted at 6.32 s against a 6.11 s limit (readings 1.73 to 2.11 s); run alone twice
+straight after, it passed with readings 1.67 to 2.55 s. The property it exists for held every time: mounted after the 3 s race and seconds before
+the held response (11.59 s). A bound tighter than the noise of the thing it measures fails on load, not on a defect.
+CAUGHT: 1 Oct 2026 by `qa/run.sh --release` (ios 77/78).
+RULE: a timing bound carries the noise measured in the same run. The slack is 1 s plus the spread of the run's own four boot readings, and the
+detail prints it. The ordering checks (after the race, before the release) are unchanged and are the ones that would catch a worker that waits for
+the network.
+TEST: ios IOS27-17 (78/78 three times after the change, once inside the full release gate).

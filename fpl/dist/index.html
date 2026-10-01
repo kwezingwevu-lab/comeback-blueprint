@@ -30198,7 +30198,7 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
   }
   function truncateElements(live, uptoGw) {
     try {
-      if (!isObj(live)) return live;
+      if (!isObj(live)) return null;
       var upto = intOf(uptoGw, 0), gw = isObj(live.gw) ? live.gw : {}, keys = Object.keys(gw).map(function(k) {
         return num(k, NaN);
       }).filter(isFinite).filter(function(k) {
