@@ -387,6 +387,8 @@ const FIX = {
       { plan: PLAN, ctx: CTX_MKT, mode: "simple", reveals: {}, onReveal: noop, onConfirm: noop, mc: MCP }
     ]
   },
+  /* 2 Oct 2026: the data's age on the landing card once it is a day old. Renders nothing while the data is fresh. */
+  StaleNote: { props: { ctx: Object.assign({}, CTX, { now: Date.parse(CTX.live.fetched_at) + 30 * 3600000 }) }, text: [] },
   Header: { props: { ctx: CTX, onRefresh: noop, onMenu: noop, menuOpen: false, busy: false }, text: [],
     /* IOS27-11: the same header while a refresh is in flight says "Refreshing…" in its status line, in both builds */
     variants: [{ ctx: CTX, onRefresh: noop, check: true, onMenu: noop, menuOpen: false, busy: false },
@@ -492,6 +494,23 @@ const FIX = {
 
 const missingFix = COMPONENTS.filter(function (n) { return !FIX[n]; });
 assert("components-every-component-has-a-valid-props-fixture", missingFix.length === 0, missingFix.join(","));
+
+/* 2 Oct 2026, "up to date at all times": the header says how old the data is on every screen, the tone rises past a day
+   and again past three, and the landing card adds one line once the data is a day old. Each threshold driven by moving
+   the clock against the snapshot's own fetched_at, never by a typed date. */
+{
+  const at = Date.parse(CTX.live.fetched_at), mk = function (hours) { return Object.assign({}, CTX, { now: at + hours * 3600000 }); };
+  const hdr = function (h) { const r = tryRender("Header", { ctx: mk(h), onRefresh: noop, onMenu: noop, menuOpen: false, busy: false }); return r.ok ? r.html : ""; };
+  const ageSpan = function (html) { const m = /<span[^>]*data-testid="data-age"[^>]*>((?:[^<]|&lt;)*)<\/span>/.exec(html); const c = /<span class="([^"]*)" data-testid="data-age"/.exec(html); return m ? { text: m[1], cls: c ? c[1] : "", empty: /class="" data-testid="data-age"/.test(html) } : null; };
+  const h0 = ageSpan(hdr(0.5)), h1 = ageSpan(hdr(5)), h2 = ageSpan(hdr(30)), h3 = ageSpan(hdr(100));
+  assert("FRESH-the-header-says-how-old-the-data-is-and-the-tone-rises-past-a-day-and-past-three",
+    !!h0 && /<1h old|&lt;1h old/.test(h0.text) && !!h1 && /^5h old$/.test(h1.text) && !/warnt|out/.test(h1.cls) && !h1.empty && !!h2 && /warnt/.test(h2.cls) && !!h3 && /\bout\b/.test(h3.cls),
+    JSON.stringify([h0, h1, h2, h3]));
+  const sn = function (h) { const r = tryRender("StaleNote", { ctx: mk(h) }); return r.ok ? r.html : "threw"; };
+  const fresh = sn(23), stale = sn(25);
+  assert("FRESH-the-landing-adds-one-line-once-the-data-is-a-day-old-and-not-before", fresh === "" && /data-testid="ld-stale"/.test(stale) && /check for new data before acting/.test(stale),
+    "at 23h «" + fresh + "» · at 25h «" + stale.slice(0, 120) + "»");
+}
 
 // ---------------------------------------------------------------- 5. render helpers
 
@@ -616,8 +635,9 @@ console.log("--- iOS 27 · the behaviour items ---");
 
   // IOS27-11 · the header line while a refresh is in flight, and the one status region
   const idle = plainOf(html("Header", FIX.Header.props)), busy = plainOf(html("Header", FIX.Header.variants[1]));
-  assert("IOS27-11-the-header-status-reads-Refreshing-while-busy-and-the-version-otherwise",
-    /Refreshing…/.test(busy) && !/Refreshing/.test(idle) && /v\d+/.test(idle) && !/v\d+/.test(busy),
+  /* 2 Oct 2026: the idle slot shows the data's age ("5h old"), which replaced the version (now on the Lab's build line). */
+  assert("IOS27-11-the-header-status-reads-Refreshing-while-busy-and-the-data-age-otherwise",
+    /Refreshing…/.test(busy) && !/Refreshing/.test(idle) && /\b\d+(min|h|d) old\b|<1h old/.test(idle) && !/ old\b/.test(busy),
     "idle «" + idle.slice(0, 90) + "» busy «" + busy.slice(0, 90) + "»");
   const an0 = html("Announcer", FIX.Announcer.props), an1 = html("Announcer", FIX.Announcer.variants[0]);
   const roles = function (h) { return (h.match(/role="status"/g) || []).length; };
@@ -1922,7 +1942,7 @@ console.log("--- v110 D6 · the Lab tab: method, limits, dated sources ---");
     };
     const need = MB.intel.sources.map(function (s) { return plain(toSast(String(s))); }).concat([
       "feeds, pulled " + sast(MB.asOf) + " SAST", "Desk research, dated " + sast(MB.intel.asOf) + " SAST", "fitted " + sast(MB.model.at) + " SAST",
-      "This build " + sast(PR.at) + " SAST", "content hash " + PR.hash, "Classic plan: solved " + sast(SP.at) + " SAST",
+      "This build, v" + String(require(path.join(ROOT, "package.json")).version).split(".")[0] + ", " + sast(PR.at) + " SAST", "content hash " + PR.hash, "Classic plan: solved " + sast(SP.at) + " SAST",
       "within " + pct2(pl.gap) + " in " + secsT(pl.secs), "Classic wildcard timing, solved " + sast(tm.at) + " SAST"]);
     ["noWildcard", "undecayed"].forEach(function (k) { if (SP[k] && SP[k].ok) need.push("within " + pct2(SP[k].gap) + " in " + secsT(SP[k].secs)); });
     ["now", "later", "never"].forEach(function (k) { if (tm[k] && tm[k].ok) need.push(k + " within " + pct2(tm[k].gap) + " in " + secsT(tm[k].secs)); });

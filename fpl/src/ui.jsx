@@ -581,6 +581,24 @@ function ageText(h) {
   if (h === null || h === undefined || !isFinite(h)) return "—";
   return h < 0 ? "fresh" : hoursText(h);
 }
+/* How old the numbers are, on every screen (2 Oct 2026, the manager: "up to date at all times"). The feeds are pulled
+   when the app is built or refreshed; nothing in the file is live, so the honest thing it can do is say how old its
+   figures are, and say it louder once a price window has certainly passed (prices change overnight, so a day-old
+   snapshot has missed at least one) and louder again after three days. */
+function dataAgeH(ctx) {
+  const t = ctx && ctx.live ? msOf(ctx.live.fetched_at) : 0;
+  return t && ctx.now ? (ctx.now - t) / 3600000 : null;
+}
+function dataAgeTone(h) { return h === null || !isFinite(h) ? "warnt" : h > 72 ? "out" : h > 24 ? "warnt" : ""; }
+/* In the status line the age takes the version's old slot, so the line stays on one row at 390px: "5h old". The version
+   moved to the Lab's build line, where it sits with the content hash it belongs with. */
+function dataAgeShort(h) { return h === null || !isFinite(h) ? "age ?" : h < 1 ? "<1h old" : ageText(h) + " old"; }
+function dataAgeText(h) { return h === null || !isFinite(h) ? "data age unknown" : h < 1 ? "data under an hour old" : "data " + ageText(h) + " old"; }
+function StaleNote(props) {
+  const h = dataAgeH(props.ctx);
+  if (h !== null && isFinite(h) && h <= 24) return null;
+  return <div className="note note-w" data-testid="ld-stale">{(h === null || !isFinite(h) ? "Data age unknown" : "Data " + ageText(h) + " old") + ": check for new data before acting."}</div>;
+}
 function gwProgress(ctx) {
   try {
     const evs = ctx.events || [];
@@ -1219,6 +1237,7 @@ function GwActionCard(props) {
     return (
       <div className="landing card" data-plan="solved">
         <div className="lead"><span className="hi">{lv.lead}</span> before {lv.dlText} SAST.</div>
+        <StaleNote ctx={ctx} />
         {lv.fifteen.length ? (
           <div className="panel">
             <div className="panel-k">Classic · fifteen</div>
@@ -1276,6 +1295,7 @@ function GwActionCard(props) {
         {plan.kind === "transfers" ? <span><span className="hi">Make {plan.tp.moves.length} transfer{plan.tp.moves.length === 1 ? "" : "s"}</span> before {sastText(plan.deadline)}.</span> : null}
         {plan.kind === "hold" ? <span><span className="hi">Hold</span> — no transfer clears the bar.</span> : null}
       </div>
+      <StaleNote ctx={ctx} />
 
       {plan.kind === "wildcard" ? (
         <div className="panel">
@@ -1422,7 +1442,7 @@ function Header(props) {
           <span>{deadlineLine(ctx.hoursToDeadline)}</span>
           <span>FT {ctx.ft}</span>
           {props.busy ? <span>Refreshing…</span> : <span>{money(ctx.bank)} bank</span>}
-          {props.busy ? null : <span>{APP_VERSION}</span>}
+          {props.busy ? null : <span className={dataAgeTone(dataAgeH(ctx)) || undefined} data-testid="data-age" aria-label={dataAgeText(dataAgeH(ctx))}>{dataAgeShort(dataAgeH(ctx))}</span>}
         </div>
       </div>
       <div className="hdr-r">
@@ -3540,7 +3560,7 @@ function labView(mc) {
     // ── sources, dated, and how the plans were solved
     if (when(MC.asOf)) v.build.push("Official Fantasy Premier League and FPL Draft public feeds, pulled " + when(MC.asOf) + ".");
     if (when(model.at)) v.build.push("Backtest and position corrections fitted " + when(model.at) + ".");
-    if (preHash) v.build.push("This build" + (when(PRE.at) ? " " + when(PRE.at) : "") + "; content hash " + preHash + (same ? ", the same as the solved plan's." : hash
+    if (preHash) v.build.push("This build, " + APP_VERSION + "," + (when(PRE.at) ? " " + when(PRE.at) : "") + "; content hash " + preHash + (same ? ", the same as the solved plan's." : hash
       ? "; the solved plan's is " + hash + ", so it is set aside." : "; no solved plan carries one."));
     const yr = (function () { const t = Date.parse(typeof intel.asOf === "string" ? intel.asOf : MC.asOf); return isFinite(t) ? new Date(t).getUTCFullYear() : null; })();
     v.desk = (Array.isArray(intel.sources) ? intel.sources : []).map(function (s) { return labSastText(txt(s), yr); }).filter(Boolean).slice(0, 60);

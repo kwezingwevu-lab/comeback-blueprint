@@ -32722,6 +32722,23 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
   function ageText(h) {
     return h == null || !isFinite(h) ? "\u2014" : h < 0 ? "fresh" : hoursText(h);
   }
+  function dataAgeH(ctx) {
+    let t = ctx && ctx.live ? msOf(ctx.live.fetched_at) : 0;
+    return t && ctx.now ? (ctx.now - t) / 36e5 : null;
+  }
+  function dataAgeTone(h) {
+    return h === null || !isFinite(h) ? "warnt" : h > 72 ? "out" : h > 24 ? "warnt" : "";
+  }
+  function dataAgeShort(h) {
+    return h === null || !isFinite(h) ? "age ?" : h < 1 ? "<1h old" : ageText(h) + " old";
+  }
+  function dataAgeText(h) {
+    return h === null || !isFinite(h) ? "data age unknown" : h < 1 ? "data under an hour old" : "data " + ageText(h) + " old";
+  }
+  function StaleNote(props) {
+    let h = dataAgeH(props.ctx);
+    return h !== null && isFinite(h) && h <= 24 ? null : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "note note-w", "data-testid": "ld-stale", children: (h === null || !isFinite(h) ? "Data age unknown" : "Data " + ageText(h) + " old") + ": check for new data before acting." });
+  }
   function gwProgress(ctx) {
     try {
       let evs = ctx.events || [], next = evs.filter(function(e) {
@@ -33365,6 +33382,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
           lv.dlText,
           " SAST."
         ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StaleNote, { ctx }),
         lv.fifteen.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "panel", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "panel-k", children: "Classic \xB7 fifteen" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "names", children: [
@@ -33458,6 +33476,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
           " \u2014 no transfer clears the bar."
         ] }) : null
       ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StaleNote, { ctx }),
       plan.kind === "wildcard" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "panel", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "panel-k", children: "The fifteen" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "names", children: [
@@ -33680,7 +33699,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
             money(ctx.bank),
             " bank"
           ] }),
-          props.busy ? null : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: APP_VERSION })
+          props.busy ? null : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: dataAgeTone(dataAgeH(ctx)) || void 0, "data-testid": "data-age", "aria-label": dataAgeText(dataAgeH(ctx)), children: dataAgeShort(dataAgeH(ctx)) })
         ] })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "hdr-r", children: [
@@ -36025,7 +36044,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
       }), coverTxt = cover.map(function(c) {
         return "GW" + c.g + " (" + c.have + " of " + c.all + " matches)";
       }), lastCov = cover.length ? cover[cover.length - 1].g : next, cEnd = pl ? wN : fin(cfg.classicEnd) ? cfg.classicEnd : null, dEnd = fin(cfg.draftEnd) ? cfg.draftEnd : null;
-      next !== null && v.limits.push("Bookmaker prices are loaded for " + (coverTxt.length ? coverTxt.length < 2 ? coverTxt[0] : coverTxt.slice(0, -1).join(", ") + " and " + coverTxt[coverTxt.length - 1] : "no gameweek yet") + ". From GW" + (cover.length ? lastCov + 1 : next) + " the team ratings carry the fixtures" + (cEnd !== null && dEnd !== null ? ", to GW" + cEnd + " in Classic and GW" + dEnd + " in Draft" : "") + "; add prices on the Odds tab as they appear."), when(MC2.asOf) && v.build.push("Official Fantasy Premier League and FPL Draft public feeds, pulled " + when(MC2.asOf) + "."), when(model.at) && v.build.push("Backtest and position corrections fitted " + when(model.at) + "."), preHash && v.build.push("This build" + (when(PRE2.at) ? " " + when(PRE2.at) : "") + "; content hash " + preHash + (same ? ", the same as the solved plan's." : hash ? "; the solved plan's is " + hash + ", so it is set aside." : "; no solved plan carries one."));
+      next !== null && v.limits.push("Bookmaker prices are loaded for " + (coverTxt.length ? coverTxt.length < 2 ? coverTxt[0] : coverTxt.slice(0, -1).join(", ") + " and " + coverTxt[coverTxt.length - 1] : "no gameweek yet") + ". From GW" + (cover.length ? lastCov + 1 : next) + " the team ratings carry the fixtures" + (cEnd !== null && dEnd !== null ? ", to GW" + cEnd + " in Classic and GW" + dEnd + " in Draft" : "") + "; add prices on the Odds tab as they appear."), when(MC2.asOf) && v.build.push("Official Fantasy Premier League and FPL Draft public feeds, pulled " + when(MC2.asOf) + "."), when(model.at) && v.build.push("Backtest and position corrections fitted " + when(model.at) + "."), preHash && v.build.push("This build, " + APP_VERSION + "," + (when(PRE2.at) ? " " + when(PRE2.at) : "") + "; content hash " + preHash + (same ? ", the same as the solved plan's." : hash ? "; the solved plan's is " + hash + ", so it is set aside." : "; no solved plan carries one."));
       let yr = (function() {
         let t = Date.parse(typeof intel.asOf == "string" ? intel.asOf : MC2.asOf);
         return isFinite(t) ? new Date(t).getUTCFullYear() : null;
