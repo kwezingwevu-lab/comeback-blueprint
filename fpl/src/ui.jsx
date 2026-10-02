@@ -1904,12 +1904,15 @@ function solvedPlanView(mc, now, setting) {
          for the case, not a proved best: planning the earlier weeks around the final reshuffle might add a little. So the
          plan above minus this one, plus the proof tolerance, is the most waiting can cost. Absent from a build that did not
          build it, and then nothing is said. */
-      let latest = "";
+      let latest = "", latestMore = "";
       if (ok(T.latest) && T.latest.constructed === true) {
         const LT = T.latest, rs = isO(LT.reshuffle) ? LT.reshuffle : null;
         const lwk = Array.isArray(LT.weeks) ? LT.weeks.filter(function (x) { return isO(x) && x.chip === "wildcard"; })[0] : null;
         const behind = T.now.total - LT.total;
-        latest = "Played as late as the rules allow, GW" + (lwk && fin(lwk.gw) ? lwk.gw : cEnd) + ", the last deadline before set one expires: keep the no-wildcard plan to the week before, then rebuild the fifteen for that week" +
+        /* First paint carries one short sentence (Part G: the Plan tab stays under 500 words); the reasoning sits behind a reveal. */
+        latest = "Played as late as the rules allow, GW" + (lwk && fin(lwk.gw) ? lwk.gw : cEnd) + ": " + f0(LT.total) +
+          (behind > 0 ? ", at most " + f1(behind + tol) + " behind once the tolerance is added." : ", not below the plan above.");
+        latestMore = "The last deadline before set one expires. Keep the no-wildcard plan to the week before, then rebuild the fifteen for that week" +
           (rs && fin(rs.changes) ? " (" + rs.changes + (rs.changes === 1 ? " change" : " changes") + ")" : "") + ". That plan is worth " + f0(LT.total) + ", " +
           (behind > 0 ? f1(behind) + " below the plan above, so waiting to the end costs at most " + f1(behind + tol) + " points once the proof tolerance of about " + tol + " is added" : "not below the plan above") +
           ". It is a plan you could play, checked against the rules, and a floor: planning around the late wildcard might add a little. Points are counted only to GW" + cEnd +
@@ -1918,6 +1921,7 @@ function solvedPlanView(mc, now, setting) {
       view.timing = {
         clear: clear,
         latest: latest,
+        latestMore: latestMore,
         head: "Classic wildcard timing, each case solved on its own to about the same tolerance.",
         cases: "Play it in GW" + gw + ": " + f0(T.now.total) + ". Play it later, best week " + lgw + ": " + f0(T.later.total) + ". Keep it unplayed to GW" + cEnd + ": " + f0(T.never.total) + ".",
         never: proved(T.never)
@@ -2072,6 +2076,11 @@ function TabPlan(props) {
               <div className={"note" + (sv.timing.clear ? "" : " note-w")} data-testid="plan-timing">
                 <b>{sv.timing.head}</b> {sv.timing.cases + " " + sv.timing.never + " " + sv.timing.verdict + (sv.timing.latest ? " " + sv.timing.latest : "")}
               </div>
+            ) : null}
+            {sv.timing && sv.timing.latestMore ? (
+              <Reveal id="pl-latest" label="The wildcard as late as possible" open={!!(ui.reveals || {})["pl-latest"]} onToggle={on.rev}>
+                <div className="dim" data-testid="plan-latest-more">{sv.timing.latestMore}</div>
+              </Reveal>
             ) : null}
             <div data-testid="plan-xi">
               <div className="dim">{"Classic GW" + sv.gw + " under the plan, " + sv.shape + ": " + sv.weekEp + " expected with the captain's points doubled."}</div>

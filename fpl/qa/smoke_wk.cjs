@@ -403,12 +403,12 @@ async function main() {
   {
     const bad = [];
     fifteens.forEach((f) => {
-      const r = E.legal15(f.ids, ctx.els, f.budget === null ? 1e9 : f.budget);
+      const r = E.legal15(E.costedSquad(f.ids, ctx), ctx.els, f.budget === null ? 1e9 : f.budget);   // kept players at their selling price (2 Oct 2026)
       if (!r.ok) bad.push(f.label + ": " + r.reasons.join(", "));
     });
     assert("legal15-on-every-proposed-fifteen",
       fifteens.length >= 4 && !bad.length,
-      fifteens.map((f) => f.label + " " + E.legal15(f.ids, ctx.els, f.budget === null ? 1e9 : f.budget).cost + (f.budget === null ? "" : "/" + f.budget)).join(" · ") + (bad.length ? " — " + bad.join("; ") : ""));
+      fifteens.map((f) => f.label + " " + E.legal15(E.costedSquad(f.ids, ctx), ctx.els, f.budget === null ? 1e9 : f.budget).cost + (f.budget === null ? "" : "/" + f.budget)).join(" · ") + (bad.length ? " — " + bad.join("; ") : ""));
   }
 
   // ---- 10 · E-005 / E-009: three per club in the squad, two per club incoming

@@ -568,6 +568,21 @@ function legal15(ids, els, budget) {
   } catch (e) { res.ok = false; res.reasons.push("engine error: " + errMsg(e)); }
   return res;
 }
+/* A proposed fifteen costed as FPL costs it (2 Oct 2026): a player kept from the squad you own is not sold and bought back,
+   so he costs his selling price, and only a new player costs today's price. Measured against ctx.budget (bank plus the
+   selling value of the fifteen you own), that is exactly "the bank after the transfers is not negative". Charging a kept
+   player today's price instead over-charges anyone who has risen since he was bought: on 2 Oct the solved wildcard kept
+   Haaland (selling price 15.5, price 15.6) and the old check called a legal £0.0m-bank fifteen £0.1m over. */
+function costedSquad(ids, ctx) {
+  var owned = {};
+  if (isObj(ctx) && Array.isArray(ctx.squad)) ctx.squad.forEach(function (s) { if (isObj(s)) owned[s.id] = s; });
+  return arr(ids).map(function (x) {
+    var id = idOf(x), el = isObj(ctx) && isObj(ctx.els) ? ctx.els[id] : null;
+    if (!isFinite(id)) return null;            // junk in, nothing out: legal15 then reports a short or non-numeric squad (mc_full P05)
+    if (!el || !owned[id]) return id;
+    return { id: id, purchase: sellPrice(num(el.now_cost, 0), owned[id].purchase) };
+  });
+}
 function legalXI(ids, els) {
   var res = { ok: false, reasons: [], formation: "" };
   try {
@@ -1612,7 +1627,7 @@ function wildcardSolver(ctx, opts) {
     res.ok = true; res.ids = chosen.ids; res.cost = chosen.cost; res.bank = budget - chosen.cost; res.score = chosen.score; res.model = model;
     res.steps = chosen.steps; res.spend = chosen.spend;
     res.xi = bestXI(chosen.ids, ctx);
-    var L = legal15(chosen.ids, ctx.els, budget); if (!L.ok) { res.ok = false; res.reasons = res.reasons.concat(L.reasons); }
+    var L = legal15(costedSquad(chosen.ids, ctx), ctx.els, budget); if (!L.ok) { res.ok = false; res.reasons = res.reasons.concat(L.reasons); }
   } catch (e) { res.ok = false; res.reasons.push("engine error: " + errMsg(e)); }
   return res;
 }
@@ -1659,7 +1674,7 @@ function wildcardOptions(ctx, opts) {
       var ids = uniq(idList(list)).filter(function (id) { return ctx.els[id]; });
       v.ids = ids;
       if (ids.length !== 15) { v.reasons.push(label + " is " + ids.length + " known players, not fifteen"); return v; }
-      var L = legal15(ids, ctx.els, budget);
+      var L = legal15(costedSquad(ids, ctx), ctx.els, budget);
       v.legal = L.ok; v.cost = L.cost; v.bank = Math.trunc(budget - L.cost);
       if (!L.ok) v.reasons = v.reasons.concat(L.reasons);
       v.objective = wcObjective(ids, ctx, "TS");
@@ -5499,7 +5514,7 @@ if (typeof module !== "undefined" && module.exports) {
     ENGINE_VERSION: ENGINE_VERSION, SCORING: SCORING, REFRESH_PAIRS: REFRESH_PAIRS, DECAY: DECAY, PRIOR_PPS: PRIOR_PPS, FORMATIONS: FORMATIONS, SQUAD_SHAPE: SQUAD_SHAPE, POS_NAME: POS_NAME, TOURNAMENT_MODELS: TOURNAMENT_MODELS,
     num: num, intOf: intOf, clamp: clamp, isObj: isObj, kindOf: kindOf, arr: arr, errMsg: errMsg, okCtx: okCtx, idOf: idOf, idList: idList, elMap: elMap, elType: elType, uniq: uniq, sum: sum, sortNum: sortNum, quantile: quantile, nowMs: nowMs, combos: combos,
     rowStat: rowStat, pointsFor: pointsFor, draftScoring: draftScoring, gwPoints: gwPoints,
-    clubCounts: clubCounts, posCounts: posCounts, legal15: legal15, legalXI: legalXI, formationOf: formationOf,
+    clubCounts: clubCounts, posCounts: posCounts, legal15: legal15, costedSquad: costedSquad, legalXI: legalXI, formationOf: formationOf,
     shrunkPps: shrunkPps, flagInfo: flagInfo, isFlagged: isFlagged, statsFor: statsFor, pStart: pStart, fxMult: fxMult, fxMultInfo: fxMultInfo, teamMults: teamMults, xp5FromMults: xp5FromMults, xp1With: xp1With, xp5With: xp5With, xp1: xp1, xp5: xp5,
     teamStrength: teamStrength, tsEntry: tsEntry, tsXg: tsXg, tsMult: tsMult, tsPcs: tsPcs, overUnderTags: overUnderTags, runAvg: runAvg,
     elementGwStats: elementGwStats, rivalPickShares: rivalPickShares, rivalOwn: rivalOwn, capShare: capShare, rivalOwnMax: rivalOwnMax, convergenceRisk: convergenceRisk, classify: classify,

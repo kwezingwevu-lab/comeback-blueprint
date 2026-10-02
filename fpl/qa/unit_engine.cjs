@@ -774,6 +774,17 @@ check("REFRESH-request-never-mentions-ep_this-or-ep_next", function () {
 function refreshState() {
   return { live: { next_event: 4, events: [{ id: 4, deadline_time: "2026-09-12T12:30:00Z" }], elements: [{ id: 1, web_name: "P1", status: "a", chance: null, now_cost: 70, cost_change_event: 0 }, { id: 2, web_name: "P2", status: "a", chance: null, now_cost: 50, cost_change_event: 0 }] } };
 }
+/* 2 Oct 2026: a fifteen is costed as FPL costs it. A kept player is not sold and bought back, so he costs his selling price
+   (purchase plus half the rise, rounded down); only a new player costs today's price. Hand-checked: bought at 50, now 53,
+   selling price 51. */
+check("BUDGET-a-kept-player-costs-his-selling-price-and-a-new-player-costs-todays-price", function () {
+  const own = CTX.squad[0], keepId = own.id, newId = Object.keys(CTX.els).map(Number).filter(function (id) { return CTX.squadIds.indexOf(id) < 0; })[0];
+  const els = Object.assign({}, CTX.els); els[keepId] = Object.assign({}, CTX.els[keepId], { now_cost: 53 });
+  const ctx = Object.assign({}, CTX, { els: els, squad: CTX.squad.map(function (s) { return s.id === keepId ? Object.assign({}, s, { purchase: 50 }) : s; }) });
+  const c = E.costedSquad([keepId, newId], ctx);
+  const ok = typeof c[0] === "object" && c[0].id === keepId && c[0].purchase === 51 && c[1] === newId;
+  return { ok: ok, detail: JSON.stringify(c) + " (kept at 51 = 50 + floor(3/2); the new player plain, so legal15 charges today's price)" };
+});
 check("REFRESH-applyRefresh-applies-a-good-payload-without-mutating-the-input", function () {
   const st = refreshState(), before = JSON.stringify(st);
   const ns = E.applyRefresh(st, { fetched_at: "2026-09-11T07:00:00Z", elements: [{ id: 1, status: "d", chance: 75, news: "Knock" }] });
@@ -2536,7 +2547,7 @@ if (!LIVE) {
 
   if (WEEKLY && WEEKLY.classic && Array.isArray(WEEKLY.classic.wildcard15)) {
     const w15 = WEEKLY.classic.wildcard15;
-    const L15 = E.legal15(w15, LCTX.els, LCTX.budget);
+    const L15 = E.legal15(E.costedSquad(w15, LCTX), LCTX.els, LCTX.budget);   // kept players at their selling price (2 Oct 2026)
     const xi = E.bestXI(w15, LCTX);
     const cp = E.captainPick(xi.ids, LCTX);
     const name = function (id) { return id !== null && LCTX.els[id] ? LCTX.els[id].web_name : String(id); };

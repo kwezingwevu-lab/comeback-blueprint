@@ -130,3 +130,22 @@ re-solved. The solve is `python3 pipeline/solve.py 240`; the chip-timing and lon
 covers the gameweek, the deadlines, price moves and flags on the manager's players, and the plan's change in each
 game. It refuses (exit 3) a pull that is behind the committed snapshot, or any file not written by the run.
 Dry-run it on the tree with `node pipeline/refresh_note.cjs --before data --after data`, which says nothing changed.
+
+
+### How current the data is (2 Oct 2026)
+
+The manager asked for the data to be current at all times. What the app can and cannot do about that, as it stands:
+
+- Nothing in the app is live. The feeds, the odds, the injury overrides, the pundit notes and the plan are a snapshot taken
+  when a session (or `refresh.yml`) runs stages 1–8. The header now says how old that snapshot is on every screen ("5h old",
+  amber past a day, pink past three), and the landing card adds one line once it is a day old.
+- Prices change overnight, and flags and news change whenever a club or the FPL team publishes them; the press conferences
+  that settle availability come on the Thursday and Friday before a Saturday deadline. A refresh is worth most straight
+  after those, and right after the overnight price change.
+- `refresh.yml` runs daily at 06:17 UTC and proceeds only inside an international break, and only from the default branch,
+  which does not carry it yet. Running it every three hours in every week was proposed on 2 Oct 2026 and NOT made: changing
+  the schedule needs the manager's approval. Until then a session refreshes by hand: `bash pipeline/pull.sh`, the bake,
+  calibrate and export, the desk research in `pipeline/intel.js` re-read with dated sources, then the solve if the export hash
+  moved.
+- The desk research (odds, injuries, press conferences, pundits) is read by a person or an agent from dated web sources and
+  written into `pipeline/intel.js` with its date and source; it is never fetched by the app.

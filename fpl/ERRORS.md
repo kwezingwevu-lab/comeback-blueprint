@@ -1907,3 +1907,26 @@ with the wildcard played in the last week (`pipeline/latest_wildcard.py`, using 
 never `pgrep -f` or `pkill -f`, which match the shell that contains the pattern.
 TEST: plan_legality 51/51 (four checks on `latest` and four mutations: the wildcard moved to week one, an earlier week no longer the never plan's, a
 last week whose bank the rules do not give, a total that is not the sum), the standing byte-identity check on solve.py, and components `D2-the-timing-note-carries-the-wildcard-played-as-late-as-the-rules-allow…` with three mutations.
+
+### E-150 · v110 · the app's own budget check charged a kept player today's price, and called a legal £0.0m-bank wildcard £0.1m over
+CAUSE: legal15 costs each entry at its `purchase` if one is given and at today's price otherwise, and the callers (wildcardOptions,
+wcSolve's final check, unit_engine's weekly check, smoke_wk check 9) passed bare ids, so every player in the new fifteen was charged
+today's price, kept players included, against a budget of the bank plus the selling value of the fifteen owned. FPL does not sell and
+re-buy a kept player: a wildcard moves money only for players sold (at their selling price) and bought (at today's price). The two
+differ for anyone kept who has risen since he was bought. On 2 Oct the solved wildcard kept Haaland (selling price 15.5, price 15.6)
+and spent to £0.0m; the old check said 99.6 against 99.5. The optimiser and qa/plan_legality's rule replay, which both cost transfers
+the FPL way, said the plan was legal, and they were right. Every earlier plan had at least £0.1m of slack, which hid it.
+CAUGHT: 2 Oct 2026, by the release gate after the refresh (unit_engine LIVE-WEEKLY, wildcardOptions "written", smoke_wk check 9).
+RULE: a proposed fifteen is costed with `costedSquad(ids, ctx)`: a kept player at his selling price, a new one at today's price, so
+the check against ctx.budget is exactly "the bank after the transfers is not negative". The budget is never loosened to pass.
+TEST: unit_engine `BUDGET-a-kept-player-costs-his-selling-price-and-a-new-player-costs-todays-price` (hand-checked: bought at 50, now 53,
+selling price 51), and the three checks above, now on costedSquad.
+
+### E-151 · v110 · baking twice in one session made the "since the last build" delta compare a bake with itself
+CAUSE: bake.js takes the previous block for its delta from the file it is about to overwrite. The 2 Oct refresh baked once on the
+feeds and again after the desk research, so the second bake's "previous" was the first bake of the same morning, and the delta was
+empty: the Command tab dropped its changes section, and Mykolenko's new flag (the one change since the 1 Oct plan) was not shown.
+CAUGHT: 2 Oct 2026, by components `A-TabCommand-renders-every-testid-it-owns` (cmd-delta missing).
+RULE: a refresh that bakes more than once passes `--prev` the last COMMITTED block (`git show HEAD:fpl/data/mc_data.json`), so the
+delta is what changed since the plan of record. The export hash does not read the delta, so this never forces a re-solve.
+TEST: components `A-TabCommand-renders-every-testid-it-owns`; the 2 Oct block's delta lists Mykolenko a → d 75%.

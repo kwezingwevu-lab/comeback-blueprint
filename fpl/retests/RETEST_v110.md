@@ -611,6 +611,41 @@ iterations, ios 78/78, 0 failures.
 
 ---
 
+### The refresh on 2 October, and "current at all times" (2 Oct 2026)
+
+Asked for: the data, statistics, analysis, pundits' opinions, press conferences and forecasts current at all times.
+
+**What was refreshed, as at 07:25–07:52Z on 2 Oct.** The official Classic and Draft feeds (53 pulled, `data/live.json`
+re-fetched); since 1 Oct the only change was Mykolenko flagged 75% (leg). The desk research in `pipeline/intel.js` was
+re-read in full by three research agents, each told to return only what a page it opened said, with the page's own date:
+bookmaker prices for all twenty gameweek 6 and 7 fixtures (OddsPortal, live scrape; gameweek 6 read twice and matched;
+Chelsea v Bournemouth moved most), start-probability overrides for seven players where dated reporting now differs from the
+official flag (João Pedro 0.40, Semenyo 0.45, Brobbey 0.25, van Ewijk 0.50, Dunk 0.70, Havertz 0.20, Mykolenko 0.50, each
+with its sources), and nine dated notes: international matches still to come on 3–6 Oct, no gameweek 6 press-conference
+schedule published yet (Coventry and Newcastle play on Monday and may not speak before the deadline), prices not paused for the
+break, international minutes for the plan's players, and pundit opinion on the captaincy (The Scout, OneFPL and Fantasy
+Football Scout back Saka; RotoWire projects Bruno and Palmer higher), on the plan's picks (no published draft runs three
+Everton players; Gabriel called pricy) and on the chips (Manchester City host PSG on 14 Oct, three days before the Triple
+Captain week).
+
+**The plan, re-solved on that input (hash e24645609f1ec9db).** 903.41, proved within 0.39%: Wildcard GW6, captain Saka, vice
+Gabriel; Triple Captain GW7 and Bench Boost GW8 on Haaland; no hits; £0.0m in the bank. Against 1 Oct it buys Raya where it
+bought Benitez (who sat under the three-starts floor), keeps Diop where it bought Branthwaite, and moves the Bench Boost from GW9
+to GW8. Wildcard in GW7: 900.54, 2.87 behind, inside the 3.6-point tolerance, so the two weeks are level on expected points and
+the tie-breakers decide. Never: 892.59. As late as the rules allow (GW19, built): 896.84. Draft: twelve claims in the same order,
+Mainoo held back; stress 637.5, mean 640.4, against 595.4 today. Raya and Haaland are the declared locks over the rival-ownership
+gate.
+
+**What "at all times" can and cannot mean here.** Nothing in the app is live: it carries a snapshot. Since this change the header
+says how old the snapshot is on every screen ("5h old"; amber past a day, pink past three) and the landing card says to check
+for new data once it is a day old (components, smoke 69/69, webkit 58/58, ios 78/78). The scheduled refresh (`refresh.yml`) still
+runs only daily inside international breaks and only from the default branch, where it is not yet merged; running it every three
+hours in every week was proposed and declined by the session's permission check, so it is the manager's to approve. Press
+conferences for gameweek 6 have not happened (expected 8–9 Oct); the next refresh worth doing is after them, and again after the
+overnight price change before the deadline.
+
+---
+
 ## 4. What has not been done yet
 
 - The merge to `main` and the protection of `main` (audit F02, SEC-05): both are the manager's to do or approve. The tag
