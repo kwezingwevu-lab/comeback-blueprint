@@ -644,6 +644,15 @@ hours in every week was proposed and declined by the session's permission check,
 conferences for gameweek 6 have not happened (expected 8–9 Oct); the next refresh worth doing is after them, and again after the
 overnight price change before the deadline.
 
+**The gate.** The release run on the refreshed tree found three real defects, each fixed and logged: the app's own budget check
+charged a kept player today's price and called the legal £0.0m-bank wildcard £0.1m over (E-150; the optimiser and the rule replay
+were right); the second bake of the morning compared itself with the first and lost the "since the last build" changes (E-151);
+and the 30-second solver smoke had stopped being a margin on this input (E-152, now 45 s). The Plan tab went to 524 words with
+today's longer timing wording, so the late-wildcard reasoning moved behind a reveal. Final release run on a4ab3af: 38 of 39 steps
+green, the one red the solver smoke at its old 30 s limit; after E-152, solver_smoke 7/7 twice alone. Suites on that run:
+unit_engine 274/274, components 300/300, smoke 69/69, smoke_wk 37/37, webkit 58/58, ios 78/78, verify 34/34, plan_legality 51/51
+and 59/59, mc_full 308/308 at 25,000 iterations (after the costedSquad guard), mc_all 136 invariants over 1,000,000.
+
 ---
 
 ## 4. What has not been done yet
