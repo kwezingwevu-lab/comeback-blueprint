@@ -605,6 +605,10 @@ four mutations, each red), components 295/295 (the sentence with its figures, ab
 mutations), smoke 69/69 with the Plan tab inside its word gate, smoke_wk 37/37, verify 34/34, ios 78/78, mc_separation 43/43,
 privacy 27/27, visual 56/56.
 
+**The release gate with the scenario in: ALL PASS, 39 of 39 steps, 1,148 s**, `qa/run.sh --release` on the committed tree: plan_legality 51/51
+and 59/59, components 295/295, mc_full 302/302 at 25,000 iterations (950,013 assertions), mc_all 136 invariants over 1,000,000
+iterations, ios 78/78, 0 failures.
+
 ---
 
 ## 4. What has not been done yet
