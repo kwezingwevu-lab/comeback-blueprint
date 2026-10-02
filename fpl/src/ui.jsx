@@ -1627,6 +1627,9 @@ function commandView(mc, ctx, lv) {
         view.flags.delta = "Since the last build (" + sastDate(d.since) + " SAST): " + pr.length + plural(pr.length, " price change", " price changes") + " and " +
           fl.length + plural(fl.length, " flag change", " flag changes") + " across the game. " +
           (hit.length ? "Touching your squads, the plan or the claims: " + hit.join("; ") + "." : "None touches your squads, the plan or the claims.");
+      } else {
+        /* 2 Oct 2026: nothing moved is worth a line too, so a reader knows the comparison was made and when (E-151). */
+        view.flags.delta = "Since the last build (" + sastDate(d.since) + " SAST): no price or flag has changed across the game.";
       }
     }
 

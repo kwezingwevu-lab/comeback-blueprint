@@ -700,7 +700,11 @@ async function main() {
       });
       await page.reload({ waitUntil: "load" });
       await page.waitForSelector(".mc-root");
-      await page.waitForTimeout(800);
+      /* The first save's read-back sets data-store from "pending" to the copy's name. A fixed 800 ms wait was enough alone and
+         not beside two research agents on four cores (2 Oct 2026, E-153): wait on the state itself, generously, and then
+         read everything in one pass; a store that never settles still fails below, on "pending". */
+      try { await page.waitForFunction(function () { const r = document.querySelector(".mc-root"); return r && r.getAttribute("data-store") && r.getAttribute("data-store") !== "pending"; }, null, { timeout: 15000 }); } catch (e) { /* read it as it stands */ }
+      await page.waitForTimeout(200);
       const after = await page.evaluate(function () {
         const r = document.querySelector(".mc-root");
         return {

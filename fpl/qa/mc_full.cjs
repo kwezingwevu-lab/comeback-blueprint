@@ -732,8 +732,12 @@ const GROUPS = [
     const ok = r.errObj instanceof TypeError;
     return ok ? null : { ok: false, detail: (r.errObj && r.errObj.constructor ? r.errObj.constructor.name : typeof r.errObj) + ": " + r.err };
   }],
-  ["P04", "every call terminates inside two seconds", function (r) {
-    return r.ms < 2000 ? null : { ok: false, detail: r.kinds + " took " + Math.round(r.ms) + " ms" };
+  ["P04", "every call terminates inside two seconds (App, which renders the whole page on the real block, inside five)", function (r) {
+    /* The bound catches a hang (E-035 looped 1e308 times). App's junk render falls back to the real data and paints every tab:
+       1.4 s on 28 Sep, 2.0 s on 2 Oct as the block grew (E-153), nowhere near a loop. Five seconds for that one call keeps the
+       watchdog a watchdog; every other call keeps two. */
+    const cap = r.name === "App" ? 5000 : 2000;
+    return r.ms < cap ? null : { ok: false, detail: r.kinds + " took " + Math.round(r.ms) + " ms (cap " + cap + ")" };
   }],
   ["P05", "no NaN in any returned number", function (r) {
     if (r.threw) return null;

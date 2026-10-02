@@ -10,7 +10,7 @@
 "use strict";
 
 const INTEL = {
-  asOf: "2026-10-02T07:45:00Z",
+  asOf: "2026-10-02T13:45:00Z",
   /* Gameweek 5 market numbers (allaboutfpl / Fantasy Football Scout clean-sheet odds and RotoWire prices, 17 Sep). Kept as calibration anchors now the week is played. */
   market5: { MCI: { xg: 2.36, cs: 0.48 }, NEW: { xg: 2.01, cs: 0.35 }, NFO: { xg: 1.88, cs: 0.38 }, LIV: { xg: 1.84 }, ARS: { xg: 1.80, cs: 0.34 }, EVE: { xg: 1.80, cs: 0.34 }, MUN: { xg: 1.80 }, CHE: { xg: 1.77 }, LEE: { xg: 1.77, cs: 0.33 }, TOT: { cs: 0.31 } },
   /* Average bookmaker match prices (home, draw, away), OddsPortal, read 26 September. Every fixture
@@ -58,10 +58,13 @@ const INTEL = {
     "Pundits on captaincy, gameweek 6 (opinion, dated): The Scout backs Saka, who 'now has spot-kick duties' (premierleague.com, 1 Oct); OneFPL says the armband 'should not be automatically locked on Haaland' (26–27 Sep); Fantasy Football Scout calls Saka 'the more convincing attacking option' (30 Sep). RotoWire's projections (updated 1 Oct) put Bruno 6.56 and Palmer 5.94 above Saka 5.82 and Haaland 5.81. Haaland is about 74% owned and Saka about 14% (RotoWire), so a Saka armband is a large differential against the field.",
     "Pundits on the plan's picks (opinion, dated): Tarkowski, Hall, Groß, Barry and Haaland recur in published wildcard drafts (Fantasy Football Scout 26 Sep, Ingenuity Fantasy 28 Sep, Fantasy Football Fix 1 Oct); Branthwaite, Barry, Gonzalo and Leno are named as differentials (premierleague.com, 27 Sep). Against the plan: no published draft found runs three Everton players, and Everton's defence has conceded fewer than its 6.9 expected goals against suggests (Fantasy Football Scout, 29 Sep); Fantasy Football Scout calls Gabriel 'prohibitively pricy' at £8.0m (30 Sep); The Scout ranks Crystal Palace's and Leeds's next five fixtures among the worst (29 Sep), which touches Benitez and Stach.",
     "Chip risk, flagged by a pundit: Manchester City host PSG on Wednesday 14 Oct, Ipswich on Saturday 17 Oct (the plan's Triple Captain week for Haaland) and AEK on Tuesday 20 Oct; Fantasy Football Scout names gameweek 7 City's 'possible biggest rotation risk' (28 Sep), while guessing he is more likely rested against AEK. The plan's Bench Boost in gameweek 9 has Saka and Gabriel at Anfield.",
+    "Afternoon re-read at 2 Oct 13:45Z: no availability news changed on any listed player. Ukraine's coach confirmed Mykolenko misses tonight's match (Fantasy Football Scout, 2 Oct 11:45Z: 'we cannot count on Mykolenko, he is not feeling very well'); Sunderland still 'awaiting news' on Brobbey (Sunderland Echo, 2 Oct 11:00Z); Hall is in contention to start for England on 3 Oct (Read Newcastle, 2 Oct). Groß is September's Player of the Month and Raya its Save of the Month (premierleague.com, 2 Oct): no availability bearing. OddsPortal, read again at 2 Oct 13:45Z, moved three gameweek 6 fixtures by 0.05 or more on a leg since the 2 Oct 07:25Z read in this block: Arsenal v Leeds 1.36/4.73/7.67, Chelsea v Bournemouth 1.71/4.05/4.19, Manchester United v Tottenham 1.69/4.08/4.27; the other seven are within 0.03 on every leg. The block keeps the 2 Oct 07:25Z prices: the moves shift no implied probability by more than about half a point, the plan is re-solved after the Thursday pressers in any case, and a re-solve on this drift would replace a proven plan with the same one.",
+    "The Second Chance League (premierleague.com, 2 Oct): a global league that starts scoring from zero at the gameweek 6 deadline; every existing team is entered automatically; no cup. It changes nothing in either game's plan.",
     "There are two players called Hughes. He owns id 212, the Crystal Palace midfielder, who is fit and unflagged. The one carrying 'Groin injury - Unknown return date' is id 278, a Hull defender. Match on id, never on the name. Read from the feed pulled 26 Sep and unchanged on 2 Oct.",
   ],
   sources: [
-    "Official Fantasy Premier League and FPL Draft feeds, pulled 2 Oct 07:25Z",
+    "Official Fantasy Premier League and FPL Draft feeds, pulled 2 Oct 07:25Z and again 2 Oct 13:26Z (nothing a decision rests on moved)",
+    "Fantasy Football Scout, 2 Oct 11:45Z (international-break injury bulletin: Mykolenko); Sunderland Echo, 2 Oct 11:00Z (Brobbey); Read Newcastle, 2 Oct (Hall); premierleague.com, 2 Oct (monthly awards; Second Chance League); OddsPortal re-read at 2 Oct 13:45Z",
     "OddsPortal average match prices for gameweeks 6 and 7, read 2 Oct 07:25Z (live scrape; gameweek 6 read twice and matched)",
     "Premier Injuries injury table, read 2 Oct (an aggregator; each entry quotes its own dated report)",
     "Evening Standard, 2 Oct, on João Pedro seeing a specialist, on Havertz and on Mainoo's withdrawal",

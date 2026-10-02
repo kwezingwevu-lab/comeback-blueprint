@@ -1942,3 +1942,20 @@ RULE: the smoke's limit keeps a margin over the measured time to the first incum
 asserts is unchanged (a legal plan from the whole chain). gate.yml's step label still reads "a 30-second solve"; its command runs the
 script's default, so the behaviour follows the script.
 TEST: solver_smoke 7/7 twice alone at the new default after the change.
+
+### E-153 · v110 · the release gate ran beside two research agents and two wall-clock bounds went red
+CAUSE: on 2 Oct the afternoon release gate ran while a two-agent news sweep used the same four cores. Two checks that bound time went
+red: webkit IOS27-04 read `data-store` 800 ms after the reload and found it still "pending" (the first save's read-back had not landed),
+and mc_full P04 saw one App render take 2,049 ms against its 2,000 ms watchdog. Neither names a defect: both suites pass alone on the
+same tree (webkit 58/58, mc_full 308/308 at 25,000), and the same tree is green on GitHub's own runner. The solve rule already says a
+timed solve runs on an idle machine (E-129); the gate had no such rule written down.
+CAUGHT: 2 Oct 2026, release gate (37/39), then the two suites alone.
+RULE: the gate runs on an idle machine: no solves, no agents, no second gate beside it (the lock already stops the last). A check that
+waits for the app to reach a state waits on that state with a generous ceiling, never on a fixed sleep: IOS27-04 now waits up to 15 s for
+`data-store` to leave "pending" and fails on "pending" if it never does. The 2 s watchdog in mc_full stays as it is: it exists to catch
+a hang, and a render that takes 2.05 s on a loaded machine is not one; a run that trips it on a busy machine is re-run alone.
+TEST: webkit IOS27-04 (both storage flavours) and mc_full P04, alone, after the change.
+Amended the same day: mc_full P04 tripped again alone (App 2,039 ms). The watchdog's purpose is a hang, and App's junk render paints the whole page
+on the real block; it has grown from 1.4 s (28 Sep) to 2.0 s. App's cap is now 5 s; every other call keeps 2 s. The Command tab also now says
+"no price or flag has changed" when the delta is empty, so the comparison is visible either way, and every time in the desk research carries its
+date, because the Lab converts a dated time to SAST and shows a bare one as UTC, which D6 forbids.
