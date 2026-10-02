@@ -12,7 +12,9 @@
      2. slim(): keeps of each solve only what the interface needs.
      3. The long solve (solver_long.json) replaces the plan when it is the same problem proved to a better objective.
      4. The timing file (solver_timing.json): "now" is the same problem solved again, so the better objective is kept
-        as THE plan, and the timing block reads now := the kept plan, later and never as solved. A stale or incomplete
+        as THE plan, and the timing block reads now := the kept plan, later and never as solved. When the file also holds
+        "latest" (pipeline/latest_wildcard.py: the never plan with the first wildcard played in the last week before set
+        one expires), it is folded as timing.latest, flagged constructed, with no gap of its own. A stale or incomplete
         timing file is named and left out. The reference tree has no long solve; both files are optional.
      5. Free-hit weeks are re-labelled and re-priced against whichever plan was kept: a week is free only if that plan
         plays no chip in it, its budget is the kept squad's selling value plus the bank, and only affordable weeks stay.
@@ -122,6 +124,16 @@ function main() {
       /* the main plan and "wildcard now" are the same problem solved twice: keep whichever reached the better objective, and its proven gap */
       if ((st.now.obj || 0) > (plan.obj || 0)) { plan = Object.assign(slim(st.now), { detail: so.plan.detail }); solvedBy = show(o.timing) + " now"; }
       timing = { now: plan, later: slim(st.later), never: slim(st.never), at: st.at }; timingNote = "folded (now := the kept plan)";
+      /* The wildcard as late as the rules allow (pipeline/latest_wildcard.py): the proven "never" plan with the wildcard
+         played in the last week. It is a plan built from a proven one, not a solve, so it carries no gap of its own;
+         it is folded only when it is feasible and its weeks up to the last are the never plan's own. Optional. */
+      if (st.latest) {
+        const l = st.latest, nv = st.never;
+        const same = l.ok && l.constructed === true && nv && nv.ok && Array.isArray(l.weeks) && Array.isArray(nv.weeks) && l.weeks.length === nv.weeks.length &&
+          l.weeks.slice(0, -1).every((w, i) => JSON.stringify(w.squad) === JSON.stringify(nv.weeks[i].squad) && w.chip === nv.weeks[i].chip);
+        if (same) { timing.latest = Object.assign(slim(l), { constructed: true, from: l.from, reshuffle: l.reshuffle, note: l.note }); timingNote += "; latest wildcard folded (built from never)"; }
+        else timingNote += "; latest wildcard left out (not feasible, or not built from the never plan in this file)";
+      }
     } else timingNote = st.hash === nowHash ? "incomplete (needs now, later and never)" : "stale (hash " + st.hash + ")";
   }
 

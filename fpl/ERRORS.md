@@ -1889,3 +1889,21 @@ RULE: a timing bound carries the noise measured in the same run. The slack is 1 
 detail prints it. The ordering checks (after the race, before the release) are unchanged and are the ones that would catch a worker that waits for
 the network.
 TEST: ios IOS27-17 (78/78 three times after the change, once inside the full release gate).
+
+### E-149 · v110 · the first attempt at "wildcard as late as possible" edited the reference's solver and did not converge
+CAUSE: the request was a fourth timing scenario, the first wildcard in the last week before set one expires (GW19). The optimiser plans the first
+eight weeks week by week and holds the squad after that, and a chip cannot be played in a held week, so solve.classic cannot place a wildcard there.
+The first attempt added `wc_at` and `detail` arguments to classic() and opened all fourteen weeks. Two things were wrong. classic() is the
+reference's, byte for byte, and qa/plan_legality.cjs checks it; the edit would have turned that check red (found by re-reading the rule, not by a
+suite). And the wide solve did not converge: the scenario and its wildcard-free base each ran 1800 s on an idle machine and stopped at gaps of 3.1%
+and 4.9%, with incumbents (888.2 and 904.0) below plans already in hand (the never plan, 889.9, and the plan at 904.07), so it proved nothing and
+was worse than useless as a comparison. The same session killed its own shell with `pgrep -f <pattern>` inside the command that held the pattern
+(exit 144), an old trap (see E-129).
+CAUGHT: 2 Oct 2026, by reading the legality suite's byte-identity check before running the gate, and by the two solve logs.
+RULE: a scenario the optimiser cannot express is built from proven plans with the routines that already exist, flagged `constructed`, with no gap
+it did not earn, and called a floor. The model region of solve.py is never edited. `latest` is the proven never plan to the week before the last
+with the wildcard played in the last week (`pipeline/latest_wildcard.py`, using one_week_best under the held squad's budget, nobody re-bought):
+894.63 on 1 Oct's data, 4.77 above never playing it and 9.44 below the plan. Processes are matched by their own fields (`ps -eo pid,args | awk`),
+never `pgrep -f` or `pkill -f`, which match the shell that contains the pattern.
+TEST: plan_legality 51/51 (four checks on `latest` and four mutations: the wildcard moved to week one, an earlier week no longer the never plan's, a
+last week whose bank the rules do not give, a total that is not the sum), the standing byte-identity check on solve.py, and components `D2-the-timing-note-carries-the-wildcard-played-as-late-as-the-rules-allow…` with three mutations.

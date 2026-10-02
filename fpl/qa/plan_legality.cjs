@@ -317,6 +317,36 @@ if (PF.timing && PF.timing.now && PF.timing.later && PF.timing.never) {
   }
 }
 
+/* The wildcard as late as the rules allow (pipeline/latest_wildcard.py). Present only when the build made it. It is the proven
+   "never" plan to the week before the last with the wildcard played in the last week, so it is held to what that means:
+   one wildcard, in the last week before set one expires; every earlier week exactly the never plan's; every week legal
+   under the full rule replay (chips once, bank, free transfers, hits, points re-derived from the engine); and nobody
+   bought back who was sold earlier in the window. It carries no gap: it is built, not solved, and says so. One function,
+   so the checks and their mutations run the same code. */
+function latestVerdict(pf, data, eng) {
+  const T = pf.timing, L = T && T.latest, N = T && T.never;
+  if (!L) return null;
+  const out = [], last = eng.CFG.classicEnd, wcOf = (r) => (r && r.weeks ? r.weeks : []).filter((w) => w.chip === "wildcard").map((w) => w.gw);
+  out.push({ name: "timing: 'latest' is marked constructed, plays exactly one wildcard, in GW" + last + " (the last deadline before set one expires), and carries no gap of its own",
+    ok: !!L.ok && L.constructed === true && wcOf(L).length === 1 && wcOf(L)[0] === last && L.gap === undefined, detail: "constructed " + L.constructed + " · wildcard weeks " + wcOf(L).join(",") + " · gap " + L.gap });
+  const same = !!N && Array.isArray(N.weeks) && Array.isArray(L.weeks) && L.weeks.length === N.weeks.length &&
+    L.weeks.slice(0, -1).every((w, i) => JSON.stringify(w.squad) === JSON.stringify(N.weeks[i].squad) && w.chip === N.weeks[i].chip && w.bank === N.weeks[i].bank && w.epNet === N.weeks[i].epNet);
+  out.push({ name: "timing: every week of 'latest' before the last is the proven 'never' plan's own (squad, chip, bank, points)", ok: same, detail: same ? "" : "a week differs from the never plan, or the never plan is missing" });
+  if (Array.isArray(L.weeks) && L.weeks.length) {
+    const R = checkPlan({ plan: L, freeHit: [], replay: null }, data, eng), bad = [];
+    R.weeks.forEach((w) => w.checks.filter((c) => !c.ok).forEach((c) => bad.push("GW" + w.gw + " " + c.name + ": " + c.detail)));
+    R.plan.filter((c) => !c.ok && !/^free-hit weeks|replay block/.test(c.name)).forEach((c) => bad.push(c.name + ": " + c.detail));
+    out.push({ name: "timing: every week of 'latest' is legal under the full rule replay (" + L.weeks.length + " weeks: chips once, bank, free transfers, hits, points re-derived, no rebuy)", ok: bad.length === 0, detail: bad.slice(0, 3).join(" | ") });
+    const tot = Math.round(L.weeks.reduce((a, w) => a + (w.epNet || 0), 0) * 100) / 100;
+    out.push({ name: "timing: the total of 'latest' is the sum of its weeks, and it is not below the 'never' plan it was built from", ok: Math.abs(tot - L.total) < 0.011 && !!N && L.total >= N.total - 1e-9, detail: "weeks sum " + tot + " · total " + L.total + " · never " + (N && N.total) });
+  } else out.push({ name: "timing: 'latest' has weeks to replay", ok: false, detail: "none" });
+  return out;
+}
+{
+  const lv = latestVerdict(PF, DATA, M);
+  if (lv) lv.forEach((c) => ok(c.name, c.ok, c.detail));
+}
+
 /* the Draft roster (C5), a separate game: nothing here touches a Classic number */
 if (PF.draft && PF.draft.ok) {
   const dr = PF.draft, r0 = new Set(M.draftRoster().map((p) => p.id)), pool = new Set(M.waiverPool().map((p) => p.id)), c = { 1: 0, 2: 0, 3: 0, 4: 0 };
@@ -463,6 +493,18 @@ if (!OPT.noGolden && (OPT.golden || isReferencePlan)) {
   if (!OPT.skipGap && PF.timing && PF.timing.never) {
     const c = clone(PF); c.timing.never.gap = 0.113;
     ok("mutation: a 'never' scenario left at an 11% gap goes red on the E-129 timing check", timingProved(PF.timing) && !timingProved(c.timing), "real " + timingProved(PF.timing) + " · with never at " + c.timing.never.gap + ": " + timingProved(c.timing));
+  }
+  /* 8d. the latest wildcard: moved to an earlier week, an earlier week changed, a week the rules do not give, a total that does not add up */
+  if (PF.timing && PF.timing.latest && PF.timing.never) {
+    const real = latestVerdict(PF, DATA, M), allOk = (v) => !!v && v.every((c) => c.ok);
+    const moved = clone(PF); { const wk = moved.timing.latest.weeks; wk[wk.length - 1].chip = null; wk[0].chip = "wildcard"; }
+    ok("mutation: a 'latest' wildcard moved to the first week goes red", allOk(real) && !latestVerdict(moved, DATA, M)[0].ok, "real " + allOk(real) + " · moved: " + latestVerdict(moved, DATA, M)[0].detail);
+    const edited = clone(PF); edited.timing.latest.weeks[2].bank = Math.round((edited.timing.latest.weeks[2].bank + 0.3) * 10) / 10;
+    ok("mutation: an earlier 'latest' week that is no longer the never plan's goes red", !latestVerdict(edited, DATA, M)[1].ok, "bank of week 3 moved by 0.3");
+    const broken = clone(PF); { const wk = broken.timing.latest.weeks, w = wk[wk.length - 1]; w.bank = Math.round((w.bank + 3) * 10) / 10; }
+    ok("mutation: a last week whose bank the rules do not give goes red", !latestVerdict(broken, DATA, M)[2].ok, "last week's bank moved by 3");
+    const lied = clone(PF); lied.timing.latest.total = lied.timing.latest.total + 5;
+    ok("mutation: a 'latest' total that is not the sum of its weeks goes red", !latestVerdict(lied, DATA, M)[3].ok, "total raised by 5");
   }
   /* 9. the acceptance: total and chip weeks moved */
   if (GOLDEN) {

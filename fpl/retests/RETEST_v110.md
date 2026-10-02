@@ -582,6 +582,31 @@ log: no line starts with FAIL. On GitHub, fpl-gate run #36 (4286e46) is the firs
 
 ---
 
+### The wildcard as late as possible (2 Oct 2026)
+
+Asked for after the release gate: a scenario where the first wildcard is played as late as the rules allow, the last week before set
+one expires (GW19). The optimiser cannot place a wildcard there, because it holds the squad after the first eight weeks and a chip
+cannot be played in a held week. The first attempt widened `solve.classic` to all fourteen weeks and edited the reference's own
+function, which the legality suite forbids; the wide solve and its base then ran 1800 s each and stopped at 3.1% and 4.9% gaps with
+incumbents below plans already in hand (E-149). Neither the edit nor the result is kept.
+
+What shipped instead is `pipeline/latest_wildcard.py`: the proven `never` plan unchanged to GW18, then the wildcard in GW19 with the
+fifteen rebuilt for that week by `solve.one_week_best` under the held squad's budget, nobody re-bought. On 1 Oct's data it is worth
+**894.63**: **4.77 above never playing the wildcard (889.86) and 9.44 below playing it now (904.07)**; nine changes in the last week,
++4.75 points that week. It is built, not solved, so it is flagged constructed and carries no gap, and it is a floor, not a proved
+best. The Plan tab says so in one sentence of the timing note: waiting to the end costs at most the plan above minus this plan plus
+the proof tolerance (9.4 + 3.6, so at most about 13 points), and points are counted only to GW19, so a wildcard played then is credited
+with one week of its new squad and none of the weeks after it. That caveat is the real limit of the scenario: it measures what waiting
+gives up inside the window, not what a late wildcard would earn afterwards.
+
+Proof: `qa/plan_legality.cjs` 51/51 on `data/plan.json` (four checks on `latest`: one wildcard in GW19, no gap of its own; every earlier week
+is the never plan's own; all fourteen weeks legal under the full rule replay; the total is the sum of its weeks and not below never; and
+four mutations, each red), components 295/295 (the sentence with its figures, absent without a `latest`, and two moved-number
+mutations), smoke 69/69 with the Plan tab inside its word gate, smoke_wk 37/37, verify 34/34, ios 78/78, mc_separation 43/43,
+privacy 27/27, visual 56/56.
+
+---
+
 ## 4. What has not been done yet
 
 - The merge to `main` and the protection of `main` (audit F02, SEC-05): both are the manager's to do or approve. The tag

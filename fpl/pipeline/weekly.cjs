@@ -138,6 +138,9 @@ const fbConvergent = fbMoves.map((m) => m.in).filter((id) => E.convergenceRisk(i
 const locks = [...new Set(locksWc.concat(fbConvergent))].sort((a, b) => a - b);
 const chipWeeks = W.filter((w) => w.chip).map((w) => ({ set: 1, chip: CHIP[w.chip] || w.chip, gw: w.gw, captain: w.cap }));
 const T = PLAN.timing || {}, laterWc = T.later && T.later.weeks ? (T.later.weeks.find((w) => w.chip === "wildcard") || {}).gw : null;
+const wcWeek = (r) => (r && r.weeks ? (r.weeks.find((w) => w.chip === "wildcard") || {}).gw : null) || null;
+const LT = T.latest && T.latest.ok && T.latest.constructed === true ? T.latest : null;   // the wildcard as late as the rules allow: the never plan, then the wildcard in the last week
+const latestWc = wcWeek(LT);
 const fhBest = (PLAN.freeHit || []).filter((f) => f.free && f.affordable).sort((a, b) => b.gain - a.gain)[0] || null;
 const buys = w0.in || [], sells = w0.out || [];
 
@@ -235,6 +238,7 @@ L("    notes: " + JSON.stringify([
 ], null, 2).split("\n").join("\n    ") + ",");
 L("    why: " + JSON.stringify([
   "Timing (data/plan.json timing): wildcard now " + f2(T.now ? T.now.total : PLAN.plan.total) + (T.later ? ", later (GW" + laterWc + ") " + f2(T.later.total) : "") + (T.never ? ", never " + f2(T.never.total) : "") + " Classic expected points to GW" + cEnd + ".",
+  LT ? "The wildcard as late as the rules allow, GW" + latestWc + " (the last deadline before set one expires): the no-wildcard plan to the week before, then the fifteen rebuilt for that week" + (LT.reshuffle ? " (" + LT.reshuffle.changes + " changes, " + f2(LT.reshuffle.gain) + " that week)" : "") + ", worth " + f2(LT.total) + " Classic expected points, which is " + f2(PLAN.plan.total - LT.total) + " below the plan, so waiting to the end costs at most that plus the proof tolerance. It is a plan built from a proven one and replayed against the rules, and a floor, not a proved best. Points are counted only to GW" + cEnd + ", so a wildcard played in the last week is credited with that week alone and none after it: the cost is what waiting gives up, not the whole comparison." : "The wildcard as late as the rules allow was not built for this data.",
   (function () {
     // Two solves bound the no-wildcard problem (noWildcard, and the timing file's "never"); quote the better one, so the
     // chip's worth is never overstated.
@@ -276,7 +280,7 @@ L("  tournament: { leader: " + J(TN.leader) + ", transitions: " + TN.transitions
 L("");
 L("  // wildcardTiming(ctx) — the app engine's note; `solved` is the optimiser's (data/plan.json timing).");
 L("  timing: { now_vs_later: { by_gw19: " + Math.round(WT.breakeven.byGw19 || 0) + ", by_gw38: " + Math.round(WT.breakeven.byGw38 || 0) + ", breakeven_double_gw17: null, breakeven_later_value: " + Math.round(WT.breakeven.byGw19 || 0) + " },");
-L("    solved: { now: " + (T.now ? T.now.total : "null") + ", later: " + (T.later ? T.later.total : "null") + ", later_gw: " + (laterWc || "null") + ", never: " + (T.never ? T.never.total : "null") + " } }");
+L("    solved: { now: " + (T.now ? T.now.total : "null") + ", later: " + (T.later ? T.later.total : "null") + ", later_gw: " + (laterWc || "null") + ", never: " + (T.never ? T.never.total : "null") + ", latest: " + (LT ? LT.total : "null") + ", latest_gw: " + (latestWc || "null") + " } }");
 L("};");
 const text = lines.join("\n") + "\n";
 

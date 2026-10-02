@@ -77,7 +77,7 @@ The 240 s limits are the kit's and they are short: on the 28 Sep input three sta
 gaps, where the same problems prove within 0.4% in 250 to 470 s (E-129). So after the chain, look at the gap of
 every scenario; any above 1% is re-solved with `python3 pipeline/solve_scenario.py <now|later|never> 900 --gap 0.004`
 (one per core, nothing else running), and the full problem can be tightened with `python3 pipeline/solve_long.py 1500
---gap 0.003`. `solve_scenario.py` folds its result into the timing file only when the objective is higher and the input
+--gap 0.003`. The wildcard as late as the rules allow is not a solve: `python3 pipeline/latest_wildcard.py` builds it from the timing file's proven `never` plan, playing the wildcard in the last week (GW19, the chip stop) with the fifteen rebuilt for that week by `solve.one_week_best`, and writes it as the key `latest` (flagged constructed, no gap). The optimiser cannot place a wildcard there (it holds the squad after eight weeks and a chip cannot be played in a held week), and opening every week to it did not converge (E-149). Run it after the timing scenarios are proved; `plan.cjs` folds it as `timing.latest`. `solve_scenario.py` folds its result into the timing file only when the objective is higher and the input
 hash matches. `plan.cjs` then certifies the kept plan's gap from the tightest bound any solve of the same problem
 proved (E-128), and `qa/plan_legality.cjs` holds the kept plan, "later" and "never" to the 3% ceiling. Needs `pipeline/requirements.txt`. Proved by `qa/plan_legality.cjs` on what it produced.
 

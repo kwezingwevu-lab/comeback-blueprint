@@ -52,6 +52,7 @@ const WEEKLY = {
     ],
     why: [
       "Timing (data/plan.json timing): wildcard now 904.07, later (GW7) 899.87, never 889.86 Classic expected points to GW19.",
+      "The wildcard as late as the rules allow, GW19 (the last deadline before set one expires): the no-wildcard plan to the week before, then the fifteen rebuilt for that week (9 changes, 4.75 that week), worth 894.63 Classic expected points, which is 9.44 below the plan, so waiting to the end costs at most that plus the proof tolerance. It is a plan built from a proven one and replayed against the rules, and a floor, not a proved best. Points are counted only to GW19, so a wildcard played in the last week is credited with that week alone and none after it: the cost is what waiting gives up, not the whole comparison.",
       "Without the wildcard the best plan found is 889.86, so the chip is worth 14.21 over the window.",
       "The app's own timing model (src/engine.js wildcardTiming) puts the five-gameweek deficit of the current fifteen at 64.0 and the break-even for waiting at 136.4 by GW19."
     ]
@@ -99,5 +100,5 @@ const WEEKLY = {
 
   // wildcardTiming(ctx) — the app engine's note; `solved` is the optimiser's (data/plan.json timing).
   timing: { now_vs_later: { by_gw19: 136, by_gw38: 136, breakeven_double_gw17: null, breakeven_later_value: 136 },
-    solved: { now: 904.07, later: 899.87, later_gw: 7, never: 889.86 } }
+    solved: { now: 904.07, later: 899.87, later_gw: 7, never: 889.86, latest: 894.63, latest_gw: 19 } }
 };

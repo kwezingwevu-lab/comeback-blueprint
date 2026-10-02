@@ -1878,8 +1878,26 @@ function solvedPlanView(mc, now, setting) {
         }
         if (ins.length >= 6 && r0 && fin(r0.ftBefore)) tips.push(ins.length + " of your fifteen are being replaced anyway, which " + r0.ftBefore + plural(r0.ftBefore, " free transfer", " free transfers") + " cannot do");
       }
+      /* The wildcard played as late as the rules allow, the last week before set one expires: the proven no-wildcard plan
+         to the week before, then the wildcard, with the fifteen rebuilt for that last week (pipeline/latest_wildcard.py).
+         It is a plan built from a proven one and replayed against the rules, so its points are exact, and it is a floor
+         for the case, not a proved best: planning the earlier weeks around the final reshuffle might add a little. So the
+         plan above minus this one, plus the proof tolerance, is the most waiting can cost. Absent from a build that did not
+         build it, and then nothing is said. */
+      let latest = "";
+      if (ok(T.latest) && T.latest.constructed === true) {
+        const LT = T.latest, rs = isO(LT.reshuffle) ? LT.reshuffle : null;
+        const lwk = Array.isArray(LT.weeks) ? LT.weeks.filter(function (x) { return isO(x) && x.chip === "wildcard"; })[0] : null;
+        const behind = T.now.total - LT.total;
+        latest = "Played as late as the rules allow, GW" + (lwk && fin(lwk.gw) ? lwk.gw : cEnd) + ", the last deadline before set one expires: keep the no-wildcard plan to the week before, then rebuild the fifteen for that week" +
+          (rs && fin(rs.changes) ? " (" + rs.changes + (rs.changes === 1 ? " change" : " changes") + ")" : "") + ". That plan is worth " + f0(LT.total) + ", " +
+          (behind > 0 ? f1(behind) + " below the plan above, so waiting to the end costs at most " + f1(behind + tol) + " points once the proof tolerance of about " + tol + " is added" : "not below the plan above") +
+          ". It is a plan you could play, checked against the rules, and a floor: planning around the late wildcard might add a little. Points are counted only to GW" + cEnd +
+          ", so a wildcard played then is credited with one week and none of the weeks after it: read the cost as what waiting gives up, not as the whole comparison.";
+      }
       view.timing = {
         clear: clear,
+        latest: latest,
         head: "Classic wildcard timing, each case solved on its own to about the same tolerance.",
         cases: "Play it in GW" + gw + ": " + f0(T.now.total) + ". Play it later, best week " + lgw + ": " + f0(T.later.total) + ". Keep it unplayed to GW" + cEnd + ": " + f0(T.never.total) + ".",
         never: proved(T.never)
@@ -2032,7 +2050,7 @@ function TabPlan(props) {
             </div>
             {sv.timing ? (
               <div className={"note" + (sv.timing.clear ? "" : " note-w")} data-testid="plan-timing">
-                <b>{sv.timing.head}</b> {sv.timing.cases + " " + sv.timing.never + " " + sv.timing.verdict}
+                <b>{sv.timing.head}</b> {sv.timing.cases + " " + sv.timing.never + " " + sv.timing.verdict + (sv.timing.latest ? " " + sv.timing.latest : "")}
               </div>
             ) : null}
             <div data-testid="plan-xi">
@@ -3536,6 +3554,7 @@ function labView(mc) {
     const tm = PLAN.timing && typeof PLAN.timing === "object" ? PLAN.timing : null;
     if (pl && tm) {
       const parts = ["now", "later", "never"].filter(function (k) { return sol(tm[k]); }).map(function (k) { return k + " " + sol(tm[k]); });
+      if (tm.latest && tm.latest.constructed === true && fin(tm.latest.total)) parts.push("latest built from never, not solved");
       if (parts.length) v.solve.push("Classic wildcard timing, solved" + (when(tm.at) ? " " + when(tm.at) : "") + ": " + parts.join(", ") + ".");
     }
     if (pl && txt(src.longSolve)) v.solve.push("Classic, a longer re-solve: " + txt(src.longSolve) + ".");

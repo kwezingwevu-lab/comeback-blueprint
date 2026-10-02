@@ -855,6 +855,33 @@ console.log("--- v110 D2 · the Classic plan panel ---");
     assert("D2-the-timing-verdict-says-proved-worse-only-on-the-objective-proof-and-settled-only-beyond-the-tolerance", bad.length === 0,
       (bad.length ? "wrong: " + bad.join("; ") + " · " : "") + "tolerance " + tol + ", edge " + f1(edge) + ", never proved " + provedNever + ": «" + tim.slice(0, 260) + "»");
 
+    // the wildcard played as late as the rules allow: its sentence carries the plan's own figures, and is absent when the build has none
+    {
+      const LT = T.latest, bad2 = [];
+      if (LT && okc(LT) && LT.constructed === true) {
+        const lw2 = (LT.weeks || []).filter(function (x) { return x && x.chip === "wildcard"; })[0];
+        const behind = T.now.total - LT.total;
+        if (tim.indexOf("Played as late as the rules allow, GW" + (lw2 ? lw2.gw : EN.CFG.classicEnd)) < 0) bad2.push("the week");
+        if (tim.indexOf("That plan is worth " + f0(LT.total) + ", ") < 0) bad2.push("the total");
+        if (behind > 0 && tim.indexOf(f1(behind) + " below the plan above, so waiting to the end costs at most " + f1(behind + tol) + " points once the proof tolerance of about " + tol + " is added") < 0) bad2.push("the cost, at most " + f1(behind + tol));
+        if (behind <= 0 && tim.indexOf("not below the plan above") < 0) bad2.push("the not-below wording");
+        if (LT.reshuffle && isFinite(LT.reshuffle.changes) && tim.indexOf("(" + LT.reshuffle.changes + (LT.reshuffle.changes === 1 ? " change" : " changes") + ")") < 0) bad2.push("the number of changes");
+        if (tim.indexOf("a floor") < 0 || tim.indexOf("credited with one week and none of the weeks after it") < 0) bad2.push("the floor and horizon caveats");
+        if (/proved worse|the week is settled|treat the two weeks as level/.test(tim.slice(tim.indexOf("Played as late")))) bad2.push("the verdict's own wording leaked into the latest sentence");
+      } else if (/Played as late as the rules allow/.test(tim)) bad2.push("shown without a latest plan");
+      assert("D2-the-timing-note-carries-the-wildcard-played-as-late-as-the-rules-allow-with-its-cost-its-floor-and-its-horizon-and-only-when-the-plan-has-it", bad2.length === 0,
+        bad2.length ? "wrong: " + bad2.join("; ") : (LT ? "latest " + f0(LT.total) + " against the plan " + f0(T.now.total) + ", tolerance " + tol : "this plan carries none, and none is shown"));
+      const noLatest = (function () { const P2 = JSON.parse(JSON.stringify(SP)); delete P2.timing.latest; const r = tryRender("TabPlan", props({ mc: mcWith(P2) })); return r.ok ? part(r.html, "plan-timing") : "threw"; })();
+      assert("D2-mutation-without-a-latest-plan-the-sentence-is-not-shown-and-the-three-cases-still-are", !/Played as late as the rules allow/.test(noLatest) && /Keep it unplayed to GW/.test(noLatest), "«" + noLatest.slice(0, 160) + "»");
+      if (LT && okc(LT) && LT.constructed === true) {
+        const hi = (function () { const P2 = JSON.parse(JSON.stringify(SP)); P2.timing.latest.total = P2.timing.now.total + 3; const r = tryRender("TabPlan", props({ mc: mcWith(P2) })); return r.ok ? part(r.html, "plan-timing") : "threw"; })();
+        const lo = (function () { const P2 = JSON.parse(JSON.stringify(SP)); P2.timing.latest.total = P2.timing.now.total - 40; const r = tryRender("TabPlan", props({ mc: mcWith(P2) })); return r.ok ? part(r.html, "plan-timing") : "threw"; })();
+        assert("D2-mutation-a-latest-plan-above-the-plan-is-not-below-it-and-one-forty-points-under-costs-at-most-forty-plus-the-tolerance",
+          /not below the plan above/.test(hi) && !/at most/.test(hi.slice(hi.indexOf("Played as late"))) && new RegExp("40\\.0 below the plan above, so waiting to the end costs at most " + f1(40 + tol)).test(lo),
+          "above: «" + hi.slice(hi.indexOf("Played as late")).slice(0, 140) + "» · below by 40: «" + lo.slice(lo.indexOf("Played as late")).slice(0, 220) + "»");
+      }
+    }
+
     // the branches today's numbers do not reach, reached by moving the numbers
     const mut = function (fn) {
       const P2 = JSON.parse(JSON.stringify(SP)); fn(P2);
@@ -1899,6 +1926,7 @@ console.log("--- v110 D6 · the Lab tab: method, limits, dated sources ---");
       "within " + pct2(pl.gap) + " in " + secsT(pl.secs), "Classic wildcard timing, solved " + sast(tm.at) + " SAST"]);
     ["noWildcard", "undecayed"].forEach(function (k) { if (SP[k] && SP[k].ok) need.push("within " + pct2(SP[k].gap) + " in " + secsT(SP[k].secs)); });
     ["now", "later", "never"].forEach(function (k) { if (tm[k] && tm[k].ok) need.push(k + " within " + pct2(tm[k].gap) + " in " + secsT(tm[k].secs)); });
+    if (tm.latest && tm.latest.constructed === true) need.push("latest built from never, not solved");
     if (SP.draft && SP.draft.ok) need.push("Draft roster: solved in " + secsT(SP.draft.secs));
     const bad = miss(S0, need);
     [MB.asOf, MB.intel.asOf, SP.at, PR.at].forEach(function (iso) { if (S0.indexOf(utc(iso)) >= 0) bad.push(utc(iso) + " shown in UTC"); });
