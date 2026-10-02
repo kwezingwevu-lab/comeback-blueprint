@@ -653,6 +653,16 @@ green, the one red the solver smoke at its old 30 s limit; after E-152, solver_s
 unit_engine 274/274, components 300/300, smoke 69/69, smoke_wk 37/37, webkit 58/58, ios 78/78, verify 34/34, plan_legality 51/51
 and 59/59, mc_full 308/308 at 25,000 iterations (after the costedSquad guard), mc_all 136 invariants over 1,000,000.
 
+
+**Afternoon, 2 Oct (13:26–14:10Z).** The feeds were pulled again: nothing a decision rests on moved (export hash unchanged), so the plan
+stands and was not re-solved. A two-agent sweep for news since 07:45Z found no availability change on any listed player (Ukraine's
+coach confirmed Mykolenko out of their match; Sunderland still awaiting news on Brobbey; Hall in contention for England; Groß and Raya
+won September's monthly awards) and three gameweek 6 fixtures moved by 0.05 or more on a leg at OddsPortal, all within half a point of
+implied probability; both are recorded in the desk research with their times, and the odds table keeps the 07:25Z read. The release gate
+ran beside that sweep and tripped two wall-clock bounds (E-153): webkit IOS27-04 now waits on the store's state rather than 800 ms, and
+the fuzzer's hang watchdog allows a whole-App render five seconds (every other call keeps two). The Command tab says "no price or flag
+has changed" when the delta is empty, and every time in the desk research carries its date so the Lab shows it in SAST. On the rebuilt
+tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 34/34, mc_full 308/308 at 25,000, webkit 58/58, ios 78/78.
 ---
 
 ## 4. What has not been done yet
