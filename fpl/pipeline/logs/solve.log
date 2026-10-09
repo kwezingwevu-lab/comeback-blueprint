@@ -1,6 +1,6 @@
-plan Time limit reached. (HiGHS Status 13: Time limit reached) 240.1 s · gap 0.0816437739876253 · total 901.07
-no-wildcard 168.1 s · gap 0.09389449437501023 · total 889.14
-free hit [(6, 3.87), (7, 1.3), (8, 3.31), (9, 3.9), (10, 4.71), (11, 6.3), (12, 3.43), (13, 3.13), (14, 5.77), (15, 3.65), (16, 2.35), (17, 2.11), (18, 3.34), (19, 2.65)]
-draft 0.1 s · value 654.68 base 592.21 [('Silva', 'Ajayi'), ('Mukiele', 'Davis'), ('Hill', 'Bogle'), ('Mainoo', 'Belloumi'), ('Buendía', 'King'), ('McBurnie', 'Isidor')]
-draft if taken 636.72 [('Hill', 'Ajayi'), ('Schuster', 'Davis'), ('Justin', 'Bogle'), ('Buendía', 'Belloumi'), ('McBurnie', 'Isidor')]
-done in 409.3 s · /home/user/comeback-blueprint/fpl/data/solver_out.json
+plan Time limit reached. (HiGHS Status 13: Time limit reached) 240.3 s · gap 0.04112062403225185 · total 896.0
+no-wildcard 168.0 s · gap 0.12922795375039758 · total 887.78
+free hit [(6, 5.21), (7, 4.1), (8, 4.45), (9, 3.39), (10, 4.18), (11, 1.77), (12, 5.97), (13, 2.9), (14, 5.45), (15, 3.28), (16, 2.92), (17, 2.02), (18, 4.35), (19, 3.39)]
+draft 0.0 s · value 654.68 base 653.25 [('McBurnie', 'Igor Jesus')]
+draft if taken 654.68 [('McBurnie', 'Igor Jesus')]
+done in 409.6 s · /home/user/comeback-blueprint/fpl/data/solver_out.json

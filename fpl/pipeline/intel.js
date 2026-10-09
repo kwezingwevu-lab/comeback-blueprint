@@ -10,7 +10,7 @@
 "use strict";
 
 const INTEL = {
-  asOf: "2026-10-09T11:00:00Z",
+  asOf: "2026-10-09T16:20:00Z",
   /* Gameweek 5 market numbers (allaboutfpl / Fantasy Football Scout clean-sheet odds and RotoWire prices, 17 Sep). Kept as calibration anchors now the week is played. */
   market5: { MCI: { xg: 2.36, cs: 0.48 }, NEW: { xg: 2.01, cs: 0.35 }, NFO: { xg: 1.88, cs: 0.38 }, LIV: { xg: 1.84 }, ARS: { xg: 1.80, cs: 0.34 }, EVE: { xg: 1.80, cs: 0.34 }, MUN: { xg: 1.80 }, CHE: { xg: 1.77 }, LEE: { xg: 1.77, cs: 0.33 }, TOT: { cs: 0.31 } },
   /* Average bookmaker match prices (home, draw, away), OddsPortal, read 26 September. Every fixture
@@ -40,20 +40,21 @@ const INTEL = {
     6: {
       /* Re-read 9 Oct 2026 10:30–11:00Z, after Thursday's pressers and the first of Friday's (Fantasy Football Scout's
          dated live team-news pages, 8 and 9 Oct). Each line says which way it moves the official flag and on what reporting. */
-      "João Pedro|CHE": { p: 0.40, why: "Kept below the flag. Not in Chelsea's Wednesday training pictures (Fantasy Football Scout, 8 Oct); the Evening Standard is less confident on him than on Reece James (8 Oct, a report). Alonso's presser had not happened when read." },
+      "João Pedro|CHE": { p: 0.90, why: "Up from 0.40. Alonso, Friday: 'now they have trained well and they are ready to go… for tomorrow they will be good' (Fantasy Football Scout, 9 Oct); the feed cleared his flag at 16:17Z." },
       "Semenyo|MCI": { p: 0.45, why: "Kept below the flag. Left Ghana with a 'swollen leg' (Mirror via Fantasy Football Scout, 8 Oct); Maresca took no question on him on 9 Oct (Fantasy Football Scout, 9 Oct)." },
       "Brobbey|SUN": { p: 0.01, why: "OUT for gameweek 6. Le Bris: hamstring, 'short-term… it won't be too long', on the same timeline as Diarra, about a week (Fantasy Football Scout and Metro, 8 Oct)." },
       "van Ewijk|COV": { p: 0.65, why: "Up from 0.50. Lampard: 'Milan is back training with us… We hope he'll be alright if he comes through the next few days' (Fantasy Football Scout, 8 Oct). Coventry play Monday 12 Oct." },
       "Dunk|BHA": { p: 0.90, why: "Up from 0.70. Hurzeler said he returns after the stiff neck (Fantasy Football Scout, 9 Oct, presser); the feed has him fit." },
-      "Havertz|ARS": { p: 0.05, why: "Out for 'weeks' with a hamstring from Germany duty (football.london and the Evening Standard via Fantasy Football Scout, 8 Oct); Arteta had not confirmed when read." },
-      "Mykolenko|EVE": { p: 0.50, why: "Kept. Left the Ukraine camp early with a leg problem (roundtable via Fantasy Football Scout, 8 Oct); Moyes had not spoken when read." },
+      "Havertz|ARS": { p: 0.30, why: "Up from 0.05. Arteta, Friday: 'Ezri and Kai we will see tomorrow', a late fitness test after the hamstring on Germany duty (Fantasy Football Scout, 9 Oct)." },
+      "Mykolenko|EVE": { p: 0.50, why: "Kept. Moyes, Friday: 'has got a chance for Sunday, the extra day might help. We'll see' (Fantasy Football Scout, 9 Oct)." },
       "Haaland|MCI": { p: 0.95, why: "Fit. Maresca: 'He's good… recovered, and is ready for Anfield' (Fantasy Football Scout, 9 Oct, presser). Came off for Norway on 4 Oct, which the club treats as fatigue." },
-      "Konsa|ARS": { p: 0.60, why: "A doubt. A reported dead leg on England duty, left camp on 5 Oct (Fantasy Football Scout, 8 Oct); Arteta had not spoken when read." },
+      "Konsa|ARS": { p: 0.50, why: "Down from 0.60. Late fitness test on the dead leg: 'Ezri and Kai we will see tomorrow' (Arteta via Fantasy Football Scout, 9 Oct)." },
       "Tzolis|ARS": { p: 0.01, why: "Reported out about three weeks with a hamstring after 18 minutes for Greece (Evening Standard via Fantasy Football Scout, 8 Oct); not confirmed by the club." },
       "Joelinton|NEW": { p: 0.10, why: "Jaissle: 'They have the potential to be in the squad but… not in the starting XI' (Fantasy Football Scout, 8 Oct)." },
     },
   },
   notes: [
+    "Friday afternoon re-read, 9 Oct 2026 16:20Z (Fantasy Football Scout's Friday live page; feed pulled 16:17Z): nothing against Raya, Gabriel, Saka, Tarkowski, Barry, Diop, Janelt, Groß, Affengruber, Gonzalo, Leno or Haaland. O'Neil has 'a fully fit squad' (Ipswich); Arbeloa: 'everybody is fit and available' bar Cairney and Robinson (Fulham); Andrews ruled out only Milambo and Dasilva (Brentford). Palmer and João Pedro 'ready to go' (Alonso); Tzolis out 'a few weeks' (Arteta). Newcastle, Leeds and Bournemouth were not on that page; their Thursday pressers carried nothing against Hall, Stach or Tavernier.",
     "Re-read 9 Oct 2026 after Thursday's pressers (Bournemouth, Coventry, Leeds, Sunderland, Newcastle) and Friday's first three (Manchester City, Brighton, Fulham), from Fantasy Football Scout's live team-news pages of 8 and 9 Oct. Arsenal, Chelsea, Everton, Manchester United, Palace, Brentford, Liverpool, Villa and others spoke on Friday afternoon after this read: re-check Saka, Raya, Gabriel, Tarkowski, Barry, Mbeumo and Stach before the deadline. Nothing found against any of them. Scott (BOU) is out four to five weeks (Rose, 8 Oct); Daniel James (LEE) misses Arsenal (Farke, 8 Oct); Isak and Gakpo are injured (Iraola, 8 Oct).",
     "Re-read 2 Oct 2026. The September and October international windows are merged: no Premier League football between 20 September and Saturday 10 October. International matches are still to come on 3 to 6 October (England v Croatia on 3 Oct and v Czechia on 6 Oct with Saka and Hall; Brazil v India in Kolkata on 3 Oct with Gabriel; Côte d'Ivoire v Cameroon on 3 Oct with Mbeumo; Portugal v Norway on 4 Oct with Haaland), so new knocks are still possible. Sources: England fixtures page, Daily Cannon 29 Sep, Africa Soccer 1 Oct, ESPN UK, all read 2 Oct.",
     "No gameweek 6 press-conference schedule is published yet (Fantasy Football Scout, the Premier League site and Hayters checked 2 Oct). Saturday's clubs usually speak on Thursday 8 or Friday 9 Oct; Coventry and Newcastle, who play on Monday 12 Oct, may not speak before the deadline, which matters for Thomas and Hall. Set the claims and build the wildcard as late as the deadlines allow, and re-check after the pressers.",

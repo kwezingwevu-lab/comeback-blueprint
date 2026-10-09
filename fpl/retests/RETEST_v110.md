@@ -683,3 +683,9 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
 - Plan: WC GW6, captain Saka, vice Gabriel; BB GW7, TC GW8 on Haaland; £1.1m in the bank. Fifteen: Raya, Leno · Gabriel, Tarkowski, Diop, Hall, Affengruber · Saka, Tavernier, Janelt, Groß, Stach · Barry, Haaland, Gonzalo. Bench: Stach, Janelt, Tavernier. Affengruber starts while under the B3 three-starts floor (2/3, P(start) 0.35), named by weekly.cjs.
 - Draft waivers settled 9 Oct 12:00 SAST before this refresh; the app now shows the settled phase (sign free agents now) and the sheet is for the record.
 - E-154 (weekly.cjs budget at selling prices), E-155 (bake refuses an unreadable --prev), E-156 (components renders the pre-settle phase from a settled build), E-157 (browser age check accepts "fresh" when the feed is ahead of its pinned clock) fixed. Suites: components 300/300, smoke 69/69, smoke_wk 37/37, webkit 58/58, browser 185/185, verify 34/34, plan_legality 51/51 and 59/59, unit_engine 274/274, mc_full 308/308 at 3,000, mc_all 0 violations in 1M.
+
+## 9 Oct 2026, Friday afternoon (feeds 16:18Z, pressers read 16:20Z)
+- 35 flag changes after Friday's pressers; none on the plan's fifteen. João Pedro and Palmer cleared; Tzolis out to 24 Oct; Havertz and Konsa late fitness tests.
+- Re-solved on hash 59e05c41615ded6f: now 901.42 (gap 0.38%), later 897.84, never 890.77, latest (GW19) 893.80.
+- Plan: WC GW6, captain Saka, vice Gabriel; TC GW7, BB GW9. Fifteen: Trafford, Tzolakis · Gabriel, Thomas, Tarkowski, Hall, Affengruber · Saka, Janelt, Groß, Stach, Mbeumo · Barry, Haaland, Gonzalo; bench Gonzalo, Stach, Janelt; £0.2m bank. Level with the morning plan (901.39) inside the tolerance.
+- E-158 fixed. Suites: components 300/300, smoke 69/69, smoke_wk 37/37, plan_legality 51/51, webkit 58/58, browser 185/185.

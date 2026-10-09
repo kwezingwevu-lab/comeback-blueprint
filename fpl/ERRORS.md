@@ -1983,3 +1983,9 @@ CAUSE: qa/browser.py pins the clock 26 h before the deadline and assumed the fee
 CAUGHT: browser.py, both schemes, on the 9 Oct run.
 RULE: the check derives which answer is right from the snapshot's own `fetched_at` against the pinned clock: "fresh" when the feed is ahead of it, an age otherwise. A test never assumes when the manager refreshes.
 TEST: browser-self-check-{dark,light}-snapshot-age-is-an-age.
+
+### E-158 · v110 · two Draft checks failed after the 9 Oct waiver run
+CAUSE: smoke_wk's claims check compared each drop against the saved state's roster, which the waiver run had moved on (the engine correctly reads the league's live roster); components' Draft head expected "N claims" and the app rightly wrote "1 claim".
+CAUGHT: the 9 Oct 16:20Z refresh.
+RULE: a check compares against the source the engine reads (`draftRoster`), and count words are pluralised as the app pluralises them.
+TEST: smoke_wk draft-claims-forced-replacements-first; components D3-the-solved-roster-lists-every-pair….

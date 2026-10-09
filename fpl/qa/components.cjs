@@ -1233,7 +1233,7 @@ console.log("--- v110 D3 · the Draft tab ---");
     const last = A.weeks[A.weeks.length - 1];
     const bad = [];
     if (!r.ok) bad.push("threw " + (r.err && r.err.message));
-    if (so.indexOf(A.pairs.length + " claims, " + sgn(A.value - A.base) + " Draft points to GW" + last + " (" + f0(A.base) + " to " + f0(A.value) + ")") < 0) bad.push("the head");
+    if (so.indexOf(A.pairs.length + (A.pairs.length === 1 ? " claim, " : " claims, ") + sgn(A.value - A.base) + " Draft points to GW" + last + " (" + f0(A.base) + " to " + f0(A.value) + ")") < 0) bad.push("the head");
     A.pairs.forEach(function (q) {
       if (so.indexOf(nm(q.add) + " for " + nm(q.drop) + " " + pos(q.add)) < 0) bad.push(nm(q.add) + " for " + nm(q.drop));
       if (EN.P[q.add].p !== EN.P[q.drop].p) bad.push("a cross-position pair");

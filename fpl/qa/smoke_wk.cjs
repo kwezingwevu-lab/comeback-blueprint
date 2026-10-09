@@ -706,13 +706,16 @@ async function main() {
   // ---- 27 · C5: forced replacements first, then the largest gain
   {
     const claims = E.draftWaivers(STATE, ctx);
-    const roster = new Set((STATE.draft.roster || []).map(Number));
+    // The roster the claims are built from: the league's own when the live data carries it (it moves at every waiver run,
+    // so after the 9 Oct run the saved state's list was a week old: E-158), the saved state's otherwise.
+    const RI = E.draftRoster(STATE, ctx);
+    const roster = new Set((RI.codes && RI.codes.length ? RI.codes : (STATE.draft.roster || [])).map(Number));
     const bad = [];
     let seenUnforced = false;
     claims.forEach((c) => {
       if (c.forced && seenUnforced) bad.push("forced claim " + c.outName + " ranked below an upgrade");
       if (!c.forced) seenUnforced = true;
-      if (!roster.has(Number(c.out))) bad.push(c.outName + " is not on the saved roster");
+      if (!roster.has(Number(c.out))) bad.push(c.outName + " is not on the roster (" + RI.source + ")");
       if (roster.has(Number(c.in))) bad.push(c.inName + " is already on the roster");
     });
     const group = (f) => claims.filter((c) => c.forced === f);
