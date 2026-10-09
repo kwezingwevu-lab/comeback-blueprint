@@ -676,3 +676,10 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
   G-08, G-09), the live price check making a pushed gate perishable (F14), refresh.yml's write token on disk (SEC-04's
   second half).
 - Device-only checks: safe-area insets, focus zoom, Increase Contrast and the Home Screen app on a real iPhone 17.
+
+## 9 Oct 2026 refresh (feed 10:32Z, desk research 11:00Z)
+- Delta since 2 Oct: 26 prices, 22 flags. Pressers read: Thu 8 Oct (BOU, COV, LEE, SUN, NEW), Fri 9 Oct morning (MCI, BHA, FUL). Arsenal, Chelsea, Everton, Man Utd and the rest spoke after this read.
+- Re-solved on hash a6429f41a6d1f19e: now 901.39 (gap 0.40%), later 899.80, never 890.97, latest (GW19) 894.64. GW6 against GW7 is inside the proof's tolerance; tie-breakers (news before the deadline, free transfers kept) favour GW6.
+- Plan: WC GW6, captain Saka, vice Gabriel; BB GW7, TC GW8 on Haaland; £1.1m in the bank. Fifteen: Raya, Leno · Gabriel, Tarkowski, Diop, Hall, Affengruber · Saka, Tavernier, Janelt, Groß, Stach · Barry, Haaland, Gonzalo. Bench: Stach, Janelt, Tavernier. Affengruber starts while under the B3 three-starts floor (2/3, P(start) 0.35), named by weekly.cjs.
+- Draft waivers settled 9 Oct 12:00 SAST before this refresh; the app now shows the settled phase (sign free agents now) and the sheet is for the record.
+- E-154 (weekly.cjs budget at selling prices), E-155 (bake refuses an unreadable --prev), E-156 (components renders the pre-settle phase from a settled build), E-157 (browser age check accepts "fresh" when the feed is ahead of its pinned clock) fixed. Suites: components 300/300, smoke 69/69, smoke_wk 37/37, webkit 58/58, browser 185/185, verify 34/34, plan_legality 51/51 and 59/59, unit_engine 274/274, mc_full 308/308 at 3,000, mc_all 0 violations in 1M.

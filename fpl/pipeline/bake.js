@@ -231,7 +231,12 @@ function bake(opts) {
     sell: { "Verbruggen|BHA": 4.5, "Kinsky|TOT": 4.5, "Gabriel|ARS": 8.0, "Konsa|ARS": 4.5, "van Ewijk|COV": 4.0, "Diop|IPS": 4.0, "Shaw|MUN": 4.4, "Saka|ARS": 9.5, "Rogers|CHE": 7.6, "Hughes|CRY": 4.4, "Szoboszlai|LIV": 7.0, "Semenyo|MCI": 8.4, "João Pedro|CHE": 7.6, "Haaland|MCI": 15.5, "Brobbey|SUN": 5.8 } };
   /* what moved since the previous bake, for the "since last build" line */
   const prevPath = opts.prev === "none" ? null : (opts.prev || out);
-  const PREV = prevPath ? (() => { try { return JSON.parse(fs.readFileSync(prevPath, "utf8")); } catch (e) { return null; } })() : null;
+  // An explicit --prev that cannot be read is a refusal, never a silent empty delta (E-155): on 9 Oct a failed `git show`
+  // left a 0-byte file, the bake accepted it, and the Command tab lost its "since the last build" line without a word.
+  // The default (the existing --out file) may still be missing on a first bake.
+  const PREV = prevPath ? (() => { try { return JSON.parse(fs.readFileSync(prevPath, "utf8")); } catch (e) {
+    if (opts.prev && opts.prev !== "none") { console.error("bake: --prev " + prevPath + " is not a readable block (" + e.message + "); pass --prev none to bake without a delta"); process.exit(2); }
+    return null; } })() : null;
   const delta = { since: PREV ? PREV.asOf : null, prices: [], flags: [] };
   if (PREV) { const pv = {}; PREV.players.forEach((p) => { pv[p.id] = p; });
     players.forEach((p) => { const q = pv[p.id]; if (!q) return;

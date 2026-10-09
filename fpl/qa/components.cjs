@@ -160,6 +160,13 @@ const MCB = MODULE.exports.__MC__ || {};
 const APP_TABS = Array.isArray(MODULE.exports.__TABS__) ? MODULE.exports.__TABS__ : [];
 const APP_PRIMARY = MODULE.exports.__PRIMARY__ || {};
 let MCP = null;
+/* The pre-settle Draft panels (the claims sheet, its strip and stress note, the landing's settle time, the checklist's
+   claims step) are the ones most of this suite photographs. A build baked after the week's waivers have run (9 Oct 2026,
+   E-156) would leave them unreached, so the suite renders the pre-settle phase from the same block, and the settled phase
+   is reached by moving the data (D3-moved-once-waivers-settle-…), whichever phase the shipped build is in. */
+let BUILT_SETTLED = false;
+try { if (MCB.MC && MCB.MC.draft && MCB.MC.draft.waiversProcessed) { BUILT_SETTLED = true; MCB.MC.draft.waiversProcessed = false; } } catch (e) { /* the block check below reports it */ }
+if (BUILT_SETTLED) console.log("# the shipped block is baked after this week's waivers; rendering the pre-settle phase from it, the settled phase by moving the data");
 try { MCP = { MC: MCB.MC, PLAN: MCB.PLAN, PRE: MCB.PRE, E: MCB.MCEngine.create(MCB.MC) }; } catch (e) { MCP = null; }
 assert("components-the-mc-engine-data-plan-and-precomputed-blocks-are-in-scope",
   !!(MCP && MCP.MC && Array.isArray(MCP.MC.players) && MCP.PLAN && MCP.PRE && MCP.E && typeof MCP.E.ep === "function" &&

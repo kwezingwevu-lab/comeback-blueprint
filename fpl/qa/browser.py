@@ -1122,8 +1122,13 @@ def press_self_check(page, theme):
     assert_("browser-self-check-" + theme + "-flag-and-transfer-counts-are-numbers",
             re.match(r"^\d+$", flags["v"]) is not None and re.match(r"^\d+$", fts["v"]) is not None,
             'flags on the fifteen "%s", free transfers "%s"' % (flags["v"], fts["v"]))
+    # A feed pulled after the pinned clock (inside the last 26 h before the deadline, as on 9 Oct 2026) is stamped
+    # ahead of it, and the app's ageText says "fresh" for exactly that case (E-157); anything else must be an age.
+    with open(LIVE_JSON, "r", encoding="utf-8") as fh:
+        fetched = str(json.load(fh).get("fetched_at") or "")
+    ahead = fetched > pinned_now()[0]
     assert_("browser-self-check-" + theme + "-snapshot-age-is-an-age",
-            re.match(r"^\d+(\.\d+)?\s*(min|h|d)$", age["v"]) is not None,
+            (age["v"] == "fresh") if ahead else (re.match(r"^\d+(\.\d+)?\s*(min|h|d)$", age["v"]) is not None),
             'snapshot age "%s" (the clock is pinned to the snapshot, so this is its real age)'
             % age["v"])
     # The same verdict, rendered independently on the Squad tab. Two surfaces, one truth.

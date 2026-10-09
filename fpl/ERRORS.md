@@ -1959,3 +1959,27 @@ Amended the same day: mc_full P04 tripped again alone (App 2,039 ms). The watchd
 on the real block; it has grown from 1.4 s (28 Sep) to 2.0 s. App's cap is now 5 s; every other call keeps 2 s. The Command tab also now says
 "no price or flag has changed" when the delta is empty, so the comparison is visible either way, and every time in the desk research carries its
 date, because the Lab converts a dated time to SAST and shows a bare one as UTC, which D6 forbids.
+
+### E-154 · v110 · weekly.cjs reported the solved wildcard fifteen as over budget (£99.5m of £99.4m)
+CAUSE: weekly.cjs priced every player in the planned fifteen at `now_cost`, but the budget counts kept players at their selling price. Saka, Gabriel and Haaland had risen since purchase, so the check charged the rises the manager never gets. Same class as E-150; that fix reached the engine (`costedSquad`) but not this caller.
+CAUGHT: the 9 Oct refresh, on the first run of weekly.cjs after the price moves.
+RULE: every legal15 call on a squad that keeps owned players goes through `costedSquad`, and so does every cost figure printed beside a budget.
+TEST: weekly.cjs refuses on any conflict; the 9 Oct plan (£99.3m of £99.4m, selling prices) passes it.
+
+### E-155 · v110 · the Command tab's "since the last build" line vanished without a word
+CAUSE: `git show HEAD~1:data/mc_data.json` run from `fpl/` needs the repo-root path (`fpl/data/…`); it failed into a 0-byte file and bake.js swallowed the parse error, baking an empty delta.
+CAUGHT: components A-TabCommand (missing cmd-delta) on the 9 Oct run.
+RULE: an explicit `--prev` that cannot be parsed stops the bake (exit 2); `--prev none` is the only way to bake without a delta.
+TEST: bake.js on a 0-byte --prev exits 2 with the reason (run 9 Oct).
+
+### E-156 · v110 · eleven Draft render checks failed once the week's waivers had run
+CAUSE: the build was baked after waivers settled (9 Oct 12:00 SAST), so the app correctly showed "sign now" and no claims sheet; the suite photographed the pre-settle panels from the shipped block.
+CAUGHT: components D1/D3/A-TabDraft on the 9 Oct run.
+RULE: the suite renders the pre-settle phase from the shipped block and reaches the settled phase by moving the data, whichever phase the build is in; the app is never changed to satisfy a phase photograph.
+TEST: components.cjs logs when it flips the phase; D3-moved-once-waivers-settle still asserts the settled panels.
+
+### E-157 · v110 · the browser self-check rejected "fresh" as a snapshot age
+CAUSE: qa/browser.py pins the clock 26 h before the deadline and assumed the feed was always pulled before that moment. The 9 Oct pull (10:32Z, 23.5 h before the deadline) is stamped after the pinned clock, and the app rightly calls a snapshot stamped ahead of the clock "fresh".
+CAUGHT: browser.py, both schemes, on the 9 Oct run.
+RULE: the check derives which answer is right from the snapshot's own `fetched_at` against the pinned clock: "fresh" when the feed is ahead of it, an age otherwise. A test never assumes when the manager refreshes.
+TEST: browser-self-check-{dark,light}-snapshot-age-is-an-age.

@@ -10,7 +10,7 @@
 "use strict";
 
 const INTEL = {
-  asOf: "2026-10-02T13:45:00Z",
+  asOf: "2026-10-09T11:00:00Z",
   /* Gameweek 5 market numbers (allaboutfpl / Fantasy Football Scout clean-sheet odds and RotoWire prices, 17 Sep). Kept as calibration anchors now the week is played. */
   market5: { MCI: { xg: 2.36, cs: 0.48 }, NEW: { xg: 2.01, cs: 0.35 }, NFO: { xg: 1.88, cs: 0.38 }, LIV: { xg: 1.84 }, ARS: { xg: 1.80, cs: 0.34 }, EVE: { xg: 1.80, cs: 0.34 }, MUN: { xg: 1.80 }, CHE: { xg: 1.77 }, LEE: { xg: 1.77, cs: 0.33 }, TOT: { cs: 0.31 } },
   /* Average bookmaker match prices (home, draw, away), OddsPortal, read 26 September. Every fixture
@@ -38,18 +38,23 @@ const INTEL = {
   start: {
     5: { "João Pedro|CHE": { p: 0.15, why: "ESPN Brasil: knee, about three and a half weeks. He did miss Brentford. Carried from the 22 Sep block." }, "Shaw|MUN": { p: 0.40, why: "Carrick: 'half a chance'. Carried from the 22 Sep block." }, "N.Jackson|AVL": { p: 0.55, why: "Hooked at half-time the week before. Carried from the 22 Sep block." } },
     6: {
-      /* Re-read 2 Oct 2026 07:30–07:45Z. Each line says which way it moves the official flag and on what dated reporting. Premier
-         Injuries is an aggregator (its percentages are its own reading of the news), so it never stands alone. */
-      "João Pedro|CHE": { p: 0.40, why: "BELOW the 75% flag. Seeing a specialist in London during the break (Evening Standard, 2 Oct); a Brazilian report of knee swelling 'that could take up to four weeks' (Roundtable via Yahoo, 29 Sep, speculation); Premier Injuries lists him ruled out to 17 Oct (read 2 Oct). Alonso's pre-break target was Bournemouth on 10 Oct (premierleague.com, 28 Sep), so this is a doubt, not a write-off." },
-      "Semenyo|MCI": { p: 0.45, why: "BELOW the 75% flag. Withdrew from Ghana with a swollen leg (Okraku, 24 Sep); not pictured back in training and 'a doubt for City's next fixture against Liverpool' (Man City News, 1 Oct, a fan site); Premier Injuries 50%, no return date (read 2 Oct). No club update." },
-      "Brobbey|SUN": { p: 0.25, why: "BELOW the 75% flag. Hamstring for the Netherlands on 24 Sep; Sunderland still 'awaiting news' (Sunderland Echo, 27 Sep); Premier Injuries 25%, no return date (read 2 Oct). A former PSV doctor calls it 'very serious' (Football Insider, 2 Oct): an outside view, not his doctor's, and weighed as such." },
-      "van Ewijk|COV": { p: 0.50, why: "BELOW the 75% flag, and lower than the 26 Sep block's 0.80. Nothing new since Lampard on 22 Sep ('we hope will see him back on the other side of the break', via Rotowire); Premier Injuries now reads 25% with a return of 12 Oct (read 2 Oct). Coventry play on Monday 12 Oct, after the deadline, so he cannot be seen in a team sheet first." },
-      "Dunk|BHA": { p: 0.70, why: "Just below the 75% flag, and lower than the 26 Sep block's 0.88. A neck problem; 'pushing to be available' for Sunderland on 10 Oct (Sussex Express, 28 Sep, a report rather than a quote); Premier Injuries 50%, return 10 Oct (read 2 Oct). Draft roster." },
-      "Havertz|ARS": { p: 0.20, why: "Not owned in either squad; a wildcard-pool candidate. Hamstring for Germany on 24 Sep; The Times (27 Sep, via ArsenalInsider) says 'at least four weeks', which the club has not confirmed; Arsenal have given no timeline (ReadArsenal, 2 Oct); Premier Injuries 25% (read 2 Oct)." },
-      "Mykolenko|EVE": { p: 0.50, why: "BELOW the 75% flag the feed added on 2 Oct. Left the Ukraine camp injured on 1 Oct: the Ukrainian FA said he 'will not help the blue-and-yellows in the upcoming matches' (UNN, 1 Oct); coach Maldera: 'He isn't feeling good' (Sport Witness, 1 Oct). Premier Injuries 50%, return 11 Oct (read 2 Oct). Everton play Hull on Sunday 11 Oct." },
+      /* Re-read 9 Oct 2026 10:30–11:00Z, after Thursday's pressers and the first of Friday's (Fantasy Football Scout's
+         dated live team-news pages, 8 and 9 Oct). Each line says which way it moves the official flag and on what reporting. */
+      "João Pedro|CHE": { p: 0.40, why: "Kept below the flag. Not in Chelsea's Wednesday training pictures (Fantasy Football Scout, 8 Oct); the Evening Standard is less confident on him than on Reece James (8 Oct, a report). Alonso's presser had not happened when read." },
+      "Semenyo|MCI": { p: 0.45, why: "Kept below the flag. Left Ghana with a 'swollen leg' (Mirror via Fantasy Football Scout, 8 Oct); Maresca took no question on him on 9 Oct (Fantasy Football Scout, 9 Oct)." },
+      "Brobbey|SUN": { p: 0.01, why: "OUT for gameweek 6. Le Bris: hamstring, 'short-term… it won't be too long', on the same timeline as Diarra, about a week (Fantasy Football Scout and Metro, 8 Oct)." },
+      "van Ewijk|COV": { p: 0.65, why: "Up from 0.50. Lampard: 'Milan is back training with us… We hope he'll be alright if he comes through the next few days' (Fantasy Football Scout, 8 Oct). Coventry play Monday 12 Oct." },
+      "Dunk|BHA": { p: 0.90, why: "Up from 0.70. Hurzeler said he returns after the stiff neck (Fantasy Football Scout, 9 Oct, presser); the feed has him fit." },
+      "Havertz|ARS": { p: 0.05, why: "Out for 'weeks' with a hamstring from Germany duty (football.london and the Evening Standard via Fantasy Football Scout, 8 Oct); Arteta had not confirmed when read." },
+      "Mykolenko|EVE": { p: 0.50, why: "Kept. Left the Ukraine camp early with a leg problem (roundtable via Fantasy Football Scout, 8 Oct); Moyes had not spoken when read." },
+      "Haaland|MCI": { p: 0.95, why: "Fit. Maresca: 'He's good… recovered, and is ready for Anfield' (Fantasy Football Scout, 9 Oct, presser). Came off for Norway on 4 Oct, which the club treats as fatigue." },
+      "Konsa|ARS": { p: 0.60, why: "A doubt. A reported dead leg on England duty, left camp on 5 Oct (Fantasy Football Scout, 8 Oct); Arteta had not spoken when read." },
+      "Tzolis|ARS": { p: 0.01, why: "Reported out about three weeks with a hamstring after 18 minutes for Greece (Evening Standard via Fantasy Football Scout, 8 Oct); not confirmed by the club." },
+      "Joelinton|NEW": { p: 0.10, why: "Jaissle: 'They have the potential to be in the squad but… not in the starting XI' (Fantasy Football Scout, 8 Oct)." },
     },
   },
   notes: [
+    "Re-read 9 Oct 2026 after Thursday's pressers (Bournemouth, Coventry, Leeds, Sunderland, Newcastle) and Friday's first three (Manchester City, Brighton, Fulham), from Fantasy Football Scout's live team-news pages of 8 and 9 Oct. Arsenal, Chelsea, Everton, Manchester United, Palace, Brentford, Liverpool, Villa and others spoke on Friday afternoon after this read: re-check Saka, Raya, Gabriel, Tarkowski, Barry, Mbeumo and Stach before the deadline. Nothing found against any of them. Scott (BOU) is out four to five weeks (Rose, 8 Oct); Daniel James (LEE) misses Arsenal (Farke, 8 Oct); Isak and Gakpo are injured (Iraola, 8 Oct).",
     "Re-read 2 Oct 2026. The September and October international windows are merged: no Premier League football between 20 September and Saturday 10 October. International matches are still to come on 3 to 6 October (England v Croatia on 3 Oct and v Czechia on 6 Oct with Saka and Hall; Brazil v India in Kolkata on 3 Oct with Gabriel; Côte d'Ivoire v Cameroon on 3 Oct with Mbeumo; Portugal v Norway on 4 Oct with Haaland), so new knocks are still possible. Sources: England fixtures page, Daily Cannon 29 Sep, Africa Soccer 1 Oct, ESPN UK, all read 2 Oct.",
     "No gameweek 6 press-conference schedule is published yet (Fantasy Football Scout, the Premier League site and Hayters checked 2 Oct). Saturday's clubs usually speak on Thursday 8 or Friday 9 Oct; Coventry and Newcastle, who play on Monday 12 Oct, may not speak before the deadline, which matters for Thomas and Hall. Set the claims and build the wildcard as late as the deadlines allow, and re-check after the pressers.",
     "Prices are not paused for the break: the official daily price page (premierleague.com, 1 Oct) reports rises at 00:00 BST each day. Barry rose to £5.7m on 28 Sep and Tarkowski to £6.2m on 1 Oct. The feed pulled 2 Oct 07:25Z shows no further move since the 1 Oct build.",
@@ -63,6 +68,8 @@ const INTEL = {
     "There are two players called Hughes. He owns id 212, the Crystal Palace midfielder, who is fit and unflagged. The one carrying 'Groin injury - Unknown return date' is id 278, a Hull defender. Match on id, never on the name. Read from the feed pulled 26 Sep and unchanged on 2 Oct.",
   ],
   sources: [
+    "Fantasy Football Scout, gameweek 6 early team news and Thursday's live injury updates (8 Oct) and Friday's live injury updates (9 Oct, read before the afternoon pressers)",
+    "Official Fantasy Premier League and FPL Draft feeds, pulled 9 Oct 10:32Z",
     "Official Fantasy Premier League and FPL Draft feeds, pulled 2 Oct 07:25Z and again 2 Oct 13:26Z (nothing a decision rests on moved)",
     "Fantasy Football Scout, 2 Oct 11:45Z (international-break injury bulletin: Mykolenko); Sunderland Echo, 2 Oct 11:00Z (Brobbey); Read Newcastle, 2 Oct (Hall); premierleague.com, 2 Oct (monthly awards; Second Chance League); OddsPortal re-read at 2 Oct 13:45Z",
     "OddsPortal average match prices for gameweeks 6 and 7, read 2 Oct 07:25Z (live scrape; gameweek 6 read twice and matched)",

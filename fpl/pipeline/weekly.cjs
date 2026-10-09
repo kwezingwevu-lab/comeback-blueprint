@@ -81,8 +81,8 @@ const conflicts = [];
 const W = PLAN.plan.weeks, w0 = W[0], R0 = PLAN.replay && PLAN.replay.weeks ? PLAN.replay.weeks[0] : null;
 const kind = w0.chip === "wildcard" ? "wildcard" : (w0.in && w0.in.length ? "transfers" : "hold");
 const fifteen = w0.squad.slice();
-const cost = fifteen.reduce((s, id) => s + Number(CTX.els[id].now_cost), 0);
-const L15 = E.legal15(fifteen, CTX.els, CTX.budget);
+const cost = E.costedSquad(fifteen, CTX).reduce((s, x) => s + (x && typeof x === "object" ? x.purchase : Number(CTX.els[x].now_cost)), 0);   // kept players at their selling price, as the budget counts them (E-154)
+const L15 = E.legal15(E.costedSquad(fifteen, CTX), CTX.els, CTX.budget);   // kept players at their selling price (E-150, E-154)
 if (!L15.ok) conflicts.push("the planned fifteen is not legal15 under the app's engine: " + L15.reasons.join("; "));
 const flagged = fifteen.filter((id) => (CTX.flags[id] || {}).flagged);
 if (flagged.length) conflicts.push("the planned fifteen carries flagged players: " + flagged.map((id) => nm(id) + " " + CTX.els[id].status + " " + CTX.els[id].chance_of_playing_next_round + "%").join(", "));
