@@ -16,6 +16,8 @@
  *                                            bootstrap.json fixtures_all.json live{gw}.json
  *                                            entry.json history.json picks{gw}.json
  *                                            leagues/{id}.json (page 1) rivals/{entry}.json
+ *                                            rival_history/{entry}.json (optional: a snapshot
+ *                                            without it ships rivals with no history)
  *                                            draft_bootstrap.json draft_game.json
  *   node data/fetch_live.cjs --out PATH      write somewhere other than data/live.json
  *
@@ -84,6 +86,7 @@ function offlineFile(url) {
     if ((m = p.match(/^\/api\/event\/(\d+)\/live$/))) return `live${m[1]}.json`;
     if (p === `/api/entry/${ENTRY}`) return "entry.json";
     if (p === `/api/entry/${ENTRY}/history`) return "history.json";
+    if ((m = p.match(/^\/api\/entry\/(\d+)\/history$/))) return path.join("rival_history", `${m[1]}.json`);
     if ((m = p.match(/^\/api\/entry\/(\d+)\/event\/(\d+)\/picks$/))) {
       return Number(m[1]) === ENTRY ? `picks${m[2]}.json` : path.join("rivals", `${m[1]}.json`);
     }
@@ -321,9 +324,25 @@ async function main() {
     if (!R || !Array.isArray(R.picks)) return;
     rivals[String(rid)] = {
       event: current_event,
+      active_chip: typeof R.active_chip === "string" ? R.active_chip : null,
       picks: R.picks.map((p) => ({ element: p.element, is_captain: !!p.is_captain, multiplier: p.multiplier, position: p.position })),
     };
   });
+
+  // Rivals' seasons (15 Oct 2026, the manager: "a clear plan to win ... all my mini leagues by the end of GW19"). The
+  // route to first place needs what the table cannot say: each rival's points week by week, net of hits, and the chips
+  // already spent. entry/{id}/history/ is public; only the week number, the points, the hit cost and the chips are kept
+  // (no name of any kind). A rival whose history cannot be read keeps its picks and simply carries no history.
+  const histRaw = await pool(rivalList.filter((rid) => rivals[String(rid)]), async (rid) => {
+    try { return { rid, h: await getJSON(`${CLASSIC}/entry/${rid}/history/`) }; }
+    catch (e) { warnings.push(`rival ${rid} history: ${e.message}`); return null; }
+  });
+  for (const x of histRaw) {
+    if (!x || !x.h || !Array.isArray(x.h.current)) continue;
+    const R = rivals[String(x.rid)];
+    R.gws = x.h.current.filter((c) => Number.isInteger(c.event)).map((c) => [c.event, Number(c.points) || 0, Number(c.event_transfers_cost) || 0]);
+    R.chips = (Array.isArray(x.h.chips) ? x.h.chips : []).filter((c) => c && typeof c.name === "string" && Number.isInteger(c.event)).map((c) => ({ name: c.name, event: c.event }));
+  }
 
   // Draft: ids differ from classic for some players — carry code, and map team via team code
   const teamIdByCode = new Map(bootstrap.teams.map((t) => [t.code, t.id]));
@@ -442,7 +461,7 @@ async function main() {
   for (const w of warnings) console.error(`warn: ${w}`);
   console.log(
     `live.json: ${teams.length} teams, ${elements.length} elements, ${fixtures.length} fixtures, gw ${Object.keys(gw).join("/")}, ` +
-    `picks GW1-${pickGws.length}, ${leagues.length} leagues, ${Object.keys(rivals).length} rivals, ${draft.elements.length} draft elements, ` +
+    `picks GW1-${pickGws.length}, ${leagues.length} leagues, ${Object.keys(rivals).length} rivals (${Object.values(rivals).filter((r) => Array.isArray(r.gws)).length} with their season), ${draft.elements.length} draft elements, ` +
     `draft league ${draft.league_id === null ? "none" : draft.league_id + " (" + draft.counts.entries + " teams, " + draft.counts.freeAgents + " free agents)"}, ` +
     `ft ${out.ft_available} | fetched_at ${fetched_at} | next_event ${next_event} | deadline ${nextEv ? nextEv.deadline_time : "n/a"} | ` +
     `${Buffer.byteLength(text)} bytes -> ${path.relative(process.cwd(), OUT)}${OFFLINE_DIR ? " (offline)" : ""}`

@@ -52,7 +52,7 @@ const STYLE = `
 .refbar i{display:block;height:100%;width:40%;background:var(--cyn);animation:sl 1.1s linear infinite}
 @keyframes sl{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
 
-.tabs{display:flex;gap:2px;padding:6px 4px;background:var(--bg2);border-bottom:1px solid var(--line);position:sticky;top:var(--sat);z-index:4;
+.tabs{display:flex;gap:1px;padding:6px 4px;background:var(--bg2);border-bottom:1px solid var(--line);position:sticky;top:var(--sat);z-index:4;
   overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .tabs{padding-left:max(4px,var(--sal));padding-right:max(4px,var(--sar))}
 .tabs::-webkit-scrollbar{width:0;height:0}
@@ -127,7 +127,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
 .row:last-child{border-bottom:0}
 .row-h{min-height:38px;color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
 .row-h>*{min-width:0;overflow-wrap:anywhere}
-.row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.nmw{font-size:13px;overflow-wrap:anywhere;line-height:1.3}.nmw .nms{display:block;font-size:11px;color:var(--dim);margin-top:2px}
 .row .rt{text-align:right;font-variant-numeric:tabular-nums}
 .kv{display:flex;align-items:baseline;justify-content:space-between;gap:10px;min-height:38px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}
 .kv:last-child{border-bottom:0}
@@ -1810,7 +1810,7 @@ function solvedPlanView(mc, now, setting) {
   const QUICK = " The quick searches below still work.";
   const view = { state: "unsolved", note: "The points plan is not solved for this data, so this panel stays empty until the next rebuild." + QUICK,
     gw: 0, lastGw: 0, strip: [], timing: null, eleven: [], benchLine: [], reserve: null, shape: "", weekEp: "", wildcard: false,
-    pairs: [], bankText: "", budgetLine: false, keptText: "", price: null, weekRows: [], foot: "" };
+    pairs: [], bankText: "", budgetLine: false, keptText: "", price: null, weekRows: [], foot: "", horizons: null };
   try {
     const isO = function (v) { return !!v && typeof v === "object" && !Array.isArray(v); };
     const fin = function (x) { return typeof x === "number" && isFinite(x); };
@@ -1871,6 +1871,63 @@ function solvedPlanView(mc, now, setting) {
       { k: "GW" + gw, v: wc ? "Wildcard" : ins.length ? ins.length + " in" : "Roll", sub: "captain " + name(w.cap) + (w.chip && !wc && CHIP[w.chip] ? ", " + CHIP[w.chip] : "") },
       { k: "Free Hit", v: fh ? "GW" + fh.gw : "—", sub: fh ? sgn(fh.gain) + " that week" : "no week with it free" }
     ];
+
+    // (1b) The gameweek, the month and the season (the manager's ask of 15 Oct 2026: "maximise the gameweek, the monthly
+    // and the season points"). PLAN.horizons scores every plan solved on this input (the plan of record, the wildcard-timing
+    // cases and pipeline/horizons.py's three lenses) by gameweek, by FPL month and to the chip stop, and names the best
+    // found for each horizon (plan.cjs, step 4c). Every figure is one currency: Classic expected points with hits taken
+    // off. The month's points already banked come from the feed. Absent, nothing is said.
+    const H = isO(PLAN.horizons) ? PLAN.horizons : null;
+    const hs = function (o) { return isO(o) && fin(o.gameweek) && fin(o.month) && fin(o.season); };
+    if (H && hs(H.plan) && isO(H.month) && fin(H.month.start) && fin(H.month.stop) && Array.isArray(H.candidates) && isO(H.best)) {
+      const C = H.candidates.filter(function (c) { return isO(c) && hs(c.score) && typeof c.key === "string"; });
+      const byKey = function (k) { return C.filter(function (c) { return c.key === k; })[0] || null; };
+      const bg = byKey(H.best.gameweek), bm = byKey(H.best.month), bs = byKey(H.best.season);
+      const tol = fin(H.tol) ? H.tol : 0, banked = fin(H.month.banked) ? H.month.banked : 0;
+      const mName = typeof H.month.name === "string" && H.month.name ? H.month.name : "This month";
+      const mSpan = H.month.start === H.month.stop ? "GW" + H.month.start : "GW" + H.month.start + "–" + H.month.stop;
+      const pS = H.plan.season, pM = banked + H.plan.month, pG = H.plan.gameweek;
+      const sCost = function (c) { return c ? pS - c.score.season : NaN; };   // what a candidate takes off the total to the chip stop
+      const cost = function (c) { return !c || c.key === "plan" || !(sCost(c) > 0.05) ? "none" : "−" + f1(sCost(c)) + " to GW" + lastGw; };
+      const mGive = bs && bs.key !== "plan" ? pM - (banked + bs.score.month) : 0;
+      view.horizons = {
+        rows: [
+          { k: "GW" + gw, mine: f1(pG), best: bg ? f1(bg.score.gameweek) : "—", cost: cost(bg) },
+          { k: mName + " (" + mSpan + ")", mine: f0(pM) + (banked ? " (" + f0(banked) + " banked)" : ""), best: bm ? f0(banked + bm.score.month) : "—", cost: cost(bm) },
+          { k: "To GW" + lastGw, mine: f0(pS) + (fin(H.seasonBanked) ? " (+" + f0(H.seasonBanked) + " banked)" : ""), best: bs ? f0(bs.score.season) : "—",
+            cost: mGive > 0.05 ? "−" + f1(mGive) + " in " + mName : "none" }
+        ],
+        verdict: "", chase: "", lenses: []
+      };
+      // A free choice (inside the proof's tolerance) is said on first paint; a costly chase is already priced in the table's
+      // last column, so its sentence waits behind the reveal and the tab stays under the 500-word gate.
+      const bits = [], acts = [], dear = [];
+      const short = function (c, what, mine, best) { if (c) bits.push(c.key === "plan" || best - mine <= 0.05 ? "the best found for " + what : f1(best - mine) + " short of the best " + what); };
+      short(bg, "GW" + gw, pG, bg ? bg.score.gameweek : 0);
+      short(bm, mName, pM, bm ? banked + bm.score.month : 0);
+      short(bs, "total to GW" + lastGw, pS, bs ? bs.score.season : 0);
+      [[bm, mName, bm ? banked + bm.score.month - pM : 0], [bg, "GW" + gw, bg ? bg.score.gameweek - pG : 0]].forEach(function (c) {
+        const l = c[0], what = c[1], gain = c[2];
+        if (!l || l.key === "plan" || gain <= 0.05) return;
+        const c2 = sCost(l);
+        if (c2 <= tol) acts.push("chasing " + what + " (+" + f1(gain) + ") costs " + (c2 > 0.05 ? f1(c2) : "nothing") + " to GW" + lastGw + ", inside the proof's tolerance of about " + f1(tol) + " points, so it is a free choice: the moves are below");
+        else dear.push("chasing " + what + " would add " + f1(gain) + " there and take " + f1(c2) + " off the total to GW" + lastGw);
+      });
+      view.horizons.verdict = bits.length ? "The plan is " + bits.join(", ") + "." + (acts.length ? " Then: " + acts.join("; ") + "." : "") : "";
+      view.horizons.chase = dear.length ? "Why the plan keeps the balance: " + dear.join("; ") + "." : "";
+      const seen = {};
+      [[bg, "best GW" + gw], [bm, "best " + mName], [bs, "best total to GW" + lastGw]].forEach(function (c) {
+        const l = c[0]; if (!l || l.key === "plan" || !isO(l.first)) return;
+        if (seen[l.key]) { seen[l.key].k += ", " + c[1]; return; }
+        const fi = l.first, prs = planPairUp(P, ids(fi.out), ids(fi.in));
+        const chips = (Array.isArray(l.chips) ? l.chips : []).filter(function (x) { return isO(x) && fin(x.gw) && SHORT[x.chip]; }).map(function (x) { return SHORT[x.chip] + " GW" + x.gw; });
+        const row = { k: l.label + " (" + c[1], text: "GW" + gw + ": " + (fi.chip === "wildcard" ? "Wildcard, " + ids(fi.in).length + " changes" : prs.length ? prs.map(function (pr) { return pr.out + " to " + pr.inn; }).join(", ") : "no transfers") +
+          (fin(fi.hits) && fi.hits > 0 ? " (" + fi.hits + plural(fi.hits, " hit", " hits") + ")" : "") + "; captain " + name(fi.cap) + (fi.chip && fi.chip !== "wildcard" && CHIP[fi.chip] ? ", " + CHIP[fi.chip] : "") +
+          ". Chips: " + (chips.length ? chips.join(", ") : "none") + ". " + f1(l.score.gameweek) + " in GW" + gw + ", " + f0(banked + l.score.month) + " in " + mName + ", " + f0(l.score.season) + " to GW" + lastGw + "." };
+        seen[l.key] = row; view.horizons.lenses.push(row);
+      });
+      view.horizons.lenses.forEach(function (r) { r.k += ")"; });
+    }
 
     // (2) the timing verdict. A solve's gap bounds its own objective, so the most a restricted case could still reach
     // is obj × (1 + gap): the kept plan's objective above that bound is a proof, not an eyeball. The proof is in
@@ -2075,6 +2132,32 @@ function TabPlan(props) {
                 );
               })}
             </div>
+            {sv.horizons ? (
+              <div data-testid="plan-horizons">
+                <div className="tbl">
+                  <Row head cols="minmax(0,1fr) 64px 52px minmax(0,84px)">
+                    <span>Classic, expected</span><span className="rt">This plan</span><span className="rt">Best</span><span className="rt">Its cost</span>
+                  </Row>
+                  {sv.horizons.rows.map(function (r) {
+                    return (
+                      <Row key={r.k} cols="minmax(0,1fr) 64px 52px minmax(0,84px)">
+                        <span className="nm">{r.k}</span><span className="rt">{r.mine}</span><span className="rt">{r.best}</span><span className="rt dim">{r.cost}</span>
+                      </Row>
+                    );
+                  })}
+                </div>
+                {sv.horizons.verdict ? <div className="dim" data-testid="plan-horizons-verdict">{sv.horizons.verdict}</div> : null}
+                {sv.horizons.lenses.length || sv.horizons.chase ? (
+                  <Reveal id="pl-horizons" label="What chasing each horizon would change" open={!!(rev && rev["pl-horizons"])} onToggle={on.rev}>
+                    {sv.horizons.chase ? <div className="dim" data-testid="plan-horizons-chase">{sv.horizons.chase}</div> : null}
+                    {sv.horizons.lenses.map(function (l) {
+                      return <div key={l.k} className="dim" data-testid="plan-horizons-lens"><b>{l.k}.</b> {l.text}</div>;
+                    })}
+                    <div className="dim">Each line is a plan solved on the same data: the wildcard-timing cases, and the optimiser run again with one horizon weighted four times over (every week equal, no discount, for the total). All are scored on the plain expected points, hits taken off, and the best of them for each horizon is shown.</div>
+                  </Reveal>
+                ) : null}
+              </div>
+            ) : null}
             {sv.timing ? (
               <div className={"note" + (sv.timing.clear ? "" : " note-w")} data-testid="plan-timing">
                 <b>{sv.timing.head}</b> {sv.timing.cases + " " + sv.timing.never + " " + sv.timing.verdict + (sv.timing.latest ? " " + sv.timing.latest : "")}
@@ -2443,6 +2526,90 @@ function TabSquad(props) {
 
 /* ------------------------------------------------------------------ tab: rivals */
 
+/* 15 Oct 2026, the manager: "Make sure that a clear plan exists to win draft and all my mini leagues by the end of gw19".
+   rivalsRouteView turns leagueRoute (engine) into the Rivals tab's route: the table, one verdict and a line per league.
+   draftRouteView runs the ported engine's own titleRace (every Draft fixture left to the stop, each side's best eleven
+   from today's rosters, a normal error of 13.5 a side) and says what first place takes. Neither shows a chance of
+   winning: under eight gameweeks of data that number compounds a short edge into false certainty (E4, E-020), so the
+   route is told in points, wins and average finishing places. Total: junk gives ok:false with a note. */
+function draftRouteParams() { return { draws: DRAFT_ROUTE_DRAWS, seed: DRAFT_ROUTE_SEED }; }
+function routeWord(n, sing, many) { return n === 1 ? sing : many; }
+// total on junk (mc_full P01, P07): only non-empty strings are joined; a non-list is "?" for chips and nothing for names
+function strList(a) { return Array.isArray(a) ? a.filter(function (x) { return typeof x === "string" && x !== ""; }) : null; }
+function chipList(a) { const xs = strList(a); return xs === null ? "?" : xs.length ? xs.join(" ") : "none"; }
+function nameList(a) { const xs = strList(a) || []; return xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1]; }
+function rivalsRouteView(ctx, opts) {
+  const v = { ok: false, head: "", rows: [], verdict: "", lines: [], note: "" };
+  try {
+    const r = leagueRoute(ctx, opts);
+    if (!r.ok) { v.note = r.note || "No league to route."; return v; }
+    const m = r.mine || {};
+    v.head = r.weeksLeft + routeWord(r.weeksLeft, " gameweek", " gameweeks") + " to GW" + r.end + "." +
+      (r.planPerWeek !== null ? " The plan of record expects " + one(r.planPerWeek) + " a week to then (a model)" : "") +
+      (m.pace !== null && m.pace !== undefined ? (r.planPerWeek !== null ? "; you have averaged " : " You have averaged ") + one(m.pace) : "") +
+      (r.gamePace !== null ? " and the game " + one(r.gamePace) : "") + ". You hold " + (m.chipsLeft && m.chipsLeft.length === 4 ? "all four set-1 chips" : chipList(m.chipsLeft) + " of set 1") +
+      "; the leaders hold " + r.chipsHeldByLeaders + " of their " + 4 * r.leagues.filter(function (x) { return x.leader && x.leader.chipsLeft; }).length + ".";
+    const closeG = [], shortG = [], atPace = [];
+    r.leagues.forEach(function (x) {
+      const L = x.leader;
+      v.rows.push({ k: x.name, gap: !x.started ? "—" : x.gap <= 0 ? "+" + Math.abs(x.gap) : String(x.gap), need: !x.started || !(x.gap > 0) ? "—" : one(x.need),
+        pace: L && L.pace !== null ? one(L.pace) : "—", chips: L ? chipList(L.chipsLeft) : "—", lead: x.started && x.gap <= 0, started: x.started });
+      if (!x.started || !L) { v.lines.push({ k: x.name, text: "No scores yet in this league, so there is no gap to close." }); return; }
+      if (x.gap <= 0) { v.lines.push({ k: x.name, text: "You lead by " + Math.abs(x.gap) + "; the plan's expectation is what keeps it." }); return; }
+      if (x.overtakeGw !== null) atPace.push(x.name);
+      if (x.overtakeGwAtGame !== null) closeG.push({ n: x.name, gw: x.overtakeGwAtGame }); else if (r.planPerWeek !== null && r.gamePace !== null) shortG.push(x.name);
+      v.lines.push({ k: x.name, text: x.gap + " behind with " + r.weeksLeft + " to play: " + one(x.need) + " a week more than the leader." +
+        (L.pace !== null ? " The leader has averaged " + one(L.pace) + " (chips spent included; " + chipList(L.chipsLeft) + " left)." : " The leader's season is not in this build's data.") +
+        (r.planPerWeek === null ? "" : (L.pace === null ? "" : " At that pace the plan " + (x.overtakeGw !== null ? "overtakes in GW" + x.overtakeGw : "ends " + one(x.shortAtEnd) + " short") + ".") +
+          (r.gamePace === null ? "" : " If they fall back to the game's " + one(r.gamePace) + ", it " + (x.overtakeGwAtGame !== null ? "overtakes in GW" + x.overtakeGwAtGame : "still ends " + one(x.shortAtEndAtGame) + " short") + ".")) });
+    });
+    if (r.planPerWeek !== null) {
+      const bits = [];
+      bits.push(atPace.length ? "At the leaders' pace so far the plan's expected points alone overtake in " + nameList(atPace) + "." : "At the leaders' pace so far no league closes on expected points alone: they have scored above the plan's rate.");
+      if (closeG.length) bits.push("If they fall back to the game's average, the plan takes " + nameList(closeG.map(function (c) { return c.n + " by GW" + c.gw; })) + ".");
+      if (shortG.length) bits.push(nameList(shortG) + " need more than expected points: there, a choice level on expected points goes to the player and the captain fewer of that league own (Ownership and Captaincy below), and the chips you still hold are the swing.");
+      v.verdict = bits.join(" ");
+    }
+    v.ok = true;
+  } catch (e) { v.ok = false; v.note = "The route could not be read: " + (e && e.message ? e.message : String(e)); }
+  return v;
+}
+function draftRouteView(mc, endGw) {
+  const v = { ok: false, end: 0, rows: [], line: "", six: "", method: "", note: "" };
+  try {
+    const MC = mc && mc.MC, E = mc && mc.E;
+    if (!MC || !E || typeof E.titleRace !== "function" || !MC.draft || !Array.isArray(MC.draft.standings) || !Array.isArray(MC.draft.matches)) { v.note = "The Draft league is not in this build's data."; return v; }
+    const next = Number(MC.gw && MC.gw.next), me = MC.draft.me;
+    const stop = E.CFG && Number(E.CFG.draftEndApi) > 0 ? Number(E.CFG.draftEndApi) : 38;
+    const end = Math.min(Number(endGw) > 0 ? Number(endGw) : 19, stop);
+    if (!(next >= 1) || next > end) { v.note = "No Draft fixture is left before GW" + end + "."; return v; }
+    const race = E.titleRace(next, end, DRAFT_ROUTE_DRAWS, DRAFT_ROUTE_SEED);
+    const now = {}; MC.draft.standings.forEach(function (s) { now[s.name] = Number(s.pts) || 0; });
+    const mine = race.filter(function (x) { return x.name === me; })[0];
+    if (!mine) { v.note = "Your Draft team is not in the league's table."; return v; }
+    const others = race.filter(function (x) { return x.name !== me; }).sort(function (a, b) { return b.pts - a.pts; });
+    const games = MC.draft.matches.filter(function (m) { return !m.fin && m.gw >= next && m.gw <= end && (m.a === me || m.b === me); });
+    const top2 = others.slice(0, 2).map(function (x) { return x.name; });
+    const sixes = games.filter(function (m) { return top2.indexOf(m.a === me ? m.b : m.a) >= 0; });
+    const target = others.length ? others[0].pts : 0, myNow = now[me] || 0;
+    const needW = Math.max(0, Math.ceil((target - myNow) / 3 - 1e-9)), expW = Math.max(0, (mine.pts - myNow) / 3);
+    const strongest = others.slice().sort(function (a, b) { return b.strength - a.strength; })[0];
+    v.end = end;
+    v.rows = race.slice().sort(function (a, b) { return b.pts - a.pts || a.pos - b.pos; }).map(function (x) {
+      return { k: x.name, now: String(now[x.name] || 0), exp: one(x.pts), pos: one(x.pos), mine: x.name === me };
+    });
+    v.line = "First at GW" + end + " takes about " + Math.ceil(target) + " league points, the most any rival is expected to reach (" + others[0].name + "). You have " + myNow +
+      " and the model expects " + one(mine.pts) + " from your " + games.length + routeWord(games.length, " match", " matches") + ": about " + needW + routeWord(needW, " win", " wins") + " needed against " + one(expW) + " expected. " +
+      "Your eleven is expected to score " + one(mine.strength) + " a week" + (strongest ? ", " + (mine.strength >= strongest.strength ? "the most in the league (next " + one(strongest.strength) + ")" : "against " + one(strongest.strength) + " for the strongest") : "") +
+      ", so the deficit is the table, not the team.";
+    v.six = sixes.length ? sixes.length + " of the " + games.length + " are against the two teams expected to lead (" + sixes.map(function (m) { return "GW" + m.gw + " " + (m.a === me ? m.b : m.a); }).join(", ") +
+      "): each is a six-point swing, so those weeks get the strongest eleven and every claim that helps it." : "";
+    v.method = "Every Draft fixture to GW" + end + " played " + DRAFT_ROUTE_DRAWS.toLocaleString("en-GB") + " times by the engine, each side's best eleven from today's rosters: a claim or trade changes it. Points, wins and average places, never a chance of winning, until eight gameweeks of data (E4).";
+    v.ok = true;
+  } catch (e) { v.ok = false; v.note = "The race could not be run: " + (e && e.message ? e.message : String(e)); }
+  return v;
+}
+
 function TabRivals(props) {
   const ctx = props.ctx, ui = props.ui, on = props.on, plan = props.plan;
   const sec = function (id) { return openOf(ui, "rivals", id); };
@@ -2459,6 +2626,9 @@ function TabRivals(props) {
   const simId = props.simLeague || (ctx.leagues[0] ? ctx.leagues[0].id : 0);
   const simIds = rp ? (rp.ids.length === 15 ? rp.ids : null) : plan.kind === "wildcard" && plan.ids.length === 15 ? plan.ids : null;
   const sim = sec("rv-sim") ? mcLeague(ctx, simId, { iters: 300, ids: simIds, capId: capId, viceId: viceId }) : null;
+  // the route reads the plan of record's weekly rate only when that plan stands on the landing card (its hash is this data's)
+  const PLW = solvedW && props.mc.PLAN.plan && Array.isArray(props.mc.PLAN.plan.weeks) ? props.mc.PLAN.plan.weeks.filter(function (w) { return w && isFinite(Number(w.epNet)); }) : [];
+  const route = sec("rv-route") ? rivalsRouteView(ctx, { end: PLW.length ? PLW[PLW.length - 1].gw : 19, planPerWeek: PLW.length ? PLW.reduce(function (a, w) { return a + Number(w.epNet); }, 0) / PLW.length : null }) : null;
   return (
     <div>
       <Section id="rv-table" game="Classic" title="The six leagues" open={sec("rv-table")} onToggle={on.sec}>
@@ -2485,6 +2655,32 @@ function TabRivals(props) {
           })}
         </div>
         <div className="dim">Gap is points behind the leader. Rank colour is the move since last gameweek. <Tier k="T0" /> standings</div>
+      </Section>
+
+      <Section id="rv-route" game="Classic" title="Route to first by GW19" open={sec("rv-route")} onToggle={on.sec}>
+        {route && route.ok ? (
+          <div data-testid="rv-route">
+            <div className="dim" data-testid="rv-route-head">{route.head}</div>
+            <div className="tbl">
+              <Row head cols="minmax(0,1fr) 36px 40px 44px">
+                <span>League</span><span className="rt">Gap</span><span className="rt">Need</span><span className="rt">Pace</span>
+              </Row>
+              {route.rows.map(function (x) {
+                return (
+                  <Row key={x.k} cols="minmax(0,1fr) 36px 40px 44px">
+                    <span className="nmw">{x.k}<span className="nms">{x.started ? "Leader's chips: " + x.chips : "No scores yet"}</span></span>
+                    <span className={"rt " + (x.lead ? "go" : "")}>{x.gap}</span><span className="rt">{x.need}</span><span className="rt dim">{x.pace}</span>
+                  </Row>
+                );
+              })}
+            </div>
+            {route.verdict ? <div className="note" data-testid="rv-route-verdict">{route.verdict}</div> : null}
+            <Reveal id="rv-route-each" label="League by league" open={!!(ui.reveals || {})["rv-route-each"]} onToggle={on.rev}>
+              {route.lines.map(function (l) { return <div key={l.k} className="dim" data-testid="rv-route-line"><b>{l.k}.</b> {l.text}</div>; })}
+            </Reveal>
+            <div className="dim">Need is the gap shared over the weeks left; Pace is the leader's points a week so far, net of hits; their chips are set 1, usable to GW19. <Tier k="T0" /> standings and histories · <Tier k="model" /> the plan's rate</div>
+          </div>
+        ) : <div className="dim">{route ? route.note : ""}</div>}
       </Section>
 
       <Section id="rv-own" game="Classic" title="Ownership of your fifteen" open={sec("rv-own")} onToggle={on.sec}>
@@ -2834,6 +3030,7 @@ function TabDraft(props) {
   const order = pool ? waiverOrder(ctx) : null;
   const xi = sec("df-xi") ? draftXI(roster, ctx) : null;
   const h2h = sec("df-h2h") ? h2hProjection(ctx, { codes: roster }) : null;
+  const race = sec("df-route") ? draftRouteView(mc, 19) : null;
   const audit = sec("df-watch") ? watchlistAudit(state.draft.watchlist, ctx) : null;
   const wHours = ctx.draft.waiversTime ? (msOf(ctx.draft.waiversTime) - ctx.now) / 3600000 : null;
   const saved = state.draft.league_input || (state.draft.league_id === null ? (state.draft.entry_id === null ? "" : String(state.draft.entry_id)) : String(state.draft.league_id));
@@ -3144,6 +3341,28 @@ function TabDraft(props) {
         ) : (
           <div className="dim">{pool ? (h2h && h2h.note ? h2h.note : "No head-to-head fixture for this gameweek.") : "No head-to-head fixture without the draft league id: this week's opponent comes from the league's own fixture list."}</div>
         )}
+      </Section>
+
+      <Section id="df-route" title="Route to the top by GW19" open={sec("df-route")} onToggle={on.sec}>
+        {race && race.ok ? (
+          <div data-testid="df-route">
+            <div className="tbl">
+              <Row head cols="minmax(0,1fr) 40px 52px 48px">
+                <span>Team</span><span className="rt">Now</span><span className="rt">{"GW" + race.end}</span><span className="rt">Finish</span>
+              </Row>
+              {race.rows.map(function (x) {
+                return (
+                  <Row key={x.k} cols="minmax(0,1fr) 40px 52px 48px">
+                    <span className={"nm" + (x.mine ? " go" : "")}>{x.k}</span><span className="rt dim">{x.now}</span><span className="rt">{x.exp}</span><span className="rt dim">{x.pos}</span>
+                  </Row>
+                );
+              })}
+            </div>
+            <div className="note" data-testid="df-route-line">{race.line}</div>
+            {race.six ? <div className="dim" data-testid="df-route-six">{race.six}</div> : null}
+            <div className="dim">{race.method} <Tier k="model" /> Monte Carlo</div>
+          </div>
+        ) : <div className="dim">{race ? race.note : ""}</div>}
       </Section>
 
       <Section id="df-xi" title="Draft XI" open={sec("df-xi")} onToggle={on.sec}>

@@ -177,7 +177,7 @@ let got = null, refLine = "";
   ok("A2 every path in reference/v109/app/data.json is reproduced — " + (cmp.diffs.length ? cmp.diffs.length + " differing" : "0 differing, 0 excluded"),
     cmp.diffs.length === 0, "first ten:\n       " + firstTen(cmp.diffs));
 
-  const ADDED = ["delta", "players[*].press", "draft.events.*.tr", "draft.activity", "draft.waiverRuns"];
+  const ADDED = ["delta", "gw.phases", "players[*].press", "draft.events.*.tr", "draft.activity", "draft.waiverRuns"];   // gw.phases: the game's months (15 Oct 2026)
   const extraShapes = [...new Set(cmp.extra.map(shape))].sort();
   ok("A2 the only paths the port adds are the v111 additions: " + ADDED.join(", "),
     got !== null && extraShapes.length === ADDED.length && ADDED.slice().sort().every((a, i) => a === extraShapes[i]),
@@ -207,6 +207,33 @@ let got = null, refLine = "";
 const repo = readJson(REPO_BLOCK);
 ok("A4 the committed repo block data/mc_data.json exists and parses",
   !!repo && !!repo.classic && Array.isArray(repo.classic.recon) && Array.isArray(repo.classic.gws), repo ? "keys: " + Object.keys(repo).join(",") : "missing or unparseable");
+
+/* A9 (15 Oct 2026) — the game's months. gw.phases is read from bootstrap-static and never typed: on the committed block
+   the months tile gameweeks 1 to the last event in order, each named, with no gap and no overlap, and "Overall" (the
+   season) is not one of them; the plan is scored by gameweek, by month and by season from these. */
+{
+  const tiles = (ph, last) => {
+    if (!Array.isArray(ph) || !ph.length) return "no months";
+    let at = 1;
+    for (const x of ph) {
+      if (!x || typeof x.name !== "string" || !x.name || x.name === "Overall") return "bad month " + JSON.stringify(x);
+      if (x.start !== at || !(x.stop >= x.start)) return "gap or overlap at " + JSON.stringify(x) + " (expected start " + at + ")";
+      at = x.stop + 1;
+    }
+    return at - 1 === last ? "" : "the months end at GW" + (at - 1) + ", the season at GW" + last;
+  };
+  const lastEv = repo && repo.gw && Array.isArray(repo.gw.events) ? repo.gw.events.length : 0;
+  const why = repo && repo.gw ? tiles(repo.gw.phases, lastEv) : "no gw block";
+  ok("A9 the committed block's months (gw.phases) tile GW1–" + lastEv + " in order, named, without gap or overlap, Overall left out",
+    why === "", why || (repo.gw.phases.map((x) => x.name + " " + x.start + "–" + x.stop).join(", ")));
+  const bootPath = path.join(ROOT, "pipeline", "feeds", "bootstrap.json");
+  const boot = fs.existsSync(bootPath) ? readJson(bootPath) : null;
+  if (boot && Array.isArray(boot.phases)) {
+    const want = boot.phases.filter((x) => x.name !== "Overall").map((x) => x.name + ":" + x.start_event + "-" + x.stop_event).join(",");
+    const got = (repo.gw.phases || []).map((x) => x.name + ":" + x.start + "-" + x.stop).join(",");
+    ok("A9 the months are the feed's own, name for name and gameweek for gameweek (pipeline/feeds/bootstrap.json)", want === got, "feed " + want + " · block " + got);
+  } else ok("A9 the feeds are absent here, so the months are checked against the block alone (a clean checkout has no pipeline/feeds)", true, "no pipeline/feeds/bootstrap.json");
+}
 
 /* Σ(points × multiplier) − hit, recomputed here from the picks. */
 const rebuild = (g) => g.picks.reduce((a, k) => a + (k.pts || 0) * k.mult, 0) - (g.hit || 0);

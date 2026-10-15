@@ -126,6 +126,10 @@
  *   mcH2H(myIds, myBench, oppIds, oppBench, ctx, iters, seed) → {ok, mine, theirs, margin}
  *                                      both elevens in one loop over shared fixture draws
  *   h2hProjection(ctx, opts?)       → {ok, gw, opponent, mine, theirs, margin, marginDist, lean, note}
+ *   leagueRoute(ctx, opts?)         → {ok, next, end, weeksLeft, planPerWeek, gamePace, mine{pace, weeks, chipsLeft,
+ *                                      chipsUsed}, chipsHeldByLeaders, leagues[{id, name, size, rank, started, gap, need,
+ *                                      leader{entry, name, total, pace, weeks, chipsLeft, chipsUsed}|null, overtakeGw,
+ *                                      shortAtEnd, overtakeGwAtGame, shortAtEndAtGame}], note}
  *
  * Squad / state
  *   sanitiseState(raw)              → state (§6 shape; cap 15, dedupe on id; never throws)
@@ -2398,6 +2402,91 @@ function h2hProjection(ctx, opts) {
       " over " + iters + " shared-fixture draws, margin " + (hh.margin.mean >= 0 ? "+" : "") + hh.margin.mean.toFixed(1) +
       " (tenth to ninetieth " + hh.margin.q10.toFixed(1) + " to " + hh.margin.q90.toFixed(1) + ")";
   } catch (e) { res.note = "engine error: " + errMsg(e); }
+  return res;
+}
+
+/* ---------------------------------------------------------------- the route to first, Classic (15 Oct 2026)
+ * The manager's ask: "Make sure that a clear plan exists to win draft and all my mini leagues by the end of gw19".
+ * leagueRoute reads, for each winnable league, the gap to the leader (T0 standings), the gameweeks left to opts.end (the
+ * chip stop, 19, by default), the points a week that gap needs, each side's pace so far (points net of hits per played
+ * gameweek, T0 history), the game's own average pace (bootstrap average_entry_score over the finished gameweeks) and the
+ * set-1 chips each side still holds (T0 history.chips; set 1 runs to CHIP_SETS[0].to). With opts.planPerWeek (the plan
+ * of record's expected points a week to opts.end, a model) each league also says in which gameweek that rate overtakes
+ * the leader, at their pace so far and at the game's, or how far short it leaves you at opts.end. Nothing here is a
+ * probability: under eight gameweeks of data a chance of winning is never shown (E4, E-020). Total: junk gives ok:false. */
+var DRAFT_ROUTE_DRAWS = 2000, DRAFT_ROUTE_SEED = 19;   // the Draft race to GW19 (the app's df-route and Part M read these)
+function routePace(rows) {
+  var n = 0, s = 0;
+  arr(rows).forEach(function (r) {
+    var ev = 0, pts = NaN, cost = 0;
+    if (Array.isArray(r)) { ev = intOf(r[0], 0); pts = num(r[1], NaN); cost = num(r[2], 0); }
+    else if (isObj(r)) { ev = intOf(r.event, 0); pts = num(r.points, NaN); cost = num(r.event_transfers_cost, 0); }
+    if (ev >= 1 && ev <= 38 && isFinite(pts)) { n++; s += pts - (isFinite(cost) ? cost : 0); }
+  });
+  return n ? { pace: s / n, weeks: n } : null;
+}
+function routeChips(chips) {
+  var used = [], stop = CHIP_SETS[0].to;
+  arr(chips).forEach(function (c) {
+    if (!isObj(c)) return;
+    var k = CHIP_ALIAS[String(c.name)], ev = intOf(c.event, 0);
+    if (k && ev >= 1 && ev <= stop && used.indexOf(k) < 0) used.push(k);
+  });
+  return { used: used, left: ["WC", "FH", "BB", "TC"].filter(function (k) { return used.indexOf(k) < 0; }) };
+}
+function routeOvertake(gap, edge, next, end, weeksLeft) {
+  if (!(gap > 0)) return { gw: null, short: 0 };
+  if (edge > 0) {
+    var gw = next + Math.ceil(gap / edge - 1e-9) - 1;
+    if (gw <= end) return { gw: gw, short: 0 };
+  }
+  return { gw: null, short: gap - edge * weeksLeft };
+}
+function leagueRoute(ctx, opts) {
+  var res = { ok: false, next: 0, end: 19, weeksLeft: 0, planPerWeek: null, gamePace: null, mine: null, chipsHeldByLeaders: 0, leagues: [], note: "" };
+  try {
+    if (!okCtx(ctx) || !isObj(ctx.live)) { res.note = "no context"; return res; }
+    var o = isObj(opts) ? opts : {}, live = ctx.live;
+    var end = intOf(o.end, CHIP_SETS[0].to); if (!(end >= 1 && end <= 38)) end = CHIP_SETS[0].to;
+    var next = intOf(ctx.nextEvent, 0);
+    res.end = end; res.next = next;
+    res.weeksLeft = next >= 1 && next <= end ? end - next + 1 : 0;
+    var ppw = num(o.planPerWeek, NaN); res.planPerWeek = isFinite(ppw) && ppw > 0 && ppw < 200 ? ppw : null;
+    var evs = arr(live.events).filter(function (e) { return isObj(e) && e.finished === true && isFinite(num(e.average_entry_score, NaN)); });
+    res.gamePace = evs.length ? evs.reduce(function (a, e) { return a + num(e.average_entry_score, 0); }, 0) / evs.length : null;
+    var H = isObj(live.history) ? live.history : {};
+    var mp = routePace(H.current), mc = routeChips(H.chips);
+    res.mine = { pace: mp ? mp.pace : null, weeks: mp ? mp.weeks : 0, chipsLeft: mc.left, chipsUsed: mc.used };
+    var me = isObj(live.entry) ? intOf(live.entry.id, 0) : 0;
+    var R = isObj(live.rivals) ? live.rivals : {};
+    arr(ctx.leagues).forEach(function (L) {
+      if (!isObj(L)) return;
+      var st = arr(L.standings).filter(function (r) { return isObj(r) && isFinite(num(r.total, NaN)) && intOf(r.entry, 0) > 0; })
+        .slice().sort(function (a, b) { return num(a.rank, 1e9) - num(b.rank, 1e9) || num(b.total, 0) - num(a.total, 0); });
+      var mine = st.filter(function (r) { return intOf(r.entry, 0) === me; })[0] || null;
+      var started = !!mine && intOf(mine.rank, 0) > 0 && st.some(function (r) { return num(r.total, 0) !== 0; });
+      var lead = st.filter(function (r) { return intOf(r.entry, 0) !== me; })[0] || null;
+      var row = { id: intOf(L.id, 0), name: typeof L.name === "string" ? L.name : String(L.id), size: st.length, rank: mine ? intOf(mine.rank, 0) : 0,
+        started: started, gap: null, need: null, leader: null, overtakeGw: null, shortAtEnd: null, overtakeGwAtGame: null, shortAtEndAtGame: null };
+      if (started && lead) {
+        row.gap = num(lead.total, 0) - num(mine.total, 0);
+        row.need = res.weeksLeft > 0 && row.gap > 0 ? row.gap / res.weeksLeft : 0;
+        var rv = R[String(intOf(lead.entry, 0))];
+        var lp = isObj(rv) && Array.isArray(rv.gws) ? routePace(rv.gws) : null;
+        var lc = isObj(rv) && Array.isArray(rv.chips) ? routeChips(rv.chips) : null;
+        row.leader = { entry: intOf(lead.entry, 0), name: typeof lead.entry_name === "string" ? lead.entry_name : "", total: num(lead.total, 0),
+          pace: lp ? lp.pace : null, weeks: lp ? lp.weeks : 0, chipsLeft: lc ? lc.left : null, chipsUsed: lc ? lc.used : null };
+        if (lc) res.chipsHeldByLeaders += lc.left.length;
+        if (res.planPerWeek !== null && res.weeksLeft > 0) {
+          if (lp) { var a = routeOvertake(row.gap, res.planPerWeek - lp.pace, next, end, res.weeksLeft); row.overtakeGw = a.gw; row.shortAtEnd = a.short; }
+          if (res.gamePace !== null) { var g = routeOvertake(row.gap, res.planPerWeek - res.gamePace, next, end, res.weeksLeft); row.overtakeGwAtGame = g.gw; row.shortAtEndAtGame = g.short; }
+        }
+      }
+      res.leagues.push(row);
+    });
+    res.ok = res.leagues.length > 0;
+    if (!res.ok) res.note = "no winnable league in the snapshot";
+  } catch (e) { res.ok = false; res.note = "engine error: " + errMsg(e); }
   return res;
 }
 
@@ -5525,7 +5614,7 @@ if (typeof module !== "undefined" && module.exports) {
     draftEl: draftEl, draftEV: draftEV, draftWaivers: draftWaivers, watchlistAudit: watchlistAudit, draftXIBase: draftXIBase, draftXI: draftXI,
     draftLeagueInput: draftLeagueInput, draftOwnership: draftOwnership, draftPool: draftPool, draftRosterOf: draftRosterOf, draftRivalRosters: draftRivalRosters,
     waiverOrder: waiverOrder, waiverSim: waiverSim, waiverOutcomeFor: waiverOutcomeFor, h2hOpponent: h2hOpponent, draftRoster: draftRoster, playerSpread: playerSpread,
-    distStats: distStats, mcDraftXI: mcDraftXI, mcH2H: mcH2H, h2hProjection: h2hProjection,
+    distStats: distStats, mcDraftXI: mcDraftXI, mcH2H: mcH2H, h2hProjection: h2hProjection, routePace: routePace, routeChips: routeChips, routeOvertake: routeOvertake, leagueRoute: leagueRoute, DRAFT_ROUTE_DRAWS: DRAFT_ROUTE_DRAWS, DRAFT_ROUTE_SEED: DRAFT_ROUTE_SEED,
     sanitiseState: sanitiseState, detectSquadChange: detectSquadChange, ftAvailable: ftAvailable, sellPrice: sellPrice, bankAfter: bankAfter,
     purchasePrices: purchasePrices, sellPrices: sellPrices,
     openClosers: openClosers, salvageJson: salvageJson, stripFences: stripFences, parseJson: parseJson, blocksOf: blocksOf, pickText: pickText, blockTypes: blockTypes, refreshRequest: refreshRequest, applyRefresh: applyRefresh,

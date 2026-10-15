@@ -24,6 +24,10 @@ only. Proved by `qa/pull_guard.cjs`.
 
 ## 2. Bake — `node pipeline/bake.js` (`npm run bake`)
 
+> **Pull first, every time (ERRORS.md E-163).** The bake stamps `asOf` with its own clock, and the app reads `asOf` as the
+> time the feeds were pulled. A bake run on its own, hours after `pull.sh`, makes old feeds read as fresh. Run pull, fetch,
+> bake, calibrate and export together, even when the only change is a line in `pipeline/intel.js`.
+
 Reads the feeds and writes the block, `data/mc_data.json`: the players joined across the two id spaces by
 `code`, selling prices from the rule of the game, the points reconciliation against the official totals,
 the free-transfer ledger replayed from the published weeks, the transfer log, team season xG logs, the

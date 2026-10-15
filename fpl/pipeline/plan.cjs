@@ -30,8 +30,8 @@
         solver's fields anywhere, every disagreeing week is printed with both values, the file is still written with
         replay.agrees false and the differences listed, and the exit code is 2 so the stage goes red.
 
-   OUTPUT  plan.json = { hash, at, source: {data, out, timing, long, solvedBy, longSolve, timingFold}, plan, noWildcard,
-           undecayed, freeHit, timing, draft, draftIfTaken, draftAhead,
+   OUTPUT  plan.json = { hash, at, source: {data, out, timing, long, horizons, solvedBy, longSolve, timingFold, horizonsFold}, plan,
+           noWildcard, undecayed, freeHit, timing, horizons (step 4c; null when absent or stale), draft, draftIfTaken, draftAhead,
            replay: { weeks: [{gw, chip, ftBefore, moves, used, hitCount, hits, bank, ftAfter}], agrees, differences } }
            In the replay `hits` is points (four per hit) and `hitCount` is the number; `used` is the free transfers
            spent. No clock is written: the same inputs give the same file, so a harmless re-run changes nothing.
@@ -44,7 +44,7 @@ const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
-const DEFAULTS = { data: "data/mc_data.json", out: "data/solver_out.json", timing: "data/solver_timing.json", long: "data/solver_long.json", plan: "data/plan.json" };
+const DEFAULTS = { data: "data/mc_data.json", out: "data/solver_out.json", timing: "data/solver_timing.json", long: "data/solver_long.json", horizons: "data/solver_horizons.json", plan: "data/plan.json" };
 const HIT_POINTS = 4;            // a hit costs four points by rule (v110 §4 Classic)
 const BANK_TOL = 0.051;          // the solver rounds its bank to £0.1m each week, as the replay does
 
@@ -55,15 +55,16 @@ const r1 = (x) => Math.round(x * 10) / 10, r2 = (x) => Math.round(x * 100) / 100
 const refuse = (msg) => { console.log("plan.cjs refused: " + msg); process.exit(3); };
 
 function parseArgs(argv) {
-  const o = { data: abs(DEFAULTS.data), out: abs(DEFAULTS.out), timing: abs(DEFAULTS.timing), long: abs(DEFAULTS.long), plan: abs(DEFAULTS.plan) };
+  const o = { data: abs(DEFAULTS.data), out: abs(DEFAULTS.out), timing: abs(DEFAULTS.timing), long: abs(DEFAULTS.long), horizons: abs(DEFAULTS.horizons), plan: abs(DEFAULTS.plan) };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], v = argv[i + 1];
     if (a === "--data") { o.data = path.resolve(v); i++; }
     else if (a === "--solver-out") { o.out = path.resolve(v); i++; }
     else if (a === "--timing") { o.timing = path.resolve(v); i++; }
     else if (a === "--long") { o.long = path.resolve(v); i++; }
+    else if (a === "--horizons") { o.horizons = path.resolve(v); i++; }
     else if (a === "--out") { o.plan = path.resolve(v); i++; }
-    else refuse("unknown argument " + a + " (expected --data, --solver-out, --timing, --long, --out, each with a file)");
+    else refuse("unknown argument " + a + " (expected --data, --solver-out, --timing, --long, --horizons, --out, each with a file)");
   }
   return o;
 }
@@ -158,6 +159,77 @@ function main() {
     if (timing) timing.now = plan;   // "now" is the kept plan, with the proof it now carries
   }
 
+  /* 4c. The gameweek, the month and the season (the manager's ask of 15 Oct 2026: "maximise the gameweek, the monthly and
+     the season points"). pipeline/horizons.py solves classic() three more times on this input, each with one horizon
+     weighted up in memory (season: no discount; month: the current FPL month's weeks x4; gameweek: the next one x4), and
+     re-scores each on the unscaled expected points. Here the kept plan is scored the same way, a lens is folded only when
+     it was solved on this input (the hash) over the same weeks, and the month's points already banked come from the feed
+     (points less hits, as the game's monthly tables count them). Nothing is chosen here: the plan of record stays the kept
+     plan, and the lenses say how far each horizon is from its own best and what chasing it would cost. Optional: an
+     absent or stale file is named and left out. */
+  let horizons = null, horizonsNote = "absent";
+  if (fs.existsSync(o.horizons)) {
+    const sh = readJson(o.horizons);
+    const phases = DATA.gw && Array.isArray(DATA.gw.phases) ? DATA.gw.phases.filter((x) => x && Number.isInteger(x.start) && Number.isInteger(x.stop)) : [];
+    const first = plan.weeks[0].gw, month = phases.find((x) => x.start <= first && first <= x.stop) || null;
+    if (sh.hash !== nowHash) horizonsNote = "stale (hash " + sh.hash + ")";
+    else if (!month) horizonsNote = "left out: the data carries no FPL month for GW" + first + " (gw.phases)";
+    else {
+      const score = (weeks) => {
+        const by = phases.map((x) => {
+          const s = weeks.filter((w) => w.gw >= x.start && w.gw <= x.stop);
+          return s.length ? { id: x.id, name: x.name, start: x.start, stop: x.stop, ep: r2(s.reduce((a, w) => a + w.epNet, 0)), weeks: s.length } : null;
+        }).filter(Boolean);
+        const m = by.find((b) => b.id === month.id);
+        return { gameweek: r2(weeks[0].epNet), month: m ? m.ep : 0, season: r2(weeks.reduce((a, w) => a + w.epNet, 0)), byPhase: by };
+      };
+      const lens = (k) => {
+        const l = sh.lenses && sh.lenses[k];
+        if (!l || l.ok !== true || !Array.isArray(l.weeks) || l.weeks.length !== plan.weeks.length || l.weeks[0].gw !== first) return null;
+        const w0 = l.weeks[0];
+        return { gap: l.gap, secs: l.secs, params: l.params, score: score(l.weeks),
+          first: { gw: w0.gw, chip: w0.chip || null, cap: w0.cap, vice: w0.vice, in: w0.in, out: w0.out, hits: w0.hits },
+          chips: l.weeks.filter((w) => w.chip).map((w) => ({ gw: w.gw, chip: w.chip })) };
+      };
+      const banked = (DATA.classic && Array.isArray(DATA.classic.gws) ? DATA.classic.gws : []).filter((g) => g && g.gw >= month.start && g.gw <= month.stop && g.gw < first);
+      horizons = {
+        month: { id: month.id, name: month.name, start: month.start, stop: month.stop,
+          banked: banked.reduce((a, g) => a + (Number(g.pts) || 0) - (Number(g.hit) || 0), 0), bankedWeeks: banked.map((g) => g.gw) },
+        seasonBanked: DATA.classic && Number.isFinite(Number(DATA.classic.total)) ? Number(DATA.classic.total) : null,
+        tol: r2((typeof plan.gap === "number" ? plan.gap : 0) * plan.total),
+        plan: score(plan.weeks),
+        lenses: { season: lens("season"), month: lens("month"), gameweek: lens("gameweek") }
+      };
+      /* The best found for each horizon is the best of EVERY plan solved on this input, not only that horizon's own lens:
+         a lens is solved to a tolerance and carries the optimiser's friction terms (transfer cost, bench weight, banked
+         transfers), so another solve can beat it on its own horizon (15 Oct 2026: the wildcard-later case reached 72.0 in
+         GW7 against the gameweek lens's 71.7, and the plan of record 820.7 to GW19 against the season lens's 817.4). Each
+         candidate is scored with the same arithmetic; ties go to the plan of record, then to the order below. */
+      const cand = [{ key: "plan", label: "This plan", weeks: plan.weeks }];
+      if (timing) {
+        if (timing.later) cand.push({ key: "later", label: "Wildcard held to a later week", weeks: timing.later.weeks });
+        if (timing.never) cand.push({ key: "never", label: "No wildcard before GW" + plan.weeks[plan.weeks.length - 1].gw, weeks: timing.never.weeks });
+      }
+      ["season", "month", "gameweek"].forEach((k) => {
+        const l = sh.lenses && sh.lenses[k];
+        if (l && l.ok === true && Array.isArray(l.weeks) && l.weeks.length === plan.weeks.length && l.weeks[0].gw === first)
+          cand.push({ key: "lens:" + k, label: k === "season" ? "Every week equal" : k === "month" ? month.name + " first" : "GW" + first + " first", weeks: l.weeks });
+      });
+      horizons.candidates = cand.filter((c) => Array.isArray(c.weeks) && c.weeks.length === plan.weeks.length).map((c) => {
+        const w0 = c.weeks[0];
+        return { key: c.key, label: c.label, score: score(c.weeks), first: { gw: w0.gw, chip: w0.chip || null, cap: w0.cap, vice: w0.vice, in: w0.in, out: w0.out, hits: w0.hits },
+          chips: c.weeks.filter((w) => w.chip).map((w) => ({ gw: w.gw, chip: w.chip })) };
+      });
+      horizons.best = {};
+      ["gameweek", "month", "season"].forEach((h) => {
+        let b = horizons.candidates[0];
+        horizons.candidates.forEach((c) => { if (c.score[h] > b.score[h] + 1e-9) b = c; });
+        horizons.best[h] = b.key;
+      });
+      horizonsNote = "folded (" + Object.values(horizons.lenses).filter(Boolean).length + " of 3 lenses, " + month.name + " GW" + month.start + "–" + month.stop + ")";
+    }
+  }
+
   /* 5. free-hit weeks against the kept plan */
   const cs = M.classicSquad(), own0 = new Set(cs.squad.map((p) => p.id)), sellMap = new Map(cs.squad.map((p) => [p.id, p.sell]));
   const sellOf = (i) => (sellMap.has(i) ? sellMap.get(i) : M.P[i].pr);   // the selling price the export gave the solver for the original fifteen; purchase price otherwise
@@ -183,8 +255,8 @@ function main() {
 
   const out = {
     hash: nowHash, at: so.at,
-    source: { data: show(o.data), out: show(o.out), timing: fs.existsSync(o.timing) ? show(o.timing) : null, long: fs.existsSync(o.long) ? show(o.long) : null, solvedBy, longSolve: longNote, timingFold: timingNote },
-    plan, noWildcard: slim(so.noWildcard), undecayed: slim(so.undecayed), freeHit, timing,
+    source: { data: show(o.data), out: show(o.out), timing: fs.existsSync(o.timing) ? show(o.timing) : null, long: fs.existsSync(o.long) ? show(o.long) : null, horizons: fs.existsSync(o.horizons) ? show(o.horizons) : null, solvedBy, longSolve: longNote, timingFold: timingNote, horizonsFold: horizonsNote },
+    plan, noWildcard: slim(so.noWildcard), undecayed: slim(so.undecayed), freeHit, timing, horizons,
     draft: so.draft || null, draftIfTaken: so.draftIfTaken || null, draftAhead: (input.draft.ahead || []).join(", "),
     replay: { weeks: replay, agrees: differences.length === 0, differences }
   };
@@ -195,7 +267,7 @@ function main() {
   const hits = replay.reduce((a, r) => a + r.hitCount, 0);
   console.log("plan.cjs wrote " + show(o.plan) + " · hash " + nowHash + " · kept " + solvedBy + " · total " + plan.total + " · objective " + plan.obj + " · gap " + plan.gap + " (" + gapNote + ")" +
     " · " + plan.weeks.length + " weeks GW" + plan.weeks[0].gw + "–" + plan.weeks[plan.weeks.length - 1].gw + " · chips " + chips + " · replayed hits " + hits +
-    " · long solve " + longNote + " · timing " + timingNote + " · free-hit weeks " + freeHit.length + " · Draft roster " + (so.draft && so.draft.ok ? "ok" : "absent"));
+    " · long solve " + longNote + " · timing " + timingNote + " · horizons " + horizonsNote + " · free-hit weeks " + freeHit.length + " · Draft roster " + (so.draft && so.draft.ok ? "ok" : "absent"));
   if (differences.length) {
     console.log("REPLAY DISAGREES with the solver's own fields (§7.1) — the replay is what the interface reads:");
     differences.forEach((d) => console.log("  GW" + d.gw + " " + d.field + ": replay " + d.replay + " · solver " + d.solver));

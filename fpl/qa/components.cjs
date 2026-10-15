@@ -365,6 +365,17 @@ const STATE_MKT = (function () {
 })();
 const CTX_MKT = ctxOf(LIVE, STATE_MKT);
 const UI_PLAN_SOLVED = { mode: "full", tab: "plan", open: allOpen(), reveals: allOpenExcept(["wc-lock"]) };
+/* v110 D2 (15 Oct 2026, E-162): the wildcard-timing note and the latest-wildcard reveal render only when the plan's first week
+   plays the wildcard. A build whose plan plays it later, or not at all, reaches them by moving the data, as E-156 does for
+   the waiver phase: the same PLAN with its first week marked a wildcard week and timing.now set to it. Absent when the
+   shipped plan already plays the wildcard first (nothing to move) or carries no timing block. */
+const MCP_WC = (function () {
+  if (!MCP || !MCP.PLAN || !MCP.PLAN.plan || !Array.isArray(MCP.PLAN.plan.weeks) || !MCP.PLAN.plan.weeks.length || !MCP.PLAN.timing) return null;
+  if (MCP.PLAN.plan.weeks[0].chip === "wildcard") return null;
+  const P2 = JSON.parse(JSON.stringify(MCP.PLAN));
+  P2.plan.weeks[0].chip = "wildcard"; P2.timing.now = P2.plan;
+  return { MC: MCP.MC, PLAN: P2, PRE: MCP.PRE, E: MCP.E };
+})();
 
 /* props: the valid fixture · text: the slots that exist to be printed · variants: extra renders
    whose union has to carry every owned testid · fuzz: the props pass C starts from (sections
@@ -431,11 +442,15 @@ const FIX = {
       // v110 D2: the solved plan with every part open, then the two worlds that must hide it behind one note
       { ctx: CTX, ui: UI_PLAN_SOLVED, on: ON, plan: PLAN, onConfirm: noop, mc: MCP },
       { ctx: CTX, ui: uiFor("plan", false), on: ON, plan: PLAN, onConfirm: noop, mc: MCP_NOPLAN },
-      { ctx: CTX_MKT, ui: uiFor("plan", false), on: ON, plan: PLAN, onConfirm: noop, mc: MCP }],
+      { ctx: CTX_MKT, ui: uiFor("plan", false), on: ON, plan: PLAN, onConfirm: noop, mc: MCP }]
+      .concat(MCP_WC ? [{ ctx: CTX, ui: UI_PLAN_SOLVED, on: ON, plan: PLAN, onConfirm: noop, mc: MCP_WC }] : []),
     fuzz: { ctx: CTX, ui: uiFor("plan", false), on: ON, plan: PLAN, onConfirm: noop, mc: MCP }
   },
   TabSquad: { props: { ctx: CTX, ui: uiFor("squad", true), on: ON, onConfirm: noop, mc: MCP }, text: [] },
-  TabRivals: { props: { ctx: CTX, ui: uiFor("rivals", true), on: ON, plan: PLAN, simLeague: 0, onSimLeague: noop, onConfirm: noop, mc: MCP }, text: [] },
+  TabRivals: { props: { ctx: CTX, ui: uiFor("rivals", true), on: ON, plan: PLAN, simLeague: 0, onSimLeague: noop, onConfirm: noop, mc: MCP }, text: [],
+    /* 15 Oct 2026: the route's verdict reads the plan's weekly rate, which only exists while the solved plan stands, and the
+       all-open fixture opens the wc-lock reveal that sets it aside; this variant keeps every section and reveal open but that one. */
+    variants: [{ ctx: CTX, ui: { mode: "full", tab: "rivals", open: allOpen(), reveals: allOpenExcept(["wc-lock"]) }, on: ON, plan: PLAN, simLeague: 0, onSimLeague: noop, onConfirm: noop, mc: MCP }] },
   TabDraft: {
     props: { ctx: CTX, ui: uiFor("draft", true), on: ON, state: baseState, onLeague: noop, mc: MCP }, text: [],
     variants: (CTX_LEAGUE ? [{ ctx: CTX_LEAGUE, ui: uiFor("draft", true), on: ON, state: STATE_LEAGUE, onLeague: noop, mc: MCP }] : [])
@@ -791,7 +806,7 @@ console.log("--- v110 D2 · the Classic plan panel ---");
       .replace(/\s+/g, " ").trim();
   };
   // One part of the panel: the markup from its data-testid to the next of the panel's own markers.
-  const MARKS = ["plan-solved", "plan-solved-note", "plan-strip", "plan-timing", "plan-xi", "plan-changes", "plan-price", "rev-pl-week", "plan-week-table", "sec-plan-tx"];
+  const MARKS = ["plan-solved", "plan-solved-note", "plan-strip", "plan-horizons", "plan-horizons-verdict", "rev-pl-horizons", "plan-horizons-chase", "plan-horizons-lens", "plan-timing", "plan-xi", "plan-changes", "plan-price", "rev-pl-week", "plan-week-table", "sec-plan-tx"];
   const OPEN_CHANGES = { mode: "full", tab: "plan", open: {}, reveals: { "pl-changes": true } };
   // Cut at tag boundaries: from the "<" of the element carrying the testid to the "<" of the next marked element.
   const raw = function (html, id) {
@@ -1027,6 +1042,77 @@ console.log("--- v110 D2 · the Classic plan panel ---");
     assert("D2-no-solved-plan-or-a-passed-first-deadline-says-so-instead-of-showing-a-plan",
       hidden(rNo) && /not solved for this data/.test(note(rNo)) && hidden(rLate) && /deadline has passed/.test(note(rLate)),
       "no plan «" + note(rNo) + "» · at " + late + " «" + note(rLate) + "»");
+  }
+
+  // (1b) The gameweek, the month and the season (the manager's ask of 15 Oct 2026). Every expectation is derived here from
+  // PLAN.horizons, the plan's own weeks, the baked months (MC.gw.phases) and the feed's points (MC.classic.gws): no figure is typed.
+  {
+    const H = SP.horizons || null;
+    const sc = function (o) { return !!o && isFinite(o.gameweek) && isFinite(o.month) && isFinite(o.season); };
+    const HZ = ["gameweek", "month", "season"];
+    const C = H && Array.isArray(H.candidates) ? H.candidates : [];
+    const byKey = function (k) { return C.filter(function (c) { return c.key === k; })[0] || null; };
+    const shipped = assert("D2-the-PLAN-block-scores-every-solved-plan-by-gameweek-month-and-season-and-names-the-best-for-each",
+      !!(H && sc(H.plan) && H.month && isFinite(H.month.start) && isFinite(H.month.stop) && C.length >= 2 && byKey("plan") &&
+        C.every(function (c) { return sc(c.score); }) && H.best && HZ.every(function (h) { return !!byKey(H.best[h]); })),
+      H ? C.length + " candidates · best " + JSON.stringify(H.best) : "no horizons in the PLAN block");
+    if (shipped) {
+      const ph = (MB.gw && Array.isArray(MB.gw.phases) ? MB.gw.phases : []).filter(function (x) { return x.start <= w.gw && w.gw <= x.stop; })[0] || null;
+      const net = pl.weeks.map(function (x) { return x.epNet; });
+      const inM = pl.weeks.filter(function (x) { return ph && x.gw >= ph.start && x.gw <= ph.stop; }).reduce(function (a, x) { return a + x.epNet; }, 0);
+      const bank0 = (MB.classic.gws || []).filter(function (g) { return ph && g.gw >= ph.start && g.gw <= ph.stop && g.gw < w.gw; }).reduce(function (a, g) { return a + g.pts - (g.hit || 0); }, 0);
+      const near = function (a, b) { return Math.abs(a - b) < 0.011; };
+      const pc = byKey("plan").score;
+      assert("D2-horizons-the-plan's-scores-are-its-own-weeks-summed-the-month-is-the-feed's-and-the-banked-points-are-the-feed's-less-hits",
+        !!ph && H.month.id === ph.id && H.month.start === ph.start && H.month.stop === ph.stop && near(H.plan.gameweek, net[0]) &&
+          near(H.plan.season, net.reduce(function (a, b) { return a + b; }, 0)) && near(H.plan.month, inM) && H.month.banked === bank0 &&
+          near(pc.gameweek, H.plan.gameweek) && near(pc.month, H.plan.month) && near(pc.season, H.plan.season),
+        "month " + JSON.stringify(H.month) + " vs feed " + JSON.stringify(ph) + " · gw " + H.plan.gameweek + "/" + net[0] + " · month " + H.plan.month + "/" + inM.toFixed(2) + " · banked " + H.month.banked + "/" + bank0);
+      const badBest = HZ.filter(function (h) { const b = byKey(H.best[h]).score[h]; return C.some(function (c) { return c.score[h] > b + 1e-9; }); });
+      assert("D2-horizons-each-best-is-the-highest-of-every-candidate-on-its-own-horizon", badBest.length === 0, badBest.length ? "not the highest on " + badBest.join(",") : JSON.stringify(H.best));
+      // the table, three rows, each figure in the same arithmetic as the view
+      const banked = H.month.banked, mName = H.month.name, mSpan = H.month.start === H.month.stop ? "GW" + H.month.start : "GW" + H.month.start + "–" + H.month.stop;
+      const pS = H.plan.season, pM = banked + H.plan.month, pG = H.plan.gameweek;
+      const bg = byKey(H.best.gameweek), bm = byKey(H.best.month), bs = byKey(H.best.season);
+      const cost = function (c) { return c.key === "plan" || !(pS - c.score.season > 0.05) ? "none" : "−" + f1(pS - c.score.season) + " to GW" + lastGw; };
+      const mGive = bs.key !== "plan" ? pM - (banked + bs.score.month) : 0;
+      const rowsWant = [
+        "GW" + w.gw + " " + f1(pG) + " " + f1(bg.score.gameweek) + " " + cost(bg),
+        mName + " (" + mSpan + ") " + f0(pM) + (banked ? " (" + f0(banked) + " banked)" : "") + " " + f0(banked + bm.score.month) + " " + cost(bm),
+        "To GW" + lastGw + " " + f0(pS) + (H.seasonBanked !== null && isFinite(H.seasonBanked) ? " (+" + f0(H.seasonBanked) + " banked)" : "") + " " + f0(bs.score.season) + " " + (mGive > 0.05 ? "−" + f1(mGive) + " in " + mName : "none")
+      ];
+      const tbl = part(h1, "plan-horizons");
+      const miss = rowsWant.filter(function (x) { return tbl.indexOf(x) < 0; });
+      assert("D2-horizons-the-table-shows-this-gameweek-this-month-and-the-total-to-the-chip-stop-with-the-best-found-and-its-cost",
+        has(h1, "plan-horizons") && miss.length === 0 && /^Classic, expected/.test(tbl), (miss.length ? "missing «" + miss.join("» «") + "» · " : "") + "«" + tbl.slice(0, 300) + "»");
+      const ver = part(h1, "plan-horizons-verdict");
+      const shortOr = function (c, what, mine, best) { return c.key === "plan" || best - mine <= 0.05 ? "the best found for " + what : f1(best - mine) + " short of the best " + what; };
+      const vWant = [shortOr(bg, "GW" + w.gw, pG, bg.score.gameweek), shortOr(bm, mName, pM, banked + bm.score.month), shortOr(bs, "total to GW" + lastGw, pS, bs.score.season)];
+      assert("D2-horizons-the-verdict-says-how-far-the-plan-is-from-each-horizon's-best",
+        vWant.every(function (x) { return ver.indexOf(x) >= 0; }), "want «" + vWant.join("» «") + "» · got «" + ver + "»");
+      // moved: a month-best plan that gains and costs nothing measurable is a free choice; one that costs more than the tolerance keeps the balance
+      const other = C.filter(function (c) { return c.key !== "plan"; })[0];
+      const withBest = function (gain, costPts) {
+        const P2 = JSON.parse(JSON.stringify(SP)), H2 = P2.horizons, c2 = H2.candidates.filter(function (c) { return c.key === other.key; })[0];
+        c2.score.month = H2.plan.month + gain; c2.score.season = H2.plan.season - costPts; H2.best.month = other.key; return P2;
+      };
+      const tolv = isFinite(H.tol) ? H.tol : 0;
+      const OPEN_H = { mode: "full", tab: "plan", open: {}, reveals: { "pl-horizons": true } };
+      const rFree = tryRender("TabPlan", props({ mc: mcWith(withBest(3, Math.max(0, tolv / 2))) }));
+      const rDear = tryRender("TabPlan", props({ mc: mcWith(withBest(3, tolv + 6)) }));
+      const rDearO = tryRender("TabPlan", props({ mc: mcWith(withBest(3, tolv + 6)), ui: OPEN_H }));
+      const vFree = rFree.ok ? part(rFree.html, "plan-horizons-verdict") : "", vDear = rDear.ok ? part(rDear.html, "plan-horizons-verdict") : "";
+      const cDear = rDearO.ok ? part(rDearO.html, "plan-horizons-chase") : "";
+      // the free choice is said on first paint; the costly chase is priced in the table and explained behind the reveal, never on first paint
+      assert("D2-horizons-moved-a-free-month-best-is-called-a-free-choice-and-a-costly-one-keeps-the-balance-behind-the-reveal",
+        /chasing [^;]*\(\+3\.0\)[^;]*free choice/.test(vFree) && !/chasing/.test(vDear) && rDear.ok && !has(rDear.html, "plan-horizons-chase") && has(rDear.html, "rev-pl-horizons") &&
+          /^Why the plan keeps the balance: chasing [^;]*would add 3\.0 there and take [\d.]+ off the total to GW\d+/.test(cDear),
+        "free «" + vFree.slice(0, 240) + "» · dear «" + vDear.slice(0, 240) + "» · behind the reveal «" + cDear.slice(0, 240) + "»");
+      const P3 = JSON.parse(JSON.stringify(SP)); P3.horizons = null;
+      const rNone = tryRender("TabPlan", props({ mc: mcWith(P3) }));
+      assert("D2-horizons-moved-a-build-without-the-lenses-shows-no-table-and-the-rest-of-the-plan-still-renders",
+        rNone.ok && !has(rNone.html, "plan-horizons") && has(rNone.html, "plan-strip") && has(rNone.html, "plan-xi"), rNone.ok ? "rendered" : String(rNone.err && rNone.err.message));
+    }
   }
 
   // Part G, measured here on the component alone (the browser gate in smoke.cjs adds the header and the tab strip)
@@ -1348,6 +1434,133 @@ console.log("--- v110 D3 · the Draft tab ---");
   }
 })();
 
+/* ---------------------------------------------------------------- 6c+. The route to first by GW19 (15 Oct 2026)
+
+   The manager: "Make sure that a clear plan exists to win draft and all my mini leagues by the end of gw19". The Rivals
+   tab's rv-route and the Draft tab's df-route are rendered and every figure is derived here: the Classic side from the
+   snapshot (LIVE's standings, each leader's season and chips, the game's average, the plan's weeks), the Draft side from
+   the engine's own titleRace run again on the same draws and seed. Neither section may show a chance of winning (E4). */
+(function () {
+  const EN = MCP ? MCP.E : null, MB = MCP ? MCP.MC : null, SP = MCP ? MCP.PLAN : null;
+  if (!assert("R-route-the-blocks-the-route-reads-are-in-the-build", !!(EN && MB && SP && LIVE && LIVE.rivals), "no MC block or no rivals")) return;
+  const secOf = function (html, id) { const a = html.indexOf('data-section="' + id + '"'); if (a < 0) return ""; const b = html.indexOf('data-section="', a + 10); return html.slice(a, b < 0 ? html.length : b); };
+  const f1 = function (x) { return Number(x).toFixed(1); };
+  // decoded text: team and league names carry "&" and apostrophes, which React writes as entities
+  const txt = function (html) {
+    return String(html).replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "").replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&quot;/g, "\"").replace(/&#x27;|&#39;/g, "'").replace(/\s+/g, " ").trim();
+  };
+  const MAP = { wildcard: "WC", freehit: "FH", bboost: "BB", "3xc": "TC" };
+  const paceOf = function (rows) { const ok = (rows || []).filter(function (r) { return Array.isArray(r) && r[0] >= 1; }); return ok.length ? ok.reduce(function (a, r) { return a + r[1] - (r[2] || 0); }, 0) / ok.length : null; };
+  const leftOf = function (chips) { const used = (chips || []).filter(function (c) { return c.event <= 19 && MAP[c.name]; }).map(function (c) { return MAP[c.name]; }); return ["WC", "FH", "BB", "TC"].filter(function (k) { return used.indexOf(k) < 0; }); };
+  const me = Number(LIVE.entry.id), next = Number(LIVE.next_event);
+  const lv = F("landingPlanView")(MCP, CTX, { locked: false, overrides: F("overrideCount")(CTX) });
+  const PLW = lv.state === "solved" && SP.plan && Array.isArray(SP.plan.weeks) ? SP.plan.weeks : [];
+  const end = PLW.length ? PLW[PLW.length - 1].gw : 19, weeks = end - next + 1;
+  const ppw = PLW.length ? PLW.reduce(function (a, w) { return a + w.epNet; }, 0) / PLW.length : null;
+  const evs = LIVE.events.filter(function (e) { return e.finished === true && isFinite(e.average_entry_score); });
+  const game = evs.reduce(function (a, e) { return a + e.average_entry_score; }, 0) / evs.length;
+  const myPace = paceOf(LIVE.history.current.map(function (c) { return [c.event, c.points, c.event_transfers_cost]; }));
+  const rivProps = function (over) {
+    const p = {}; Object.keys(FIX.TabRivals.props).forEach(function (k) { p[k] = FIX.TabRivals.props[k]; });
+    p.ui = { mode: "full", tab: "rivals", open: { "rv-route": true }, reveals: { "rv-route-each": true } };
+    Object.keys(over || {}).forEach(function (k) { p[k] = over[k]; }); return p;
+  };
+  const r1 = tryRender("TabRivals", rivProps({}));
+  if (!assert("R-route-the-rivals-tab-renders-with-the-route-open", r1.ok && r1.html.indexOf('data-testid="rv-route"') >= 0, r1.ok ? "no rv-route" : r1.err && r1.err.message)) return;
+  const S = txt(secOf(r1.html, "rv-route"));
+  // each league: gap, the weeks it is shared over, the leader's pace net of hits and the set-1 chips they hold, in table order
+  const rows = [], held = { n: 0, of: 0 }, closeAtGame = [], shortAtGame = [];
+  let anyAtPace = false;
+  LIVE.leagues.forEach(function (L) {
+    const st = L.standings.slice().sort(function (a, b) { return a.rank - b.rank; });
+    const mine = st.filter(function (r) { return r.entry === me; })[0], lead = st.filter(function (r) { return r.entry !== me; })[0];
+    const started = !!mine && mine.rank > 0 && st.some(function (r) { return r.total !== 0; });
+    if (!started || !lead) { rows.push(L.name + " No scores yet — — —"); return; }
+    const gap = lead.total - mine.total, R = LIVE.rivals[String(lead.entry)] || {}, pace = Array.isArray(R.gws) ? paceOf(R.gws) : null;
+    const left = Array.isArray(R.chips) ? leftOf(R.chips) : null;
+    if (left) { held.n += left.length; held.of += 4; }
+    rows.push(L.name + " Leader's chips: " + (left ? (left.length ? left.join(" ") : "none") : "?") + " " + (gap <= 0 ? "+" + Math.abs(gap) : gap) + " " + (gap > 0 ? f1(gap / weeks) : "—") + " " + (pace === null ? "—" : f1(pace)));
+    if (ppw !== null && gap > 0) {
+      const at = function (rate) { const edge = ppw - rate; return edge > 0 && next + Math.ceil(gap / edge - 1e-9) - 1 <= end ? next + Math.ceil(gap / edge - 1e-9) - 1 : null; };
+      if (pace !== null && at(pace) !== null) anyAtPace = true;
+      if (at(game) !== null) closeAtGame.push(L.name); else shortAtGame.push(L.name);
+    }
+  });
+  let at = -1;
+  const outOfOrder = rows.filter(function (x) { const k = S.indexOf(x, at + 1); if (k < 0) return true; at = k; return false; });
+  assert("R-route-classic-every-league-row-is-the-snapshot's-gap-shared-over-the-weeks-left-the-leader's-pace-and-chips",
+    outOfOrder.length === 0 && rows.length === LIVE.leagues.length, outOfOrder.length ? "missing «" + outOfOrder.join("» «") + "» in «" + S.slice(0, 500) + "»" : "");
+  const headWant = [weeks + " gameweeks to GW" + end + ".", "averaged " + f1(myPace), "the game " + f1(game), "the leaders hold " + held.n + " of their " + held.of + "."]
+    .concat(ppw !== null ? ["The plan of record expects " + f1(ppw) + " a week to then"] : []);
+  assert("R-route-classic-the-head-gives-the-weeks-each-pace-and-the-chips-held-on-both-sides",
+    headWant.every(function (x) { return S.indexOf(x) >= 0; }), "want «" + headWant.join("» «") + "» in «" + S.slice(0, 400) + "»");
+  if (ppw !== null) {
+    const V = txt(secOf(r1.html, "rv-route").slice(secOf(r1.html, "rv-route").indexOf('data-testid="rv-route-verdict"')));
+    assert("R-route-classic-the-verdict-names-the-leagues-the-plan-closes-at-the-game's-pace-and-the-ones-that-need-differentials",
+      (anyAtPace || /no league closes on expected points alone/.test(V)) && closeAtGame.every(function (n) { return V.indexOf(n) >= 0; }) &&
+        shortAtGame.every(function (n) { return V.indexOf(n) >= 0; }) && (!shortAtGame.length || /need more than expected points/.test(V)),
+      "close «" + closeAtGame.join(", ") + "» short «" + shortAtGame.join(", ") + "» · «" + V.slice(0, 500) + "»");
+  }
+  const lines = (r1.html.match(/data-testid="rv-route-line"/g) || []).length;
+  assert("R-route-classic-league-by-league-has-a-line-for-every-league-and-no-section-shows-a-chance-of-winning",
+    lines === LIVE.leagues.length && !/\d\s*%/.test(S) && !/chance of (winning|first)/i.test(S), lines + " lines · " + (S.match(/[^ ]*%[^ ]*/g) || []).join(" "));
+  // moved: lead one league, and strip one leader's season, then the row says so instead of inventing a figure
+  {
+    const L2 = JSON.parse(JSON.stringify(LIVE)), Lg = L2.leagues.filter(function (L) { return L.standings.some(function (r) { return r.entry === me; }); })[0];
+    const myRow = Lg.standings.filter(function (r) { return r.entry === me; })[0], top = Lg.standings.slice().sort(function (a, b) { return b.total - a.total; })[0];
+    myRow.total = top.total + 12; Lg.standings.forEach(function (r) { r.rank = r.entry === me ? 1 : r.rank + (r.rank < myRow.rank ? 1 : 0); }); myRow.rank = 1;
+    const Lo = L2.leagues.filter(function (L) { return L !== Lg && L.standings.some(function (r) { return r.entry === me; }); })[0];
+    const ldr = Lo.standings.slice().sort(function (a, b) { return a.rank - b.rank; }).filter(function (r) { return r.entry !== me; })[0];
+    delete L2.rivals[String(ldr.entry)].gws; delete L2.rivals[String(ldr.entry)].chips;
+    const r2 = tryRender("TabRivals", rivProps({ ctx: ctxOf(L2, baseState) }));
+    const S2 = r2.ok ? txt(secOf(r2.html, "rv-route")) : "";
+    assert("R-route-classic-moved-a-league-you-lead-shows-the-lead-and-a-leader-without-a-season-is-said-not-guessed",
+      r2.ok && new RegExp(Lg.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + " Leader's chips: .+? \\+12 — ").test(S2) && /You lead by 12/.test(S2) &&
+        S2.indexOf(Lo.name + " Leader's chips: ? ") >= 0 && /not in this build's data/.test(S2),
+      r2.ok ? "«" + S2.slice(0, 600) + "»" : String(r2.err && r2.err.message));
+  }
+
+  // the Draft race: the engine's own titleRace on the same draws and seed, rows by expected points, and what first takes
+  const P = F("draftRouteParams")(), dEnd = Math.min(19, EN.CFG.draftEndApi), nm = MB.draft.me;
+  const race = EN.titleRace(MB.gw.next, dEnd, P.draws, P.seed);
+  const now = {}; MB.draft.standings.forEach(function (s) { now[s.name] = s.pts; });
+  const dProps = function (over) {
+    const p = {}; Object.keys(FIX.TabDraft.props).forEach(function (k) { p[k] = FIX.TabDraft.props[k]; });
+    p.ui = { mode: "full", tab: "draft", open: { "df-route": true }, reveals: {} };
+    Object.keys(over || {}).forEach(function (k) { p[k] = over[k]; }); return p;
+  };
+  const d1 = tryRender("TabDraft", dProps({}));
+  if (!assert("R-route-the-draft-tab-renders-with-the-race-open", d1.ok && d1.html.indexOf('data-testid="df-route"') >= 0, d1.ok ? "no df-route" : d1.err && d1.err.message)) return;
+  const D = txt(secOf(d1.html, "df-route"));
+  const dRows = race.slice().sort(function (a, b) { return b.pts - a.pts || a.pos - b.pos; }).map(function (x) { return x.name + " " + (now[x.name] || 0) + " " + f1(x.pts) + " " + f1(x.pos); });
+  at = -1;
+  const dMiss = dRows.filter(function (x) { const k = D.indexOf(x, at + 1); if (k < 0) return true; at = k; return false; });
+  assert("R-route-draft-the-table-is-the-engine's-race-to-GW19-by-expected-league-points-with-the-average-finish",
+    dMiss.length === 0 && D.indexOf("GW" + dEnd) >= 0, dMiss.length ? "missing «" + dMiss.join("» «") + "» in «" + D.slice(0, 500) + "»" : "");
+  const mine = race.filter(function (x) { return x.name === nm; })[0], others = race.filter(function (x) { return x.name !== nm; }).sort(function (a, b) { return b.pts - a.pts; });
+  const games = MB.draft.matches.filter(function (m) { return !m.fin && m.gw >= MB.gw.next && m.gw <= dEnd && (m.a === nm || m.b === nm); });
+  const needW = Math.max(0, Math.ceil((others[0].pts - now[nm]) / 3 - 1e-9)), expW = Math.max(0, (mine.pts - now[nm]) / 3);
+  const top2 = others.slice(0, 2).map(function (x) { return x.name; });
+  const sixes = games.filter(function (m) { return top2.indexOf(m.a === nm ? m.b : m.a) >= 0; }).map(function (m) { return "GW" + m.gw + " " + (m.a === nm ? m.b : m.a); });
+  const lineWant = ["First at GW" + dEnd + " takes about " + Math.ceil(others[0].pts) + " league points", "(" + others[0].name + ")", "You have " + now[nm], "the model expects " + f1(mine.pts) + " from your " + games.length,
+    "about " + needW + (needW === 1 ? " win" : " wins") + " needed against " + f1(expW) + " expected", "expected to score " + f1(mine.strength) + " a week"];
+  assert("R-route-draft-the-line-says-what-first-takes-in-wins-against-the-wins-expected-and-each-side's-weekly-strength",
+    lineWant.every(function (x) { return D.indexOf(x) >= 0; }), "want «" + lineWant.join("» «") + "» in «" + D.slice(0, 700) + "»");
+  assert("R-route-draft-the-six-point-weeks-are-the-fixtures-against-the-two-teams-expected-to-lead-and-no-chance-of-winning-is-shown",
+    (sixes.length ? sixes.every(function (x) { return D.indexOf(x) >= 0; }) && D.indexOf(sixes.length + " of the " + games.length + " are against") >= 0 : !/six-point/.test(D)) &&
+      !/\d\s*%/.test(D) && /never a chance of winning/.test(D),
+    "sixes «" + sixes.join(", ") + "» · «" + D.slice(0, 700) + "»");
+  // moved: a block whose next gameweek is past the stop has no race to run, and says so
+  {
+    const M2 = JSON.parse(JSON.stringify(MB)); M2.gw.next = dEnd + 1;
+    const d2 = tryRender("TabDraft", dProps({ mc: { MC: M2, PLAN: SP, PRE: MCP.PRE, E: MCB.MCEngine.create(M2) } }));
+    const D2 = d2.ok ? txt(secOf(d2.html, "df-route")) : "";
+    assert("R-route-draft-moved-no-fixture-left-before-the-stop-says-so-instead-of-a-table",
+      d2.ok && d2.html.indexOf('data-testid="df-route"') < 0 && /No Draft fixture is left before GW/.test(D2), d2.ok ? "«" + D2 + "»" : String(d2.err && d2.err.message));
+  }
+})();
+
 /* ---------------------------------------------------------------- 6d. v110 §5 D1 — Today: the landing card and the Command tab
 
    GwActionCard ports the kit's vToday instruction (the kit's ui.js 70–132): when PLAN.plan exists and PLAN.hash equals
@@ -1548,7 +1761,12 @@ console.log("--- v110 D1 · Today: the landing card and the Command tab ---");
       if (!/^Solved plan set aside/.test(a)) bad.push(k + ": the note does not say the solved plan is set aside");
     });
     if (R.lock.ok && plain(R.lock.html).indexOf("Premiums locked") < 0) bad.push("lock: the app's own locked card is not the one shown");
-    if (R.flag.ok && plain(R.flag.html).indexOf(nmL(w.cap)) >= 0) bad.push("flag: the flagged captain " + nmL(w.cap) + " is still named");
+    /* The flagged captain may be named only as a player the app's own fifteen drops (the "Not your written fifteen" panel,
+       E-161): never as the captain, a pick or a buy. A name inside "The convergence rule drops …" is the card saying he is out. */
+    if (R.flag.ok) {
+      const ft = plain(R.flag.html), rest = ft.replace(/The convergence rule drops [^.]*\./g, ""), at = rest.indexOf(nmL(w.cap));
+      if (at >= 0) bad.push("flag: the flagged captain " + nmL(w.cap) + " is still named outside the dropped list: «…" + rest.slice(Math.max(0, at - 90), at + 60) + "…»");
+    }
     assert("D1-the-solved-card-steps-aside-for-another-hash-another-gameweek-a-passed-deadline-the-lock-a-typed-price-or-a-new-flag-and-says-why", bad.length === 0,
       bad.length ? bad.slice(0, 5).join("; ") : Object.keys(R).map(function (k) { return k + " «" + aside(R[k]).slice(23, 90) + "»"; }).join(" · "));
     const rNo = tryRender("GwActionCard", landing({ mc: MCP_NOPLAN }));

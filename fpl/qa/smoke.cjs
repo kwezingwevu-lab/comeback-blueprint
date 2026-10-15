@@ -370,14 +370,18 @@ async function main() {
       const acp = await fresh({ html: H.buildPage({ inlineData: withFlag(appCapEl.id, true) }), mode: "simple", now: NOW, state: STATE_PRICE });
       appCapFlagged = (await landingText(acp)).replace(/\n/g, " ");
     }
+    /* E-161, E-167: a flagged player may still be NAMED on the card, inside "The convergence rule drops …", which is the
+       card saying he is out; he must never be the captain, the vice, a pick or a buy. The sentence is cut before the name
+       is looked for, exactly as the components twin cuts it. */
+    const outSaid = function (text) { return text.replace(/The convergence rule drops [^.]*\./g, ""); };
     const gone = function (name, text) {
       const e = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      return !new RegExp("(Captain|vice)\\s+" + e).test(text) && !rx(name).test(text);
+      return !new RegExp("(Captain|vice)\\s+" + e).test(text) && !rx(name).test(outSaid(text));
     };
     H.assert("C1-flagged-player-is-never-captain-nor-vice",
       !!capEl && new RegExp("Captain\\s+" + shippedCap.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(oneLine) &&
       !new RegExp("(Captain|vice)\\s+" + shippedCap.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(capFlaggedText) &&
-      !rx(shippedCap.trim()).test(capFlaggedText) && !!appCapEl && gone(appCap.trim(), appCapFlagged),
+      !rx(shippedCap.trim()).test(outSaid(capFlaggedText)) && !!appCapEl && gone(appCap.trim(), appCapFlagged),
       (capEl ? "the shipped " + (simple ? simple.plan : "?") + " card captains " + shippedCap.trim() + " (id " + capEl.id + "); with a 75% flag on him and nothing else changed the landing reads «" +
         capFlaggedText.slice(0, 120) + "»" : "no captain could be read off the shipped landing: «" + oneLine.slice(0, 120) + "»") +
         " · the app's own card captains " + (appCap ? appCap.trim() : "nobody") + "; flagged, it reads «" + appCapFlagged.slice(0, 100) + "»");

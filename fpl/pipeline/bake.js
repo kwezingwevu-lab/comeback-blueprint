@@ -90,6 +90,10 @@ function bake(opts) {
   const nextEv = events.find((e) => new Date(e.dl).getTime() > now) || events[events.length - 1];
   const liveEv = [...events].reverse().find((e) => new Date(e.dl).getTime() <= now) || events[0];   // the gameweek whose deadline has passed most recently
   const lastDone = [...events].reverse().find((e) => e.fin) || { id: 0 };
+  /* The game's own months ("phases" in bootstrap-static: October is gameweeks 6–9 this season), read and never typed, so the
+     plan can be scored by gameweek, by month and by season (the manager's ask of 15 Oct 2026). "Overall" is the season. */
+  const phases = (Array.isArray(b.phases) ? b.phases : []).filter((x) => x && x.name !== "Overall" && Number.isInteger(x.start_event) && Number.isInteger(x.stop_event))
+    .map((x) => ({ id: x.id, name: x.name, start: x.start_event, stop: x.stop_event }));
   const dEvents = {}; db.events.data.forEach((e) => { dEvents[e.id] = { dl: e.deadline_time, wv: e.waivers_time, tr: e.trades_time || null }; });
 
   /* ── teams and fixtures ────────────────────────────────────────────────── */
@@ -242,7 +246,7 @@ function bake(opts) {
     players.forEach((p) => { const q = pv[p.id]; if (!q) return;
       if (q.pr !== p.pr) delta.prices.push({ id: p.id, from: q.pr, to: p.pr });
       if (q.st !== p.st || q.cop !== p.cop || (q.news || "") !== (p.news || "")) delta.flags.push({ id: p.id, from: q.st + (q.cop != null ? " " + q.cop + "%" : ""), to: p.st + (p.cop != null ? " " + p.cop + "%" : ""), news: p.news || "" }); }); }
-  const DATA = { asOf, delta, screen: SCREEN, gw: { live: liveEv.id, next: nextEv.id, lastDone: lastDone.id, events, withData: gwsWithData }, teams, fixtures, players, teamSeason, classic, draft, intel: INTEL,
+  const DATA = { asOf, delta, screen: SCREEN, gw: { live: liveEv.id, next: nextEv.id, lastDone: lastDone.id, events, withData: gwsWithData, phases }, teams, fixtures, players, teamSeason, classic, draft, intel: INTEL,
     rules: { maxFt, clubLimit: b.game_settings.squad_team_limit || 3, chipStop } };
   const json = JSON.stringify(DATA);
   const line = `baked ${asOf} · live GW${liveEv.id} · next GW${nextEv.id} (deadline ${nextEv.dl}) · ${players.length} players · ${fixtures.length} fixtures · classic picks for GW ${Object.keys(picks).join(",")} · FT into GW${nextEv.id}: ${ft} · draft rosters ${Object.keys(rosters).length} · my draft elevens ${myDraftGws.map((x) => x.gw).join(",")} · rivals' elevens now ${Object.keys(rivalsNow).length} · leagues with tables ${leagues.filter((l) => l.top).length} · ${(Buffer.byteLength(json) / 1024).toFixed(0)} kB`;

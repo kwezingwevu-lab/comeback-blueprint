@@ -1989,3 +1989,75 @@ CAUSE: smoke_wk's claims check compared each drop against the saved state's rost
 CAUGHT: the 9 Oct 16:20Z refresh.
 RULE: a check compares against the source the engine reads (`draftRoster`), and count words are pluralised as the app pluralises them.
 TEST: smoke_wk draft-claims-forced-replacements-first; components D3-the-solved-roster-lists-every-pair….
+
+### E-159 · v110 · CLAUDE.md E7 credited six numbers to a paper that prints none of them as a ranking
+CAUSE: E7 ("Evidence-ranked edge (PLOS ONE 2021, 901,912 managers)") was written from memory of the paper and never checked against it. The paper (O'Brien, Gleeson and O'Sullivan, PLoS ONE 16(3): e0246698, 2021) exists and the sample is right, but it ranks no sources of edge: two of the six numbers can be rebuilt from its Figure 3 as descriptive tier gaps, one is a regression slope in another unit, and three are not in it. Law A2.1 (never hallucinate; every number carries a tier) was broken in the master prompt itself.
+CAUGHT: 15 Oct 2026, when the manager asked to use every relevant connector; a literature check through the Consensus connector and the article page.
+RULE: a citation in this file is checked against the source before it is relied on, and a number the source does not print is labelled with how it was derived or as the app's own estimate. The manager's text stays as written; the correction sits beside it, dated.
+TEST: none automated (prose); the dated note under E7 records the check.
+
+### E-160 · v110 · the scheduled refresh ran for five days without the repository
+CAUSE: the routine (created 10 Oct through the remote-session tool, which cannot attach a repository) fires sessions tagged no-git-repo. They rebuilt and republished the app every four hours, but nothing they did reached the branch: each run began again from the 9 Oct commit, re-solved from scratch, and the first one, unable to read the artifact, created a second copy of the app. The code and data in the repository stayed at 9 Oct.
+CAUGHT: 15 Oct 2026, from the branch history (no commit since 9 Oct) and the routine's session record.
+RULE: a routine whose work must persist attaches the repository with push access before it does anything (add_repo in its prompt, or a repository selected when it is created), and the first run is checked for a commit on the branch before the routine is trusted. A run that cannot push says so in its summary instead of publishing as if it had.
+TEST: the routine's prompt now begins with add_repo and ends by checking that its commit is on the remote branch.
+
+### E-161 · v110 · the landing's flagged-captain check failed on a name the card prints as dropped
+CAUSE: components D1 flags the solved plan's captain and asserts his name appears nowhere on the app's fallback card. On the 15 Oct data the fallback is the app's own wildcard card, whose "Not your written fifteen" panel says "The convergence rule drops Haaland (100% rival-owned)": the card naming him as out, which is right.
+CAUGHT: 15 Oct 2026, a build on a test solve whose captain was Haaland.
+RULE: assert on the role, not on the absence of a name: the flagged player is never the captain, a pick or a buy; the one sentence that lists who the convergence rule drops may name him.
+TEST: components D1-the-solved-card-steps-aside-… (the flag case now prints where the name appears when it fails).
+
+### E-162 · v110 · the Plan tab's wildcard-week parts are reachable only when the plan plays the wildcard first
+CAUSE: plan-timing and the latest-wildcard reveal render only when the plan's first week is a wildcard week. The 15 Oct plan starts from a squad with five free transfers, where the chip may fall later or not at all, and "renders every testid it owns" would then fail for a state the data has moved past (E-156's class).
+CAUGHT: 15 Oct 2026, the test build.
+RULE: a part that only one shape of plan reaches is reached by moving the data in the suite, never by assuming the shipped plan's shape.
+TEST: components TabPlan's variants carry MCP_WC (the shipped PLAN with its first week marked a wildcard week) whenever the shipped plan does not play it first.
+
+### E-163 · v110 · a re-bake without a pull stamped the 18:41Z feeds as pulled at 22:47Z
+CAUSE: `pipeline/bake.js` stamps `asOf` with its own clock (`new Date()`), and the Lab and the landing read `asOf` as "feeds pulled". A bake run alone, hours after `pipeline/pull.sh`, to carry a two-word fix in `pipeline/intel.js`, made four-hour-old feeds read as fresh.
+CAUGHT: 15 Oct 2026 22:47Z, the diff of the re-baked block against the one before it (`asOf`, `intel.sources`, `model.at` moved; nothing else), before anything was built or shipped.
+RULE: a bake always follows a pull in the same sitting, so `asOf` is the feeds' time to within minutes; any change to the desk research is shipped by pull, fetch, bake, calibrate and export together. The pull that fixed it found a new flag (Chilwell), which moved the input hash and forced the re-solve the stale bake would have hidden.
+TEST: pipeline/README.md stage 2 states the rule; the routine's prompt runs pull, fetch and bake in one step.
+
+### E-164 · v110 · intermediate "feed pull" commits turned the CI gate red four times
+CAUSE: on 28 Sep, 2 Oct and twice on 9 Oct a commit carried freshly pulled data before the plan was re-solved on it. Every hash-guarded suite then refuses the build (correctly), so `fpl-gate` failed on those commits even though the next commit, carrying the re-solve, was green.
+CAUGHT: 15 Oct 2026, reading the repository's failure notifications (Gmail) and the Actions history: runs 45 and 47 red on the pull commits, 46 and 48 green on the re-solves.
+RULE: a commit is pushed only when the whole gate passes on it; data and the plan solved on it travel in one commit. The local replay of `.github/workflows/gate.yml` runs before every push.
+TEST: the 16 Oct push carries data, plan, build and suites together after the local replay of every gate step.
+
+### E-165 · v110 · a negative check matched the honest sentence it was guarding
+CAUSE: the Draft route's test required the section to contain "never a chance of winning" and also not to match /chance of (winning|first)/, which that very sentence matches. The check contradicted itself and failed on correct copy.
+CAUGHT: 15 Oct 2026, the first components run of the route tests.
+RULE: a check that copy shows no probability tests for the probability itself (a number followed by %), never for words the copy uses to say it shows none.
+TEST: components R-route-draft-…-no-chance-of-winning-is-shown and R-route-classic-…-no-section-shows-a-chance-of-winning test /\d\s*%/.
+
+### E-166 · v110 · a mutation check passed vacuously once the free transfers reached the cap
+CAUSE: mc_rules proves the N1 ledger by mutating it (a wildcard week that adds one free transfer) and requiring the mutated ledger to disagree with PLAN.replay. With five free transfers banked into the GW7 wildcard week, one more is capped back to five, so the two ledgers agree and the check went red on a state the data had legitimately reached; its old fallback ("the plan has no wildcard week") was vacuous.
+CAUGHT: 15 Oct 2026, the local replay of the CI gate before pushing.
+RULE: a mutation is shown where it can show. When no wildcard week in the plan starts below the cap, the same leaky ledger runs on the built history (wildcard at two free transfers), where it must disagree and the honest ledger must agree. Never a pass with nothing tested.
+TEST: mc_rules "mutation: a ledger in which the wildcard week adds a free transfer disagrees with …" names which ledger it used.
+
+### E-167 · v110 · E-161 recurred in the browser twin of the check it fixed
+CAUSE: E-161 narrowed the components check that a flagged captain leaves the card (a name inside "The convergence rule drops …" is the card saying he is out) but not smoke's C1-flagged-player-is-never-captain-nor-vice, which reads the same card in a browser. With Haaland flagged the app's own card prints "The convergence rule drops Haaland (100% rival-owned) …", and smoke failed on it.
+CAUGHT: 15 Oct 2026, the local gate replay; diagnosed by printing both flagged landings in full.
+RULE: a check narrowed in one suite is narrowed in every twin in the same commit: grep the check's stem across qa/ (components, smoke, webkit, ios) before closing the entry. The narrowing is the same regex in each.
+TEST: smoke C1 cuts the sentence with the same /The convergence rule drops [^.]*\./ the components twin uses.
+
+### E-168 · v110 · in Inter, the app's own face, "Review" was clipped at 390px
+CAUSE: the sandbox now resolves Inter locally, where earlier runs fell back to Liberation Sans (36.08px for "Review"). In Inter the label measures 37.19px; the 2px gaps left each of the nine cells 36.89px at 390. A phone that loads Inter from Google Fonts clipped it the same way.
+CAUGHT: 15 Oct 2026, smoke tab-strip-fits-with-labels-above-380px-and-icon-only-at-360 in the local gate replay.
+RULE: the strip's gap is 1px (eight gaps return 8px, 0.89px a cell); Part G records the change and why. A layout check is believed over an earlier screenshot taken in a fallback face.
+TEST: smoke and webkit tab-strip-fits-… at 360, 390 and 430.
+
+### E-169 · v110 · two new formatting helpers were not total
+CAUSE: `nameList` and `chipList`, written on 15 Oct for the route views, assumed an array of strings: a non-array threw, and a list holding objects printed "[object Object]". The views only ever pass them clean lists, but they are top-level functions, and the app's rule is that every top-level function is total.
+CAUGHT: 15 Oct 2026, mc_full 3000 (P01 nothing throws, P07 no "undefined/NaN/[object Object]" in a returned string), before anything shipped.
+RULE: a helper added at module level is written total from the start: inputs are filtered to the type it formats (`strList`), and a non-list has its own stated output.
+TEST: mc_full P01 and P07 over every top-level function, 319 of 319.
+
+### E-170 · v110 · this container has no WebKit build and no Python Playwright
+CAUSE: the session's container was rebuilt (its fonts date from 3 Oct 2026): `/opt/pw-browsers` now holds only Chromium 1194, so `qa/webkit.js` and `qa/ios.cjs` cannot launch WebKit, and `python3 -c "import playwright"` fails, so `qa/browser.py` cannot start. The 9 Oct gate ran all three.
+CAUGHT: 15 Oct 2026, the local gate replay (each stops at launch, 0 of 1).
+RULE: a suite that did not run is reported as not run, with the reason, never as a pass. Installing either is a dependency install the manager has asked to approve first, so it is not done unasked; CI installs both on its runner and runs all three on every push, and that run is read before the work is called done.
+TEST: the RETEST section of 16 Oct names the three steps as not run locally and gives the CI run that ran them.

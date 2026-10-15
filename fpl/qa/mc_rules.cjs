@@ -170,10 +170,19 @@ function ledgerDiff(weeks, replay, ft0, keeps, chipAfter) {
     synSteps.join(",") === "1→2,2→2,2→1 hit 1,1→2", "");   // frozen-ok: the arithmetic of Part N1 on the synthetic history above
   /* mutation: a ledger in which a wildcard week adds one, the class of E-102 */
   const leaky = (ft, chip) => (chip === "wildcard" ? Math.min(FT_CAP, ft + 1) : ft);
-  const badM = ledgerDiff(W, R, MC.classic.ftNext, KEEPS, leaky), badS = W.some((w) => w.chip === "wildcard");
+  const badM = ledgerDiff(W, R, MC.classic.ftNext, KEEPS, leaky);
   const line = redLine(N_FT, badM.length === 0, badM.slice(0, 2).join("; "));
-  ok("mutation: a ledger in which the wildcard week adds a free transfer disagrees with PLAN.replay", !badS || line !== null,
-    line ? "red: " + line : "the plan has no wildcard week to disagree on", true);
+  /* E-166: one more free transfer is visible only in a wildcard week that starts below the cap; at FT_CAP it is capped away,
+     so PLAN.replay cannot tell the two ledgers apart and the mutation must be shown on a history where it can show: the
+     built one above, whose wildcard week starts at 2. Never a vacuous pass. */
+  const visible = W.some((w, i) => w.chip === "wildcard" && R[i] && R[i].ftBefore < FT_CAP);
+  const synReplay = (function () { let f0 = 1; return syn.map((w) => { const s = ledgerStep(f0, w.in.length, w.chip, KEEPS);
+    const r = { gw: w.gw, ftBefore: f0, moves: w.in.length, used: s.used, hitCount: s.hitCount, hits: HIT * s.hitCount, ftAfter: s.ftAfter }; f0 = s.ftAfter; return r; }); })();
+  const badSyn = ledgerDiff(syn, synReplay, 1, KEEPS, leaky);
+  ok("mutation: a ledger in which the wildcard week adds a free transfer disagrees with " + (visible ? "PLAN.replay" :
+    "the built history (the plan's wildcard week starts at the cap of " + FT_CAP + ", where one more is capped away)"),
+    visible ? line !== null : badSyn.length > 0 && ledgerDiff(syn, synReplay, 1, KEEPS).length === 0,
+    visible ? (line ? "red: " + line : "the leaky ledger agreed with PLAN.replay") : (badSyn[0] || "the leaky ledger agreed with the built history"), true);
 }
 
 /* ---------------------------------------------------------------- N1 · chips */

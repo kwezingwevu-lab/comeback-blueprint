@@ -1,6 +1,6 @@
 {
   "version": 110,
-  "exported_at": "2026-09-27T04:19:32Z",
+  "exported_at": "2026-10-15T22:54:50Z",
   "entry": 3546875,
   "squad": [
     {
@@ -65,9 +65,9 @@
     }
   ],
   "bank": 16,
-  "ft": 4,
+  "ft": 5,
   "value": 999,
-  "confirmed_gw": 5,
+  "confirmed_gw": 6,
   "leagues": [
     1314671,
     1683215,
