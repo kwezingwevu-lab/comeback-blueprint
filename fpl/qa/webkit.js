@@ -1102,6 +1102,40 @@ async function main() {
       }).join(" ‖ ");
     }
 
+    // ------------------------------------------------------ E-171 · the refresh that runs from the app, in Safari's engine
+    // The twin of smoke's E171 checks: a stand-in for the viewer's connector records every call; the trigger id is read
+    // from the app's own source. The iPhone app renders the page in WebKit, so this is the engine that matters.
+    {
+      const SRC = fs.readFileSync(path.join(ROOT, "src", "ui.jsx"), "utf8");
+      const TRIG = ((/const REFRESH_ROUTINE = \{[^}]*trigger: "([^"]+)"/.exec(SRC)) || [])[1] || null;
+      const FETCHED = Date.parse(LIVE.fetched_at), iso = function (ms) { return new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z"); };
+      const stub = function (cfg) {
+        window.__MCP_CALLS__ = [];
+        window.claude = { use: async function (n) {
+          if (n !== "mcp") return null;
+          return { callTool: async function (server, tool, input) {
+            window.__MCP_CALLS__.push({ server: server, tool: tool, input: input });
+            if (tool === "get_trigger") return { content: [], payload: { trigger: { id: input.trigger_id, enabled: true, last_fired_at: cfg.lastFired, next_run_at: cfg.next, last_run: { status: "ROUTINE_RUN_STATUS_SUCCEEDED", fired_at: cfg.lastFired } } } };
+            if (tool === "fire_trigger") return { content: [], payload: { ok: true } };
+            const e = new Error("unknown tool"); e.code = "bad_request"; throw e;
+          } };
+        } };
+      };
+      const rc = await browser.newContext({ viewport: VIEW });
+      try {
+        const rp = await rc.newPage(); watch(rp, "routine");
+        await rp.addInitScript(stub, { lastFired: iso(FETCHED + 2 * 3600000), next: iso(FETCHED + 6 * 3600000) });
+        await openPage(rp, { html: HTML.shim, now: iso(FETCHED + 5 * 3600000) });
+        await rp.waitForTimeout(1200);
+        const calls = await rp.evaluate(function () { return window.__MCP_CALLS__ || []; });
+        const note = await rp.evaluate(function () { const n = document.querySelector('[data-testid="routine-note"]'); return n ? n.innerText : ""; });
+        H.assert("E171-under-webkit-opening-stale-data-reads-the-routine-then-starts-one-refresh-with-the-app's-trigger",
+          !!TRIG && calls.length === 2 && calls[0].tool === "get_trigger" && calls[1].tool === "fire_trigger" &&
+            calls.every(function (c) { return c.server === "Claude Code Remote" && c.input && c.input.trigger_id === TRIG; }) && /Refresh started/.test(note),
+          JSON.stringify(calls).slice(0, 300) + " · note «" + note.slice(0, 100) + "»");
+      } finally { await rc.close(); }
+    }
+
     // ------------------------------------------------------ close
 
     console.log("(webkit measured: landing " + MEASURED.landingWords + " words / " + MEASURED.landingPanels + " panels · tab words " + MEASURED.tabWords + ")");

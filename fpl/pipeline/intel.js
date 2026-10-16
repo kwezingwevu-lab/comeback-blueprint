@@ -10,7 +10,7 @@
 "use strict";
 
 const INTEL = {
-  asOf: "2026-10-15T18:50:00Z",
+  asOf: "2026-10-16T07:50:00Z",
   /* Gameweek 5 market numbers (allaboutfpl / Fantasy Football Scout clean-sheet odds and RotoWire prices, 17 Sep). Kept as calibration anchors now the week is played. */
   market5: { MCI: { xg: 2.36, cs: 0.48 }, NEW: { xg: 2.01, cs: 0.35 }, NFO: { xg: 1.88, cs: 0.38 }, LIV: { xg: 1.84 }, ARS: { xg: 1.80, cs: 0.34 }, EVE: { xg: 1.80, cs: 0.34 }, MUN: { xg: 1.80 }, CHE: { xg: 1.77 }, LEE: { xg: 1.77, cs: 0.33 }, TOT: { cs: 0.31 } },
   /* Average bookmaker match prices (home, draw, away), OddsPortal, read 26 September. Every fixture
@@ -44,7 +44,11 @@ const INTEL = {
          dated live team-news pages, 8 and 9 Oct). Each line says which way it moves the official flag and on what reporting. */
       "João Pedro|CHE": { p: 0.90, why: "Up from 0.40. Alonso, Friday: 'now they have trained well and they are ready to go… for tomorrow they will be good' (Fantasy Football Scout, 9 Oct); the feed cleared his flag at 16:17Z." },
       "Semenyo|MCI": { p: 0.45, why: "Kept below the flag. Left Ghana with a 'swollen leg' (Mirror via Fantasy Football Scout, 8 Oct); Maresca took no question on him on 9 Oct (Fantasy Football Scout, 9 Oct)." },
-      "Brobbey|SUN": { p: 0.01, why: "OUT for gameweek 6. Le Bris: hamstring, 'short-term… it won't be too long', on the same timeline as Diarra, about a week (Fantasy Football Scout and Metro, 8 Oct)." },
+      "Brobbey|SUN": { p: 0.45, why: "BELOW the feed's 100%. Bench in Europe on 15 Oct; Le Bris: 'They're training with the squad now, so they will be ready' (Sunderland Echo, 16 Oct 05:00Z), with no word on starting." },
+      "Isidor|SUN": { p: 0.25, why: "BELOW the flag. 'Major doubt': did not travel for the European tie and is not ruled out (Sunderland Echo, 16 Oct 05:00Z)." },
+      "Meunier|SUN": { p: 0.01, why: "OUT. Le Bris on the weekend: 'it's a no' (Sunderland Echo, 16 Oct 05:00Z)." },
+      "Mateta|CRY": { p: 0.15, why: "BELOW the flag. Glasner gives him only 'some chance this weekend' (cpfc.co.uk, 15 Oct 19:39Z)." },
+      "Kesler-Hayden|COV": { p: 0.6, why: "Available again after the knock (Coventry Live, 16 Oct 04:00Z); minutes on return uncertain." },
       "van Ewijk|COV": { p: 0.65, why: "Up from 0.50. Lampard: 'Milan is back training with us… We hope he'll be alright if he comes through the next few days' (Fantasy Football Scout, 8 Oct). Coventry play Monday 12 Oct." },
       "Dunk|BHA": { p: 0.90, why: "Up from 0.70. Hurzeler said he returns after the stiff neck (Fantasy Football Scout, 9 Oct, presser); the feed has him fit." },
       "Havertz|ARS": { p: 0.30, why: "Up from 0.05. Arteta, Friday: 'Ezri and Kai we will see tomorrow', a late fitness test after the hamstring on Germany duty (Fantasy Football Scout, 9 Oct)." },
@@ -68,6 +72,7 @@ const INTEL = {
     },
   },
   notes: [
+    "Re-read 16 Oct 2026 about 07:50Z before Friday's pressers: Isidor a major doubt, Meunier out, Brobbey ready but unproven (Sunderland Echo, 16 Oct 05:00Z); Mateta 'some chance' (cpfc.co.uk, 15 Oct 19:39Z); Kesler-Hayden available (Coventry Live, 16 Oct 04:00Z); Szoboszlai and Gakpo still doubts (Liverpool.com, 16 Oct 06:03Z, the feed's flags kept); Reece James a doubt (the feed's 75% kept). Manchester City, Chelsea, United, Arsenal and Everton speak later on Friday; the routine re-reads after them.",
     "Read 15 Oct 2026 about 18:50Z for gameweek 7 (deadline Sat 17 Oct 10:00Z, 12:00 SAST), through the Parallel Search and Exa connectors. No injury reported against Raya, Gabriel, Saka, Konsa or Havertz (Arsenal; Saka was ill and benched against Lille, then scored and assisted: Arteta via Hayters, 13 Oct; the Evening Standard expects him to start, 15 Oct), Haaland (two goals against PSG; 'Man City are not believed to have any injury concerns', Evening Standard, 14 Oct), Palmer and João Pedro (played against Bournemouth, Evening Standard, 12 Oct), Tarkowski, Barry, Diop, Janelt, Groß, Hall, Tavernier, Silva, Thomas, van Ewijk, Leno, Affengruber, Gonzalo, Calvert-Lewin, Stach, Trafford, Tzolakis or Kinsky. Out or doubtful elsewhere: Isak, Gakpo and Szoboszlai doubts and Gravenberch suspended (Iraola, liverpoolfc.com, 15 Oct); Saliba, Hincapié and Tzolis out (Evening Standard, 15 Oct); Sesko doubtful and Dorgu out (Yorkshire Evening Post, 15 Oct); Mateta not yet available (Sage via Fantasy Football Scout, 14 Oct); Ruggeri out more than a month (Emery, Birmingham Live, 13 Oct); Milenković and Igor Jesus out (Nottingham Post, 13 Oct); Kulusevski and Porro doubtful (Evening Standard, 15 Oct).",
     "Still to come before the gameweek 7 deadline: Maresca on Friday 16 Oct at 12:30Z (mancity.com, 12 Oct); Moyes and Carrick on Friday, times not published (everton.news and United In Focus, read 15 Oct); the other clubs had not published times when read. Re-read the flags after them; Shaw, Mainoo, Szoboszlai, Mykolenko and Brobbey are the overrides they decide.",
     "Friday afternoon re-read, 9 Oct 2026 16:20Z (Fantasy Football Scout's Friday live page; feed pulled 16:17Z): nothing against Raya, Gabriel, Saka, Tarkowski, Barry, Diop, Janelt, Groß, Affengruber, Gonzalo, Leno or Haaland. O'Neil has 'a fully fit squad' (Ipswich); Arbeloa: 'everybody is fit and available' bar Cairney and Robinson (Fulham); Andrews ruled out only Milambo and Dasilva (Brentford). Palmer and João Pedro 'ready to go' (Alonso); Tzolis out 'a few weeks' (Arteta). Newcastle, Leeds and Bournemouth were not on that page; their Thursday pressers carried nothing against Hall, Stach or Tavernier.",
@@ -85,7 +90,8 @@ const INTEL = {
     "There are two players called Hughes. He owns id 212, the Crystal Palace midfielder, who is fit and unflagged. The one carrying 'Groin injury - Unknown return date' is id 278, a Hull defender. Match on id, never on the name. Read from the feed pulled 26 Sep and unchanged on 2 Oct.",
   ],
   sources: [
-    "Official Fantasy Premier League and FPL Draft feeds, pulled 15 Oct 18:41Z",
+    "Sunderland Echo, 16 Oct 05:00Z (Le Bris on Isidor, Meunier, Brobbey); cpfc.co.uk, 15 Oct 19:39Z (Mateta); Coventry Live, 16 Oct 04:00Z (Kesler-Hayden); Liverpool.com, 16 Oct 06:03Z",
+    "Official Fantasy Premier League and FPL Draft feeds, pulled 16 Oct 09:20Z",
     "Betexplorer Premier League fixtures (average of 17 bookmakers for gameweek 7, 12 for gameweek 8), read 15 Oct 18:47Z through the Nimble connector; OddsPortal's league page read the same minute as the cross-check",
     "liverpoolfc.com, 15 Oct (Iraola's press conference); BBC, 15 Oct (Jaissle, Lampard); Hull Live via Fantasy Football Scout, 15 Oct (Jakirovic)",
     "Manchester Evening News, 12 Oct (Carrick on Shaw and Mainoo); Yorkshire Evening Post, 15 Oct (Leeds v Manchester United team news)",

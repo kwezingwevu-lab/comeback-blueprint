@@ -2061,3 +2061,21 @@ CAUSE: the session's container was rebuilt (its fonts date from 3 Oct 2026): `/o
 CAUGHT: 15 Oct 2026, the local gate replay (each stops at launch, 0 of 1).
 RULE: a suite that did not run is reported as not run, with the reason, never as a pass. Installing either is a dependency install the manager has asked to approve first, so it is not done unasked; CI installs both on its runner and runs all three on every push, and that run is read before the work is called done.
 TEST: the RETEST section of 16 Oct names the three steps as not run locally and gives the CI run that ran them.
+
+### E-171 · v110 · the app showed 8-hour-old data although a refresh was scheduled every four hours
+CAUSE: two faults together. (1) The scheduled routine fired fresh sessions with no repository attached ("config:no-git-repo"); attaching one unattended needs the owner's in-person confirmation, so the 00:09Z and 04:09Z runs on 16 Oct stopped within two minutes having pulled nothing (E-160's class: the prompt fix of 15 Oct told the run to attach the repository, but the run had no way to). (2) By design a run that found nothing decision-relevant moved neither committed nor republished, so the page's data age kept climbing even when a run had checked. And the app's own refresh button ran the old web-search path, which cannot pull the FPL feeds from a page (the browser's origin rules).
+CAUGHT: 16 Oct 2026 07:21 SAST, the manager's screenshot: "Data is 8 hours stale".
+RULE: the refresh routine fires into the Claude Code session that holds the repository and push access (trigger "FPL Mission Control refresh (master session)", every two hours), never into a fresh session that must attach one; every run republishes the page from fresh feeds, re-solving only when the input hash moved; and the page itself reaches that routine through the viewer's Claude Code Remote connector (the artifact `mcp` capability): opening it starts a refresh when the data is over two hours old and nothing started in the last hour, and the refresh button starts one at any time. Each connector failure that has its own fix says so.
+TEST: components R-refresh-… (seven checks: the payload read, the open-time rule, one sentence per failure, the Lab line, the Lab and header with the routine on); smoke E171-… (four browser checks through a stand-in connector) and its WebKit twin.
+
+### E-172 · v110 · a new smoke block left the suite's shared page in simple mode
+CAUSE: the E171 checks reused smoke's shared `context`/`page` and left them on a simple-mode page, so the next check (the tab strip at 360, 390 and 430) found no tabs.
+CAUGHT: 16 Oct 2026, the first smoke run of the new block.
+RULE: a block that needs its own page opens its own browser context and closes it; it never reassigns the suite's shared page (CLAUDE.md H2: a check depends on nothing it did not set up).
+TEST: smoke 73/73 with the block in place, tab-strip check included.
+
+### E-173 · v110 · the manager was told Isidor belongs to a Draft rival; he is on the manager's own roster
+CAUSE: reading `data/mc_data.json` by hand in chat, `"ds":"o","do":"Yoh-Nited"` was taken as "owned by another team". Yoh-Nited is the manager's own Draft team (CLAUDE.md A1), and his roster (league entry 281896) carries Isidor. The app itself was right; only the chat message was wrong, and it told him a 25%-chance forward on his own roster did not affect him.
+CAUGHT: 16 Oct 2026 10:25Z, when this session listed league entry 281896's roster after waivers.
+RULE: before saying whose player someone is in the Draft, resolve the owner against the manager's league entry id (`live.draft.me.leagueEntryId`) and the roster under that key, never against a team name read by eye. In any message, a Draft owner is "you" or "a rival", never a raw name.
+TEST: none added: the defect was in a chat message, not in code the suites run; the rule binds the session's reporting.

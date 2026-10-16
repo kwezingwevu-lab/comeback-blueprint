@@ -413,6 +413,76 @@ function landOn(sectionId) {
   } catch (e) { /* the page stays where it is */ }
 }
 
+/* 16 Oct 2026 · the refresh that runs from the app (ERRORS.md E-171). The manager: "every time I open the app it needs to
+   update and refresh every single thing" (15 Oct) and "Data is 8 hours stale" (16 Oct). A published page cannot fetch the
+   FPL API (the browser's origin rules), but the claude.ai viewer lets it call the viewer's own connectors (the artifact
+   `mcp` capability). REFRESH_ROUTINE names the scheduled refresh that fires into the Claude Code session that owns this app:
+   through the built-in "Claude Code Remote" connector the page reads its last run (get_trigger) and starts one
+   (fire_trigger). That session pulls the feeds, re-solves when anything moved and republishes the page. Opening the app
+   starts one by itself only when the data is older than staleH hours and nothing started in the last quietMin minutes;
+   the refresh button starts one at any time. Where the viewer offers no connector (the dist build, an older viewer) the
+   app keeps the refresh paths it had. */
+const REFRESH_ROUTINE = { server: "Claude Code Remote", trigger: "trig_01QuZE4jqj5L9gq3dPhYFNfr", staleH: 2, quietMin: 60 };
+/* get_trigger's payload (or junk) → what the page shows. Total: anything else is {ok:false}. */
+function routineRun(payload) {
+  const out = { ok: false, enabled: null, lastFired: null, status: null, finished: null, next: null };
+  try {
+    const isO = function (v) { return !!v && typeof v === "object" && !Array.isArray(v); };
+    const t = isO(payload) ? (isO(payload.trigger) ? payload.trigger : payload) : null;
+    if (!t) return out;
+    const iso = function (v) { return typeof v === "string" && isFinite(Date.parse(v)) ? v : null; };
+    const lr = isO(t.last_run) ? t.last_run : {};
+    out.enabled = typeof t.enabled === "boolean" ? t.enabled : null;
+    out.lastFired = iso(t.last_fired_at) || iso(lr.fired_at);
+    out.status = typeof lr.status === "string" && /^[A-Z_]{1,60}$/.test(lr.status) ? lr.status.replace(/^ROUTINE_RUN_STATUS_/, "").replace(/_/g, " ").toLowerCase() : null;
+    out.finished = iso(lr.finished_at);
+    out.next = iso(t.next_run_at);
+    out.ok = out.enabled !== null || out.lastFired !== null || out.next !== null;
+  } catch (e) { /* total */ }
+  return out;
+}
+/* Whether opening the app should start a refresh by itself: only when the data is stale (or its age unknown), the routine
+   is not paused, and nothing started within quietMin minutes, so two opens a minute apart start one refresh, not two. */
+function autoRefreshDue(ageH, run, nowMs, cfg) {
+  const c = cfg && typeof cfg === "object" && !Array.isArray(cfg) ? cfg : REFRESH_ROUTINE;
+  const staleH = typeof c.staleH === "number" && isFinite(c.staleH) ? c.staleH : REFRESH_ROUTINE.staleH;
+  const quietMin = typeof c.quietMin === "number" && isFinite(c.quietMin) ? c.quietMin : REFRESH_ROUTINE.quietMin;
+  const age = typeof ageH === "number" && isFinite(ageH) ? ageH : null;
+  if (age !== null && age <= staleH) return { due: false, why: "fresh" };
+  const r = run && typeof run === "object" && !Array.isArray(run) ? run : {};
+  if (r.enabled === false) return { due: false, why: "paused" };
+  const fired = typeof r.lastFired === "string" ? Date.parse(r.lastFired) : NaN;
+  const now = typeof nowMs === "number" && isFinite(nowMs) ? nowMs : NaN;
+  if (isFinite(fired) && isFinite(now) && now - fired < quietMin * 60000) return { due: false, why: "recent" };
+  return { due: true, why: age === null ? "unknown age" : "stale" };
+}
+/* One sentence per connector failure that has its own fix (the mcp contract: never one banner for all of them). A failed
+   start (write) may still have gone through on the ambiguous codes, so it says so; a failed read does not. */
+function routineErrorText(code, server, write) {
+  const s = typeof server === "string" && server ? server : REFRESH_ROUTINE.server;
+  switch (code) {
+    case "needs_reauth": return "Reconnect " + s + " in claude.ai Settings, Connectors, then tap refresh again.";
+    case "server_not_connected": case "server_not_found": return "Add " + s + " in claude.ai Settings, Connectors, to refresh from the app.";
+    case "selection_required": return "Choose which " + s + " connection this page uses when claude.ai asks, then tap refresh again.";
+    case "not_in_manifest": case "approval_required": case "consent_required": return "This page needs your permission to use " + s + ": allow it in the page's Permissions menu, then tap refresh again.";
+    case "blocked_by_policy": return "Your organisation's policy blocks " + s + " for this page.";
+    case "tool_error": return s + " refused the request.";
+    case "server_unavailable": case "upstream_error": case "rate_limited":
+      return write === true ? s + " did not answer, so the refresh may still have started: check the age above in a few minutes before tapping again." : s + " did not answer; try again in a minute.";
+    default: return "Refreshing from the app is not available in this view; the scheduled refresh still runs every two hours.";
+  }
+}
+/* The line the Lab shows about the routine. */
+function routineLine(run) {
+  const r = run && typeof run === "object" && !Array.isArray(run) ? run : {};
+  const at = function (iso) { const t = sastText(iso); return t ? t + " SAST" : ""; };
+  const parts = [];
+  if (typeof r.lastFired === "string" && at(r.lastFired)) parts.push("last started " + at(r.lastFired) + (typeof r.status === "string" && r.status ? " (" + r.status + ")" : ""));
+  if (r.enabled === false) parts.push("paused");
+  else if (typeof r.next === "string" && at(r.next)) parts.push("next " + at(r.next));
+  return parts.length ? "Scheduled refresh: " + parts.join("; ") + "." : "Scheduled refresh: no run recorded yet.";
+}
+
 /* iOS 27 · IOS27-11. What a settled refresh says out loud, built from the game week the app is on (never a typed one).
    80 characters at most: "Refresh failed: " and the first 60 characters of the reason. In the dist build the refresh is a
    check for a newer build, so its outcomes are worded for that: okMsg is the "Nothing newer" note the check leaves when
@@ -1446,7 +1516,7 @@ function Header(props) {
         </div>
       </div>
       <div className="hdr-r">
-        <button className="btn-sm btn-ic" data-testid="refresh" aria-label={props.check ? "Check for new data" : "Refresh player data"}
+        <button className="btn-sm btn-ic" data-testid="refresh" aria-label={props.routine ? "Refresh everything now" : props.check ? "Check for new data" : "Refresh player data"}
           onClick={props.onRefresh} aria-busy={props.busy ? "true" : "false"}>
           <RefreshCw aria-hidden="true" />
         </button>
@@ -3860,8 +3930,15 @@ function TabLab(props) {
       </Section>
 
       <Section id="lab-refresh" title="Refresh" open={sec("lab-refresh")} onToggle={on.sec}>
-        {rf.dist ? null : <div className="dim">Model and search pairing</div>}
-        {rf.dist ? null : (
+        {rf.routine ? (
+          <div data-testid="lab-routine">
+            <div className="dim">{rf.routine.line || "Scheduled refresh: reading its last run."}</div>
+            {rf.routine.err ? <div className="dim">{rf.routine.err}</div> : null}
+            <div className="dim">The button below asks the Claude Code session that builds this app to pull every feed, re-solve if anything moved and republish this page. Opening the app does it by itself when the data is over {REFRESH_ROUTINE.staleH} hours old. <Tier k="T0" /> once the new page loads</div>
+          </div>
+        ) : null}
+        {rf.dist || rf.routine ? null : <div className="dim">Model and search pairing</div>}
+        {rf.dist || rf.routine ? null : (
           <select className="inp" data-testid="refresh-pair" value={state.refresh.pair} aria-label="Model and search tool"
             onChange={function (e) { rf.onPair(e.target.value); }}>
             {Object.keys(REFRESH_PAIRS).map(function (k) {
@@ -3870,12 +3947,12 @@ function TabLab(props) {
           </select>
         )}
         <button className="btn" data-testid="refresh-run" onClick={rf.onRefresh} disabled={rf.busy}>
-          <RefreshCw aria-hidden="true" />{rf.busy ? "Checking" : rf.dist ? "Check for new data" : "Check flags and prices"}
+          <RefreshCw aria-hidden="true" />{rf.busy ? "Checking" : rf.routine ? "Refresh everything now" : rf.dist ? "Check for new data" : "Check flags and prices"}
         </button>
         {rf.busy ? <div className="refbar" data-testid="refbar-lab"><i /></div> : null}
         {rf.err ? <div className="err" data-testid="refresh-err">{rf.err}</div> : null}
         {rf.okMsg ? <div className="note">{rf.okMsg}</div> : null}
-        {rf.dist ? (
+        {rf.routine ? null : rf.dist ? (
           <div className="dim">Asks the server for a newer build of this page. The player snapshot travels inside the page, so a newer build brings newer flags and prices. Nothing is sent to Anthropic from here. <Tier k="T0" /> once the new build loads</div>
         ) : (
           <div className="dim">One search, one JSON reply, four thousand tokens so the search results cannot eat the answer. A failure leaves the snapshot exactly as it was. <Tier k="T0" /> after it lands</div>
@@ -4260,6 +4337,58 @@ export default function App() {
   }, [checkMsg]);
 
   const ctx = React.useMemo(function () { return buildCtx(live, state, now); }, [live, state, now]);
+  /* E-171: the refresh routine, reached through the viewer's Claude Code Remote connector when this view offers one */
+  const [routine, setRoutine] = React.useState({ avail: false, run: null, msg: "", err: "" });
+  const mcpRef = React.useRef(null), ctxRef = React.useRef(ctx), autoRef = React.useRef(false);
+  ctxRef.current = ctx;
+  const fireRoutine = React.useCallback(async function (origin) {
+    const mcp = mcpRef.current;
+    if (!mcp) return false;
+    setBusy(true); setRefErr(null); setOkMsg(""); setMenuOpen(false);
+    try {
+      const at = sastText(nowISO());
+      await mcp.callTool(REFRESH_ROUTINE.server, "fire_trigger", { trigger_id: REFRESH_ROUTINE.trigger,
+        text: "Asked from the app (" + origin + ") at " + at + " SAST, showing " + dataAgeText(dataAgeH(ctxRef.current)) + "." });
+      const m = "Refresh started " + at + " SAST: the feeds are pulled, the plan re-solved if anything moved, and this page republished, usually within 10 to 40 minutes. Reopen it then.";
+      setRoutine(function (r) { return Object.assign({}, r, { msg: m, err: "" }); });
+      setOkMsg(m);
+      return true;
+    } catch (e) {
+      const code = e && typeof e === "object" ? e.code : "";
+      const t = routineErrorText(code, REFRESH_ROUTINE.server, true) + (code === "tool_error" && e && typeof e.message === "string" && e.message ? " (" + e.message.slice(0, 80) + ")" : "");
+      setRoutine(function (r) { return Object.assign({}, r, { err: t, msg: "" }); });
+      setRefErr(t);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+  React.useEffect(function () {
+    let alive = true;
+    (async function () {
+      try {
+        const c = typeof window !== "undefined" ? window.claude : null;
+        if (!c || typeof c.use !== "function") return;
+        const mcp = await c.use("mcp");
+        if (!alive || !mcp || typeof mcp.callTool !== "function") return;
+        mcpRef.current = mcp;
+        setRoutine(function (r) { return Object.assign({}, r, { avail: true }); });
+        let run = null;
+        try {
+          const res = await mcp.callTool(REFRESH_ROUTINE.server, "get_trigger", { trigger_id: REFRESH_ROUTINE.trigger }, { cache: false });
+          run = routineRun(res && typeof res === "object" ? res.payload : null);
+        } catch (e) {
+          if (alive) setRoutine(function (r) { return Object.assign({}, r, { err: routineErrorText(e && typeof e === "object" ? e.code : "", REFRESH_ROUTINE.server, false) }); });
+          return;
+        }
+        if (!alive) return;
+        setRoutine(function (r) { return Object.assign({}, r, { run: run }); });
+        const due = autoRefreshDue(dataAgeH(ctxRef.current), run, msOf(nowISO()), REFRESH_ROUTINE);
+        if (due.due && !autoRef.current) { autoRef.current = true; await fireRoutine("on opening"); }
+      } catch (e) { /* the page keeps the refresh paths it had */ }
+    })();
+    return function () { alive = false; };
+  }, []);
   React.useEffect(function () {
     if (busy) { wasBusy.current = true; setSaid(function (t) { return t ? "" : t; }); return; }
     if (!wasBusy.current) return;
@@ -4494,14 +4623,16 @@ export default function App() {
     if (ui.tab === "odds") return <TabOdds ctx={ctx} ui={ui} on={on} mc={mc} />;
     if (ui.tab === "review") return <TabReview ctx={ctx} ui={ui} on={on} mc={mc} />;
     return <TabLab ctx={ctx} ui={ui} on={on} state={state} onDownload={onDownload} onCopy={onCopy} onImport={onImport} importErr={importErr} storeMode={boot.save.mode}
-      refresh={{ busy: busy, err: refErr, okMsg: okMsg, onRefresh: isDist ? onCheck : onRefresh, onPair: onPair, dist: isDist }} mc={mc} />;
+      refresh={{ busy: busy, err: refErr, okMsg: okMsg, onRefresh: routine.avail ? function () { fireRoutine("the Lab"); } : isDist ? onCheck : onRefresh, onPair: onPair, dist: isDist,
+        routine: routine.avail ? { line: routine.run ? routineLine(routine.run) : "", err: routine.err } : null }} mc={mc} />;
   };
 
   return (
     <div className="mc-root" data-tokens={TOKENS.length} data-mode={ui.mode} data-view={ui.tab} data-gw={ctx.nextEvent} data-store={boot.save.mode}>
       <style>{STYLE}</style>
       <Announcer text={said} />
-      <Header ctx={ctx} onRefresh={isDist ? onCheck : onRefresh} check={isDist} onMenu={function () { setMenuOpen(!menuOpen); }} menuOpen={menuOpen} busy={busy} />
+      <Header ctx={ctx} onRefresh={routine.avail ? function () { fireRoutine("the refresh button"); } : isDist ? onCheck : onRefresh} check={isDist && !routine.avail} routine={routine.avail}
+        onMenu={function () { setMenuOpen(!menuOpen); }} menuOpen={menuOpen} busy={busy} />
       {busy ? <div className="refbar" data-testid="refbar"><i /></div> : null}
       <div className="gwbar" data-testid="gwbar" data-pct={pct} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Gameweek progress"><i style={{ width: pct + "%" }} /></div>
       {menuOpen ? <Menu mode={ui.mode} onMode={setMode} onJump={jump} /> : null}
@@ -4511,6 +4642,7 @@ export default function App() {
           fresh={isDist && isApp && boot.fresh && !imported && showLanding} onImport={function () { jump("lab-import"); }}
           check={isDist && !(ui.mode === "full" && ui.tab === "lab") ? checkMsg : ""} />
         {refErr ? <div className="err" data-testid="err">{refErr}</div> : null}
+        {routine.msg && !busy ? <div className="note" data-testid="routine-note">{routine.msg}</div> : null}
         <Boundary key={ui.mode + ui.tab}>
           {showLanding ? (
             <div>

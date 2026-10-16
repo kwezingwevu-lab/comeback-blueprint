@@ -232,6 +232,7 @@ assert("D-the-ownership-map-covers-every-literal-testid-in-the-source",
    useState, which only a user event sets. They are not skipped — each one is asserted to be
    exercised by a browser suite that clicks it, so nothing falls between the two. */
 const SSR_UNREACHABLE = {
+  "routine-note": "App's routine note renders only after its own effect has reached the viewer's connector and started a refresh (E-171)",
   "draft-league-save": "TabDraft's Save button appears only once the league input differs from the saved value (local useState `txt`)",
   "import-apply": "TabLab's Apply button appears only once the paste box holds text (local useState `imp`)",
   "refbar": "App's refresh bar renders only while its own `busy` state is true",
@@ -509,7 +510,10 @@ const FIX = {
       refresh: { busy: true, err: "400 invalid_request_error", okMsg: "", onRefresh: noop, onPair: noop }, mc: MCP },
       /* iOS 27: the dist build's refresh asks the server for a newer build and offers no Claude call */
       { ctx: CTX, ui: uiFor("lab", true), on: ON, state: baseState, onDownload: noop, onCopy: noop, onImport: noop, importErr: null,
-        refresh: { busy: false, err: null, okMsg: "Nothing newer: this is the latest build.", onRefresh: noop, onPair: noop, dist: true }, mc: MCP }]
+        refresh: { busy: false, err: null, okMsg: "Nothing newer: this is the latest build.", onRefresh: noop, onPair: noop, dist: true }, mc: MCP },
+      /* E-171: a viewer that offers the Claude Code Remote connector refreshes through the routine */
+      { ctx: CTX, ui: uiFor("lab", true), on: ON, state: baseState, onDownload: noop, onCopy: noop, onImport: noop, importErr: null,
+        refresh: { busy: false, err: null, okMsg: "", onRefresh: noop, onPair: noop, dist: false, routine: { line: "Scheduled refresh: no run recorded yet.", err: "" } }, mc: MCP }]
   },
   App: { props: {}, text: [] }
 };
@@ -1432,6 +1436,45 @@ console.log("--- v110 D3 · the Draft tab ---");
       (txt.match(/\bClassic\b/gi) || []).length + " mentions of Classic on first paint");
     assert("D3-the-draft-tab-first-paint-stays-under-the-500-word-gate-on-the-component-alone", words > 0 && words < 500, words + " visible words");
   }
+})();
+
+/* ---------------------------------------------------------------- 6c++. The refresh that runs from the app (16 Oct 2026, E-171)
+
+   The helpers behind the routine: the get_trigger payload read, the open-time rule (stale and quiet), one sentence per
+   connector failure with its own fix, and the Lab's line; then the Lab and the header rendered with the routine on. Every
+   input here is built in the test (a synthetic payload, never a live one). */
+(function () {
+  const run = F("routineRun"), due = F("autoRefreshDue"), errT = F("routineErrorText"), line = F("routineLine");
+  if (!assert("R-refresh-the-helpers-are-top-level-functions", [run, due, errT, line].every(function (f) { return typeof f === "function"; }), "missing helper")) return;
+  const T0 = Date.parse("2026-10-16T09:00:00Z"), iso = function (ms) { return new Date(ms).toISOString(); };
+  const pay = { trigger: { id: "trig_test", enabled: true, next_run_at: iso(T0 + 90 * 60000), last_fired_at: iso(T0 - 30 * 60000),   // frozen-ok: a synthetic payload
+    last_run: { status: "ROUTINE_RUN_STATUS_SUCCEEDED", fired_at: iso(T0 - 30 * 60000), finished_at: iso(T0 - 20 * 60000) } } };
+  const r = run(pay), junk = [null, undefined, 3, "x", [], { trigger: [] }, { last_run: "x" }].map(run);
+  assert("R-refresh-routineRun-reads-the-trigger-payload-and-nothing-else",
+    r.ok && r.enabled === true && r.lastFired === pay.trigger.last_fired_at && r.status === "succeeded" && r.next === pay.trigger.next_run_at && r.finished === pay.trigger.last_run.finished_at &&
+      junk.every(function (j) { return j && j.ok === false; }), JSON.stringify(r));
+  const cfg = { staleH: 2, quietMin: 60 };
+  const cases = [
+    [due(1.5, r, T0, cfg), false, "fresh"], [due(5, run({ trigger: { enabled: true, last_fired_at: iso(T0 - 3 * 3600000) } }), T0, cfg), true, "stale"],
+    [due(5, r, T0, cfg), false, "recent"], [due(5, run({ trigger: { enabled: false } }), T0, cfg), false, "paused"], [due(null, null, T0, cfg), true, "unknown age"]];
+  assert("R-refresh-opening-starts-one-only-when-the-data-is-stale-the-routine-is-on-and-nothing-started-in-the-quiet-window",
+    cases.every(function (c) { return c[0].due === c[1] && c[0].why === c[2]; }), JSON.stringify(cases.map(function (c) { return c[0]; })));
+  const codes = ["needs_reauth", "server_not_connected", "approval_required", "blocked_by_policy", "tool_error", "server_unavailable"];
+  const texts = codes.map(function (c) { return errT(c, "Claude Code Remote", true); });
+  assert("R-refresh-each-connector-failure-with-its-own-fix-has-its-own-sentence-and-an-ambiguous-start-says-it-may-have-gone-through",
+    new Set(texts).size === codes.length && /Reconnect Claude Code Remote/.test(texts[0]) && /Add Claude Code Remote/.test(texts[1]) && /Permissions menu/.test(texts[2]) &&
+      /may still have started/.test(texts[5]) && !/may still have started/.test(errT("server_unavailable", "Claude Code Remote", false)) && typeof errT(undefined) === "string",
+    texts.join(" | "));
+  const L = line(r), Lp = line(run({ trigger: { enabled: false, last_fired_at: pay.trigger.last_fired_at } }));
+  assert("R-refresh-the-Lab-line-names-the-last-start-in-SAST-with-its-outcome-and-the-next-run-or-paused",
+    /^Scheduled refresh: last started .+ SAST \(succeeded\); next .+ SAST\.$/.test(L) && /paused\.$/.test(Lp) && line(null) === "Scheduled refresh: no run recorded yet.", L + " | " + Lp);
+  const lab = tryRender("TabLab", FIX.TabLab.variants[FIX.TabLab.variants.length - 1]);
+  const txt = lab.ok ? visibleText(lab.html) : "";
+  assert("R-refresh-the-Lab-with-the-routine-on-offers-one-refresh-and-drops-the-web-search-pairing",
+    lab.ok && lab.html.indexOf('data-testid="lab-routine"') >= 0 && /Refresh everything now/.test(txt) && lab.html.indexOf('data-testid="refresh-pair"') < 0 && !/One search, one JSON reply/.test(txt),
+    lab.ok ? txt.slice(0, 300) : String(lab.err && lab.err.message));
+  const hd = tryRender("Header", { ctx: CTX, onRefresh: noop, onMenu: noop, menuOpen: false, busy: false, routine: true });
+  assert("R-refresh-the-header-button-says-what-it-does-when-the-routine-is-on", hd.ok && /aria-label="Refresh everything now"/.test(hd.html), hd.ok ? "" : String(hd.err && hd.err.message));
 })();
 
 /* ---------------------------------------------------------------- 6c+. The route to first by GW19 (15 Oct 2026)

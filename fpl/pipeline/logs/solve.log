@@ -1,6 +1,6 @@
-plan Optimization terminated successfully. (HiGHS Status 7: Optimal) 205.9 s · gap 0.004981153427679013 · total 819.89
-no-wildcard 168.0 s · gap 0.03986975297750981 · total 809.38
-free hit [(7, 0.79), (8, 6.49), (9, 2.69), (10, 1.76), (11, 2.17), (12, 2.7), (13, 3.22), (14, 3.02), (15, 3.24), (16, 3.35), (17, 0.8), (18, 2.78), (19, 3.32)]
-draft 0.0 s · value 621.53 base 618.45 [('Verbruggen', 'Sels'), ('Tielemans', 'Buendía')]
-draft if taken 619.82 [('Verbruggen', 'Sels')]
-done in 375.3 s · /home/user/comeback-blueprint/fpl/data/solver_out.json
+plan Time limit reached. (HiGHS Status 13: Time limit reached) 240.1 s · gap 0.017977402388717575 · total 814.93
+no-wildcard 168.1 s · gap 0.018546364880618123 · total 803.91
+free hit [(7, 0.65), (8, 3.73), (9, 2.5), (10, 3.54), (11, 2.37), (12, 3.18), (13, 4.0), (14, 3.82), (15, 3.14), (16, 2.76), (17, 1.49), (18, 3.71), (19, 2.95)]
+draft 0.0 s · value 620.19 base 600.9 [('Murillo', 'Affengruber'), ('Mainoo', 'King'), ('Tielemans', 'Buendía')]
+draft if taken 603.56 [('Tielemans', 'King')]
+done in 409.6 s · /home/user/comeback-blueprint/fpl/data/solver_out.json

@@ -588,6 +588,66 @@ async function main() {
     H.assert("no-horizontal-scroll-at-360px-and-390px", scrolls.length === 0,
       scrolls.length ? scrolls.join("; ") : (2 * TABS.length) + " measurements (2 widths x " + TABS.length + " tabs), scrollWidth never exceeded clientWidth");
 
+    // E-171 (16 Oct 2026) · the refresh that runs from the app. A stand-in for the viewer's connector (window.claude.use("mcp"))
+    // records every call; the trigger id is read from the app's own source, never typed here.
+    {
+      const SRC = require("fs").readFileSync(path.join(ROOT, "src", "ui.jsx"), "utf8");
+      const TRIG = ((/const REFRESH_ROUTINE = \{[^}]*trigger: "([^"]+)"/.exec(SRC)) || [])[1] || null;
+      const FETCHED = Date.parse(LIVE.fetched_at);
+      const stub = function (o) {
+        return function (cfg) {
+          window.__MCP_CALLS__ = [];
+          window.claude = { use: async function (n) {
+            if (n !== "mcp") return null;
+            return { callTool: async function (server, tool, input) {
+              window.__MCP_CALLS__.push({ server: server, tool: tool, input: input });
+              if (tool === "get_trigger") return { content: [], payload: { trigger: { id: input.trigger_id, enabled: true, last_fired_at: cfg.lastFired, next_run_at: cfg.next, last_run: { status: "ROUTINE_RUN_STATUS_SUCCEEDED", fired_at: cfg.lastFired } } } };
+              if (tool === "fire_trigger") { if (cfg.fireErr) { const e = new Error("stub"); e.code = cfg.fireErr; throw e; } return { content: [], payload: { ok: true } }; }
+              const e = new Error("unknown tool"); e.code = "bad_request"; throw e;
+            } };
+          } };
+        };
+      };
+      // its own context, closed after each case: the shared page the next checks use is never touched (E-172)
+      let rctx = null;
+      async function routinePage(now, cfg) {
+        if (rctx) { await rctx.close(); rctx = null; }
+        rctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+        const rp = await rctx.newPage(); watch(rp);
+        await rp.addInitScript(stub(), cfg);
+        await H.open(rp, { mode: "simple", now: now });
+        await rp.waitForTimeout(900);
+        return rp;
+      }
+      const calls = async function (p) { return p.evaluate(function () { return window.__MCP_CALLS__ || []; }); };
+      // stale (five hours after the snapshot) and quiet (last start three hours earlier): opening starts one refresh
+      const nowStale = isoAt(FETCHED + 5 * 3600000);
+      const pA = await routinePage(nowStale, { lastFired: isoAt(FETCHED + 2 * 3600000), next: isoAt(FETCHED + 6 * 3600000) });
+      const cA = await calls(pA), noteA = await pA.evaluate(function () { const n = document.querySelector('[data-testid="routine-note"]'); return n ? n.innerText : ""; });
+      H.assert("E171-opening-stale-data-reads-the-routine-then-starts-one-refresh-with-the-app's-trigger",
+        !!TRIG && cA.length === 2 && cA[0].tool === "get_trigger" && cA[1].tool === "fire_trigger" && cA.every(function (c) { return c.server === "Claude Code Remote" && c.input && c.input.trigger_id === TRIG; }) &&
+          /Refresh started/.test(noteA),
+        JSON.stringify(cA).slice(0, 300) + " · note «" + noteA.slice(0, 120) + "»");
+      // stale but a refresh started ten minutes ago: no second start
+      const pB = await routinePage(nowStale, { lastFired: isoAt(FETCHED + 5 * 3600000 - 10 * 60000), next: isoAt(FETCHED + 6 * 3600000) });
+      const cB = await calls(pB);
+      H.assert("E171-a-refresh-started-inside-the-quiet-window-is-not-started-again-on-opening",
+        cB.length === 1 && cB[0].tool === "get_trigger", JSON.stringify(cB).slice(0, 200));
+      // fresh data: nothing starts on opening; the header button starts one and says so
+      const pC = await routinePage(NOW, { lastFired: isoAt(FETCHED - 3600000), next: isoAt(FETCHED + 3600000) });
+      const cC0 = await calls(pC), label = await pC.getAttribute('[data-testid="refresh"]', "aria-label");
+      await pC.click('[data-testid="refresh"]'); await pC.waitForTimeout(500);
+      const cC1 = await calls(pC), noteC = await pC.evaluate(function () { const n = document.querySelector('[data-testid="routine-note"]'); return n ? n.innerText : ""; });
+      H.assert("E171-with-fresh-data-opening-starts-nothing-and-the-refresh-button-starts-one",
+        cC0.length === 1 && cC0[0].tool === "get_trigger" && label === "Refresh everything now" && cC1.length === 2 && cC1[1].tool === "fire_trigger" && /Refresh started/.test(noteC),
+        JSON.stringify(cC1).slice(0, 220) + " · label " + label + " · note «" + noteC.slice(0, 80) + "»");
+      // a lapsed connector: the reason and its fix, never a generic failure
+      const pD = await routinePage(nowStale, { lastFired: isoAt(FETCHED), next: isoAt(FETCHED + 6 * 3600000), fireErr: "needs_reauth" });
+      const errD = await pD.evaluate(function () { const n = document.querySelector('[data-testid="err"]'); return n ? n.innerText : ""; });
+      H.assert("E171-a-lapsed-connector-says-reconnect-it", /Reconnect Claude Code Remote/.test(errD), "«" + errD + "»");
+      if (rctx) { await rctx.close(); rctx = null; }
+    }
+
     // v110 D0 · the strip rule of CLAUDE.md Part G (27 Sep 2026), at 360, 390 and 430, by element walk.
     {
       const readings = [], breaches = [];
