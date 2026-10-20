@@ -2109,3 +2109,9 @@ CAUSE: E-171 made the routine fire every two hours and the app start one wheneve
 CAUGHT: 20 Oct 2026, the manager's message.
 RULE: one scheduled refresh per gameweek, at the deadline minus 48 hours: the routine (trig_01QuZE4jqj5L9gq3dPhYFNfr) is a one-shot that re-arms itself to the next deadline − 48 h at the end of each run, read from `events[is_next]`; opening the app starts nothing (`REFRESH_ROUTINE.autoOnOpen` false); ↻ stays as a manual override.
 TEST: components R-refresh case "off"; smoke E171-opening-stale-data-reads-the-routine-and-starts-nothing-(48-hour-rule) and its WebKit twin.
+
+### E-179 · v110 · E-177 read the manager's limit one week too early; he wants Wildcard 1 played in GW19
+CAUSE: the manager's first message ("only be played before gw19") was taken as GW18 at the latest. His correction the same day: "The first wildcard will only be played before gw20. So play it for gw 19." So the limit is GW19, the game's own, and he chooses to play Wildcard 1 in GW19 rather than the solver's GW8.
+CAUGHT: 20 Oct 2026, the manager's correction.
+RULE: `solve.SET1_LAST` is 19 and plan_legality refuses any chip after GW19. `plan.cjs` (WC1_GW = 19) keeps the GW19 wildcard plan from `latest_wildcard.py` as the plan of record (the proven never plan to GW18, then the wildcard in GW19, carrying the never solve's proof), and keeps the solver's plan beside it as timing.now so the cost of the choice stays visible. On the 20 Oct data: 725.24 against the solver's 740.93 (wildcard GW8), −15.69 expected points to GW19.
+TEST: plan_legality 50/50 on the 20 Oct data with the choice applied (the E-128 proof read from the never solve; the timing check accepts the GW19 plan as kept).

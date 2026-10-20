@@ -422,8 +422,9 @@ point: a rule in a prompt that no function names is a rule nobody applies.
   to masquerade as a rule of the game.
 - **Chips.** Two of each. The first set can be used up to the GW19 deadline: wildcard and free hit
   from GW2, bench boost and triple captain from GW1. One chip per gameweek.
-  **The manager's rule (20 Oct 2026, E-177):** set-1 chips are played before GW19, so GW18 at the latest
-  (`solve.SET1_LAST`); the game's own limit (GW19) still bounds the planning window.
+  **The manager's rule (20 Oct 2026, E-177 corrected by E-179):** set-1 chips are played before GW20, so GW19 at the
+  latest (`solve.SET1_LAST`), and he chooses to play **Wildcard 1 in GW19** (`plan.cjs` WC1_GW): the GW19 wildcard plan is
+  the plan of record, the solver's own plan is shown beside it with what the choice costs.
 - **Selling price.** The price paid plus half of any rise, rounded down to £0.1m; a fall is taken in
   full. Price paid is `now_cost − cost_change_start` for the original fifteen and `element_in_cost`
   from `/api/entry/{id}/transfers/` for anyone bought since. A screenshot is not a source: prices

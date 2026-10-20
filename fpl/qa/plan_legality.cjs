@@ -227,9 +227,9 @@ function checkPlan(pf, data, eng) {
   /* the plan as a whole */
   const twice = Object.keys(chipsSeen).filter((c) => chipsSeen[c] > 1);
   planChecks.push({ name: "each chip is used at most once", ok: twice.length === 0, detail: twice.map((c) => c + " x" + chipsSeen[c]).join(", ") });
-  // the manager's rule of 20 Oct 2026 (E-177): set-1 chips are played before GW19, so no chip week after GW18
-  const lateChips = weeks.filter((w) => w.chip && w.gw > 18).map((w) => w.chip + " GW" + w.gw);
-  planChecks.push({ name: "no set-1 chip is played after GW18 (the manager's limit, E-177)", ok: lateChips.length === 0, detail: lateChips.join(", ") || "chips in " + (weeks.filter((w) => w.chip).map((w) => w.chip + " GW" + w.gw).join(", ") || "no week") });
+  // the manager's rule of 20 Oct 2026 (E-177, corrected by E-179): set-1 chips are played before GW20, so none after GW19
+  const lateChips = weeks.filter((w) => w.chip && w.gw > 19).map((w) => w.chip + " GW" + w.gw);
+  planChecks.push({ name: "no set-1 chip is played after GW19 (the manager's limit, E-179)", ok: lateChips.length === 0, detail: lateChips.join(", ") || "chips in " + (weeks.filter((w) => w.chip).map((w) => w.chip + " GW" + w.gw).join(", ") || "no week") });
   const gws = pl.weeks.map((w) => w.gw), first = data.gw.next, last = eng.CFG.classicEnd;
   planChecks.push({ name: "the weeks run from the next deadline to the chip stop without a gap", ok: gws.length === last - first + 1 && gws.every((g, i) => g === first + i), detail: "weeks " + gws.join(",") + " · expected " + first + "–" + last });
   const tot = sum(pl.weeks, (w) => w.ep) - HIT_POINTS * sum(pl.weeks, (w) => w.hits);
@@ -290,6 +290,8 @@ if (OPT.skipGap) {
       grab(src.out, (f) => f.plan && raws.push({ label: "main plan", p: f.plan })),
       src.long ? grab(src.long, (f) => f.plan && raws.push({ label: "long solve", p: f.plan })) : true,
       src.timing ? grab(src.timing, (f) => f.now && raws.push({ label: "wildcard now", p: f.now })) : true,
+      // E-179: the manager's GW19 wildcard plan is the never plan to GW18, so it carries the never solve's proof
+      PF.plan && PF.plan.managerChoice && src.timing ? grab(src.timing, (f) => f.never && raws.push({ label: "wildcard never (the manager's choice)", p: f.never })) : true,
     ];
     const key = JSON.stringify((PF.plan || {}).params || null);
     const peers = raws.filter((x) => x.p && x.p.ok && typeof x.p.obj === "number" && typeof x.p.gap === "number" && JSON.stringify(x.p.params || null) === key);
@@ -307,8 +309,10 @@ if (OPT.skipGap) {
 const timingProved = (T) => !!T && !!T.later && !!T.never && typeof T.later.gap === "number" && T.later.gap < GAP_MAX && typeof T.never.gap === "number" && T.never.gap < GAP_MAX;
 if (PF.timing && PF.timing.now && PF.timing.later && PF.timing.never) {
   const T = PF.timing, wcOf = (r) => (r.weeks || []).filter((w) => w.chip === "wildcard").map((w) => w.gw);
-  ok("timing: 'now' is the kept plan, 'later' plays the wildcard after the first week, 'never' plays none",
-    T.now.total === PF.plan.total && T.now.obj === PF.plan.obj && wcOf(T.later).every((g) => g > PF.plan.weeks[0].gw) && wcOf(T.never).length === 0,
+  // E-179: under the manager's choice the kept plan is the GW19 wildcard plan (timing.latest), and 'now' is the solver's own
+  const keptIsNow = PF.plan.managerChoice ? (!!T.latest && T.latest.total === PF.plan.total && wcOf(PF.plan).join() === "19") : (T.now.total === PF.plan.total && T.now.obj === PF.plan.obj);
+  ok("timing: 'now' is the kept plan (or, by the manager's choice, the GW19 wildcard plan is), 'later' plays the wildcard after the first week, 'never' plays none",
+    keptIsNow && wcOf(T.later).every((g) => g > PF.plan.weeks[0].gw) && wcOf(T.never).length === 0,
     "now " + T.now.total + "/" + PF.plan.total + " · later wildcard " + wcOf(T.later).join(",") + " · never wildcard " + wcOf(T.never).join(","));
   /* E-129. The timing verdict compares three solves, so each must carry its own proof: a scenario stopped by the
      240 s clock at 6% or 11% (the 28 Sep refresh: 5.8% and 11.3%, on problems that prove to 0.4% in 250 to 430 s) makes
@@ -486,7 +490,7 @@ if (!OPT.noGolden && (OPT.golden || isReferencePlan)) {
   if (!OPT.skipGap) {
     const c = clone(PF); c.plan.gap = 0.00001; c.plan.gapOwn = c.plan.gapOwn || 0.05;
     const src = PF.source || {}, raw = [];
-    [[src.out, (f) => f.plan], [src.long, (f) => f.plan], [src.timing, (f) => f.now]].forEach(([rel, pick]) => { const f = rel ? readJson(here(rel)) : null; if (f && f.hash === PF.hash && pick(f)) raw.push(pick(f)); });
+    [[src.out, (f) => f.plan], [src.long, (f) => f.plan], [src.timing, (f) => f.now]].concat(PF.plan && PF.plan.managerChoice ? [[src.timing, (f) => f.never]] : []).forEach(([rel, pick]) => { const f = rel ? readJson(here(rel)) : null; if (f && f.hash === PF.hash && pick(f)) raw.push(pick(f)); });
     const key = JSON.stringify((PF.plan || {}).params || null);
     const bestB = raw.filter((p) => p.ok && typeof p.obj === "number" && typeof p.gap === "number" && JSON.stringify(p.params || null) === key).reduce((a, p) => Math.min(a, p.obj * (1 + p.gap)), Infinity);
     const floorGap = isFinite(bestB) ? bestB / PF.plan.obj - 1 : null;

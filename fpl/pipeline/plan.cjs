@@ -230,6 +230,18 @@ function main() {
     }
   }
 
+  /* 4c. The manager's choice (20 Oct 2026, ERRORS.md E-179): "The first wildcard will only be played before gw20. So play it
+     for gw 19." The plan of record is then the GW19 wildcard plan (pipeline/latest_wildcard.py: the proven never plan with the
+     wildcard in GW19), not the solver's own pick; the solved plan stays beside it as timing.now so the Plan tab can show what
+     the choice costs. It carries the never plan's proof, since it is that plan to GW18. */
+  const WC1_GW = 19;
+  let choiceNote = "none";
+  if (WC1_GW && timing && timing.latest && timing.latest.weeks.some((w) => w.gw === WC1_GW && w.chip === "wildcard")) {
+    plan = Object.assign({}, timing.latest, { obj: timing.never.obj, gap: timing.never.gap, detail: plan.detail, params: timing.never.params, managerChoice: "wildcard GW" + WC1_GW });
+    solvedBy = "the manager's choice: wildcard GW" + WC1_GW + " (built from the never plan)";
+    choiceNote = "wildcard GW" + WC1_GW + " kept as the plan of record (" + timing.latest.total + " against the solver's " + timing.now.total + ")";
+  } else if (WC1_GW) choiceNote = "wildcard GW" + WC1_GW + " asked for but no GW" + WC1_GW + " wildcard plan in the timing file; the solver's plan is kept";
+
   /* 5. free-hit weeks against the kept plan */
   const cs = M.classicSquad(), own0 = new Set(cs.squad.map((p) => p.id)), sellMap = new Map(cs.squad.map((p) => [p.id, p.sell]));
   const sellOf = (i) => (sellMap.has(i) ? sellMap.get(i) : M.P[i].pr);   // the selling price the export gave the solver for the original fifteen; purchase price otherwise
@@ -265,7 +277,7 @@ function main() {
 
   const chips = plan.weeks.filter((w) => w.chip).map((w) => "GW" + w.gw + " " + w.chip).join(", ") || "none";
   const hits = replay.reduce((a, r) => a + r.hitCount, 0);
-  console.log("plan.cjs wrote " + show(o.plan) + " · hash " + nowHash + " · kept " + solvedBy + " · total " + plan.total + " · objective " + plan.obj + " · gap " + plan.gap + " (" + gapNote + ")" +
+  console.log("plan.cjs wrote " + show(o.plan) + " · hash " + nowHash + " · kept " + solvedBy + " · choice " + choiceNote + " · total " + plan.total + " · objective " + plan.obj + " · gap " + plan.gap + " (" + gapNote + ")" +
     " · " + plan.weeks.length + " weeks GW" + plan.weeks[0].gw + "–" + plan.weeks[plan.weeks.length - 1].gw + " · chips " + chips + " · replayed hits " + hits +
     " · long solve " + longNote + " · timing " + timingNote + " · horizons " + horizonsNote + " · free-hit weeks " + freeHit.length + " · Draft roster " + (so.draft && so.draft.ok ? "ok" : "absent"));
   if (differences.length) {
