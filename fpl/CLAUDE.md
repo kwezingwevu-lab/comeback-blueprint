@@ -164,6 +164,8 @@ Key on **element id**, never name/club. Name matching missed Konsa (AVL→ARS) a
 Invariant: **no account-touching calls** (`/my-team/`, `/transfers/`, login).
 
 > **16 Oct 2026 (ERRORS.md E-171).** In the claude.ai viewer the refresh no longer runs steps 1–5: the page reaches the refresh routine through the viewer's own **Claude Code Remote** connector (artifact `mcp` capability; tools `get_trigger` and `fire_trigger`, trigger named in `REFRESH_ROUTINE` in `src/ui.jsx`). The routine fires into the Claude Code session that holds the repository, which pulls the feeds, re-solves when the input hash moves and republishes the page. Opening the app starts one when the data is over two hours old and nothing started in the last hour; ↻ starts one at any time. Steps 1–5 remain only where the viewer offers no connector. The invariant above still holds: the page calls nothing on the FPL account.
+>
+> **20 Oct 2026 (ERRORS.md E-176).** The routine only works while its session is free to act. A bound session never ends a turn with notifications queued, never parks in plan mode, and collapses a backlog of firings into one refresh. A refresh lands whole (bake, solve, plan, build, commit) or the tree goes back to HEAD.
 
 ---
 
