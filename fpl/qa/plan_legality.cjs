@@ -227,6 +227,9 @@ function checkPlan(pf, data, eng) {
   /* the plan as a whole */
   const twice = Object.keys(chipsSeen).filter((c) => chipsSeen[c] > 1);
   planChecks.push({ name: "each chip is used at most once", ok: twice.length === 0, detail: twice.map((c) => c + " x" + chipsSeen[c]).join(", ") });
+  // the manager's rule of 20 Oct 2026 (E-177): set-1 chips are played before GW19, so no chip week after GW18
+  const lateChips = weeks.filter((w) => w.chip && w.gw > 18).map((w) => w.chip + " GW" + w.gw);
+  planChecks.push({ name: "no set-1 chip is played after GW18 (the manager's limit, E-177)", ok: lateChips.length === 0, detail: lateChips.join(", ") || "chips in " + (weeks.filter((w) => w.chip).map((w) => w.chip + " GW" + w.gw).join(", ") || "no week") });
   const gws = pl.weeks.map((w) => w.gw), first = data.gw.next, last = eng.CFG.classicEnd;
   planChecks.push({ name: "the weeks run from the next deadline to the chip stop without a gap", ok: gws.length === last - first + 1 && gws.every((g, i) => g === first + i), detail: "weeks " + gws.join(",") + " · expected " + first + "–" + last });
   const tot = sum(pl.weeks, (w) => w.ep) - HIT_POINTS * sum(pl.weeks, (w) => w.hits);

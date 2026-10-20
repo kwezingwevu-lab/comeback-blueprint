@@ -6600,7 +6600,9 @@ function landOn(sectionId) {
    starts one by itself only when the data is older than staleH hours and nothing started in the last quietMin minutes;
    the refresh button starts one at any time. Where the viewer offers no connector (the dist build, an older viewer) the
    app keeps the refresh paths it had. */
-const REFRESH_ROUTINE = { server: "Claude Code Remote", trigger: "trig_01QuZE4jqj5L9gq3dPhYFNfr", staleH: 2, quietMin: 60 };
+/* 20 Oct 2026 (the manager): refresh only 48 hours before each deadline. The routine runs once per gameweek on that
+   schedule, so opening the app starts nothing (autoOnOpen false); ↻ stays as a manual override. */
+const REFRESH_ROUTINE = { server: "Claude Code Remote", trigger: "trig_01QuZE4jqj5L9gq3dPhYFNfr", staleH: 2, quietMin: 60, autoOnOpen: false };
 /* get_trigger's payload (or junk) → what the page shows. Total: anything else is {ok:false}. */
 function routineRun(payload) {
   const out = { ok: false, enabled: null, lastFired: null, status: null, finished: null, next: null };
@@ -6625,6 +6627,7 @@ function autoRefreshDue(ageH, run, nowMs, cfg) {
   const c = cfg && typeof cfg === "object" && !Array.isArray(cfg) ? cfg : REFRESH_ROUTINE;
   const staleH = typeof c.staleH === "number" && isFinite(c.staleH) ? c.staleH : REFRESH_ROUTINE.staleH;
   const quietMin = typeof c.quietMin === "number" && isFinite(c.quietMin) ? c.quietMin : REFRESH_ROUTINE.quietMin;
+  if (c.autoOnOpen === false) return { due: false, why: "off" };
   const age = typeof ageH === "number" && isFinite(ageH) ? ageH : null;
   if (age !== null && age <= staleH) return { due: false, why: "fresh" };
   const r = run && typeof run === "object" && !Array.isArray(run) ? run : {};
@@ -10143,7 +10146,7 @@ function TabLab(props) {
           <div data-testid="lab-routine">
             <div className="dim">{rf.routine.line || "Scheduled refresh: reading its last run."}</div>
             {rf.routine.err ? <div className="dim">{rf.routine.err}</div> : null}
-            <div className="dim">The button below asks the Claude Code session that builds this app to pull every feed, re-solve if anything moved and republish this page. Opening the app does it by itself when the data is over {REFRESH_ROUTINE.staleH} hours old. <Tier k="T0" /> once the new page loads</div>
+            <div className="dim">The button below asks the Claude Code session that builds this app to pull every feed, re-solve if anything moved and republish this page. It also runs by itself once a gameweek, 48 hours before the deadline; use this button only for a manual refresh outside that window. <Tier k="T0" /> once the new page loads</div>
           </div>
         ) : null}
         {rf.dist || rf.routine ? null : <div className="dim">Model and search pairing</div>}

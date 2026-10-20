@@ -1456,7 +1456,7 @@ console.log("--- v110 D3 · the Draft tab ---");
   const cfg = { staleH: 2, quietMin: 60 };
   const cases = [
     [due(1.5, r, T0, cfg), false, "fresh"], [due(5, run({ trigger: { enabled: true, last_fired_at: iso(T0 - 3 * 3600000) } }), T0, cfg), true, "stale"],
-    [due(5, r, T0, cfg), false, "recent"], [due(5, run({ trigger: { enabled: false } }), T0, cfg), false, "paused"], [due(null, null, T0, cfg), true, "unknown age"]];
+    [due(5, r, T0, cfg), false, "recent"], [due(5, run({ trigger: { enabled: false } }), T0, cfg), false, "paused"], [due(null, null, T0, cfg), true, "unknown age"], [due(50, run({ trigger: { enabled: true } }), T0, { staleH: 2, quietMin: 60, autoOnOpen: false }), false, "off"]];
   assert("R-refresh-opening-starts-one-only-when-the-data-is-stale-the-routine-is-on-and-nothing-started-in-the-quiet-window",
     cases.every(function (c) { return c[0].due === c[1] && c[0].why === c[2]; }), JSON.stringify(cases.map(function (c) { return c[0]; })));
   const codes = ["needs_reauth", "server_not_connected", "approval_required", "blocked_by_policy", "tool_error", "server_unavailable"];

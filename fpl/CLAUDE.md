@@ -165,6 +165,8 @@ Invariant: **no account-touching calls** (`/my-team/`, `/transfers/`, login).
 
 > **16 Oct 2026 (ERRORS.md E-171).** In the claude.ai viewer the refresh no longer runs steps 1–5: the page reaches the refresh routine through the viewer's own **Claude Code Remote** connector (artifact `mcp` capability; tools `get_trigger` and `fire_trigger`, trigger named in `REFRESH_ROUTINE` in `src/ui.jsx`). The routine fires into the Claude Code session that holds the repository, which pulls the feeds, re-solves when the input hash moves and republishes the page. Opening the app starts one when the data is over two hours old and nothing started in the last hour; ↻ starts one at any time. Steps 1–5 remain only where the viewer offers no connector. The invariant above still holds: the page calls nothing on the FPL account.
 >
+> **20 Oct 2026 (ERRORS.md E-178), the manager's standing rule.** Refresh or update only 48 hours before each gameweek deadline. The routine is a one-shot at deadline − 48 h that re-arms itself for the next gameweek; opening the app starts nothing (`autoOnOpen` false); ↻ is a manual override only. This supersedes the two-hour schedule and the open-time start above.
+>
 > **20 Oct 2026 (ERRORS.md E-176).** The routine only works while its session is free to act. A bound session never ends a turn with notifications queued, never parks in plan mode, and collapses a backlog of firings into one refresh. A refresh lands whole (bake, solve, plan, build, commit) or the tree goes back to HEAD.
 
 ---
@@ -420,6 +422,8 @@ point: a rule in a prompt that no function names is a rule nobody applies.
   to masquerade as a rule of the game.
 - **Chips.** Two of each. The first set can be used up to the GW19 deadline: wildcard and free hit
   from GW2, bench boost and triple captain from GW1. One chip per gameweek.
+  **The manager's rule (20 Oct 2026, E-177):** set-1 chips are played before GW19, so GW18 at the latest
+  (`solve.SET1_LAST`); the game's own limit (GW19) still bounds the planning window.
 - **Selling price.** The price paid plus half of any rise, rounded down to £0.1m; a fall is taken in
   full. Price paid is `now_cost − cost_change_start` for the original fifteen and `element_in_cost`
   from `/api/entry/{id}/transfers/` for anyone bought since. A screenshot is not a source: prices

@@ -2097,3 +2097,15 @@ CAUSE: the routine fired into the master session as designed (E-171), but that s
 CAUGHT: 20 Oct 2026 04:35Z, when this session finally exited plan mode and read the backlog.
 RULE: (1) a session the routine is bound to must never end a turn idle with notifications queued; it reads them and runs one refresh (a backlog collapses to one run; the 45-minute rule covers duplicates). (2) It never sits in plan mode or awaits approval while bound: either it exits plan mode and acts, or the routine is pointed elsewhere by the manager. (3) A refresh is never left half-done in the tree: bake, solve, plan, build and commit land together or the tree is reset to HEAD.
 TEST: none in code can see a session's mode; the guard on the page is the existing data-age line in the header (E-171), which said "4 days" throughout. The rule binds the session and is written into CLAUDE.md D4.
+
+### E-177 · v110 · the "wildcard as late as the rules allow" case and the chip windows used GW19, a week the manager will not play a set-1 chip in
+CAUSE: the set-1 chip stop was read from bootstrap (`chips[].stop_event` 19) and used both as the planning horizon and as the last chip week, and CLAUDE.md B2/N1 said set 1 "can be used up to the GW19 deadline". The game does allow GW19; the manager's own rule is stricter: "The first wildcard will only be played before gw19" (20 Oct 2026), i.e. GW18 at the latest.
+CAUGHT: 20 Oct 2026, the manager's message.
+RULE: the planning window still runs to the chip stop (cEnd), but no set-1 chip is placed after `solve.SET1_LAST` (18). The solver's model functions stay byte-identical to the reference kit (plan_legality checks it), so the limit is not a model constraint: plan_legality refuses any kept plan with a chip after GW18 (a red there means re-solve with the limit), and `latest_wildcard.py` plays the wildcard in GW18 and holds the rebuilt fifteen in GW19. A game rule and a manager rule are kept apart in code and in copy.
+TEST: plan_legality "no set-1 chip is played after GW18 (the manager's limit, E-177)". latest_wildcard rebuilt on the 20 Oct data: GW18, 725.47 against never 722.51.
+
+### E-178 · v110 · a refresh every two hours and on every app open, against the manager's wish
+CAUSE: E-171 made the routine fire every two hours and the app start one whenever its data was over two hours old. The manager does not want that: "Going forward only run a refresh or update 48 hours before the gw deadline" (20 Oct 2026).
+CAUGHT: 20 Oct 2026, the manager's message.
+RULE: one scheduled refresh per gameweek, at the deadline minus 48 hours: the routine (trig_01QuZE4jqj5L9gq3dPhYFNfr) is a one-shot that re-arms itself to the next deadline − 48 h at the end of each run, read from `events[is_next]`; opening the app starts nothing (`REFRESH_ROUTINE.autoOnOpen` false); ↻ stays as a manual override.
+TEST: components R-refresh case "off"; smoke E171-opening-stale-data-reads-the-routine-and-starts-nothing-(48-hour-rule) and its WebKit twin.

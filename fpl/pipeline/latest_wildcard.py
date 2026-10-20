@@ -41,20 +41,24 @@ W = [g for g in solve.GWS if g <= solve.IN["cEnd"]]; T = len(W)
 weeks = [dict(w) for w in nv["weeks"]]
 if len(weeks) != T:
     sys.exit("the never plan has %d weeks and the window has %d" % (len(weeks), T))
-last = weeks[-1]
+# The latest week the first wildcard may be played is the manager's set-1 limit (solve.SET1_LAST, GW18; E-177), not the
+# last week of the window: the wildcard goes in that week and the rebuilt fifteen is held for the weeks after it.
+if solve.SET1_LAST not in W:
+    sys.exit("GW%d (the set-1 limit) is not in the planning window %s" % (solve.SET1_LAST, W))
+tl = W.index(solve.SET1_LAST)
+last = weeks[tl]
 if last.get("chip"):
     sys.exit("the never plan already plays %s in GW%d, so a wildcard cannot share the week" % (last["chip"], last["gw"]))
 if not last.get("held"):
-    sys.exit("the last week of the never plan is not a held week; nothing to rebuild")
+    sys.exit("GW%d of the never plan is not a held week; nothing to rebuild" % last["gw"])
 
 own = set(C["squad"])
 sellv = lambda i: C["sell"].get(str(i), P[i]["pr"]) if i in own else P[i]["pr"]
 held_sq = list(last["squad"]); prev_sq = set(held_sq)
 budget = round(sum(sellv(i) for i in held_sq) + last["bank"], 1)
 sold = set()
-for w in weeks[:-1]:
+for w in weeks[:tl]:
     sold.update(w["out"])
-tl = T - 1
 # nobody sold earlier in the window may be bought again: take them out of the one-week search by giving them a prohibitive
 # expected score for this week only, and restore it after (the shared data is not changed on disk).
 saved = {i: P[i]["ep"][tl] for i in sold if i in P}
@@ -64,27 +68,41 @@ try:
 finally:
     for i, v in saved.items(): P[i]["ep"][tl] = v
 if best is None:
-    sys.exit("no feasible fifteen for the last week under a budget of %.1f" % budget)
+    sys.exit("no feasible fifteen for GW%d under a budget of %.1f" % (last["gw"], budget))
 
 held_ep = last["ep"]
 if best["ep"] <= held_ep + 1e-9:          # no better than keeping the squad: play the wildcard with the same fifteen
     sq = held_sq; xi = list(last["xi"]); cap = last["cap"]; ep = held_ep; same = True
 else:
     sq = best["squad"]; xi = best["xi"]; cap = best["cap"]; ep = best["ep"]; same = False
-bench = sorted([i for i in sq if i not in xi and P[i]["p"] != 1], key=lambda i: -P[i]["ep"][tl])
-gk2 = [i for i in sq if i not in xi and P[i]["p"] == 1]
-vice = sorted([i for i in xi if i != cap], key=lambda i: -P[i]["ep"][tl])[0]
+def week_row(t, sq, xi, cap, ep, chip, ins, outs, base):
+    bench = sorted([i for i in sq if i not in xi and P[i]["p"] != 1], key=lambda i: -P[i]["ep"][t])
+    gk2 = [i for i in sq if i not in xi and P[i]["p"] == 1]
+    vice = sorted([i for i in xi if i != cap], key=lambda i: -P[i]["ep"][t])[0]
+    return {"gw": W[t], "chip": chip, "xi": xi, "bench": bench, "gk2": gk2[0] if gk2 else None, "cap": cap, "vice": vice, "in": ins, "out": outs,
+            "ftBefore": base["ftBefore"], "used": 0, "hits": 0, "bank": base["bank"], "ep": round(ep, 2), "epNet": round(ep, 2), "squad": list(sq), "held": chip is None}
 ins = [i for i in sq if i not in prev_sq]; outs = [i for i in prev_sq if i not in sq]
 bank = round(last["bank"] + sum(sellv(i) for i in outs) - sum(P[i]["pr"] for i in ins), 1)
 if bank < -1e-9:
     sys.exit("internal error: the rebuilt fifteen overspends (bank %.1f)" % bank)
-weeks[-1] = {"gw": last["gw"], "chip": "wildcard", "xi": xi, "bench": bench, "gk2": gk2[0] if gk2 else None, "cap": cap, "vice": vice, "in": ins, "out": outs,
-             "ftBefore": last["ftBefore"], "used": 0, "hits": 0, "bank": bank, "ep": round(ep, 2), "epNet": round(ep, 2), "squad": list(sq), "held": False}
+weeks[tl] = week_row(tl, sq, xi, cap, ep, "wildcard", ins, outs, dict(last, bank=bank))
+# the weeks after the wildcard hold the rebuilt fifteen: the best eleven and armband of that fifteen, found by the same
+# one-week search with everyone outside it priced out for that week only.
+for t2 in range(tl + 1, T):
+    saved2 = {i: P[i]["ep"][t2] for i in P if i not in sq}
+    for i in saved2: P[i]["ep"][t2] = -99.0
+    try:
+        hold = solve.one_week_best(t2, 1000.0)
+    finally:
+        for i, v in saved2.items(): P[i]["ep"][t2] = v
+    if hold is None or set(hold["squad"]) != set(sq):
+        sys.exit("could not hold the rebuilt fifteen in GW%d" % W[t2])
+    weeks[t2] = week_row(t2, sq, hold["xi"], hold["cap"], hold["ep"], weeks[t2].get("chip"), [], [], dict(weeks[t2], bank=bank))
 total = round(sum(w["epNet"] for w in weeks), 2)
 res = {"ok": True, "constructed": True, "from": "never", "total": total, "weeks": weeks, "wcGw": last["gw"],
        "reshuffle": {"gw": last["gw"], "budget": budget, "heldEp": round(held_ep, 2), "newEp": round(ep, 2), "gain": round(ep - held_ep, 2),
                      "changes": len(ins), "sameFifteen": same, "excludedRebuys": len(saved)},
-       "note": "the never plan to GW%d, then the wildcard in GW%d: %s" % (W[-2], last["gw"], "the same fifteen (nothing better under the budget)" if same else "%d changes for %+.2f points that week" % (len(ins), ep - held_ep))}
+       "note": "the never plan to GW%d, then the wildcard in GW%d (the set-1 limit), the new fifteen held after: %s" % (W[tl - 1], last["gw"], "the same fifteen (nothing better under the budget)" if same else "%d changes for %+.2f points that week" % (len(ins), ep - held_ep))}
 # read-modify-write, hash-checked again just before writing (another solve may have written the file in the meantime)
 t = json.load(open(path))
 if t.get("hash") != solve.IN.get("hash"):

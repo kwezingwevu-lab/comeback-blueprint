@@ -280,6 +280,12 @@ def later(TL=540, gap=0.01, path=None):
     print("later", r.get("status"), r.get("secs"), "s · gap", r.get("gap"), "· total", r.get("total"), "· wc", next((w["gw"] for w in r.get("weeks", []) if w["chip"] == "wildcard"), None), flush=True)
     return r
 
+# The manager's rule (20 Oct 2026, ERRORS.md E-177): set-1 chips are played before GW19, so GW18 at the latest. The game
+# itself allows GW19 (bootstrap chips stop_event 19); this is a tighter limit of his, and the planning window still runs to cEnd.
+# The model functions above stay byte-identical to the reference kit (plan_legality), so the limit is not a model
+# constraint: latest_wildcard.py builds on it, and plan_legality refuses any kept plan with a chip after it.
+SET1_LAST = 18
+
 def main():
     if ARGS.later:
         later(TL=ARGS.tl or 540); return

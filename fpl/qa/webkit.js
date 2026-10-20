@@ -1129,9 +1129,10 @@ async function main() {
         await rp.waitForTimeout(1200);
         const calls = await rp.evaluate(function () { return window.__MCP_CALLS__ || []; });
         const note = await rp.evaluate(function () { const n = document.querySelector('[data-testid="routine-note"]'); return n ? n.innerText : ""; });
-        H.assert("E171-under-webkit-opening-stale-data-reads-the-routine-then-starts-one-refresh-with-the-app's-trigger",
-          !!TRIG && calls.length === 2 && calls[0].tool === "get_trigger" && calls[1].tool === "fire_trigger" &&
-            calls.every(function (c) { return c.server === "Claude Code Remote" && c.input && c.input.trigger_id === TRIG; }) && /Refresh started/.test(note),
+        // 20 Oct 2026: refresh only 48 h before each deadline (the manager), so stale data starts nothing on opening
+        H.assert("E171-under-webkit-opening-stale-data-reads-the-routine-and-starts-nothing-(48-hour-rule)",
+          !!TRIG && calls.length === 1 && calls[0].tool === "get_trigger" &&
+            calls.every(function (c) { return c.server === "Claude Code Remote" && c.input && c.input.trigger_id === TRIG; }) && !/Refresh started/.test(note),
           JSON.stringify(calls).slice(0, 300) + " · note «" + note.slice(0, 100) + "»");
       } finally { await rc.close(); }
     }

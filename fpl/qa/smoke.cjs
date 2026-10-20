@@ -624,9 +624,10 @@ async function main() {
       const nowStale = isoAt(FETCHED + 5 * 3600000);
       const pA = await routinePage(nowStale, { lastFired: isoAt(FETCHED + 2 * 3600000), next: isoAt(FETCHED + 6 * 3600000) });
       const cA = await calls(pA), noteA = await pA.evaluate(function () { const n = document.querySelector('[data-testid="routine-note"]'); return n ? n.innerText : ""; });
-      H.assert("E171-opening-stale-data-reads-the-routine-then-starts-one-refresh-with-the-app's-trigger",
-        !!TRIG && cA.length === 2 && cA[0].tool === "get_trigger" && cA[1].tool === "fire_trigger" && cA.every(function (c) { return c.server === "Claude Code Remote" && c.input && c.input.trigger_id === TRIG; }) &&
-          /Refresh started/.test(noteA),
+      // 20 Oct 2026: refresh only 48 h before each deadline (the manager), so even stale data starts nothing on opening
+      H.assert("E171-opening-stale-data-reads-the-routine-and-starts-nothing-(48-hour-rule)",
+        !!TRIG && cA.length === 1 && cA[0].tool === "get_trigger" && cA.every(function (c) { return c.server === "Claude Code Remote" && c.input && c.input.trigger_id === TRIG; }) &&
+          !/Refresh started/.test(noteA),
         JSON.stringify(cA).slice(0, 300) + " · note «" + noteA.slice(0, 120) + "»");
       // stale but a refresh started ten minutes ago: no second start
       const pB = await routinePage(nowStale, { lastFired: isoAt(FETCHED + 5 * 3600000 - 10 * 60000), next: isoAt(FETCHED + 6 * 3600000) });
@@ -643,6 +644,7 @@ async function main() {
         JSON.stringify(cC1).slice(0, 220) + " · label " + label + " · note «" + noteC.slice(0, 80) + "»");
       // a lapsed connector: the reason and its fix, never a generic failure
       const pD = await routinePage(nowStale, { lastFired: isoAt(FETCHED), next: isoAt(FETCHED + 6 * 3600000), fireErr: "needs_reauth" });
+      await pD.click('[data-testid="refresh"]'); await pD.waitForTimeout(500);   // nothing starts on opening now (E-178): press ↻
       const errD = await pD.evaluate(function () { const n = document.querySelector('[data-testid="err"]'); return n ? n.innerText : ""; });
       H.assert("E171-a-lapsed-connector-says-reconnect-it", /Reconnect Claude Code Remote/.test(errD), "«" + errD + "»");
       if (rctx) { await rctx.close(); rctx = null; }

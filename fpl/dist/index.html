@@ -32677,7 +32677,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
     } catch {
     }
   }
-  var REFRESH_ROUTINE = { server: "Claude Code Remote", trigger: "trig_01QuZE4jqj5L9gq3dPhYFNfr", staleH: 2, quietMin: 60 };
+  var REFRESH_ROUTINE = { server: "Claude Code Remote", trigger: "trig_01QuZE4jqj5L9gq3dPhYFNfr", staleH: 2, quietMin: 60, autoOnOpen: !1 };
   function routineRun(payload) {
     let out = { ok: !1, enabled: null, lastFired: null, status: null, finished: null, next: null };
     try {
@@ -32694,7 +32694,9 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
     return out;
   }
   function autoRefreshDue(ageH, run, nowMs2, cfg) {
-    let c = cfg && typeof cfg == "object" && !Array.isArray(cfg) ? cfg : REFRESH_ROUTINE, staleH = typeof c.staleH == "number" && isFinite(c.staleH) ? c.staleH : REFRESH_ROUTINE.staleH, quietMin = typeof c.quietMin == "number" && isFinite(c.quietMin) ? c.quietMin : REFRESH_ROUTINE.quietMin, age = typeof ageH == "number" && isFinite(ageH) ? ageH : null;
+    let c = cfg && typeof cfg == "object" && !Array.isArray(cfg) ? cfg : REFRESH_ROUTINE, staleH = typeof c.staleH == "number" && isFinite(c.staleH) ? c.staleH : REFRESH_ROUTINE.staleH, quietMin = typeof c.quietMin == "number" && isFinite(c.quietMin) ? c.quietMin : REFRESH_ROUTINE.quietMin;
+    if (c.autoOnOpen === !1) return { due: !1, why: "off" };
+    let age = typeof ageH == "number" && isFinite(ageH) ? ageH : null;
     if (age !== null && age <= staleH) return { due: !1, why: "fresh" };
     let r2 = run && typeof run == "object" && !Array.isArray(run) ? run : {};
     if (r2.enabled === !1) return { due: !1, why: "paused" };
@@ -36578,9 +36580,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: rf.routine.line || "Scheduled refresh: reading its last run." }),
           rf.routine.err ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: rf.routine.err }) : null,
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dim", children: [
-            "The button below asks the Claude Code session that builds this app to pull every feed, re-solve if anything moved and republish this page. Opening the app does it by itself when the data is over ",
-            REFRESH_ROUTINE.staleH,
-            " hours old. ",
+            "The button below asks the Claude Code session that builds this app to pull every feed, re-solve if anything moved and republish this page. It also runs by itself once a gameweek, 48 hours before the deadline; use this button only for a manual refresh outside that window. ",
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tier, { k: "T0" }),
             " once the new page loads"
           ] })
