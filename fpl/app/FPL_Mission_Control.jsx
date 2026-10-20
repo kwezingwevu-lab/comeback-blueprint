@@ -7755,10 +7755,32 @@ function openOf(ui, tab, id) { const v = ui && ui.open ? ui.open[id] : undefined
    game: Classic and Draft are never added, netted or compared (§1.1, N3). Times are SAST (§1.6). The league table is
    read, never written as prose (§7.6, E-122). Total: junk in any slot gives empty lists, never a throw.
    lv is landingPlanView's answer, so the checklist's Classic item says exactly what the landing card says. */
+/* The instant a desk note speaks from: its first "D Mon" (or "D Mon YYYY"), with an "HH:MMZ" that follows within a few
+   words, else noon that day. The year is the one that puts the date nearest the reference instant, so a note from late
+   December reads right in January. null when the note carries no date (qa/bake.cjs A7 requires one on every note). */
+function noteDateMs(note, ref) {
+  try {
+    const MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+    const m = /\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*(?:\s+(\d{4}))?(?:\D{0,12}?(\d{2}):(\d{2})Z)?/.exec(String(note));
+    if (!m) return null;
+    const mo = MON[m[2].slice(0, 3).toLowerCase()], hh = m[4] ? +m[4] : 12, mi = m[5] ? +m[5] : 0;
+    const r = isFinite(ref) ? ref : Date.now(), y0 = new Date(r).getUTCFullYear();
+    const ys = m[3] ? [+m[3]] : [y0 - 1, y0, y0 + 1];
+    return ys.map(function (y) { return Date.UTC(y, mo, +m[1], hh, mi); }).sort(function (a, b) { return Math.abs(a - r) - Math.abs(b - r); })[0];
+  } catch (e) { return null; }
+}
+/* The last deadline that has passed in the baked block (the deadline of gw.lastDone), as ms; NaN when unknown. */
+function noteWindowStart(mc) {
+  try {
+    const ev = (mc && mc.gw && Array.isArray(mc.gw.events) ? mc.gw.events : []).filter(function (e) { return e && e.id === mc.gw.lastDone; })[0];
+    const t = ev ? Date.parse(ev.dl) : NaN;
+    return isFinite(t) ? t : NaN;
+  } catch (e) { return NaN; }
+}
 function commandView(mc, ctx, lv) {
   const empty = function () {
     return { next: { gw: "", lede: "", items: [] }, last: { classicHead: "", classic: [], draftHead: "", draft: [] },
-      flags: { classicHead: "", classic: [], draftHead: "", draft: [], delta: "" }, notes: { lede: "", redraft: "", buildHead: "", build: [], deskHead: "", desk: [] } };
+      flags: { classicHead: "", classic: [], draftHead: "", draft: [], delta: "" }, notes: { lede: "", redraft: "", buildHead: "", build: [], deskHead: "", desk: [], deskOlder: 0 } };
   };
   const view = empty();
   try {
@@ -7889,8 +7911,17 @@ function commandView(mc, ctx, lv) {
     if (rd && fin(rd.fromGw) && sastDate(rd.at)) view.notes.redraft = "Your Draft league re-drafts " + sastDate(rd.at) + " SAST, effective GW" + rd.fromGw + ", so this roster plays through GW" + (rd.fromGw - 1) + ".";
     view.notes.build = (Array.isArray(PRE.changes) ? PRE.changes : []).map(txt).filter(Boolean).slice(0, 40);
     view.notes.buildHead = view.notes.build.length ? "This build" + (sastDate(PRE.at) ? ", " + sastDate(PRE.at) + " SAST" : "") + ":" : "";
-    view.notes.desk = (Array.isArray(intel.notes) ? intel.notes : []).map(txt).filter(Boolean).slice(0, 40);
-    view.notes.deskHead = view.notes.desk.length ? "Desk research, each note from the source it names:" : "";
+    /* 16 Oct 2026: Command shows the desk notes written for the gameweek being planned, the ones dated after the last
+       deadline; the earlier ones are a played week's news and stay in pipeline/intel.js, the dated record (the notes are append-only,
+       so listing them all here grew this tab with every refresh and kept GW6's news on the GW7 screen). */
+    const desk = (Array.isArray(intel.notes) ? intel.notes : []).map(txt).filter(Boolean);
+    const noteSince = noteWindowStart(MC);
+    const fresh = desk.filter(function (n) { const at = noteDateMs(n, noteSince); return at === null || !isFinite(noteSince) || at >= noteSince; });
+    view.notes.desk = fresh.slice(0, 40);
+    view.notes.deskOlder = desk.length - fresh.length;
+    const kept = view.notes.deskOlder ? view.notes.deskOlder + " earlier " + (view.notes.deskOlder === 1 ? "note, written for a played gameweek, stays" : "notes, written for played gameweeks, stay") + " in the dated desk-research record (pipeline/intel.js)" : "";
+    view.notes.deskHead = view.notes.desk.length ? "Desk research for GW" + MC.gw.next + ", each note from the source it names" + (kept ? " (" + kept + "):" : ":")
+      : (kept ? "No desk note is dated after the GW" + MC.gw.lastDone + " deadline yet; " + kept + "." : "");
   } catch (e) { return empty(); }
   return view;
 }
@@ -7962,7 +7993,7 @@ function TabCommand(props) {
           {cv.notes.redraft ? <div className="cmdn">{cv.notes.redraft}</div> : null}
           {cv.notes.build.length ? <div className="dim">{cv.notes.buildHead}</div> : null}
           {cv.notes.build.length ? <ul className="cmdl">{cv.notes.build.map(function (x, i) { return <li key={"b" + i}>{x}</li>; })}</ul> : null}
-          {cv.notes.desk.length ? <div className="dim">{cv.notes.deskHead}</div> : null}
+          {cv.notes.deskHead ? <div className="dim" data-testid="cmd-notes-desk-head">{cv.notes.deskHead}</div> : null}
           {cv.notes.desk.length ? <ul className="cmdl">{cv.notes.desk.map(function (x, i) { return <li key={"d" + i}>{x}</li>; })}</ul> : null}
         </div>
       </Section>

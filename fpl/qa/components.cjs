@@ -1955,13 +1955,30 @@ console.log("--- v110 D1 · Today: the landing card and the Command tab ---");
     const nt = r.ok ? part(r.html, "cmd-notes-list") : "", all = r.ok ? plain(r.html) : "";
     const bad = [];
     (PR.changes || []).forEach(function (s) { if (nt.indexOf(plain(s)) < 0) bad.push("build note «" + s.slice(0, 40) + "»"); });
-    ((MB.intel && MB.intel.notes) || []).forEach(function (s) { if (nt.indexOf(plain(s)) < 0) bad.push("desk note «" + s.slice(0, 40) + "»"); });
+    /* 16 Oct 2026: Command lists the desk notes dated after the last deadline and counts the rest, which the Lab keeps
+       (they are a played week's news; listing them all grew this tab every refresh and moved browser.py's Command
+       histogram past its tolerance on CI run 51). The Lab lists intel.sources, not the notes, so the line names the record. The date is parsed here on its own, not with the app's helper: a note
+       speaks from its first "D Mon [YYYY]", with an "HH:MMZ" within a few characters after it, else noon. */
+    const MONS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+    const lastDl = Date.parse(((MB.gw.events || []).filter(function (e) { return e.id === MB.gw.lastDone; })[0] || {}).dl);
+    const noteAt = function (n) {
+      const m = /\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*(?:\s+(\d{4}))?(?:\D{0,12}?(\d{2}):(\d{2})Z)?/.exec(n);
+      if (!m) return null;
+      const y = m[3] ? +m[3] : new Date(lastDl).getUTCFullYear();
+      return Date.UTC(y, MONS.indexOf(m[2].toLowerCase()), +m[1], m[4] ? +m[4] : 12, m[5] ? +m[5] : 0);
+    };
+    const deskAll = (MB.intel && MB.intel.notes) || [];
+    const fresh = deskAll.filter(function (n) { const t = noteAt(n); return t === null || t >= lastDl; }), older = deskAll.filter(function (n) { return fresh.indexOf(n) < 0; });
+    fresh.forEach(function (s) { if (nt.indexOf(plain(s)) < 0) bad.push("current desk note missing «" + s.slice(0, 40) + "»"); });
+    older.forEach(function (s) { if (nt.indexOf(plain(s)) >= 0) bad.push("a played week's note still on Command «" + s.slice(0, 40) + "»"); });
+    if (older.length && nt.indexOf(older.length + " earlier " + (older.length === 1 ? "note, written for a played gameweek, stays" : "notes, written for played gameweeks, stay") + " in the dated desk-research record (pipeline/intel.js)") < 0) bad.push("the count of earlier notes (" + older.length + ") and where they stay");
+    if (!isFinite(lastDl)) bad.push("no deadline for gw.lastDone " + MB.gw.lastDone);
     if (all.indexOf("Feeds pulled " + sastAt(MB.asOf).day + " SAST") < 0) bad.push("the feed date");
     if (MB.intel && MB.intel.asOf && all.indexOf("Desk research dated " + sastAt(MB.intel.asOf).day + " SAST") < 0) bad.push("the desk-research date");
     const rd = MB.draft.league.redraft;
     if (rd && nt.indexOf("re-drafts " + sastAt(rd.at).day + " SAST, effective GW" + rd.fromGw + ", so this roster plays through GW" + (rd.fromGw - 1)) < 0) bad.push("the re-draft line");
-    assert("D1-cmd-notes-lists-the-build-notes-and-the-desk-research-dated-and-the-re-draft-from-the-league", r.ok && bad.length === 0,
-      (bad.length ? bad.slice(0, 4).join("; ") + " · " : "") + (PR.changes || []).length + " build notes, " + ((MB.intel && MB.intel.notes) || []).length + " desk notes");
+    assert("D1-cmd-notes-lists-the-build-notes-this-weeks-desk-research-and-the-re-draft-earlier-notes-counted", r.ok && bad.length === 0,
+      (bad.length ? bad.slice(0, 4).join("; ") + " · " : "") + (PR.changes || []).length + " build notes; desk notes " + fresh.length + " on Command (after the GW" + MB.gw.lastDone + " deadline), " + older.length + " counted and left to pipeline/intel.js");
   }
 
   // (11) the tick store: state.done keeps "<gameweek>:<item>" set to true and nothing else, total under junk

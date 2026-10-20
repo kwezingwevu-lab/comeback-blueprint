@@ -93,10 +93,17 @@ if (H && H.plan && Array.isArray(H.candidates) && H.best) {
 const dev = (MC.draft.events || {})[String(gw)] || {};
 const cl = (WEEKLY.draft.claims || []).map((c) => c.why ? c.why.split(",")[0] : "");
 const cs = PRE && PRE.claims ? PRE.claims : null;
-let draft = "**Draft GW" + gw + ": " + (cl.length ? cl.length + (cl.length === 1 ? " claim" : " claims") : "no claim") + "** (" +
+let draft = "**Draft GW" + gw + ": " + (cl.length ? cl.length + (MC.draft.waiversProcessed ? (cl.length === 1 ? " move" : " moves") : (cl.length === 1 ? " claim" : " claims")) : (MC.draft.waiversProcessed ? "no move" : "no claim")) + "** (" +
   (dev.wv ? (MC.draft.waiversProcessed ? "waivers settled " : "waivers settle ") + sast(dev.wv) : "waiver time not in the feed") + (dev.tr ? "; trades close " + sast(dev.tr) : "") + "). " +
-  (cl.length ? "Lodge in this order: " + cl.join("; ") + ". " : "") +
-  (cs && isFinite(cs.valueStress) ? "Worth " + f1(cs.valueStress) + " Draft expected points to GW" + M.CFG.draftEnd + " under the stress test, a mean of " + f1(cs.meanValue) + " over " + cs.runs + " simulated waiver runs, against " + f1(cs.valueNow) + " today." : "");
+  (MC.draft.waiversProcessed
+    ? (cl.length ? (function () {
+        // after the run (CLAUDE.md N2): weekly.cjs writes each line as "sign now" or "locked until the next waiver run"
+        const now = [], later = [];
+        (WEEKLY.draft.claims || []).forEach((c, i) => (/sign now/.test(c.why || "") ? now : later).push(cl[i]));
+        return (now.length ? "Sign now, as free agents: " + now.join("; ") + ". " : "") + (later.length ? "Locked until the next waiver run, so claim then: " + later.join("; ") + ". " : "");
+      })() : "")
+    : (cl.length ? "Lodge in this order: " + cl.join("; ") + ". " : "") +
+  (cs && isFinite(cs.valueStress) ? "Worth " + f1(cs.valueStress) + " Draft expected points to GW" + M.CFG.draftEnd + " under the stress test, a mean of " + f1(cs.meanValue) + " over " + cs.runs + " simulated waiver runs, against " + f1(cs.valueNow) + " today." : ""));
 
 /* the leagues to GW19 (the manager's ask of 15 Oct 2026: "a clear plan to win draft and all my mini leagues by the end of
    gw19"). Classic from the engine's leagueRoute on data/live.json with the plan's own weekly rate; Draft from the ported

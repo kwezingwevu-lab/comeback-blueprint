@@ -33983,13 +33983,37 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
     let v = ui && ui.open ? ui.open[id] : void 0;
     return v === void 0 ? PRIMARY[tab] === id : !!v;
   }
+  function noteDateMs(note, ref) {
+    try {
+      let MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 }, m = /\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*(?:\s+(\d{4}))?(?:\D{0,12}?(\d{2}):(\d{2})Z)?/.exec(String(note));
+      if (!m) return null;
+      let mo = MON[m[2].slice(0, 3).toLowerCase()], hh = m[4] ? +m[4] : 12, mi = m[5] ? +m[5] : 0, r2 = isFinite(ref) ? ref : Date.now(), y0 = new Date(r2).getUTCFullYear();
+      return (m[3] ? [+m[3]] : [y0 - 1, y0, y0 + 1]).map(function(y) {
+        return Date.UTC(y, mo, +m[1], hh, mi);
+      }).sort(function(a, b) {
+        return Math.abs(a - r2) - Math.abs(b - r2);
+      })[0];
+    } catch {
+      return null;
+    }
+  }
+  function noteWindowStart(mc) {
+    try {
+      let ev = (mc && mc.gw && Array.isArray(mc.gw.events) ? mc.gw.events : []).filter(function(e) {
+        return e && e.id === mc.gw.lastDone;
+      })[0], t = ev ? Date.parse(ev.dl) : NaN;
+      return isFinite(t) ? t : NaN;
+    } catch {
+      return NaN;
+    }
+  }
   function commandView(mc, ctx, lv) {
     let empty = function() {
       return {
         next: { gw: "", lede: "", items: [] },
         last: { classicHead: "", classic: [], draftHead: "", draft: [] },
         flags: { classicHead: "", classic: [], draftHead: "", draft: [], delta: "" },
-        notes: { lede: "", redraft: "", buildHead: "", build: [], deskHead: "", desk: [] }
+        notes: { lede: "", redraft: "", buildHead: "", build: [], deskHead: "", desk: [], deskOlder: 0 }
       };
     }, view = empty();
     try {
@@ -34133,7 +34157,14 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
       let intel = isO(MC2.intel) ? MC2.intel : {};
       view.notes.lede = (sastDate(MC2.asOf) ? "Feeds pulled " + sastDate(MC2.asOf) + " SAST. " : "") + (sastDate(intel.asOf) ? "Desk research dated " + sastDate(intel.asOf) + " SAST. " : "") + "The two games are scored and planned separately everywhere in this app.";
       let rd = isO(D.league) && isO(D.league.redraft) ? D.league.redraft : null;
-      rd && fin(rd.fromGw) && sastDate(rd.at) && (view.notes.redraft = "Your Draft league re-drafts " + sastDate(rd.at) + " SAST, effective GW" + rd.fromGw + ", so this roster plays through GW" + (rd.fromGw - 1) + "."), view.notes.build = (Array.isArray(PRE2.changes) ? PRE2.changes : []).map(txt).filter(Boolean).slice(0, 40), view.notes.buildHead = view.notes.build.length ? "This build" + (sastDate(PRE2.at) ? ", " + sastDate(PRE2.at) + " SAST" : "") + ":" : "", view.notes.desk = (Array.isArray(intel.notes) ? intel.notes : []).map(txt).filter(Boolean).slice(0, 40), view.notes.deskHead = view.notes.desk.length ? "Desk research, each note from the source it names:" : "";
+      rd && fin(rd.fromGw) && sastDate(rd.at) && (view.notes.redraft = "Your Draft league re-drafts " + sastDate(rd.at) + " SAST, effective GW" + rd.fromGw + ", so this roster plays through GW" + (rd.fromGw - 1) + "."), view.notes.build = (Array.isArray(PRE2.changes) ? PRE2.changes : []).map(txt).filter(Boolean).slice(0, 40), view.notes.buildHead = view.notes.build.length ? "This build" + (sastDate(PRE2.at) ? ", " + sastDate(PRE2.at) + " SAST" : "") + ":" : "";
+      let desk = (Array.isArray(intel.notes) ? intel.notes : []).map(txt).filter(Boolean), noteSince = noteWindowStart(MC2), fresh = desk.filter(function(n) {
+        let at = noteDateMs(n, noteSince);
+        return at === null || !isFinite(noteSince) || at >= noteSince;
+      });
+      view.notes.desk = fresh.slice(0, 40), view.notes.deskOlder = desk.length - fresh.length;
+      let kept = view.notes.deskOlder ? view.notes.deskOlder + " earlier " + (view.notes.deskOlder === 1 ? "note, written for a played gameweek, stays" : "notes, written for played gameweeks, stay") + " in the dated desk-research record (pipeline/intel.js)" : "";
+      view.notes.deskHead = view.notes.desk.length ? "Desk research for GW" + MC2.gw.next + ", each note from the source it names" + (kept ? " (" + kept + "):" : ":") : kept ? "No desk note is dated after the GW" + MC2.gw.lastDone + " deadline yet; " + kept + "." : "";
     } catch {
       return empty();
     }
@@ -34234,7 +34265,7 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
           cv.notes.build.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "cmdl", children: cv.notes.build.map(function(x, i) {
             return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: x }, "b" + i);
           }) }) : null,
-          cv.notes.desk.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: cv.notes.deskHead }) : null,
+          cv.notes.deskHead ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", "data-testid": "cmd-notes-desk-head", children: cv.notes.deskHead }) : null,
           cv.notes.desk.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "cmdl", children: cv.notes.desk.map(function(x, i) {
             return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: x }, "d" + i);
           }) }) : null

@@ -148,11 +148,17 @@ const buys = w0.in || [], sells = w0.out || [];
 const sheet = AN.buildClaimSheet(M, MC, PLAN.draft.pairs, { mc: true, fitOnly: true });   // no flagged player lodged (CLAUDE.md D2)
 const CP = { held: sheet.held };
 const tag = (c) => sheet.landed.indexOf(c.add) >= 0 ? "lands" : sheet.lost.indexOf(c.add) >= 0 ? "taken first" : "not reached";
+// Once this gameweek's waivers have settled the sheet is no longer a claims run (CLAUDE.md N2): an unclaimed player is
+// signed instantly until the deadline, and one dropped in that run is locked until the next. The waiver-run odds and the
+// stress-test label describe a run that has already happened, so they are not written then.
+const settled = !!MC.draft.waiversProcessed;
+const howNow = (id) => M.howToGet(P[id]) === "free" ? "sign now (a free agent until the GW" + next + " deadline)" : "locked until the next waiver run, so lodge it as a claim then";
 const claims = sheet.sheet.map((c) => ({
   out: code(c.drop), in: code(c.add),
   why: nm(c.add) + " for " + nm(c.drop) + " (" + POS[P[c.add].p] + "), " + (c.kind === "backup" ? "backup for " + nm(c.of) : "first choice") +
-    ": +" + f1(c.gain) + " Draft expected points to GW" + dEnd + (sheet.land && sheet.land[c.add] !== undefined ? ", lands in " + Math.round(100 * sheet.land[c.add]) + "% of " + sheet.runs + " simulated waiver runs" : "") +
-    ", stress test: " + tag(c)
+    ": +" + f1(c.gain) + " Draft expected points to GW" + dEnd +
+    (settled ? ", " + howNow(c.add)
+      : (sheet.land && sheet.land[c.add] !== undefined ? ", lands in " + Math.round(100 * sheet.land[c.add]) + "% of " + sheet.runs + " simulated waiver runs" : "") + ", stress test: " + tag(c))
 }));
 const rosterNow = M.draftRoster().map((p) => p.id);
 const after = rosterNow.slice();
@@ -251,10 +257,10 @@ L("  },");
 L("");
 L("  draft: {");
 L("    // buildClaimSheet (src/mc_analysis.js) on the solved roster's pairs, with the Monte Carlo orderings — the same call");
-L("    // data/pre.json makes. Lodge in exactly this order: " + (sheet.strategy === "firsts" ? "every first choice, then the backups" : "each backup directly under its first choice") + " — the ordering that lands more value under the league's own processing (strategy " + J(sheet.strategy) + ").");
+L("    // data/pre.json makes. " + (settled ? "This gameweek's waivers have settled: each line says whether its player can be signed now or is locked until the next run, in order of gain." : "Lodge in exactly this order: " + (sheet.strategy === "firsts" ? "every first choice, then the backups" : "each backup directly under its first choice") + " — the ordering that lands more value under the league's own processing (strategy " + J(sheet.strategy) + ")."));
 if (sheet.orderings) L("    // Monte Carlo over " + sheet.runs + " runs, mean Draft value by ordering: " + sheet.orderings.map((o) => o.name + " " + f1(o.mean)).join("; ") + ".");
 L("    pool: \"api\",");
-L("    pool_note: " + J("League " + MC.draft.league.id + ": the ins are free agents in the league's own feed, and the waiver model reproduces the league's claim log (qa/waiver_log.cjs). " + sheet.sheet.length + " claims, " + sheet.sheet.filter((c) => c.kind === "backup").length + " of them backups." + (CP.held.length ? " Held back because the player is flagged (re-check after the pressers): " + CP.held.map((h) => nm(h.add) + " for " + nm(h.drop) + " (status " + h.status + (h.chance !== null ? ", " + h.chance + "%" : "") + ")").join(", ") + "." : "")) + ",");
+L("    pool_note: " + J("League " + MC.draft.league.id + ": the ins are free agents in the league's own feed, and the waiver model reproduces the league's claim log (qa/waiver_log.cjs). " + sheet.sheet.length + " claims, " + sheet.sheet.filter((c) => c.kind === "backup").length + " of them backups." + (settled ? " Waivers for GW" + next + " have settled, so a free agent is signed instantly until the deadline and a player dropped in that run is locked until the next." : "") + (CP.held.length ? " Held back because the player is flagged (re-check after the pressers): " + CP.held.map((h) => nm(h.add) + " for " + nm(h.drop) + " (status " + h.status + (h.chance !== null ? ", " + h.chance + "%" : "") + ")").join(", ") + "." : "")) + ",");
 L("    claims: [");
 claims.forEach((c, i) => L("      { out: " + c.out + ", in: " + c.in + ", why: " + J(c.why) + " }" + (i < claims.length - 1 ? "," : "")));
 L("    ],");

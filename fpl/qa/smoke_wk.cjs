@@ -671,6 +671,27 @@ async function main() {
       claims.length + " claims, all " + (2 * claims.length) + " codes resolve in both tables; worked example " + (ex ? ex.web_name + " draft id " + ex.id + " vs classic id " + ctx.byCode[ex.code].id + " (keying on the draft id would give " + (wrong ? wrong.web_name : "nobody") + ")" : "none") + (bad.length ? " — " + bad.join("; ") : ""));
   }
 
+  // ---- 25b · the written Draft lines speak to the waiver phase the live API is in (CLAUDE.md N2; 16 Oct 2026). Before
+  // the run every line is a claim with its waiver-run odds and stress-test label; once `game.waivers_processed` is true
+  // the run has happened, so each line says "sign now" for a player the league feed has as status a and "locked until the
+  // next waiver run" for one it has as status l, and none still quotes a run that is over.
+  {
+    const claims = (WEEKLY.draft && WEEKLY.draft.claims) || [];
+    const settled = !!(LIVE.draft && LIVE.draft.game && LIVE.draft.game.waivers_processed);
+    const st = {}; ((LIVE.draft && LIVE.draft.ownership) || []).forEach((o) => { st[o.code] = o.status; });
+    const bad = [];
+    claims.forEach((c) => {
+      const w = String(c.why || ""), s = st[c.in];
+      if (settled) {
+        if (/simulated waiver runs|stress test:/.test(w)) bad.push(c.in + " still quotes the settled run");
+        if (/sign now/.test(w) ? s !== "a" : /locked until the next waiver run/.test(w) ? s !== "l" : true) bad.push(c.in + " (status " + s + ") reads: " + w.slice(0, 90));
+      } else if (!/stress test:/.test(w) || /sign now/.test(w)) bad.push(c.in + " is not written as a claim: " + w.slice(0, 90));
+    });
+    assert("draft-lines-match-the-waiver-phase",
+      claims.length >= 1 && !bad.length,
+      claims.length + " lines, waivers " + (settled ? "settled" : "not yet run") + ": " + claims.map((c) => c.in + " " + (st[c.in] || "?")).join(", ") + (bad.length ? " — " + bad.join("; ") : ""));
+  }
+
   // ---- 26 · and the size of that mismatch reconciles against the live API, not a frozen number
   //
   // This check used to assert "59 of 655" as a constant. The game added a player on

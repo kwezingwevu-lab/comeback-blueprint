@@ -368,6 +368,36 @@ if (INTEL) {
   ok("A7 every start override has p in (0, 1], a Name|TEAM key with a real club, and a why carrying a date — " + startRows.length + " overrides over gameweeks " + Object.keys(INTEL.start || {}).join(","),
     startRows.length > 0 && badStart.length === 0, badStart.map((b) => b.gw + " " + b.key + " " + fmt(b.o)).join(" · "));
 
+  /* E-174 (16 Oct 2026): an override for gameweek N can only rest on reporting published before N's deadline. A source
+     citation reads "(Outlet, 16 Oct)" or "(Outlet, 16 Oct 05:00Z)"; one dated after the deadline means the line was
+     written for a later week and filed under the wrong one (16 Oct reporting landed in the gameweek 6 block and
+     overwrote its Brobbey line). A citation without a time counts from 00:00Z that day. */
+  const MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+  const dlOf = {}; (((repo || got || {}).gw || {}).events || []).forEach((e) => { dlOf[e.id] = Date.parse(e.dl); });
+  const citeRe = new RegExp(",\\s*(\\d{1,2})\\s+(" + MONTH + ")(?:\\s+(\\d{2}):(\\d{2})Z)?\\)", "g");
+  const lateCites = (why, dl) => {
+    const late = []; let m; citeRe.lastIndex = 0;
+    while ((m = citeRe.exec(String(why)))) {
+      const mo = MON[m[2].slice(0, 3).toLowerCase()], y0 = new Date(dl).getUTCFullYear();
+      const at = [y0 - 1, y0, y0 + 1].map((y) => Date.UTC(y, mo, +m[1], m[3] ? +m[3] : 0, m[4] ? +m[4] : 0))
+        .sort((a, b) => Math.abs(a - dl) - Math.abs(b - dl))[0];
+      if (at > dl) late.push(m[0].slice(1, -1).trim());
+    }
+    return late;
+  };
+  const undl = startRows.filter(({ gw }) => !isFinite(dlOf[gw]));
+  const lateStart = startRows.map((r) => ({ r, late: isFinite(dlOf[r.gw]) ? lateCites(r.o && r.o.why, dlOf[r.gw]) : [] })).filter((x) => x.late.length);
+  ok("A7 every start override cites only reporting published before its own gameweek's deadline (E-174) — " + startRows.length + " overrides checked",
+    startRows.length > 0 && undl.length === 0 && lateStart.length === 0,
+    "no deadline for: " + undl.map((u) => u.gw + " " + u.key).join(",") + " · late: " + lateStart.map((x) => "GW" + x.r.gw + " " + x.r.key + " cites " + x.late.join(", ")).join(" · "));
+  {
+    const g = Object.keys(dlOf).map(Number).filter((n) => INTEL.start && INTEL.start[n]).sort((a, b) => a - b)[0];
+    const after = new Date(dlOf[g] + 6 * 86400000), stamp = after.getUTCDate() + " " + ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][after.getUTCMonth()];
+    ok("A7 mutation: an override for GW" + g + " citing (Outlet, " + stamp + "), six days after that deadline, is caught",
+      g != null && lateCites("Out (Some Outlet, " + stamp + ").", dlOf[g]).length === 1 && lateCites("Out (Some Outlet, " + stamp + " 09:00Z).", dlOf[g] + 7 * 86400000).length === 0,
+      "gameweek " + g + ", stamp " + stamp);
+  }
+
   /* market5 anchors: a team code and numbers in range, so a typo cannot ride in as an anchor. */
   const badM5 = Object.keys(INTEL.market5 || {}).filter((t) => !(T.has(t) && Object.keys(INTEL.market5[t]).every((k) => (k === "xg" && INTEL.market5[t].xg > 0 && INTEL.market5[t].xg < 5) || (k === "cs" && INTEL.market5[t].cs > 0 && INTEL.market5[t].cs < 1))));
   ok("A7 every market5 anchor names a real club with xg in (0, 5) and cs in (0, 1)", Object.keys(INTEL.market5 || {}).length > 0 && badM5.length === 0, badM5.join(","));
