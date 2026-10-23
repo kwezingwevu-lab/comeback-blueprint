@@ -54,7 +54,7 @@ let timing = "";
 const choice = pl.managerChoice && T && T.now ? T.now : null;   // E-179/E-181: the plan of record is the manager's; the solver's best is priced beside it
 const wcOf = (r) => ((r && r.weeks) || []).find((x) => x.chip === "wildcard");
 if (choice && T.never) {
-  timing = " The solver's own best under the GW13 rule plays the wildcard in GW" + ((wcOf(choice) || {}).gw || "—") + ": " + f2(choice.total) + " (" + sgn(choice.total - pl.total) + " against your GW" + (wcWeek ? wcWeek.gw : last) + " choice)." +
+  timing = (pl.fixedWeek ? " GW" + pl.fixedWeek.gw + " is the manager's own week (" + pl.fixedWeek.why + "); GW" + (pl.fixedWeek.gw + 1) + " onward is solved from the squad it leaves." : "") + " The solver's own best under the GW13 rule plays the wildcard in GW" + ((wcOf(choice) || {}).gw || "—") + ": " + f2(choice.total) + " (" + sgn(choice.total - pl.total) + " against your GW" + (wcWeek ? wcWeek.gw : last) + " choice)." +
     " Never: " + f2(T.never.total) + " (" + sgn(T.never.total - pl.total) + ")." +
     " The proof's tolerance is about " + f1(tol) + " points.";
 } else if (T && T.later && T.never) {

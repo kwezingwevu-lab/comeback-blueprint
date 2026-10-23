@@ -133,7 +133,7 @@ function main() {
         const l = st.latest, nv = st.never;
         const same = l.ok && l.constructed === true && nv && nv.ok && Array.isArray(l.weeks) && Array.isArray(nv.weeks) && l.weeks.length === nv.weeks.length &&
           l.weeks.slice(0, -1).every((w, i) => JSON.stringify(w.squad) === JSON.stringify(nv.weeks[i].squad) && w.chip === nv.weeks[i].chip);
-        if (same) { timing.latest = Object.assign(slim(l), { constructed: true, from: l.from, reshuffle: l.reshuffle, note: l.note }); timingNote += "; latest wildcard folded (built from never)"; }
+        if (same) { timing.latest = Object.assign(slim(l), { constructed: true, from: l.from, reshuffle: l.reshuffle, note: l.note, fixedWeek: l.fixedWeek || null }); timingNote += "; latest wildcard folded (built from never)"; }
         else timingNote += "; latest wildcard left out (not feasible, or not built from the never plan in this file)";
       }
     } else timingNote = st.hash === nowHash ? "incomplete (needs now, later and never)" : "stale (hash " + st.hash + ")";
@@ -168,7 +168,7 @@ function main() {
   const WC1_GW = 19;
   let choiceNote = "none";
   if (WC1_GW && timing && timing.latest && timing.latest.weeks.some((w) => w.gw === WC1_GW && w.chip === "wildcard")) {
-    plan = Object.assign({}, timing.latest, { obj: timing.never.obj, gap: timing.never.gap, secs: timing.never.secs, status: timing.never.status, detail: plan.detail, params: timing.never.params, managerChoice: "wildcard GW" + WC1_GW });   // the solve time and status are the never solve's, whose plan this is to GW18
+    plan = Object.assign({}, timing.latest, { obj: timing.never.obj, gap: timing.never.gap, secs: timing.never.secs, status: timing.never.status, detail: plan.detail, params: timing.never.params, managerChoice: "wildcard GW" + WC1_GW, fixedWeek: timing.latest.fixedWeek || null });   // the solve time and status are the never solve's, whose plan this is to GW18
     solvedBy = "the manager's choice: wildcard GW" + WC1_GW + " (built from the never plan)";
     choiceNote = "wildcard GW" + WC1_GW + " kept as the plan of record (" + timing.latest.total + " against the solver's " + timing.now.total + ")";
   } else if (WC1_GW) choiceNote = "wildcard GW" + WC1_GW + " asked for but no GW" + WC1_GW + " wildcard plan in the timing file; the solver's plan is kept";

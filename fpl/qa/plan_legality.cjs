@@ -472,6 +472,13 @@ if (!OPT.noGolden && (OPT.golden || isReferencePlan)) {
   if (GOLDEN) acceptance(PF, GOLDEN, M).forEach((c) => ok(c.name, c.ok, c.detail));
 } else console.log("     acceptance against golden.json not run: " + (OPT.noGolden ? "--no-golden" : "this plan was not built from reference/v109/app/solver_out.json (source.out " + (PF.source && PF.source.out) + "); the golden numbers were recorded on the reference data"));
 
+/* ---------------------------------------------------------------- E-186: a week the manager fixed himself */
+const fixedVerdict = (pf) => { const f = pf.plan && pf.plan.fixedWeek, w = pf.plan && pf.plan.weeks[0]; if (!f) return null;
+  const same = (a, b) => JSON.stringify((a || []).slice().sort()) === JSON.stringify((b || []).slice().sort());
+  return { ok: !!w && w.gw === f.gw && same(w.in, f.in) && same(w.out, f.out) && w.hits === f.hits, detail: "fixed GW" + f.gw + " in " + f.in + " out " + f.out + " · plan's week in " + (w && w.in) + " out " + (w && w.out) + " hits " + (w && w.hits) }; };
+{ const v = fixedVerdict(PF); if (v) { ok("the plan's first week is the week the manager fixed (E-186)", v.ok, v.detail);
+    const m = JSON.parse(JSON.stringify(PF)); m.plan.weeks[0].in = [999999]; ok("mutation: a first week other than the fixed one goes red (E-186)", !fixedVerdict(m).ok, fixedVerdict(m).detail); } }
+
 /* ---------------------------------------------------------------- E-181 across the whole file */
 const earlyAnywhere = (pf) => chipsAnywhere(pf).filter((c) => c.gw < RULES.from || c.gw > RULES.last);
 {

@@ -2151,3 +2151,9 @@ CAUSE: the solver chooses the eleven on expected points, and the flag scales Sak
 CAUGHT: 23 Oct 2026, the 390 px screenshot of the Plan tab before shipping.
 RULE: until the eleven is re-picked under rule 3 in the pipeline (weekly.cjs re-ordering the solved eleven with the engine's bestXI, or the export carrying the flag-scaled start probability), the reply names the rule-3 eleven for the gameweek. Open: fix in the next session, with a smoke_wk check that no solved eleven breaks rule 3.
 TEST: none yet (open).
+
+### E-186 · v110 · the plan ignored the manager's last-man-standing league
+CAUSE: the six tracked leagues were fixed on 11 Sep (`LEAGUE_IDS`). Champions League Survivor (id 817455, 26 managers, from GW7) was never read. Its rule, from the manager on 23 Oct 2026: the lowest GW score after hits is eliminated each week. A −8 week is a survival risk the season objective cannot see. On the 23 Oct feeds the −8 plan was 42.8 expected in GW8, about 5.5% to finish last of 26; one free transfer was 49.0, about 2.1% (scratch model: rivals' GW7 squads, standard deviation 13).
+CAUGHT: 23 Oct 2026, the manager's screenshot of his leagues.
+RULE: the manager chose survival first for GW8, with one free transfer (Semenyo out, Mbeumo in). `pipeline/fixed_week.cjs` takes a week the manager fixes: the eleven and armband come from engine.js (C1 rules 2 and 3), the solve runs from the week after, and the result is stitched as never and latest. No change to classic(). On these feeds the result is 729.58 to GW19, against the −8 plan's 727.14 and the solver's 728.59, so survival costs nothing measurable. E-185 does not arise in this squad (no bench player at 0.75 or more behind Saka). Open: the survivor league in the app (its data, elimination replay, weekly risk), to be built before the GW9 refresh.
+TEST: plan_legality "the plan's first week is the week the manager fixed (E-186)" and its mutation.

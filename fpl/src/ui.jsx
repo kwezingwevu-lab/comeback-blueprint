@@ -2121,7 +2121,7 @@ function solvedPlanView(mc, now, setting) {
       const cost = choice.total - pl.total;
       const lwk = wcOf(pl);
       view.choice = {
-        head: "Your chip rules: no chip before GW13, Wildcard 1 in GW" + (lwk || cEnd) + ".",
+        head: "Your chip rules: no chip before GW13, Wildcard 1 in GW" + (lwk || cEnd) + "." + (isO(pl.fixedWeek) ? " GW" + pl.fixedWeek.gw + " is your own survival-first week; the weeks after it are solved from the squad it leaves." : ""),
         text: "Your plan, wildcard GW" + (lwk || cEnd) + ": " + f0(pl.total) + ". The solver's best under the GW13 rule, wildcard GW" + (wcOf(choice) || "—") + ": " + f0(choice.total) +
           ". No wildcard to GW" + cEnd + ": " + f0(T.never.total) + ". " +
           (cost > tol ? "Waiting for GW" + (lwk || cEnd) + " costs about " + f1(cost) + " points to GW" + cEnd + ", more than the tolerance of about " + tol + "."

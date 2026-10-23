@@ -752,3 +752,28 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
   - a free hit in GW8;
   - a chip in GW8 on timing.never.
 - **Open.** E-185: the solved eleven starts Saka (d 50%) over Barry, against C1 rule 3. The reply names the rule-3 eleven.
+
+## 23 Oct 2026, 09:30Z: GW8 survival first (E-186)
+
+- **The manager's choice.** Survival first for GW8, for his last-man-standing league, where the lowest score after hits goes out each week.
+- **GW8.** Semenyo out, Mbeumo in, 1 free transfer, no hit. Captain Haaland, vice Mbeumo. Bank £2.7m.
+- **The plan from GW9.** Re-solved from that squad. Bench Boost GW16, Wildcard GW19. 729.58 to GW19, against the −8 plan's 727.14.
+- **Gate, local.**
+
+  | Suite | Result |
+  |---|---|
+  | plan_legality (shipped) | 63/63 |
+  | plan_legality (reference) | 67/67 |
+  | unit_engine | 275/275 |
+  | components | 329/329 |
+  | smoke | 73/73 |
+  | smoke_wk | 38/38 |
+  | mc_rules | 42/42 |
+  | export_hash | 36/36 |
+  | verify | 34/34 |
+  | buttons | 10/10 |
+  | mc_full | 325/325 |
+  | privacy | 27/27 |
+  | tdz | clean |
+
+  WebKit, iOS and browser.py run on CI.
