@@ -453,6 +453,26 @@ async function main() {
       "transfer plan leaves " + tp.bankAfter + " (recomputed raw " + tpBank + "), written fallback " + fbBank + ", wildcard " + wc.bank + " tenths");
   }
 
+  // ---- 12b · E-185 (23 Oct 2026): C1 rule 3 on the solved first week. A player with P(start) below 0.5 never starts
+  // while a fit player (0.75 or more) of the same position sits on the bench. Probabilities are the engine's own,
+  // flag factor applied (ctx.xp), so Saka (flagged 50%) is 0.47 in the eleven.
+  {
+    const xiW = W1 && Array.isArray(W1.xi) ? W1.xi.map(Number) : [];
+    const benchW = W1 && Array.isArray(W1.bench) ? W1.bench.map(Number) : [];
+    const pOf = (id) => ((ctx.xp && ctx.xp[id]) || {}).pstart;
+    const breaks = [];
+    xiW.forEach((id) => {
+      const pid = pOf(id);
+      if (!(pid < 0.5)) return;
+      const pos = ctx.els[id] && ctx.els[id].element_type;
+      const fit = benchW.filter((b) => ctx.els[b] && ctx.els[b].element_type === pos && pOf(b) >= 0.75);
+      if (fit.length) breaks.push(nm(id) + " (P " + pid.toFixed(2) + ") starts over " + fit.map(nm).join(", "));
+    });
+    assert("first-week-eleven-follows-C1-rule-3-no-sub-half-start-over-a-fit-bench-player-(E-185)",
+      !!W1 && xiW.length === 11 && breaks.length === 0,
+      W1 ? (breaks.length ? "rule 3 breaks: " + breaks.join("; ") : "the GW" + W1.gw + " eleven of " + xiW.length + " keeps rule 3") : "no solved plan");
+  }
+
   // ---- 13 · E-019: the captain is in the XI, on the wildcard path
   // E-114 (v110 D1): the landing shows the solved plan whenever PLAN and PRE share a hash for the next gameweek and its
   // deadline is ahead, and the app's own card whenever that plan is set aside. Both are held. The solved card's captain

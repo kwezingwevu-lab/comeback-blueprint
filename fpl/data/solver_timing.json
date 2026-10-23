@@ -1348,7 +1348,7 @@
  "never": {
   "ok": true,
   "status": "Optimization terminated successfully. (HiGHS Status 7: Optimal)",
-  "secs": 73,
+  "secs": 74.3,
   "gap": 0.0039951371696863875,
   "total": 726.05,
   "obj": 532.76,
@@ -2021,7 +2021,7 @@
    "out": [
     397
    ],
-   "why": "survival first in the last-man-standing league (manager, 23 Oct 2026)",
+   "why": "the best single free transfer on points (the manager's no-hit week); his last-man-standing league eliminates from GW13",
    "hits": 0,
    "bank": 2.7,
    "epNet": 48.97,
@@ -2721,7 +2721,7 @@
    "out": [
     397
    ],
-   "why": "survival first in the last-man-standing league (manager, 23 Oct 2026)",
+   "why": "the best single free transfer on points (the manager's no-hit week); his last-man-standing league eliminates from GW13",
    "hits": 0,
    "bank": 2.7,
    "epNet": 48.97,
@@ -2737,7 +2737,7 @@
   "out": [
    397
   ],
-  "why": "survival first in the last-man-standing league (manager, 23 Oct 2026)",
+  "why": "the best single free transfer on points (the manager's no-hit week); his last-man-standing league eliminates from GW13",
   "hits": 0,
   "bank": 2.7,
   "epNet": 48.97,

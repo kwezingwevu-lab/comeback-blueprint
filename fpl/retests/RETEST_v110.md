@@ -753,9 +753,9 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
   - a chip in GW8 on timing.never.
 - **Open.** E-185: the solved eleven starts Saka (d 50%) over Barry, against C1 rule 3. The reply names the rule-3 eleven.
 
-## 23 Oct 2026, 09:30Z: GW8 survival first (E-186)
+## 23 Oct 2026, 09:30Z: GW8, one free transfer on points (E-186)
 
-- **The manager's choice.** Survival first for GW8, for his last-man-standing league, where the lowest score after hits goes out each week.
+- **The manager's choice.** One free transfer for GW8. His last-man-standing league eliminates from GW13, so no survival argument applies this week; the move is the best single free transfer on points.
 - **GW8.** Semenyo out, Mbeumo in, 1 free transfer, no hit. Captain Haaland, vice Mbeumo. Bank £2.7m.
 - **The plan from GW9.** Re-solved from that squad. Bench Boost GW16, Wildcard GW19. 729.58 to GW19, against the −8 plan's 727.14.
 - **Gate, local.**
@@ -777,3 +777,27 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
   | tdz | clean |
 
   WebKit, iOS and browser.py run on CI.
+
+## 23 Oct 2026, 15:05Z: a new flag after the snapshot; the app not republished (E-187)
+
+- **What the live check found.** The plan's feeds are from 05:38Z. Since then the official feed has changed 24 flags. Two are on the GW8 fifteen:
+  - Saka d 50% → i 0% ("Thigh injury – Unknown return date");
+  - Calvert-Lewin a → d 50% ("Foot injury", added 13:00Z).
+  - Janelt (s, until 31 Oct) and Brobbey (d 75%) are unchanged.
+- **The move, re-checked on those flags.** Every legal single transfer was ranked on the GW8–19 expected-points sum, with Saka's GW8 at 0 and Calvert-Lewin's halved.
+  - Semenyo to Mbeumo leads with +42.8. The next is van Ewijk to Calafiori, +30.5.
+  - No Saka sale makes the top six.
+  - The move stands.
+- **The eleven, re-picked** by engine.js bestXI and captainPick on a context patched with the live flags.
+  - Starting eleven, 4-3-3:
+    - GK: Verbruggen
+    - DEF: De Cuyper, Guéhi, Tarkowski, Diop
+    - MID: Mbeumo, Rogers, Gomez
+    - FWD: Haaland, Calvert-Lewin, Brobbey
+  - Bench: Kinsky; van Ewijk, Janelt, Saka.
+  - Captain Haaland, vice Mbeumo.
+  - C1 rule 3 holds, because the bench has no forward at P(start) 0.75 or more.
+  - The published app still starts Saka. The reply carries this eleven.
+- **Draft, from the Draft API at 15:05Z.** Murillo and Tielemans are status a, unowned, and waivers have been processed. Affengruber and King are still on the roster. Draft flags: Janelt s, Isidor d 50%. Separately, `state/kwezi.json` draft.roster dates from 26 Sep and differs from the live roster. That is a follow-up.
+- **Why the app was not republished.** smoke_wk check 18 is red on the Calvert-Lewin flag, correctly. Turning it green needs a fresh pull, and a fresh pull forces the full re-solve chain, which runs past the 16:45Z hard stop. The one D2 exception (E-184) was already used today. CI runs the same live check, so the commit is held locally and goes out with the 29 Oct refresh.
+
