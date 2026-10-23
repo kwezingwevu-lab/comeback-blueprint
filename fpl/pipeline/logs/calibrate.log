@@ -1,0 +1,6 @@
+backtest GW3,4,5,6,7 in 0.6s · points given a start: ρ 0.166 v naive 0.079 (n 1100) · minutes Brier 0.137 v naive 0.160 (n 2014) · team goals log-lik -152.5 v naive -154.3 (n 50)
+  pos 1: n 100 pred 3.28 act 3.64 ratio 1.111 [0.976, 1.249] ρ 0.210 v 0.026 MAE 2.20 v 2.59 → factor 1
+  pos 2: n 423 pred 3.38 act 3.61 ratio 1.069 [0.994, 1.147] ρ 0.181 v 0.061 MAE 2.50 v 2.90 → factor 1
+  pos 3: n 475 pred 3.23 act 3.59 ratio 1.113 [1.046, 1.182] ρ 0.165 v 0.025 MAE 2.09 v 2.73 → factor 1.057
+  pos 4: n 102 pred 3.81 act 4.15 ratio 1.087 [0.950, 1.249] ρ 0.149 v 0.159 MAE 2.69 v 2.99 → factor 1
+  minutes buckets: 0-0.2: 595 pred 9% act 13% | 0.2-0.4: 162 pred 29% act 24% | 0.4-0.6: 227 pred 50% act 44% | 0.6-0.8: 212 pred 71% act 69% | 0.8-1: 818 pred 91% act 89%

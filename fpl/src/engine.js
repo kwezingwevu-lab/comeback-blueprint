@@ -336,6 +336,10 @@ var MINUTES_CHALLENGER = "The minutes logistic";
 var MINUTES_INCUMBENT = "the Laplace rate";
 var CHIP_NAMES = ["WC", "BB", "TC", "FH"];
 var CHIP_SETS = [{ set: 1, from: 1, to: 19 }, { set: 2, from: 20, to: 38 }];
+/* The manager's own chip rules, kept apart from the game's windows above (which mc_rules holds to the game): no chip of
+   any kind before GW13 (22 Oct 2026, ERRORS.md E-181: he needs them for a last-man-standing league too) and Wildcard 1
+   in GW19 (20 Oct 2026, E-179). chipSolver never offers a set-1 chip outside them. */
+var MANAGER_CHIPS = { chipsFrom: 13, wc1Gw: 19 };
 var CHIP_ALIAS = { wildcard: "WC", bboost: "BB", "3xc": "TC", freehit: "FH", wc: "WC", bb: "BB", tc: "TC", fh: "FH" };
 var CHIP_PRICE_WINDOWS = 4;
 var CHIP_MAX_WINDOWS = 2;
@@ -4166,6 +4170,7 @@ function chipSolver(ctx, opts) {
   try {
     if (!okCtx(ctx)) { res.note = "no usable context"; return res; }
     var o = isObj(opts) ? opts : {};
+    var gameOnly = o.gameOnly === true;   // the game's windows alone, without the manager's rules (the synthetic calendars' tests)
     res.nextEvent = ctx.nextEvent;
     var w = chipWindows(ctx.live);
     res.doubles = w.doubles.map(function (d) { return { event: d.event, n: d.n, teams: d.teams.slice() }; });
@@ -4190,14 +4195,15 @@ function chipSolver(ctx, opts) {
         var events = [];
         if (chip === "BB" || chip === "TC") events = res.doubles.map(function (d) { return d.event; });
         else if (chip === "FH") events = res.blanks.map(function (b) { return b.event; });
-        else events = [ctx.nextEvent];
+        else events = [S.set === 1 && !gameOnly ? MANAGER_CHIPS.wc1Gw : ctx.nextEvent];
+        var lo = S.set === 1 && !gameOnly ? Math.max(S.from, MANAGER_CHIPS.chipsFrom) : S.from;   // E-181: the manager's GW13 floor binds set 1
         var inSet = [];
         for (var ei = 0; ei < events.length; ei++) {
           var ev = intOf(events[ei], 0);
-          if (ev >= S.from && ev <= S.to && ev >= ctx.nextEvent) inSet.push(ev);
+          if (ev >= lo && ev <= S.to && ev >= ctx.nextEvent) inSet.push(ev);
         }
         if (!inSet.length) {
-          res.reasons.push(chip + " has no window inside set " + S.set + " (GW" + S.from + " to GW" + S.to + ") that is still ahead of GW" + ctx.nextEvent);
+          res.reasons.push(chip + " has no window inside set " + S.set + " (GW" + lo + " to GW" + S.to + (lo > S.from ? ", your rule: no chip before GW" + lo : "") + ") that is still ahead of GW" + ctx.nextEvent);
           continue;
         }
         var priced = [];
@@ -5636,7 +5642,7 @@ if (typeof module !== "undefined" && module.exports) {
     dcMatches: dcMatches, dixonColes: dixonColes, dcLambdas: dcLambdas, dcPcs: dcPcs,
     cleanSheetCalibration: cleanSheetCalibration,
     logGamma: logGamma, nbDispersion: nbDispersion, pointsPmf: pointsPmf, crpsDiscrete: crpsDiscrete, logScoreDiscrete: logScoreDiscrete,
-    MINUTES_FEATURES: MINUTES_FEATURES, CHIP_SETS: CHIP_SETS, CHIP_NAMES: CHIP_NAMES, PROMOTION_HOLDOUT_WEEKS: PROMOTION_HOLDOUT_WEEKS,
+    MINUTES_FEATURES: MINUTES_FEATURES, CHIP_SETS: CHIP_SETS, MANAGER_CHIPS: MANAGER_CHIPS, CHIP_NAMES: CHIP_NAMES, PROMOTION_HOLDOUT_WEEKS: PROMOTION_HOLDOUT_WEEKS,
     TOURNAMENT_PROMOTE_AT: TOURNAMENT_PROMOTE_AT, MC_MIN_GWS_FOR_PWIN: MC_MIN_GWS_FOR_PWIN,
     WINNABLE_MAX_SIZE: WINNABLE_MAX_SIZE, WINPROB_TOP_N: WINPROB_TOP_N, AUTOSUB_MAX_BLANKS: AUTOSUB_MAX_BLANKS,
     DC_DECAY_PER_DAY: DC_DECAY_PER_DAY, PTS_DIST_MIN: PTS_DIST_MIN, PTS_DIST_MAX: PTS_DIST_MAX, SHRINK_K: SHRINK_K

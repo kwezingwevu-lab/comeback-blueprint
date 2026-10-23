@@ -1107,7 +1107,14 @@ async function main() {
         await lc.close();
       }
       const a = lockShots.pure, b = lockShots.locked, c = lockShots.app;
-      H.assert("locking-the-premiums-changes-the-landing-fifteen-and-keeps-a-captain",
+      // E-180: the lock is a wildcard setting. When the written plan opens with a transfer week the app's own card has no
+      // fifteen to move and the solved card stays (it was not solved on the lock); the twin holds that instead.
+      let WK = null;
+      try { WK = (new Function(require("fs").readFileSync(require("path").join(__dirname, "..", "data", "weekly.js"), "utf8") + "\n;return WEEKLY;"))(); } catch (e) { WK = null; }
+      if (WK && WK.classic && WK.classic.plan !== "wildcard") H.assert("locking-the-premiums-leaves-a-transfer-week-plan-on-the-landing-with-its-armband-(E-180)",
+        a.plan === "solved" && b.plan === "solved" && a.captain === b.captain && a.vice === b.vice && a.captain !== "" && b.vice !== "" && a.words < 110 && b.words < 110 && c.plan === "app" && c.captain !== "" && c.words < 110,
+        "unlocked (" + a.plan + "): captain " + a.captain + ", vice " + a.vice + ", " + a.words + " words · locked (" + b.plan + "): captain " + b.captain + ", vice " + b.vice + " · the app's own card (" + c.plan + "): captain " + c.captain);
+      else H.assert("locking-the-premiums-changes-the-landing-fifteen-and-keeps-a-captain",
         !!STATE_PRICE && c.plan === "app" && b.plan === "app" && c.fifteen !== "" && b.fifteen !== "" && c.fifteen !== b.fifteen && a.fifteen !== b.fifteen &&
           a.captain !== "" && a.captain !== "\u2014" && b.captain !== "" && b.captain !== "\u2014" && c.captain !== "" && c.captain !== "\u2014" &&
           b.vice !== "" && b.vice !== "\u2014" && a.words < 110 && b.words < 110 && c.words < 110,

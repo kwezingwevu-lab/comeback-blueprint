@@ -10,7 +10,7 @@
 "use strict";
 
 const INTEL = {
-  asOf: "2026-10-16T07:50:00Z",
+  asOf: "2026-10-23T05:40:00Z",
   /* Gameweek 5 market numbers (allaboutfpl / Fantasy Football Scout clean-sheet odds and RotoWire prices, 17 Sep). Kept as calibration anchors now the week is played. */
   market5: { MCI: { xg: 2.36, cs: 0.48 }, NEW: { xg: 2.01, cs: 0.35 }, NFO: { xg: 1.88, cs: 0.38 }, LIV: { xg: 1.84 }, ARS: { xg: 1.80, cs: 0.34 }, EVE: { xg: 1.80, cs: 0.34 }, MUN: { xg: 1.80 }, CHE: { xg: 1.77 }, LEE: { xg: 1.77, cs: 0.33 }, TOT: { cs: 0.31 } },
   /* Average bookmaker match prices (home, draw, away), OddsPortal, read 26 September. Every fixture
@@ -72,6 +72,7 @@ const INTEL = {
     },
   },
   notes: [
+    "Read 23 Oct 2026 about 05:40Z for gameweek 8 (deadline Fri 23 Oct 17:30Z, 19:30 SAST). Saka (ARS) came off inside ten minutes at Bayern on 21 Oct with a thigh problem (RotoWire, 21 Oct); the official feed now has him d 50% 'Thigh injury', so the feed's flag stands and no override is added. Semenyo (MCI) out about eight weeks with the knee, to mid-December (Maresca via Fantasy Football Scout, 22 Oct 13:00Z); the feed has him i 0%. Haaland 'the only one 100% available' (Maresca, same page). Murillo, Sels and Gibbs-White fit (Glasner via Fantasy Football Scout, 21 Oct 14:15Z). Brobbey stays at the feed's 75%. Arteta had not spoken when read; re-check Saka after his presser.",
     "Re-read 16 Oct 2026 about 07:50Z before Friday's pressers: Isidor a major doubt, Meunier out, Brobbey ready but unproven (Sunderland Echo, 16 Oct 05:00Z); Mateta 'some chance' (cpfc.co.uk, 15 Oct 19:39Z); Kesler-Hayden available (Coventry Live, 16 Oct 04:00Z); Szoboszlai and Gakpo still doubts (Liverpool.com, 16 Oct 06:03Z, the feed's flags kept); Reece James a doubt (the feed's 75% kept). Manchester City, Chelsea, United, Arsenal and Everton speak later on Friday; the routine re-reads after them.",
     "Read 15 Oct 2026 about 18:50Z for gameweek 7 (deadline Sat 17 Oct 10:00Z, 12:00 SAST), through the Parallel Search and Exa connectors. No injury reported against Raya, Gabriel, Saka, Konsa or Havertz (Arsenal; Saka was ill and benched against Lille, then scored and assisted: Arteta via Hayters, 13 Oct; the Evening Standard expects him to start, 15 Oct), Haaland (two goals against PSG; 'Man City are not believed to have any injury concerns', Evening Standard, 14 Oct), Palmer and João Pedro (played against Bournemouth, Evening Standard, 12 Oct), Tarkowski, Barry, Diop, Janelt, Groß, Hall, Tavernier, Silva, Thomas, van Ewijk, Leno, Affengruber, Gonzalo, Calvert-Lewin, Stach, Trafford, Tzolakis or Kinsky. Out or doubtful elsewhere: Isak, Gakpo and Szoboszlai doubts and Gravenberch suspended (Iraola, liverpoolfc.com, 15 Oct); Saliba, Hincapié and Tzolis out (Evening Standard, 15 Oct); Sesko doubtful and Dorgu out (Yorkshire Evening Post, 15 Oct); Mateta not yet available (Sage via Fantasy Football Scout, 14 Oct); Ruggeri out more than a month (Emery, Birmingham Live, 13 Oct); Milenković and Igor Jesus out (Nottingham Post, 13 Oct); Kulusevski and Porro doubtful (Evening Standard, 15 Oct).",
     "Still to come before the gameweek 7 deadline: Maresca on Friday 16 Oct at 12:30Z (mancity.com, 12 Oct); Moyes and Carrick on Friday, times not published (everton.news and United In Focus, read 15 Oct); the other clubs had not published times when read. Re-read the flags after them; Shaw, Mainoo, Szoboszlai, Mykolenko and Brobbey are the overrides they decide.",
@@ -90,6 +91,7 @@ const INTEL = {
     "There are two players called Hughes. He owns id 212, the Crystal Palace midfielder, who is fit and unflagged. The one carrying 'Groin injury - Unknown return date' is id 278, a Hull defender. Match on id, never on the name. Read from the feed pulled 26 Sep and unchanged on 2 Oct.",
   ],
   sources: [
+    "Fantasy Football Scout, 21 Oct 14:15Z and 22 Oct 13:00Z (gameweek 8 team news: Glasner, Maresca); RotoWire (Adam Zdroik), 21 Oct (Saka); official Fantasy Premier League feed read 23 Oct 05:35Z",
     "Sunderland Echo, 16 Oct 05:00Z (Le Bris on Isidor, Meunier, Brobbey); cpfc.co.uk, 15 Oct 19:39Z (Mateta); Coventry Live, 16 Oct 04:00Z (Kesler-Hayden); Liverpool.com, 16 Oct 06:03Z",
     "Official Fantasy Premier League and FPL Draft feeds, pulled 16 Oct 09:20Z",
     "Betexplorer Premier League fixtures (average of 17 bookmakers for gameweek 7, 12 for gameweek 8), read 15 Oct 18:47Z through the Nimble connector; OddsPortal's league page read the same minute as the cross-check",

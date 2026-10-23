@@ -712,3 +712,43 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
 - Plan: Wildcard GW7, captain Haaland, vice Saka, Bench Boost GW8, Triple Captain GW11, £0.6m in the bank. Buys: Janelt, Van Hecke, De Cuyper, Groß, Barry, Leno, Stach, Trafford, Mbeumo, Silva, Gonzalo, Affengruber; Gabriel, Saka and Haaland stay.
 - Draft: waivers settled at 10:00Z. Neither claim landed (Verbruggen went to a rival; Tielemans is unowned, so the Buendía claim was evidently not lodged or did not process). After waivers: Tielemans for Buendía can be signed instantly (+2.3 to GW20); Murillo for Affengruber (+10.5) is locked until the GW8 waivers; Mainoo is held back as flagged. Isidor is on the manager's own roster (E-173 corrects this session's chat message saying otherwise).
 - Gate, replayed locally in gate.yml's order: 34 of 37 steps green (components 329/329, smoke 73/73, smoke_wk 37/37, verify 34/34, unit_engine 274/274, plan_legality 50/50 and 59/59, buttons 10/10, mc_full 3000 at 323/323, mc_all 1,000,000 iterations, 136 invariants, 0 failures); webkit, ios and browser.py cannot run in this container (E-170) and go to CI.
+
+## 23 Oct 2026, gameweek 8 (feeds 05:38Z, desk research 05:40Z, re-solved 05:51Z; built on the manager's rules of 20 and 22 Oct)
+
+- **Rules applied.** No chip before GW13 (E-181), Wildcard 1 in GW19 (E-179). The one 48-hour exception is used for the Saka flag (E-184).
+- **Data.** Input hash cd96607c93c3239e. `state/kwezi.json` advanced to the GW7 picks (E-182): five GW7 transfers, bank £2.3m, 1 free transfer.
+- **Plan of record.** Classic GW8: sell Brobbey, Verbruggen and Semenyo; buy Raya, Barry and Mbeumo (2 hits, −8). Captain Haaland, vice Mbeumo. Bench Boost GW13, Wildcard GW19, free hit held (best GW15). Worth 727.14 to GW19.
+- **Beside it.**
+  - The solver's own best under the GW13 rule: 728.59, wildcard GW13. That is +1.45, inside the 2.5-point tolerance.
+  - Never: 723.76.
+  - The "Every week equal" lens: 49.0 in GW8 with one free transfer (Semenyo to Mbeumo). It plays the wildcard in GW13, so it is against the manager's choice, and the app and Part M now say so instead of calling it free.
+- **Gate, local.**
+
+  | Suite | Result |
+  |---|---|
+  | tdz | clean |
+  | plan_legality (shipped) | 61/61 |
+  | plan_legality (reference) | 67/67 |
+  | unit_engine | 275/275 |
+  | components | 329/329 |
+  | smoke | 73/73 |
+  | smoke_wk | 38/38 |
+  | mc_rules | 42/42 |
+  | bake | 46/46 |
+  | export_hash | 36/36 |
+  | verify | 34/34 |
+  | realistic | 8/8 |
+  | buttons | 10/10 (170 · 0 · 0 · 0) |
+  | mc_full | 3000 iterations, 325/325 |
+  | mc_all | 1M iterations, 136 invariants, 0 failures |
+
+  WebKit, iOS and browser.py run on CI only (E-170).
+- **Mutations proved red.**
+  - an undeclared one-byte edit in classic();
+  - the E-181 gate removed;
+  - a bogus delta pair;
+  - a Bench Boost in GW8;
+  - a chip in GW20 (E-183);
+  - a free hit in GW8;
+  - a chip in GW8 on timing.never.
+- **Open.** E-185: the solved eleven starts Saka (d 50%) over Barry, against C1 rule 3. The reply names the rule-3 eleven.

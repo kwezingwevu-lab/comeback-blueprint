@@ -84,8 +84,14 @@ const fifteen = w0.squad.slice();
 const cost = E.costedSquad(fifteen, CTX).reduce((s, x) => s + (x && typeof x === "object" ? x.purchase : Number(CTX.els[x].now_cost)), 0);   // kept players at their selling price, as the budget counts them (E-154)
 const L15 = E.legal15(E.costedSquad(fifteen, CTX), CTX.els, CTX.budget);   // kept players at their selling price (E-150, E-154)
 if (!L15.ok) conflicts.push("the planned fifteen is not legal15 under the app's engine: " + L15.reasons.join("; "));
-const flagged = fifteen.filter((id) => (CTX.flags[id] || {}).flagged);
-if (flagged.length) conflicts.push("the planned fifteen carries flagged players: " + flagged.map((id) => nm(id) + " " + CTX.els[id].status + " " + CTX.els[id].chance_of_playing_next_round + "%").join(", "));
+// E-180: the wildcard rules (every one of the fifteen fit) bind only a wildcard week. In a transfer week the players
+// kept are the manager's own and may sit flagged on the bench; what must be fit is what the week asks him to do: the
+// buys, the captain and the vice. A flagged player kept is named in the notes, not refused.
+const isFlag = (id) => (CTX.flags[id] || {}).flagged, flagTxt = (id) => nm(id) + " " + CTX.els[id].status + " " + (CTX.flags[id] || {}).chance + "%";
+const mustBeFit = kind === "wildcard" ? fifteen : [...new Set((w0.in || []).concat([w0.cap, w0.vice]))];
+const flagged = mustBeFit.filter(isFlag);
+if (flagged.length) conflicts.push((kind === "wildcard" ? "the planned fifteen carries flagged players: " : "the week's buys or armband carry flagged players: ") + flagged.map(flagTxt).join(", "));
+const keptFlagged = kind === "wildcard" ? [] : fifteen.filter((id) => isFlag(id) && mustBeFit.indexOf(id) < 0);
 const appXI = E.bestXI(fifteen, CTX);
 [["captain", w0.cap], ["vice", w0.vice]].forEach(([k, id]) => { if (appXI.ids.indexOf(id) < 0) conflicts.push("the plan's " + k + " " + nm(id) + " is not in the app engine's eleven of the fifteen (" + appXI.formation + ")"); });
 const locksWc = fifteen.filter((id) => E.convergenceRisk(id, CTX).risk);
@@ -119,11 +125,14 @@ function fallbackBreaks(moves, cap, vice) {
   if (cap === vice) why.push("captain and vice are the same player");
   return why;
 }
-const nw0 = NW ? NW.weeks[0] : null;
+// E-180: when the plan of record opens with a transfer week (the manager's GW19 wildcard), there is no chip to fall back
+// from: the fallback is the plan's own week, held to the same hard rules.
+const nw0 = kind === "wildcard" ? (NW ? NW.weeks[0] : null) : w0;
 let fbMoves = nw0 ? pairUp(nw0.out || [], nw0.in || []) : [], fbCap = nw0 ? nw0.cap : null, fbVice = nw0 ? nw0.vice : null, fbSource, fbWhy = [];
 if (nw0 && fbMoves.length !== (nw0.in || []).length) fbWhy.push("its transfers do not pair position for position");
 if (nw0) fbWhy = fbWhy.concat(fallbackBreaks(fbMoves, fbCap, fbVice));
-if (nw0 && !fbWhy.length) fbSource = "the optimiser's no-wildcard scenario, week one (data/plan.json noWildcard, " + f2(NW.total) + " Classic expected points to GW" + cEnd + ")";
+if (nw0 && !fbWhy.length && kind !== "wildcard") fbSource = "the plan of record's own GW" + next + " week (no chip is played in it)";
+else if (nw0 && !fbWhy.length) fbSource = "the optimiser's no-wildcard scenario, week one (data/plan.json noWildcard, " + f2(NW.total) + " Classic expected points to GW" + cEnd + ")";
 else {
   const tp = E.transferProtocol(null, CTX);
   fbMoves = tp.moves.map((m) => ({ out: m.out, in: m.in }));
@@ -143,6 +152,8 @@ const LT = T.latest && T.latest.ok && T.latest.constructed === true ? T.latest :
 const latestWc = wcWeek(LT);
 const fhBest = (PLAN.freeHit || []).filter((f) => f.free && f.affordable).sort((a, b) => b.gain - a.gain)[0] || null;
 const buys = w0.in || [], sells = w0.out || [];
+const choice = PLAN.plan.managerChoice || null;
+const RULE_NOTE = "No chip before GW13 (the manager's rule of 22 Oct 2026: chips are kept for his last-man-standing league too) and Wildcard 1 in GW19 (his choice of 20 Oct 2026).";
 
 /* ─────────────── Draft ─────────────── */
 const sheet = AN.buildClaimSheet(M, MC, PLAN.draft.pairs, { mc: true, fitOnly: true });   // no flagged player lodged (CLAUDE.md D2)
@@ -180,7 +191,7 @@ sheet.sheet.forEach((q) => {
 });
 // CLAUDE.md B3: wildcard picks have three starts of the last three, P(start) at least 0.75 and status a. The
 // optimiser prices minutes through P(start) instead of a hard floor, so a buy under the floor is reported by name.
-const b3 = buys.filter((id) => { const gs = CTX.gwStats[id] || {}; const e = CTX.els[id]; return !(gs.starts_last3 >= 3) || !(e && e.status === "a") || !((CTX.xp[id] || {}).pstart >= 0.75); })
+const b3 = kind !== "wildcard" ? [] : buys.filter((id) => { const gs = CTX.gwStats[id] || {}; const e = CTX.els[id]; return !(gs.starts_last3 >= 3) || !(e && e.status === "a") || !((CTX.xp[id] || {}).pstart >= 0.75); })
   .map((id) => nm(id) + " (" + ((CTX.gwStats[id] || {}).starts_last3) + "/3 starts, P(start) " + f2((CTX.xp[id] || {}).pstart || 0) + ", " + (CTX.els[id] || {}).status + ")");
 
 /* ─────────────── the record of what this replaces ─────────────── */
@@ -236,14 +247,21 @@ L("      moves: " + J(fbMoves).replace(/"(\w+)":/g, "$1: ").replace(/,(?=[a-z{])
 L("      captain: " + fbCap + ", vice: " + fbVice + "                            // " + nm(fbCap) + ", " + nm(fbVice));
 L("    },");
 L("    chip: " + J(w0.chip || null) + ",");
+L("    // The week's own ledger, replayed from the rules (data/plan.json replay), never the solver's variables (E-180).");
+L("    transfers: " + J(pairUp(sells, buys)).replace(/"(\w+)":/g, "$1: ").replace(/,(?=[a-z{])/g, ", ") + ",");
+L("    hits: " + (R0 ? R0.hitCount : w0.hits || 0) + ", ft_before: " + (R0 ? R0.ftBefore : "null") + ", ft_after: " + (R0 ? R0.ftAfter : "null") + ", bank_after: " + (R0 ? Math.round(R0.bank * 10) : "null") + ",");
+L("    manager_choice: " + J(choice) + ",");
 L("    notes: " + JSON.stringify([
-  "The plan is the optimiser's (pipeline/solve.py, HiGHS), proved within " + f2(100 * PLAN.plan.gap) + "% of the best possible: " + f2(PLAN.plan.total) + " Classic expected points from GW" + next + " to GW" + cEnd + ", " + W.reduce((s, w) => s + (w.hits || 0), 0) + " hits.",
+  (choice ? "The plan of record is the manager's choice (" + choice + "): the optimiser's no-wildcard plan (pipeline/solve.py, HiGHS), proved within " + f2(100 * PLAN.plan.gap) + "% of the best plan without a wildcard, with the fifteen rebuilt in GW19: " : "The plan is the optimiser's (pipeline/solve.py, HiGHS), proved within " + f2(100 * PLAN.plan.gap) + "% of the best possible: ") + f2(PLAN.plan.total) + " Classic expected points from GW" + next + " to GW" + cEnd + ", " + W.reduce((s, w) => s + (w.hits || 0), 0) + " hits.",
   "Chips in the plan: " + chipWeeks.map((c) => c.chip + " GW" + c.gw + (c.chip === "TC" ? " on " + nm(c.captain) : "")).join(", ") + (fhBest ? "; the best free-hit week is GW" + fhBest.gw + " at +" + f2(fhBest.gain) + ", not taken." : "."),
   "Free transfers come from the replayed ledger (data/plan.json replay), never the solver's own variables: " + (R0 ? R0.ftBefore + " into GW" + next + ", " + R0.ftAfter + " after it" + (w0.chip === "wildcard" ? ", because a wildcard week keeps the count." : ".") : "no replay."),
+  RULE_NOTE,
+  keptFlagged.length ? "Kept but flagged, so not in the eleven unless cleared: " + keptFlagged.map(flagTxt).join(", ") + "." : "No flagged player is kept outside the eleven.",
   locks.length ? locks.map(nm).join(", ") + (locks.length === 1 ? " is" : " are") + " at or over the 60% rival-ownership gate and kept on purpose; the rule-pure search on the Plan tab prices the difference." : "No player in the fifteen is over the rival-ownership gate."
 ], null, 2).split("\n").join("\n    ") + ",");
 L("    why: " + JSON.stringify([
-  "Timing (data/plan.json timing): wildcard now " + f2(T.now ? T.now.total : PLAN.plan.total) + (T.later ? ", later (GW" + laterWc + ") " + f2(T.later.total) : "") + (T.never ? ", never " + f2(T.never.total) : "") + " Classic expected points to GW" + cEnd + ".",
+  choice && T.now ? "The cost of the manager's rules: the solver's own best plan under the GW13 rule plays the wildcard in GW" + wcWeek(T.now) + " for " + f2(T.now.total) + " Classic expected points to GW" + cEnd + "; the plan of record (wildcard GW19) is " + f2(PLAN.plan.total) + ", " + f2(T.now.total - PLAN.plan.total) + " less." : "No manager's choice is applied: the plan is the solver's own.",
+  "Timing (data/plan.json timing): wildcard " + (choice ? "at the solver's week (GW" + wcWeek(T.now) + ") " : "now ") + f2(T.now ? T.now.total : PLAN.plan.total) + (T.later ? ", later (GW" + laterWc + ") " + f2(T.later.total) : "") + (T.never ? ", never " + f2(T.never.total) : "") + " Classic expected points to GW" + cEnd + ".",
   LT ? "The wildcard as late as the rules allow, GW" + latestWc + " (the last deadline before set one expires): the no-wildcard plan to the week before, then the fifteen rebuilt for that week" + (LT.reshuffle ? " (" + LT.reshuffle.changes + " changes, " + f2(LT.reshuffle.gain) + " that week)" : "") + ", worth " + f2(LT.total) + " Classic expected points, which is " + f2(PLAN.plan.total - LT.total) + " below the plan, so waiting to the end costs at most that plus the proof tolerance. It is a plan built from a proven one and replayed against the rules, and a floor, not a proved best. Points are counted only to GW" + cEnd + ", so a wildcard played in the last week is credited with that week alone and none after it: the cost is what waiting gives up, not the whole comparison." : "The wildcard as late as the rules allow was not built for this data.",
   (function () {
     // Two solves bound the no-wildcard problem (noWildcard, and the timing file's "never"); quote the better one, so the
@@ -278,6 +296,7 @@ L("");
 L("  chips: {");
 L("    set1_expires_gw: " + MC.rules.chipStop + ",");
 L("    planned: " + J(chipWeeks.map((c) => ({ set: c.set, chip: c.chip, gw: c.gw }))).replace(/"(\w+)":/g, "$1: ").replace(/,(?=[a-z])/g, ", ") + ",");
+L("    rule: " + J(RULE_NOTE) + ", chips_from_gw: 13, wc1_gw: 19,");
 L("    note: " + J("Chips from data/plan.json: " + chipWeeks.map((c) => c.chip + " GW" + c.gw).join(", ") + "." + (fhBest ? " The free hit is held; its best week is GW" + fhBest.gw + "." : "")));
 L("  },");
 L("");
@@ -294,7 +313,7 @@ const text = lines.join("\n") + "\n";
 const back = (new Function(text + "\n;return WEEKLY;"))();
 if (back.hash !== PLAN.hash || back.classic.wildcard15.length !== 15 || back.draft.claims.length !== claims.length) refuse("the written block does not read back", 5);
 
-console.log("weekly.cjs · v" + OPT.version + " GW" + next + " · plan " + PLAN.hash + " · " + kind + " · captain " + nm(w0.cap) + ", vice " + nm(w0.vice) +
+console.log("weekly.cjs · v" + OPT.version + " GW" + next + " · plan " + PLAN.hash + " · " + kind + (choice ? " (" + choice + ")" : "") + (R0 ? " · " + buys.length + " transfer(s), " + R0.hitCount + " hit(s), FT " + R0.ftBefore + "→" + R0.ftAfter + ", bank " + R0.bank : "") + " · captain " + nm(w0.cap) + ", vice " + nm(w0.vice) +
   " · chips " + chipWeeks.map((c) => c.chip + " GW" + c.gw).join(", ") + " · locks " + (locks.map(nm).join(", ") || "none") + " · cost " + money(cost) + " of " + money(CTX.budget) +
   " · fallback " + fbMoves.map((m) => nm(m.out) + "→" + nm(m.in)).join(", ") + " (captain " + nm(fbCap) + ", from " + (fbSource.indexOf("transferProtocol") >= 0 ? "the app's protocol" : "the optimiser") + ")" +
   " · Draft " + claims.length + " claims (" + sheet.strategy + "), mean " + (sheet.meanValue !== undefined ? f1(sheet.meanValue) : "-") + " p10 " + (sheet.p10 !== undefined ? f1(sheet.p10) : "-") + " p90 " + (sheet.p90 !== undefined ? f1(sheet.p90) : "-") + ", stress " + f1(sheet.valueStress) + ", all first " + f1(sheet.valueAll) + ", now " + f1(sheet.valueNow));
@@ -305,6 +324,7 @@ if (notes5.length) console.log("note: src/engine.js draftEV (five gameweeks) sco
 // On the wildcard every place is re-picked, so a protected player the optimiser lets go is reported, not refused.
 const konsa = sells.filter((id) => (CTX.gwStats[id] || {}).konsa === true);
 if (konsa.length) console.log("note: the wildcard lets go of " + konsa.map(nm).join(", ") + ", whom the Konsa rule protects from a weekly sale (started the last match after a spell out)");
+if (keptFlagged.length) console.log("note: kept but flagged (bench or held, legal in a transfer week): " + keptFlagged.map(flagTxt).join(", "));
 if (b3.length) console.log("note: wildcard buys under CLAUDE.md B3's floor (three starts of three, P(start) 0.75, status a): " + b3.join(", "));
 if (conflicts.length) { console.log("CONFLICTS with the app's rules (" + conflicts.length + "):"); conflicts.forEach((c) => console.log("  - " + c)); }
 if (OPT.dry) { console.log("--dry-run: nothing written"); process.stdout.write(text.slice(0, 0)); }

@@ -114,6 +114,7 @@ function main() {
     const sl = readJson(o.long);
     if (sl.hash !== nowHash) longNote = "stale (hash " + sl.hash + ")";
     else if (!(sl.plan && sl.plan.ok)) longNote = "no feasible plan";
+    else if (JSON.stringify(sl.plan.params || null) !== JSON.stringify(so.plan.params || null)) longNote = "other params (a rule changed since; E-181)";
     else if ((sl.plan.obj || 0) > (plan.obj || 0)) { plan = slim(sl.plan); solvedBy = show(o.long) + " plan"; longNote = "kept (objective " + sl.plan.obj + ", gap " + sl.plan.gap + ")"; }
     else longNote = "not better (objective " + sl.plan.obj + " vs " + plan.obj + ")";
     if (sl.hash === nowHash && sl.plan && sl.plan.ok) sameProblem.push({ label: "long solve", p: sl.plan });
@@ -123,7 +124,7 @@ function main() {
     if (st.hash === nowHash && st.now && st.now.ok) sameProblem.push({ label: "wildcard now", p: st.now });
     if (st.hash === nowHash && st.now && st.later && st.never) {
       /* the main plan and "wildcard now" are the same problem solved twice: keep whichever reached the better objective, and its proven gap */
-      if ((st.now.obj || 0) > (plan.obj || 0)) { plan = Object.assign(slim(st.now), { detail: so.plan.detail }); solvedBy = show(o.timing) + " now"; }
+      if (JSON.stringify(st.now.params || null) === JSON.stringify(so.plan.params || null) && (st.now.obj || 0) > (plan.obj || 0)) { plan = Object.assign(slim(st.now), { detail: so.plan.detail }); solvedBy = show(o.timing) + " now"; }
       timing = { now: plan, later: slim(st.later), never: slim(st.never), at: st.at }; timingNote = "folded (now := the kept plan)";
       /* The wildcard as late as the rules allow (pipeline/latest_wildcard.py): the proven "never" plan with the wildcard
          played in the last week. It is a plan built from a proven one, not a solve, so it carries no gap of its own;
@@ -158,6 +159,19 @@ function main() {
     }
     if (timing) timing.now = plan;   // "now" is the kept plan, with the proof it now carries
   }
+
+  /* 4b2. The manager's choice (20 Oct 2026, ERRORS.md E-179): "The first wildcard will only be played before gw20. So play it
+     for gw 19." The plan of record is then the GW19 wildcard plan (pipeline/latest_wildcard.py: the proven never plan with the
+     wildcard in GW19), not the solver's own pick; the solved plan stays beside it as timing.now so the Plan tab can show what
+     the choice costs. It carries the never plan's proof, since it is that plan to GW18. Applied before the horizons
+     (4c), so the gameweek, month and season are scored on the plan of record (E-181). */
+  const WC1_GW = 19;
+  let choiceNote = "none";
+  if (WC1_GW && timing && timing.latest && timing.latest.weeks.some((w) => w.gw === WC1_GW && w.chip === "wildcard")) {
+    plan = Object.assign({}, timing.latest, { obj: timing.never.obj, gap: timing.never.gap, secs: timing.never.secs, status: timing.never.status, detail: plan.detail, params: timing.never.params, managerChoice: "wildcard GW" + WC1_GW });   // the solve time and status are the never solve's, whose plan this is to GW18
+    solvedBy = "the manager's choice: wildcard GW" + WC1_GW + " (built from the never plan)";
+    choiceNote = "wildcard GW" + WC1_GW + " kept as the plan of record (" + timing.latest.total + " against the solver's " + timing.now.total + ")";
+  } else if (WC1_GW) choiceNote = "wildcard GW" + WC1_GW + " asked for but no GW" + WC1_GW + " wildcard plan in the timing file; the solver's plan is kept";
 
   /* 4c. The gameweek, the month and the season (the manager's ask of 15 Oct 2026: "maximise the gameweek, the monthly and
      the season points"). pipeline/horizons.py solves classic() three more times on this input, each with one horizon
@@ -207,7 +221,8 @@ function main() {
          candidate is scored with the same arithmetic; ties go to the plan of record, then to the order below. */
       const cand = [{ key: "plan", label: "This plan", weeks: plan.weeks }];
       if (timing) {
-        if (timing.later) cand.push({ key: "later", label: "Wildcard held to a later week", weeks: timing.later.weeks });
+        if (plan.managerChoice && timing.now) cand.push({ key: "now", label: "The solver's wildcard week", weeks: timing.now.weeks });
+        if (timing.later) cand.push({ key: "later", label: "Wildcard held past GW" + (timing.later.weeks[Math.max(0, ((timing.later.params || {}).wcFrom || 1) - 1)] || {}).gw, weeks: timing.later.weeks });
         if (timing.never) cand.push({ key: "never", label: "No wildcard before GW" + plan.weeks[plan.weeks.length - 1].gw, weeks: timing.never.weeks });
       }
       ["season", "month", "gameweek"].forEach((k) => {
@@ -230,18 +245,6 @@ function main() {
     }
   }
 
-  /* 4c. The manager's choice (20 Oct 2026, ERRORS.md E-179): "The first wildcard will only be played before gw20. So play it
-     for gw 19." The plan of record is then the GW19 wildcard plan (pipeline/latest_wildcard.py: the proven never plan with the
-     wildcard in GW19), not the solver's own pick; the solved plan stays beside it as timing.now so the Plan tab can show what
-     the choice costs. It carries the never plan's proof, since it is that plan to GW18. */
-  const WC1_GW = 19;
-  let choiceNote = "none";
-  if (WC1_GW && timing && timing.latest && timing.latest.weeks.some((w) => w.gw === WC1_GW && w.chip === "wildcard")) {
-    plan = Object.assign({}, timing.latest, { obj: timing.never.obj, gap: timing.never.gap, detail: plan.detail, params: timing.never.params, managerChoice: "wildcard GW" + WC1_GW });
-    solvedBy = "the manager's choice: wildcard GW" + WC1_GW + " (built from the never plan)";
-    choiceNote = "wildcard GW" + WC1_GW + " kept as the plan of record (" + timing.latest.total + " against the solver's " + timing.now.total + ")";
-  } else if (WC1_GW) choiceNote = "wildcard GW" + WC1_GW + " asked for but no GW" + WC1_GW + " wildcard plan in the timing file; the solver's plan is kept";
-
   /* 5. free-hit weeks against the kept plan */
   const cs = M.classicSquad(), own0 = new Set(cs.squad.map((p) => p.id)), sellMap = new Map(cs.squad.map((p) => [p.id, p.sell]));
   const sellOf = (i) => (sellMap.has(i) ? sellMap.get(i) : M.P[i].pr);   // the selling price the export gave the solver for the original fifteen; purchase price otherwise
@@ -252,7 +255,7 @@ function main() {
     const budget = r1(w.squad.reduce((a, i) => a + sellOf(i), 0) + w.bank), cost = r1(f.squad.reduce((a, i) => a + buyOf(i), 0));
     const fhEp = f.xi.reduce((a, i) => a + M.ep(M.P[i], f.gw), 0) + M.ep(M.P[f.cap], f.gw), base = w.xi.reduce((a, i) => a + M.ep(M.P[i], f.gw), 0) + M.ep(M.P[w.cap], f.gw);
     return Object.assign({}, f, { free: !chipWeeks.has(f.gw), budget, cost, affordable: cost <= budget + 1e-9, gain: r2(fhEp - base) });
-  }).filter(Boolean).filter((f) => f.affordable);
+  }).filter(Boolean).filter((f) => f.affordable).filter((f) => f.gw >= ((so.plan.params || {}).chipFrom || 0) && f.gw <= 19);   // E-181: no free hit before GW13; set 1 ends GW19
 
   /* 6. the replay, and its comparison with the solver's own fields */
   const replay = replayLedger(plan.weeks, { ft0: cs.ft, bank0: cs.bank, own0, maxFt: DATA.rules.maxFt, sellOf, buyOf });

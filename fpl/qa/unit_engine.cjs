@@ -2133,8 +2133,9 @@ check("F5-per-transition-Spearman-averages-back-to-the-published-mean", function
 
 // ================================================================ F8 — the chip solver on the real calendar
 
-const SYN_SOLVE = E.chipSolver(CTX, {});
-const SYN_SOLVE_CHIP = E.chipSolver(CTX_CHIP, {});
+const SYN_SOLVE = E.chipSolver(CTX, { gameOnly: true });
+const SYN_SOLVE_CHIP = E.chipSolver(CTX_CHIP, { gameOnly: true });
+const SYN_SOLVE_MGR = E.chipSolver(CTX_CHIP, {});   // the manager's rules applied (E-181)
 
 function solverShapeErrors(s, nextEvent) {
   const bad = [];
@@ -2177,6 +2178,15 @@ check("F8-a-real-double-and-a-real-blank-are-found-and-every-chip-is-priced-in-t
     ", FH " + (fh ? r2(fh.value) : "—") + " points; " + s.windowNote };
 });
 
+check("F8-E181-with-the-manager's-rules-no-set-one-chip-is-offered-before-GW13-and-the-wildcard-is-GW19", function () {
+  const s = SYN_SOLVE_MGR, M = E.MANAGER_CHIPS;
+  const early = s.candidates.filter(function (c) { return c.set === 1 && c.event < M.chipsFrom; });
+  const wc = s.candidates.filter(function (c) { return c.set === 1 && c.chip === "WC"; });
+  const why = s.reasons.some(function (r) { return /no chip before GW13/.test(r); });
+  return { ok: s.ok && M.chipsFrom === 13 && M.wc1Gw === 19 && early.length === 0 && wc.every(function (c) { return c.event === M.wc1Gw; }) && why && SYN_SOLVE_CHIP.candidates.some(function (c) { return c.set === 1 && c.event < 13; }),
+    detail: "double GW5 and blank GW6 on the calendar: game-only offers " + SYN_SOLVE_CHIP.candidates.filter(function (c) { return c.set === 1 && c.event < 13; }).length + " set-1 candidates before GW13, the manager's rules " + early.length + "; wildcard weeks " + wc.map(function (c) { return c.event; }).join(",") + "; reason named " + why };
+});
+
 check("F8-the-solver-never-uses-a-chip-twice-nor-two-chips-in-one-gameweek", function () {
   const bad = solverShapeErrors(SYN_SOLVE, CTX.nextEvent).concat(solverShapeErrors(SYN_SOLVE_CHIP, CTX_CHIP.nextEvent));
   const s = SYN_SOLVE_CHIP;
@@ -2192,7 +2202,7 @@ check("F8-a-chip-already-used-in-a-set-is-never-offered-again-in-that-set", func
   const V = JSON.parse(JSON.stringify(SYN_CHIP));
   V.history.chips = [{ name: "bboost", event: 2 }, { name: "wildcard", event: 3 }];
   const c = E.buildCtx(V, SYN_STATE, SYN_NOW);
-  const s = E.chipSolver(c, {});
+  const s = E.chipSolver(c, { gameOnly: true });
   const bb = s.candidates.filter(function (x) { return x.chip === "BB" && x.set === 1; });
   const wc = s.candidates.filter(function (x) { return x.chip === "WC" && x.set === 1; });
   const tc = s.candidates.filter(function (x) { return x.chip === "TC" && x.set === 1; });
@@ -2219,7 +2229,7 @@ const SYN_LATE = (function () {
 
 check("F8-a-double-inside-set-two-is-only-ever-assigned-to-a-set-two-chip", function () {
   const c = E.buildCtx(SYN_LATE, SYN_STATE, SYN_NOW);
-  const s = E.chipSolver(c, {});
+  const s = E.chipSolver(c, { gameOnly: true });
   const bad = solverShapeErrors(s, c.nextEvent);
   const dbl = s.doubles.filter(function (d) { return d.event === 20; })[0];
   if (!dbl) bad.push("the GW20 double was not detected");
@@ -2562,9 +2572,21 @@ if (!LIVE) {
       const capRow = cp.table.filter(function (r) { return r.id === cp.capId; })[0];
       return { ok: cp.capId !== null && xi.ids.indexOf(cp.capId) >= 0 && capRow && capRow.flagged === false, detail: "capId " + cp.capId + " in XI=" + (xi.ids.indexOf(cp.capId) >= 0) + " flagged=" + (capRow ? capRow.flagged : "n/a") };
     });
-    check("LIVE-WEEKLY-wildcard15-carries-no-flagged-player", function () {
+    // E-180: the wildcard rule (every one of the fifteen fit) binds a wildcard week only. In a transfer week the
+    // manager's kept players may sit flagged on the bench; the buys, the captain and the vice may not.
+    const isWc = WEEKLY.classic.plan === "wildcard";
+    const flagTxt = function (id) { return name(id) + " (" + LCTX.flags[id].status + " " + LCTX.flags[id].chance + "%)"; };
+    if (isWc) check("LIVE-WEEKLY-wildcard15-carries-no-flagged-player", function () {
       const flagged = w15.filter(function (id) { return LCTX.flags[id] && LCTX.flags[id].flagged; });
-      return { ok: flagged.length === 0, detail: "flagged in the fifteen: " + flagged.map(function (id) { return name(id) + " (" + LCTX.flags[id].status + " " + LCTX.flags[id].chance + "%)"; }).join(", ") || "none" };
+      return { ok: flagged.length === 0, detail: "flagged in the fifteen: " + flagged.map(flagTxt).join(", ") || "none" };
+    });
+    else check("LIVE-WEEKLY-transfer-week-buys-captain-and-vice-are-unflagged-(E-180)", function () {
+      const must = (WEEKLY.classic.transfers || []).map(function (m) { return m.in; }).concat([WEEKLY.classic.captain, WEEKLY.classic.vice]);
+      const flagged = must.filter(function (id) { return LCTX.flags[id] && LCTX.flags[id].flagged; });
+      const ledger = Number.isInteger(WEEKLY.classic.hits) && Number.isInteger(WEEKLY.classic.ft_before) && Number.isInteger(WEEKLY.classic.ft_after) && Number.isFinite(WEEKLY.classic.bank_after) && WEEKLY.classic.bank_after >= 0;
+      return { ok: flagged.length === 0 && ledger && Array.isArray(WEEKLY.classic.transfers),
+        detail: "flagged among the buys and armband: " + (flagged.map(flagTxt).join(", ") || "none") + " · ledger hits " + WEEKLY.classic.hits + ", FT " + WEEKLY.classic.ft_before + "→" + WEEKLY.classic.ft_after + ", bank " + WEEKLY.classic.bank_after +
+          " · kept but flagged (allowed): " + (w15.filter(function (id) { return LCTX.flags[id] && LCTX.flags[id].flagged && must.indexOf(id) < 0; }).map(flagTxt).join(", ") || "none") };
     });
   } else {
     console.log("WEEKLY: data/weekly.js could not be evaluated — wildcard15 checks skipped");
@@ -2621,7 +2643,8 @@ if (!LIVE) {
         const want = WEEKLY.classic.wildcard15.filter(function (id) { return LCTX.els[id] && E.convergenceRisk(id, LCTX).risk; }).sort(function (a, b) { return a - b; });
         const got = lopt.locks.map(function (l) { return l.id; }).sort(function (a, b) { return a - b; });
         const held = lopt.locked.ok && want.every(function (id) { return lopt.locked.ids.indexOf(id) >= 0; });
-        return { ok: want.length > 0 && want.join(",") === got.join(",") && held,
+        // a transfer week's fifteen is the manager's own and may hold no convergent player at all (E-180)
+        return { ok: (want.length > 0 || WEEKLY.classic.plan !== "wildcard") && want.join(",") === got.join(",") && held,
           detail: want.length + " of the written fifteen are 60%+ rival-owned (" + want.map(function (id) { return LCTX.els[id].web_name; }).join(", ") + "); locks " + (want.join(",") === got.join(",") ? "match" : "DO NOT match: " + got.join(",")) + "; all held in the locked solve: " + held };
       });
       check("LIVE-wildcardOptions-does-not-move-the-default-solver-answer-or-rule-C1.6", function () {

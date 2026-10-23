@@ -36,6 +36,15 @@ the transfer cap, the Draft horizon from `league.drafts`) and the dated desk res
 `pipeline/intel.js`. The previous block supplies the "since last build" delta. Rival managers' personal
 names never reach the output. Writes: `data/mc_data.json` only. Proved by `qa/bake.cjs`.
 
+## 2b. State — `node pipeline/state.cjs` (ERRORS.md E-182)
+
+Writes `state/kwezi.json` from `data/live.json` and `pipeline/feeds/transfers.json`: the entry's own picks for the gameweek
+in play keyed by element id, each with its purchase price (`element_in_cost` of the latest transfer that brought the player
+in, else `now_cost − cost_change_start`), the bank, the free transfers and `confirmed_gw`. Everything else in the file is
+kept. It prints the players in and out against the saved fifteen, and the refresh reply lists them; `--check` writes
+nothing and exits 1 when the file is behind the feed. Run it after the bake on every refresh. Proved by `qa/unit_engine.cjs`
+LIVE-STATE.
+
 ## 3. Calibrate — `node pipeline/calibrate.js [data/mc_data.json]` (`npm run calibrate`)
 
 Runs the walk-forward backtest in `pipeline/backtest.js` on the block and writes `model = { calib,

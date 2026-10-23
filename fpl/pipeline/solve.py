@@ -104,12 +104,12 @@ class Model:
 POSN = {1: 2, 2: 5, 3: 5, 4: 3}
 PLAY = {1: (1, 1), 2: (3, 5), 3: (2, 5), 4: (1, 3)}
 
-def classic(decay=0.95, bench_w=0.10, gk_bench_w=0.03, tau=0.6, ft_value=1.5, allow=None, detail=8, no_rebuy=True, wc_from=0, time_limit=240, gap=0.005):
+def classic(decay=0.95, bench_w=0.10, gk_bench_w=0.03, tau=0.6, ft_value=1.5, allow=None, detail=8, no_rebuy=True, wc_from=0, time_limit=240, gap=0.005, chip_from=None, no_chip=()):
     """Transfers are planned week by week for the first `detail` gameweeks; after that the squad is held to gameweek 19,
     with the eleven, the armband and the bench boost and triple captain still chosen week by week. Banked free
     transfers at the end of the detailed window are valued at `ft_value` points each."""
     C = IN["classic"]; W = [g for g in GWS if g <= IN["cEnd"]]; T = len(W); TD = min(detail, T)
-    allow = allow or {"wildcard": C["chips"]["wildcard"], "bboost": C["chips"]["bboost"], "3xc": C["chips"]["3xc"]}
+    allow = allow or {"wildcard": C["chips"]["wildcard"], "bboost": C["chips"]["bboost"], "3xc": C["chips"]["3xc"]}; cf = SET1_FROM if chip_from is None else chip_from
     own = set(C["squad"]); hor = lambda p: sum(p["ep"][:T])
     cand = set(own)
     for pos, k in {1: 8, 2: 30, 3: 34, 4: 18}.items():
@@ -121,7 +121,8 @@ def classic(decay=0.95, bench_w=0.10, gk_bench_w=0.03, tau=0.6, ft_value=1.5, al
     wc, bb, tc, ft, used, pen, wct, hit, bank = {}, {}, {}, {}, {}, {}, {}, {}, {}
     for t in range(T):
         d = decay ** t; det = t < TD
-        wc[t] = m.var(0, 1 if (allow.get("wildcard") and det and t >= wc_from) else 0); bb[t] = m.var(0, 1 if allow.get("bboost") else 0); tc[t] = m.var(0, 1 if allow.get("3xc") else 0)
+        open_t = W[t] >= cf and W[t] not in no_chip
+        wc[t] = m.var(0, 1 if (allow.get("wildcard") and det and t >= wc_from and open_t) else 0); bb[t] = m.var(0, 1 if (allow.get("bboost") and open_t) else 0); tc[t] = m.var(0, 1 if (allow.get("3xc") and open_t) else 0)
         if det:
             ft[t] = m.var(C["ft"] if t == 0 else 0, C["ft"] if t == 0 else C["maxFt"])
             used[t] = m.var(0, C["maxFt"], cost=-d * tau); pen[t] = m.var(0, 15, cost=-d * (4 + tau))
@@ -187,7 +188,7 @@ def classic(decay=0.95, bench_w=0.10, gk_bench_w=0.03, tau=0.6, ft_value=1.5, al
         ftn = ftn if chip == "wildcard" else min(C["maxFt"], ftn - usedn + 1); prev = set(sq)
     gapv = getattr(res, "mip_gap", None)
     return {"ok": True, "status": res.message, "secs": round(secs, 1), "gap": gapv, "obj": round(-res.fun, 2), "total": round(total, 2), "ftEnd": ftn,
-            "weeks": weeks, "n": N, "detail": TD, "params": {"decay": decay, "benchW": bench_w, "tau": tau, "ftValue": ft_value, "allow": allow, "noRebuy": no_rebuy, "wcFrom": wc_from}}
+            "weeks": weeks, "n": N, "detail": TD, "params": {"decay": decay, "benchW": bench_w, "tau": tau, "ftValue": ft_value, "allow": allow, "noRebuy": no_rebuy, "wcFrom": wc_from, "chipFrom": cf, "noChip": sorted(no_chip)}}
 
 def one_week_best(t, budget, gap=0.002):
     """Best squad for a single gameweek under a budget: what a free hit could field that week."""
@@ -250,7 +251,7 @@ def draft(exclude=(), decay=0.95, change_cost=0.6, bench_w=0.04, time_limit=120)
 # Entry points. The paths are ARGS'; the stages and their order are the kit's.
 # ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 TIMING_KEYS = ("ok", "status", "secs", "gap", "total", "obj", "weeks", "params")
-SCENARIO_KEYS = ("ok", "status", "secs", "gap", "total", "obj", "weeks")
+SCENARIO_KEYS = ("ok", "status", "secs", "gap", "total", "obj", "weeks", "params")
 
 def no_wildcard_allow():
     return {"wildcard": False, "bboost": IN["classic"]["chips"]["bboost"], "3xc": IN["classic"]["chips"]["3xc"]}
@@ -261,8 +262,8 @@ def chip_timing(TL=420, gap=0.004, path=None):
     path = path or ARGS.timing
     out = {}; save = lambda: dump(out, path)
     out["hash"] = IN.get("hash"); out["at"] = stamp()
-    for key, kw in (("now", {}), ("later", {"wc_from": 1}), ("never", {"allow": no_wildcard_allow()})):
-        r = classic(time_limit=TL, gap=gap, **kw); out[key] = {k: r[k] for k in TIMING_KEYS if k in r}; save()
+    for key in ("now", "later", "never"):
+        r = classic(time_limit=TL, gap=gap, **scenario_kwargs(key)); out[key] = {k: r[k] for k in TIMING_KEYS if k in r}; save()
         print(key, r.get("status"), r.get("secs"), "s · gap", r.get("gap"), "· total", r.get("total"), "· wc week", next((w["gw"] for w in r.get("weeks", []) if w["chip"] == "wildcard"), None), flush=True)
     out["done"] = True; save()
     return out
@@ -274,8 +275,8 @@ def later(TL=540, gap=0.01, path=None):
     if not os.path.exists(path): sys.exit("no timing file at %s — run chip_timing first" % path)
     t = json.load(open(path))
     if t.get("hash") != IN.get("hash"): sys.exit("the timing file at %s was solved on other data (hash %s vs %s)" % (path, t.get("hash"), IN.get("hash")))
-    r = classic(time_limit=TL, gap=gap, wc_from=1)
-    if r.get("ok") and (r.get("obj") or 0) > (t.get("later", {}).get("obj") or 0):
+    r = classic(time_limit=TL, gap=gap, **scenario_kwargs("later"))
+    if replaces(r, t.get("later")):
         t["later"] = {k: r[k] for k in TIMING_KEYS if k in r}; dump(t, path); print("later: folded into", path, flush=True)
     print("later", r.get("status"), r.get("secs"), "s · gap", r.get("gap"), "· total", r.get("total"), "· wc", next((w["gw"] for w in r.get("weeks", []) if w["chip"] == "wildcard"), None), flush=True)
     return r
@@ -285,6 +286,21 @@ def later(TL=540, gap=0.01, path=None):
 # The model functions above stay byte-identical to the reference kit (plan_legality), so the limit is not a model
 # constraint: latest_wildcard.py builds on it, and plan_legality refuses any kept plan with a chip after it.
 SET1_LAST = 19
+# The manager's rule of 22 Oct 2026 (ERRORS.md E-181): no chip of any kind before GW13; he needs his chips for a
+# last-man-standing league as well. This one IS a model constraint (classic()'s chip_from, default SET1_FROM): the
+# declared E-181 change to the reference region, which plan_legality applies before its byte-identity check.
+SET1_FROM = 13
+
+def scenario_kwargs(key):
+    """The three timing cases in one place. With the GW13 gate "now" means the solver's best wildcard week (GW13 onward)
+    and "later" holds it past the first open week; "never" also keeps GW19 free of any chip, the manager's wildcard week."""
+    W = [g for g in GWS if g <= IN["cEnd"]]; i = next((t for t, g in enumerate(W) if g >= SET1_FROM), len(W))
+    return {"now": {}, "later": {"wc_from": max(1, i + 1)}, "never": {"allow": no_wildcard_allow(), "no_chip": (SET1_LAST,)}}[key]
+
+def replaces(new, old):
+    """A stored case is replaced when the new solve ran on other params (a rule changed) or proves a better plan."""
+    old = old or {}
+    return bool(new.get("ok")) and (old.get("params") != new.get("params") or (new.get("obj") or 0) > (old.get("obj") or 0))
 
 def main():
     if ARGS.later:
@@ -293,12 +309,13 @@ def main():
     save = lambda: dump(out, ARGS.out)     # written after every stage, so a partial run is still usable (§7.2)
     TL = ARGS.tl or 240
     plan = classic(time_limit=TL); out["plan"] = plan; save(); print("plan", plan.get("status"), plan.get("secs"), "s · gap", plan.get("gap"), "· total", plan.get("total"), flush=True)
-    nowc = classic(allow=no_wildcard_allow(), time_limit=int(TL * 0.7))
+    nowc = classic(time_limit=int(TL * 0.7), **scenario_kwargs("never"))
     out["noWildcard"] = {k: nowc[k] for k in SCENARIO_KEYS if k in nowc}; save(); print("no-wildcard", nowc.get("secs"), "s · gap", nowc.get("gap"), "· total", nowc.get("total"), flush=True)
     fh = []
     if plan.get("ok") and IN["classic"]["chips"].get("freehit"):
         own0 = set(IN["classic"]["squad"])
         for t, w in enumerate(plan["weeks"]):
+            if not (SET1_FROM <= w["gw"] <= SET1_LAST): continue     # E-181: no free hit before GW13
             sell_value = sum((IN["classic"]["sell"].get(str(i), P[i]["pr"]) if i in own0 else P[i]["pr"]) for i in w["squad"]) + w["bank"]
             best = one_week_best(t, round(sell_value, 1)); base = sum(P[i]["ep"][t] for i in w["xi"]) + P[w["cap"]]["ep"][t]
             if best: fh.append({"gw": w["gw"], "gain": round(best["ep"] - base, 2), "budget": round(sell_value, 1), "free": w["chip"] is None, **best})

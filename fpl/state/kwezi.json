@@ -1,23 +1,23 @@
 {
   "version": 110,
-  "exported_at": "2026-10-15T22:54:50Z",
+  "exported_at": "2026-10-21T17:31:42Z",
   "entry": 3546875,
   "squad": [
     {
-      "id": 496,
+      "id": 109,
       "purchase": 45
     },
     {
-      "id": 4,
-      "purchase": 80
+      "id": 115,
+      "purchase": 51
     },
     {
-      "id": 259,
-      "purchase": 40
+      "id": 229,
+      "purchase": 62
     },
     {
-      "id": 31,
-      "purchase": 45
+      "id": 388,
+      "purchase": 60
     },
     {
       "id": 397,
@@ -28,16 +28,16 @@
       "purchase": 75
     },
     {
-      "id": 368,
-      "purchase": 70
+      "id": 127,
+      "purchase": 50
     },
     {
       "id": 12,
       "purchase": 95
     },
     {
-      "id": 552,
-      "purchase": 60
+      "id": 98,
+      "purchase": 50
     },
     {
       "id": 411,
@@ -48,26 +48,26 @@
       "purchase": 60
     },
     {
-      "id": 109,
+      "id": 496,
       "purchase": 45
     },
     {
-      "id": 212,
-      "purchase": 45
+      "id": 552,
+      "purchase": 60
+    },
+    {
+      "id": 259,
+      "purchase": 40
     },
     {
       "id": 175,
       "purchase": 40
-    },
-    {
-      "id": 423,
-      "purchase": 45
     }
   ],
-  "bank": 16,
-  "ft": 5,
+  "bank": 23,
+  "ft": 1,
   "value": 999,
-  "confirmed_gw": 6,
+  "confirmed_gw": 7,
   "leagues": [
     1314671,
     1683215,

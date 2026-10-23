@@ -69,6 +69,27 @@ const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
 const REF_APP = path.join(ROOT, "reference", "v109", "app");
+/* E-181 (22 Oct 2026): the one declared change to the reference's model region, the GW13 chip gate in classic(). Each old
+   text must occur exactly once in the reference region; the region with every pair applied must appear verbatim in
+   pipeline/solve.py. Any other edit inside the region stays red. */
+const E181_DELTA = [
+  ["time_limit=240, gap=0.005):\n", "time_limit=240, gap=0.005, chip_from=None, no_chip=()):\n"],
+  ["\"3xc\": C[\"chips\"][\"3xc\"]}\n    own = set(C[\"squad\"])", "\"3xc\": C[\"chips\"][\"3xc\"]}; cf = SET1_FROM if chip_from is None else chip_from\n    own = set(C[\"squad\"])"],
+  ["        d = decay ** t; det = t < TD\n        wc[t] = m.var(0, 1 if (allow.get(\"wildcard\") and det and t >= wc_from) else 0); bb[t] = m.var(0, 1 if allow.get(\"bboost\") else 0); tc[t] = m.var(0, 1 if allow.get(\"3xc\") else 0)",
+   "        d = decay ** t; det = t < TD\n        open_t = W[t] >= cf and W[t] not in no_chip\n        wc[t] = m.var(0, 1 if (allow.get(\"wildcard\") and det and t >= wc_from and open_t) else 0); bb[t] = m.var(0, 1 if (allow.get(\"bboost\") and open_t) else 0); tc[t] = m.var(0, 1 if (allow.get(\"3xc\") and open_t) else 0)"],
+  ["\"wcFrom\": wc_from}}", "\"wcFrom\": wc_from, \"chipFrom\": cf, \"noChip\": sorted(no_chip)}}"],
+];
+function modelRegionVerdict(mine, refRegion, delta) {
+  if (!mine || !refRegion || refRegion.length < 1000) return { ok: false, detail: "no region to compare" };
+  if (mine.split("def classic(").length !== 2) return { ok: false, detail: "def classic( must occur exactly once in solve.py" };
+  let want = refRegion;
+  for (const [a, b] of delta) {
+    const n = want.split(a).length - 1;
+    if (n !== 1) return { ok: false, detail: "a declared delta's old text occurs " + n + " times in the reference region (needs exactly 1): " + a.slice(0, 50) };
+    want = want.replace(a, () => b);
+  }
+  return mine.indexOf(want) >= 0 ? { ok: true, detail: "" } : { ok: false, detail: "the reference's " + refRegion.length + "-byte model region with the " + delta.length + " declared E-181 changes does not appear verbatim in pipeline/solve.py" };
+}
 
 /* ---------------------------------------------------------------- arguments */
 function parseArgs(argv) {
@@ -160,9 +181,38 @@ const hashCheck = (pf) => ({ name: "the plan carries the export hash of this dat
   const mine = (() => { try { return fs.readFileSync(path.join(ROOT, "pipeline", "solve.py"), "utf8"); } catch (e) { return null; } })();
   const ref = (() => { try { return fs.readFileSync(path.join(REF_APP, "solve.py"), "utf8"); } catch (e) { return null; } })();
   const rr = region(ref);
-  ok("pipeline/solve.py's model functions (class Model, classic, one_week_best, draft) are byte-identical to reference/v109/app/solve.py's",
-    !!mine && !!rr && rr.length > 1000 && mine.indexOf(rr) >= 0,
-    !mine ? "pipeline/solve.py is missing" : !ref ? "the reference solve.py is missing" : !rr ? "the model region could not be located in the reference" : "the reference's " + rr.length + "-byte model region does not appear verbatim in pipeline/solve.py");
+  const v = modelRegionVerdict(mine, rr, E181_DELTA);
+  ok("pipeline/solve.py's model functions (class Model, classic, one_week_best, draft) are reference/v109/app/solve.py's byte for byte, with only the declared E-181 change (no chip before GW13)",
+    v.ok, !mine ? "pipeline/solve.py is missing" : !ref ? "the reference solve.py is missing" : v.detail);
+  /* E-181 mutations: the region check must go red on an undeclared edit, on the delta missing, and on a delta the reference does not contain */
+  if (v.ok) {
+    const at = mine.indexOf("def classic("), one = mine.slice(0, at + 20) + "#" + mine.slice(at + 20);
+    ok("mutation: a one-byte edit inside classic() outside the declared delta goes red on the region check", !modelRegionVerdict(one, rr, E181_DELTA).ok, modelRegionVerdict(one, rr, E181_DELTA).detail);
+    const undone = E181_DELTA.reduce((t, [a, b]) => t.replace(b, () => a), mine);
+    ok("mutation: solve.py with the reference region restored (the E-181 gate missing) goes red", !modelRegionVerdict(undone, rr, E181_DELTA).ok, modelRegionVerdict(undone, rr, E181_DELTA).detail);
+    ok("mutation: a declared delta whose old text is not in the reference goes red", !modelRegionVerdict(mine, rr, E181_DELTA.concat([["no such text in the reference", "x"]])).ok, "extra pair refused");
+  }
+}
+
+/* ---------------------------------------------------------------- the manager's chip rules (E-179, E-181) */
+/* Read from pipeline/solve.py, never typed here: SET1_FROM (no chip before it, 22 Oct 2026) and SET1_LAST (19). They bind
+   plans solved on the season's own data; the reference kit's data (reference/v109) predates them and is exempt, and the
+   run says so. A missing declaration is a failure, not a default. */
+const SOLVE_TEXT = (() => { try { return fs.readFileSync(path.join(ROOT, "pipeline", "solve.py"), "utf8"); } catch (e) { return ""; } })();
+const SET1_FROM = (SOLVE_TEXT.match(/^SET1_FROM = (\d+)/m) || [])[1] | 0, SET1_LAST = (SOLVE_TEXT.match(/^SET1_LAST = (\d+)/m) || [])[1] | 0;
+ok("pipeline/solve.py declares the manager's chip window (SET1_FROM " + SET1_FROM + ", SET1_LAST " + SET1_LAST + ")", SET1_FROM > 1 && SET1_LAST >= SET1_FROM, "read by regex from solve.py");
+const MANAGER_RULES = !/reference[\\/]v109[\\/]/.test(rel(DATA_PATH || ""));
+if (!MANAGER_RULES) console.log("     the manager's chip window is not applied: this plan was solved on the reference kit's data (" + rel(DATA_PATH || "") + ")");
+const RULES = { from: MANAGER_RULES ? SET1_FROM : 0, last: SET1_LAST || 19 };
+/* every chip a plan file names, wherever it names it: the plan, the timing cases and the horizon lenses and candidates */
+function chipsAnywhere(pf) {
+  const out = [], add = (where, weeks) => (Array.isArray(weeks) ? weeks : []).forEach((w) => w && w.chip && out.push({ where, gw: w.gw, chip: w.chip }));
+  add("plan", pf.plan && pf.plan.weeks);
+  Object.keys(pf.timing || {}).forEach((k) => pf.timing[k] && add("timing." + k, pf.timing[k].weeks));
+  const H = pf.horizons || {};
+  Object.keys(H.lenses || {}).forEach((k) => H.lenses[k] && add("lens " + k, H.lenses[k].chips));
+  (H.candidates || []).forEach((c) => add("candidate " + c.key, c.chips));
+  return out;
 }
 
 /* ---------------------------------------------------------------- the rules, as one function over a plan file */
@@ -227,9 +277,15 @@ function checkPlan(pf, data, eng) {
   /* the plan as a whole */
   const twice = Object.keys(chipsSeen).filter((c) => chipsSeen[c] > 1);
   planChecks.push({ name: "each chip is used at most once", ok: twice.length === 0, detail: twice.map((c) => c + " x" + chipsSeen[c]).join(", ") });
-  // the manager's rule of 20 Oct 2026 (E-177, corrected by E-179): set-1 chips are played before GW20, so none after GW19
-  const lateChips = weeks.filter((w) => w.chip && w.gw > 19).map((w) => w.chip + " GW" + w.gw);
-  planChecks.push({ name: "no set-1 chip is played after GW19 (the manager's limit, E-179)", ok: lateChips.length === 0, detail: lateChips.join(", ") || "chips in " + (weeks.filter((w) => w.chip).map((w) => w.chip + " GW" + w.gw).join(", ") || "no week") });
+  // the manager's rules: set-1 chips are played before GW20, so none after GW19 (20 Oct 2026, E-179), and none before
+  // GW13 (22 Oct 2026, E-181). Read from the plan's own weeks: the 20 Oct check read the replay rows, which carry no chip (E-183).
+  const chipList = pl.weeks.filter((w) => w.chip).map((w) => w.chip + " GW" + w.gw).join(", ") || "no week";
+  const lateChips = pl.weeks.filter((w) => w.chip && w.gw > RULES.last).map((w) => w.chip + " GW" + w.gw);
+  planChecks.push({ name: "no set-1 chip is played after GW" + RULES.last + " (the manager's limit, E-179)", ok: lateChips.length === 0, detail: lateChips.join(", ") || "chips in " + chipList });
+  const earlyChips = pl.weeks.filter((w) => w.chip && w.gw < RULES.from).map((w) => w.chip + " GW" + w.gw);
+  planChecks.push({ name: "no chip is played before GW" + RULES.from + " (the manager's rule, E-181)", ok: earlyChips.length === 0, detail: earlyChips.join(", ") || "chips in " + chipList });
+  { const fhOut = (Array.isArray(pf.freeHit) ? pf.freeHit : []).filter((f) => f.gw < RULES.from || f.gw > RULES.last).map((f) => "GW" + f.gw);
+    planChecks.push({ name: "free-hit window: every priced free-hit week lies in GW" + RULES.from + "–" + RULES.last + " (E-181)", ok: fhOut.length === 0, detail: fhOut.join(", ") || (pf.freeHit || []).map((f) => f.gw).join(",") }); }
   const gws = pl.weeks.map((w) => w.gw), first = data.gw.next, last = eng.CFG.classicEnd;
   planChecks.push({ name: "the weeks run from the next deadline to the chip stop without a gap", ok: gws.length === last - first + 1 && gws.every((g, i) => g === first + i), detail: "weeks " + gws.join(",") + " · expected " + first + "–" + last });
   const tot = sum(pl.weeks, (w) => w.ep) - HIT_POINTS * sum(pl.weeks, (w) => w.hits);
@@ -415,6 +471,32 @@ if (!OPT.noGolden && (OPT.golden || isReferencePlan)) {
   ok("golden.json is readable for the acceptance", !!GOLDEN && !!GOLDEN.classic && !!GOLDEN.classic.plan, OPT.golden || "reference/v109/app/golden.json");
   if (GOLDEN) acceptance(PF, GOLDEN, M).forEach((c) => ok(c.name, c.ok, c.detail));
 } else console.log("     acceptance against golden.json not run: " + (OPT.noGolden ? "--no-golden" : "this plan was not built from reference/v109/app/solver_out.json (source.out " + (PF.source && PF.source.out) + "); the golden numbers were recorded on the reference data"));
+
+/* ---------------------------------------------------------------- E-181 across the whole file */
+const earlyAnywhere = (pf) => chipsAnywhere(pf).filter((c) => c.gw < RULES.from || c.gw > RULES.last);
+{
+  const bad = earlyAnywhere(PF);
+  ok("no chip before GW" + RULES.from + " or after GW" + RULES.last + " anywhere in the file: plan, timing cases, horizon lenses and candidates (E-181)", bad.length === 0,
+    bad.map((c) => c.where + " " + c.chip + " GW" + c.gw).join(", ") || chipsAnywhere(PF).length + " chip entries checked");
+  if (MANAGER_RULES) {
+    const early = PF.plan.weeks.find((w) => !w.chip && w.gw < RULES.from);
+    if (early) {
+      const m1 = JSON.parse(JSON.stringify(PF)); m1.plan.weeks.find((w) => w.gw === early.gw).chip = "bboost";
+      const c1 = checkPlan(m1, DATA, M).plan.find((c) => c.name.indexOf("no chip is played before") === 0);
+      ok("mutation: a bench boost in GW" + early.gw + " goes red on 'no chip before GW" + RULES.from + "'", !!c1 && !c1.ok, c1 ? c1.detail : "no check");
+    }
+    const m2 = JSON.parse(JSON.stringify(PF)); m2.plan.weeks[m2.plan.weeks.length - 1] = Object.assign({}, m2.plan.weeks[m2.plan.weeks.length - 1], { gw: RULES.last + 1, chip: "freehit" });
+    const c2 = checkPlan(m2, DATA, M).plan.find((c) => c.name.indexOf("no set-1 chip is played after") === 0);
+    ok("mutation: the last week relabelled GW" + (RULES.last + 1) + " with a chip goes red on 'no set-1 chip after GW" + RULES.last + "' (E-183: the check is live)", !!c2 && !c2.ok, c2 ? c2.detail : "no check");
+    const m3 = JSON.parse(JSON.stringify(PF)); m3.freeHit = (m3.freeHit || []).concat([{ gw: PF.plan.weeks[0].gw, gain: 1, free: true }]);
+    const c3 = checkPlan(m3, DATA, M).plan.find((c) => c.name.indexOf("free-hit window") === 0);
+    ok("mutation: a free-hit entry in GW" + PF.plan.weeks[0].gw + " goes red on the free-hit window", !!c3 && !c3.ok, c3 ? c3.detail : "no check");
+    if (PF.timing && PF.timing.never && early) {
+      const m4 = JSON.parse(JSON.stringify(PF)); const w4 = m4.timing.never.weeks.find((w) => w.gw === early.gw); if (w4) w4.chip = "bboost";
+      ok("mutation: a chip in GW" + early.gw + " on timing.never goes red on the whole-file check", earlyAnywhere(m4).length > 0, earlyAnywhere(m4).map((c) => c.where + " GW" + c.gw).join(","));
+    }
+  }
+}
 
 /* ---------------------------------------------------------------- mutations: every rule must be able to go red */
 {

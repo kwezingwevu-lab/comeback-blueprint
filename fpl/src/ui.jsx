@@ -1185,7 +1185,7 @@ function landingPlanView(mc, ctx, setting) {
     if (isFinite(dl) && isFinite(t) && t >= dl) return aside("its GW" + gw + " deadline has passed.");
     // the settings the plan was not solved on
     const s = isO(setting) ? setting : {};
-    if (s.locked === true) return aside("the premiums are locked in on the Plan tab.");
+    if (s.locked === true && (w.chip === "wildcard" || w.chip === "freehit")) return aside("the premiums are locked in on the Plan tab.");   // E-180: the lock is a wildcard setting; a transfer week is not solved on it
     if (fin(s.overrides) && s.overrides > 0) return aside(s.overrides + plural(s.overrides, " match price is", " match prices are") + " overridden on the Odds tab.");
     // the players it names: all in this snapshot, and nobody it recommends flagged since it was solved (C1 rule 2)
     const ids = function (v) { return Array.isArray(v) ? v.filter(fin) : []; };
@@ -1203,7 +1203,7 @@ function landingPlanView(mc, ctx, setting) {
     const nm = function (id) { return nameOf(ctx, id); };
     view.state = "solved"; view.gw = gw; view.kind = kind; view.squadIds = squad;
     view.lead = kind === "wildcard" ? "Play the Wildcard" : kind === "freehit" ? "Play the Free Hit"
-      : kind === "transfers" ? "Make " + ins.length + plural(ins.length, " transfer", " transfers") + (chip ? " and play the " + CHIP[chip] : "")
+      : kind === "transfers" ? "Make " + ins.length + plural(ins.length, " transfer", " transfers") + (fin(w.hits) && w.hits > 0 ? " (−" + 4 * w.hits + ")" : "") + (chip ? " and play the " + CHIP[chip] : "")
         : (chip ? "Play the " + CHIP[chip] : "Roll the free transfer");
     view.deadline = dlIso; view.dlText = sastText(dlIso);
     view.hours = isFinite(dl) && isFinite(t) ? (dl - t) / 3600000 : null;
@@ -1223,10 +1223,14 @@ function landingPlanView(mc, ctx, setting) {
     const ok = function (r) { return isO(r) && r.ok === true && fin(r.total); };
     const nw = (T && ok(T.never) ? T.never : null) || (ok(PLAN.noWildcard) ? PLAN.noWildcard : null);
     const lastW = pl.weeks[pl.weeks.length - 1], lastGw = isO(lastW) && fin(lastW.gw) ? lastW.gw : gw;
-    const later = pl.weeks.filter(function (x) { return isO(x) && fin(x.gw) && x.gw > gw && typeof x.chip === "string" && CHIP[x.chip] && x.chip !== "wildcard"; })
+    // E-180/E-181: every chip after this week is named, the wildcard included (the manager's GW19 wildcard)
+    const later = pl.weeks.filter(function (x) { return isO(x) && fin(x.gw) && x.gw > gw && typeof x.chip === "string" && CHIP[x.chip]; })
       .map(function (x) { return CHIP[x.chip] + " in GW" + x.gw + (x.chip === "3xc" && fin(x.cap) ? " on " + nm(x.cap) : ""); });
+    const choice = typeof pl.managerChoice === "string" && T && ok(T.now) ? T.now : null;
+    const solverWc = choice && Array.isArray(choice.weeks) ? (choice.weeks.filter(function (x) { return isO(x) && x.chip === "wildcard"; })[0] || {}).gw : null;
     view.whyText = "Classic: the plan is worth " + f0(pl.total) + " expected points to GW" + lastGw +
-      (nw ? ", " + sgn(pl.total - nw.total) + " on the best plan that keeps the wildcard unplayed" : "") + ". " +
+      (choice ? " with your rules (no chip before GW13, Wildcard GW19); the solver's own best, wildcard GW" + (solverWc || "—") + ", is " + f0(choice.total) + " (" + sgn(pl.total - choice.total) + ")"
+        : nw ? ", " + sgn(pl.total - nw.total) + " on the best plan that keeps the wildcard unplayed" : "") + ". " +
       (later.length ? "Then " + later.join(", ") + ". " : "") +
       "It is solved week by week with every transfer, hit and chip, and the Plan tab has the eleven, the timing verdict and every week.";
 
@@ -1599,8 +1603,8 @@ function noteWindowStart(mc) {
   try {
     const ev = (mc && mc.gw && Array.isArray(mc.gw.events) ? mc.gw.events : []).filter(function (e) { return e && e.id === mc.gw.lastDone; })[0];
     const t = ev ? Date.parse(ev.dl) : NaN;
-    return isFinite(t) ? t : NaN;
-  } catch (e) { return NaN; }
+    return isFinite(t) ? t : null;   // null, never NaN, when no played gameweek is known (mc_full P05)
+  } catch (e) { return null; }
 }
 function commandView(mc, ctx, lv) {
   const empty = function () {
@@ -1741,7 +1745,7 @@ function commandView(mc, ctx, lv) {
        so listing them all here grew this tab with every refresh and kept GW6's news on the GW7 screen). */
     const desk = (Array.isArray(intel.notes) ? intel.notes : []).map(txt).filter(Boolean);
     const noteSince = noteWindowStart(MC);
-    const fresh = desk.filter(function (n) { const at = noteDateMs(n, noteSince); return at === null || !isFinite(noteSince) || at >= noteSince; });
+    const fresh = desk.filter(function (n) { const at = noteDateMs(n, noteSince === null ? NaN : noteSince); return at === null || noteSince === null || at >= noteSince; });
     view.notes.desk = fresh.slice(0, 40);
     view.notes.deskOlder = desk.length - fresh.length;
     const kept = view.notes.deskOlder ? view.notes.deskOlder + " earlier " + (view.notes.deskOlder === 1 ? "note, written for a played gameweek, stays" : "notes, written for played gameweeks, stay") + " in the dated desk-research record (pipeline/intel.js)" : "";
@@ -1914,7 +1918,7 @@ function solvedPlanView(mc, now, setting) {
   const QUICK = " The quick searches below still work.";
   const view = { state: "unsolved", note: "The points plan is not solved for this data, so this panel stays empty until the next rebuild." + QUICK,
     gw: 0, lastGw: 0, strip: [], timing: null, eleven: [], benchLine: [], reserve: null, shape: "", weekEp: "", wildcard: false,
-    pairs: [], bankText: "", budgetLine: false, keptText: "", price: null, weekRows: [], foot: "", horizons: null };
+    pairs: [], bankText: "", budgetLine: false, keptText: "", price: null, weekRows: [], foot: "", horizons: null, choice: null };
   try {
     const isO = function (v) { return !!v && typeof v === "object" && !Array.isArray(v); };
     const fin = function (x) { return typeof x === "number" && isFinite(x); };
@@ -1931,7 +1935,8 @@ function solvedPlanView(mc, now, setting) {
 
     const s = isO(setting) ? setting : {};
     const why = [];
-    if (s.locked === true) why.push("the premiums are locked in under Three fifteens, priced");
+    const w0c = pl.weeks[0].chip;   // E-180: the lock is a wildcard setting, so it hides only a plan that opens with a whole-squad chip
+    if (s.locked === true && (w0c === "wildcard" || w0c === "freehit")) why.push("the premiums are locked in under Three fifteens, priced");
     if (fin(s.overrides) && s.overrides > 0) why.push(s.overrides + plural(s.overrides, " match price is", " match prices are") + " overridden on the Odds tab");
     if (why.length) {
       view.state = "hidden";
@@ -1967,12 +1972,17 @@ function solvedPlanView(mc, now, setting) {
     const nw = (T && ok(T.never) ? T.never : null) || (ok(PLAN.noWildcard) ? PLAN.noWildcard : null);
     const fh = (Array.isArray(PLAN.freeHit) ? PLAN.freeHit : []).filter(function (f) { return isO(f) && f.free === true && fin(f.gain) && fin(f.gw); })
       .sort(function (a, b) { return b.gain - a.gain; })[0] || null;
+    const choice = typeof pl.managerChoice === "string" && T && ok(T.now) ? T.now : null;   // E-179/E-181: the plan of record is the manager's, the solver's own is beside it
+    const wcOf = function (r) { const x = r && Array.isArray(r.weeks) ? r.weeks.filter(function (y) { return isO(y) && y.chip === "wildcard"; })[0] : null; return x && fin(x.gw) ? x.gw : null; };
+    const hits0 = r0 && fin(r0.hits) ? r0.hits : 0;
     view.strip = [
       { k: "Expected points", v: f0(pl.total), sub: "to GW" + lastGw },
-      wc && T && ok(T.later)
+      choice
+        ? { k: "Solver's best", v: f0(choice.total), sub: "wildcard GW" + (wcOf(choice) || "—") + "; yours " + sgn(pl.total - choice.total) }
+        : wc && T && ok(T.later)
         ? { k: "Wildcard later", v: f0(T.later.total), sub: sgn(pl.total - T.later.total) + " for playing it now" }
         : { k: "Without the wildcard", v: nw ? f0(nw.total) : "—", sub: nw ? "the plan is " + sgn(pl.total - nw.total) : "not solved" },
-      { k: "GW" + gw, v: wc ? "Wildcard" : ins.length ? ins.length + " in" : "Roll", sub: "captain " + name(w.cap) + (w.chip && !wc && CHIP[w.chip] ? ", " + CHIP[w.chip] : "") },
+      { k: "GW" + gw, v: wc ? "Wildcard" : ins.length ? ins.length + " in" + (hits0 ? " (−" + hits0 + ")" : "") : "Roll", sub: "captain " + name(w.cap) + (w.chip && !wc && CHIP[w.chip] ? ", " + CHIP[w.chip] : "") },
       { k: "Free Hit", v: fh ? "GW" + fh.gw : "—", sub: fh ? sgn(fh.gain) + " that week" : "no week with it free" }
     ];
 
@@ -2014,7 +2024,11 @@ function solvedPlanView(mc, now, setting) {
         const l = c[0], what = c[1], gain = c[2];
         if (!l || l.key === "plan" || gain <= 0.05) return;
         const c2 = sCost(l);
-        if (c2 <= tol) acts.push("chasing " + what + " (+" + f1(gain) + ") costs " + (c2 > 0.05 ? f1(c2) : "nothing") + " to GW" + lastGw + ", inside the proof's tolerance of about " + f1(tol) + " points, so it is a free choice: the moves are below");
+        // E-181: under the manager's choice a lens that plays the wildcard in another week is not free: it breaks his rule
+        const lwc = (Array.isArray(l.chips) ? l.chips : []).filter(function (x) { return isO(x) && x.chip === "wildcard"; })[0];
+        const myWc = pl.weeks.filter(function (x) { return isO(x) && x.chip === "wildcard"; })[0];
+        if (pl.managerChoice && lwc && myWc && lwc.gw !== myWc.gw) dear.push("chasing " + what + " would add " + f1(gain) + " there, but it plays the wildcard in GW" + lwc.gw + ", against your GW" + myWc.gw + " choice");
+        else if (c2 <= tol) acts.push("chasing " + what + " (+" + f1(gain) + ") costs " + (c2 > 0.05 ? f1(c2) : "nothing") + " to GW" + lastGw + ", inside the proof's tolerance of about " + f1(tol) + " points, so it is a free choice: the moves are below");
         else dear.push("chasing " + what + " would add " + f1(gain) + " there and take " + f1(c2) + " off the total to GW" + lastGw);
       });
       view.horizons.verdict = bits.length ? "The plan is " + bits.join(", ") + "." + (acts.length ? " Then: " + acts.join("; ") + "." : "") : "";
@@ -2098,6 +2112,24 @@ function solvedPlanView(mc, now, setting) {
       };
     }
 
+    // (2b) The manager's chip rules and what they cost (E-179, E-181). The plan of record opens with a transfer week and
+    // plays the wildcard in GW19; the solver's own best under the GW13 rule, and the plan that never plays it, are
+    // priced beside it in one currency (Classic expected points to the chip stop), with the proof's tolerance.
+    if (choice && T && ok(T.never)) {
+      const gp = function (r) { return fin(r.gap) ? r.gap : 0; };
+      const tol = Math.round(Math.max(gp(choice), gp(T.never)) * pl.total);
+      const cost = choice.total - pl.total;
+      const lwk = wcOf(pl);
+      view.choice = {
+        head: "Your chip rules: no chip before GW13, Wildcard 1 in GW" + (lwk || cEnd) + ".",
+        text: "Your plan, wildcard GW" + (lwk || cEnd) + ": " + f0(pl.total) + ". The solver's best under the GW13 rule, wildcard GW" + (wcOf(choice) || "—") + ": " + f0(choice.total) +
+          ". No wildcard to GW" + cEnd + ": " + f0(T.never.total) + ". " +
+          (cost > tol ? "Waiting for GW" + (lwk || cEnd) + " costs about " + f1(cost) + " points to GW" + cEnd + ", more than the tolerance of about " + tol + "."
+            : "The two are level within the tolerance of about " + tol + " points, so your week costs nothing measurable.") +
+          " Points count only to GW" + cEnd + ", so a GW" + (lwk || cEnd) + " wildcard is credited with one week."
+      };
+    }
+
     // (3) the next gameweek's eleven, by position, with the engine's expected points; then the bench in order
     const cnt = { 1: 0, 2: 0, 3: 0, 4: 0 };
     const person = function (id) { const v = epOf(id); return { id: id, name: name(id), ep: f1(v), tag: id === w.cap ? "C" : id === w.vice ? "V" : "" }; };
@@ -2117,7 +2149,10 @@ function solvedPlanView(mc, now, setting) {
     const bank = r0 && fin(r0.bank) ? r0.bank : null;
     view.bankText = cash(bank === null ? NaN : bank);
     view.budgetLine = bank !== null && bank < 0.35 && view.pairs.length > 0;
-    if (wc && r0 && fin(r0.ftBefore) && fin(r0.ftAfter)) {
+    if (!wc && r0 && fin(r0.ftBefore) && fin(r0.ftAfter)) {
+      view.keptText = (ins.length ? ins.length + plural(ins.length, " transfer", " transfers") + " with " + r0.ftBefore + plural(r0.ftBefore, " free", " free") + (hits0 ? ", a hit of " + hits0 + " points" : ", no hit") + ". " : "") +
+        "You carry " + r0.ftAfter + plural(r0.ftAfter, " free transfer", " free transfers") + " into GW" + (gw + 1) + ".";
+    } else if (wc && r0 && fin(r0.ftBefore) && fin(r0.ftAfter)) {
       view.keptText = r0.ftAfter === r0.ftBefore
         ? "Your " + r0.ftBefore + plural(r0.ftBefore, " free transfer is", " free transfers are") + " kept for GW" + (gw + 1) + "."
         : "You carry " + r0.ftAfter + plural(r0.ftAfter, " free transfer", " free transfers") + " into GW" + (gw + 1) + ".";
@@ -2217,6 +2252,9 @@ function TabPlan(props) {
   const headRow = optRows.filter(function (r) { return r.key === headKey; })[0] || optRows[0] || null;
   const priced = wcOpts && wcOpts.ok && wcOpts.pure && wcOpts.pure.ok && wcOpts.locked && wcOpts.locked.ok && wcOpts.written && wcOpts.written.ok;
   const fb = WEEKLY.classic.fallback || { moves: [] };
+  /* E-180: when the written plan opens with a transfer week there is no chip to fall back from; the section shows that week */
+  const fbWeek = WEEKLY.classic.plan !== "wildcard" && Number.isFinite(WEEKLY.classic.bank_after);
+  const fbHits = Number(WEEKLY.classic.hits) || 0;
   const fbCost = (WEEKLY.classic.wildcard15 || []).reduce(function (s, id) { return s + (ctx.els[id] ? Number(ctx.els[id].now_cost) : 0); }, 0);
   return (
     <div>
@@ -2265,6 +2303,11 @@ function TabPlan(props) {
             {sv.timing ? (
               <div className={"note" + (sv.timing.clear ? "" : " note-w")} data-testid="plan-timing">
                 <b>{sv.timing.head}</b> {sv.timing.cases + " " + sv.timing.never + " " + sv.timing.verdict + (sv.timing.latest ? " " + sv.timing.latest : "")}
+              </div>
+            ) : null}
+            {sv.choice ? (
+              <div className="note" data-testid="plan-choice">
+                <b>{sv.choice.head}</b> {sv.choice.text}
               </div>
             ) : null}
             {sv.timing && sv.timing.latestMore ? (
@@ -2529,8 +2572,8 @@ function TabPlan(props) {
         </Guard>
       </Section>
 
-      <Section id="plan-fb" title="Fallback, without the chip" open={sec("plan-fb")} onToggle={on.sec}>
-        <div className="dim"><span className="tag tag-s">Classic</span> The transfers to make without playing the chip.</div>
+      <Section id="plan-fb" title={fbWeek ? "This week's transfers, no chip" : "Fallback, without the chip"} open={sec("plan-fb")} onToggle={on.sec}>
+        <div className="dim"><span className="tag tag-s">Classic</span> {fbWeek ? "The written plan plays no chip this week: these are its transfers, held to the same rules." : "The transfers to make without playing the chip."}</div>
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="plan-fb">
         {hidden ? <div className="note note-w">Matches are running. Transfer panels come back when the last whistle goes.</div> : (
         <div>
@@ -2544,8 +2587,18 @@ function TabPlan(props) {
             );
           })}
           <KV k="Captain, vice" v={nameOf(ctx, fb.captain) + ", " + nameOf(ctx, fb.vice)} />
-          <KV k="Written fifteen costs" v={money(fbCost) + " of " + money(ctx.budget)} tone={fbCost <= ctx.budget ? "go" : "out"} />
-          <div className="note">The written plan quotes {money(WEEKLY.classic.wildcard15_cost_written)} for that fifteen. Today it is {money(fbCost)} against a selling value of {money(ctx.budget)}: still affordable, but the price moved.</div>
+          {fbWeek ? (
+            <div data-testid="plan-fb-week">
+              <KV k="Hits" v={fbHits ? "−" + 4 * fbHits + " (" + fbHits + (fbHits === 1 ? " transfer" : " transfers") + " over the free ones)" : "none"} tone={fbHits ? "out" : "go"} />
+              <KV k="Free transfers" v={WEEKLY.classic.ft_before + " now, " + WEEKLY.classic.ft_after + " into GW" + (Number(WEEKLY.gw) + 1)} />
+              <KV k="Bank after" v={money(WEEKLY.classic.bank_after)} tone={WEEKLY.classic.bank_after >= 0 ? "go" : "out"} />
+            </div>
+          ) : (
+            <div>
+              <KV k="Written fifteen costs" v={money(fbCost) + " of " + money(ctx.budget)} tone={fbCost <= ctx.budget ? "go" : "out"} />
+              <div className="note">The written plan quotes {money(WEEKLY.classic.wildcard15_cost_written)} for that fifteen. Today it is {money(fbCost)} against a selling value of {money(ctx.budget)}{fbCost === WEEKLY.classic.wildcard15_cost_written ? "." : ": still affordable, but the price moved."}</div>
+            </div>
+          )}
           <div className="dim"><Tier k="T0" /> prices today · written plan from the weekly block</div>
         </div>
         )}
@@ -3558,6 +3611,7 @@ function TabChips(props) {
         <Guard ctx={ctx} onConfirm={props.onConfirm} where="ch-now">
         <SolvedNote mc={props.mc} ctx={ctx} reveals={ui.reveals} where="chips" text="The windows, the table and the regret figures below are the app's own quick model, which does not know the solver's weeks; where they disagree, the solved plan stands." />
         <KV k="Set one expires" v={"GW" + expiry + " deadline"} />
+        <div data-testid="ch-rule"><KV k="Your rule" v={"No chip before GW" + MANAGER_CHIPS.chipsFrom + "; Wildcard 1 in GW" + MANAGER_CHIPS.wc1Gw} tone="go" /></div>
         <KV k="Used so far" v={used.length ? used.map(function (c) { return c.name + " GW" + c.event; }).join(", ") : "none"} />
         <KV k="Doubles confirmed" v={w.doubles.length ? w.doubles.map(function (d) { return "GW" + d.event; }).join(", ") : "none"} />
         <KV k="Blanks confirmed" v={w.blanks.length ? w.blanks.map(function (b) { return "GW" + b.event; }).join(", ") : "none"} />

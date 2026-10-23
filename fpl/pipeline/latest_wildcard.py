@@ -39,9 +39,12 @@ if not (nv and nv.get("ok") and nv.get("weeks")):
 C = solve.IN["classic"]; P = solve.P
 W = [g for g in solve.GWS if g <= solve.IN["cEnd"]]; T = len(W)
 weeks = [dict(w) for w in nv["weeks"]]
+prm = nv.get("params") or {}
+if prm.get("chipFrom") != solve.SET1_FROM or solve.SET1_LAST not in (prm.get("noChip") or []):
+    sys.exit("the never plan was not solved under the manager's rules (chip_from %s, GW%d kept free); re-run chip_timing (E-181)" % (prm.get("chipFrom"), solve.SET1_LAST))
 if len(weeks) != T:
     sys.exit("the never plan has %d weeks and the window has %d" % (len(weeks), T))
-# The latest week the first wildcard may be played is the manager's set-1 limit (solve.SET1_LAST, GW18; E-177), not the
+# The latest week the first wildcard may be played is the manager's set-1 limit and chosen week (solve.SET1_LAST, GW19; E-179), not the
 # last week of the window: the wildcard goes in that week and the rebuilt fifteen is held for the weeks after it.
 if solve.SET1_LAST not in W:
     sys.exit("GW%d (the set-1 limit) is not in the planning window %s" % (solve.SET1_LAST, W))

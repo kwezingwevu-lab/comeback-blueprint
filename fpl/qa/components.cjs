@@ -378,6 +378,16 @@ const MCP_WC = (function () {
   return { MC: MCP.MC, PLAN: P2, PRE: MCP.PRE, E: MCP.E };
 })();
 
+/* A world where chasing the month costs more than the proof's tolerance, so the costly-chase sentence (plan-horizons-chase)
+   renders behind its reveal whatever the live data's lenses happen to say (22 Oct 2026: on the GW8 data every chase was free). */
+const MCP_DEAR = (function () {
+  if (!MCP || !MCP.PLAN || !MCP.PLAN.horizons || !Array.isArray(MCP.PLAN.horizons.candidates)) return null;
+  const P2 = JSON.parse(JSON.stringify(MCP.PLAN)), H2 = P2.horizons, c2 = H2.candidates.filter(function (c) { return c.key !== "plan"; })[0];
+  if (!c2) return null;
+  c2.score.month = H2.plan.month + 3; c2.score.season = H2.plan.season - ((isFinite(H2.tol) ? H2.tol : 0) + 6); H2.best.month = c2.key;
+  return { MC: MCP.MC, PLAN: P2, PRE: MCP.PRE, E: MCP.E };
+})();
+
 /* props: the valid fixture · text: the slots that exist to be printed · variants: extra renders
    whose union has to carry every owned testid · fuzz: the props pass C starts from (sections
    closed, which is first paint, and keeps the junk pass off the wildcard solver). */
@@ -444,7 +454,8 @@ const FIX = {
       { ctx: CTX, ui: UI_PLAN_SOLVED, on: ON, plan: PLAN, onConfirm: noop, mc: MCP },
       { ctx: CTX, ui: uiFor("plan", false), on: ON, plan: PLAN, onConfirm: noop, mc: MCP_NOPLAN },
       { ctx: CTX_MKT, ui: uiFor("plan", false), on: ON, plan: PLAN, onConfirm: noop, mc: MCP }]
-      .concat(MCP_WC ? [{ ctx: CTX, ui: UI_PLAN_SOLVED, on: ON, plan: PLAN, onConfirm: noop, mc: MCP_WC }] : []),
+      .concat(MCP_WC ? [{ ctx: CTX, ui: UI_PLAN_SOLVED, on: ON, plan: PLAN, onConfirm: noop, mc: MCP_WC }] : [])
+      .concat(MCP_DEAR ? [{ ctx: CTX, ui: UI_PLAN_SOLVED, on: ON, plan: PLAN, onConfirm: noop, mc: MCP_DEAR }] : []),
     fuzz: { ctx: CTX, ui: uiFor("plan", false), on: ON, plan: PLAN, onConfirm: noop, mc: MCP }
   },
   TabSquad: { props: { ctx: CTX, ui: uiFor("squad", true), on: ON, onConfirm: noop, mc: MCP }, text: [] },
@@ -854,12 +865,14 @@ console.log("--- v110 D2 · the Classic plan panel ---");
   {
     const strip = part(h1, "plan-strip");
     const want = ["Expected points " + f0(pl.total) + " to GW" + lastGw];
-    if (wc && T && okc(T.later)) want.push("Wildcard later " + f0(T.later.total) + " " + sgn(pl.total - T.later.total) + " for playing it now");
+    const wcGw = function (r) { const x = (r.weeks || []).filter(function (y) { return y.chip === "wildcard"; })[0]; return x ? x.gw : "—"; };
+    if (pl.managerChoice && T && okc(T.now)) want.push("Solver's best " + f0(T.now.total) + " wildcard GW" + wcGw(T.now) + "; yours " + sgn(pl.total - T.now.total));
+    else if (wc && T && okc(T.later)) want.push("Wildcard later " + f0(T.later.total) + " " + sgn(pl.total - T.later.total) + " for playing it now");
     else {
       const nw = (T && okc(T.never) ? T.never : null) || (okc(SP.noWildcard) ? SP.noWildcard : null);
       want.push("Without the wildcard " + (nw ? f0(nw.total) + " the plan is " + sgn(pl.total - nw.total) : "—"));
     }
-    want.push("GW" + w.gw + " " + (wc ? "Wildcard" : w.in.length ? w.in.length + " in" : "Roll") + " captain " + nm(w.cap));
+    want.push("GW" + w.gw + " " + (wc ? "Wildcard" : w.in.length ? w.in.length + " in" + (w.hits > 0 ? " (−" + 4 * w.hits + ")" : "") : "Roll") + " captain " + nm(w.cap));
     const fh = (SP.freeHit || []).filter(function (f) { return f && f.free === true && isFinite(f.gain); }).sort(function (a, b) { return b.gain - a.gain; })[0];
     want.push("Free Hit " + (fh ? "GW" + fh.gw + " " + sgn(fh.gain) + " that week" : "—"));
     const miss = want.filter(function (s) { return strip.indexOf(s) < 0; });
@@ -867,6 +880,22 @@ console.log("--- v110 D2 · the Classic plan panel ---");
     assert("D2-the-stat-strip-reads-the-plan-total-the-wildcard-case-the-next-action-and-the-free-hit-week-from-PLAN",
       miss.length === 0 && /^Classic\b/.test(lead),
       (miss.length ? "missing «" + miss.join("» «") + "» · " : "") + "strip «" + strip + "» · lead «" + lead.slice(0, 90) + "»");
+  }
+
+  // (1b) E-179/E-181: under the manager's choice the Plan tab prices it — his plan, the solver's best under the GW13 rule, never —
+  //      and names the rules; the Chips tab states the same rule from MANAGER_CHIPS
+  if (pl.managerChoice && T && okc(T.now) && okc(T.never)) {
+    const ch = part(h1, "plan-choice"), wcAt = function (r) { const x = (r.weeks || []).filter(function (y) { return y.chip === "wildcard"; })[0]; return x ? x.gw : null; };
+    const want = ["Your chip rules: no chip before GW13, Wildcard 1 in GW" + wcAt(pl), "Your plan, wildcard GW" + wcAt(pl) + ": " + f0(pl.total),
+      "wildcard GW" + wcAt(T.now) + ": " + f0(T.now.total), "No wildcard to GW" + lastGw + ": " + f0(T.never.total)];
+    const miss = want.filter(function (x) { return ch.indexOf(x) < 0; });
+    assert("D2-E181-the-choice-panel-prices-the-manager's-GW19-wildcard-against-the-solver's-best-and-never-and-names-the-rules", has(h1, "plan-choice") && miss.length === 0 && /tolerance of about \d+/.test(ch),
+      (miss.length ? "missing «" + miss.join("» «") + "» · " : "") + "«" + ch.slice(0, 260) + "»");
+  }
+  {
+    const rc = tryRender("TabChips", { ctx: CTX, ui: uiFor("chips", true), on: ON, plan: PLAN, onConfirm: noop, mc: MCP });
+    const rule = rc.ok ? part(rc.html, "ch-rule") : "";
+    assert("D2-E181-the-Chips-tab-states-the-manager's-rule-from-MANAGER_CHIPS", rc.ok && /Your rule\s*No chip before GW13; Wildcard 1 in GW19/.test(rule), "«" + rule + "»" + (rc.ok ? "" : " threw " + (rc.err && rc.err.message)));
   }
 
   // (2) the timing verdict: proved worse only on the objective proof, settled only beyond the tolerance
@@ -1039,8 +1068,11 @@ console.log("--- v110 D2 · the Classic plan panel ---");
     const note = function (r) { return r.ok ? part(r.html, "plan-solved-note") : "threw " + (r.err && r.err.message); };
     const hidden = function (r) { return r.ok && has(r.html, "plan-solved-note") && !has(r.html, "plan-strip") && !has(r.html, "plan-xi"); };
     const quick = /quick searches below still work/;
+    // E-180: the lock hides a plan that opens with a whole-squad chip; a transfer-week plan stays shown under it
+    const lockOk = (w.chip === "wildcard" || w.chip === "freehit") ? hidden(rLock) && /premiums/.test(note(rLock)) && quick.test(note(rLock))
+      : rLock.ok && has(rLock.html, "plan-strip") && !has(rLock.html, "plan-solved-note");
     assert("D2-a-planning-setting-the-plan-was-not-solved-on-hides-it-behind-one-note-that-names-the-setting",
-      hidden(rLock) && /premiums/.test(note(rLock)) && quick.test(note(rLock)) &&
+      lockOk &&
         mk > 0 && hidden(rMkt) && /Odds tab/.test(note(rMkt)) && quick.test(note(rMkt)),
       "lock «" + note(rLock) + "» · " + mk + " market gameweek(s) in ctx.state «" + note(rMkt) + "»");
     assert("D2-no-solved-plan-or-a-passed-first-deadline-says-so-instead-of-showing-a-plan",
@@ -1095,7 +1127,21 @@ console.log("--- v110 D2 · the Classic plan panel ---");
       assert("D2-horizons-the-verdict-says-how-far-the-plan-is-from-each-horizon's-best",
         vWant.every(function (x) { return ver.indexOf(x) >= 0; }), "want «" + vWant.join("» «") + "» · got «" + ver + "»");
       // moved: a month-best plan that gains and costs nothing measurable is a free choice; one that costs more than the tolerance keeps the balance
-      const other = C.filter(function (c) { return c.key !== "plan"; })[0];
+      // E-181: a candidate whose wildcard week differs from the manager's chosen one is never a free choice, so the free/dear
+      // pair is built on one that keeps his wildcard week (or plays none); the other kind is held by its own assertion below
+      const planWc = (pl.weeks.filter(function (x) { return x.chip === "wildcard"; })[0] || {}).gw;
+      const breaks = function (c) { return !!pl.managerChoice && (c.chips || []).some(function (x) { return x.chip === "wildcard" && x.gw !== planWc; }); };
+      const other = C.filter(function (c) { return c.key !== "plan" && !breaks(c); })[0] || C.filter(function (c) { return c.key !== "plan"; })[0];
+      const rival = C.filter(function (c) { return c.key !== "plan" && breaks(c); })[0];
+      if (rival) {
+        const P4 = JSON.parse(JSON.stringify(SP)), H4 = P4.horizons, c4 = H4.candidates.filter(function (c) { return c.key === rival.key; })[0];
+        c4.score.month = H4.plan.month + 3; c4.score.season = H4.plan.season; H4.best.month = rival.key;
+        const r4 = tryRender("TabPlan", props({ mc: mcWith(P4), ui: { mode: "full", tab: "plan", open: {}, reveals: { "pl-horizons": true } } }));
+        const v4 = r4.ok ? part(r4.html, "plan-horizons-verdict") : "", c4t = r4.ok ? part(r4.html, "plan-horizons-chase") : "";
+        assert("D2-E181-a-horizon-best-that-moves-the-manager's-wildcard-week-is-never-called-free-and-says-it-breaks-his-choice",
+          r4.ok && !/chasing [^;]*\(\+3\.0\)[^;]*free choice/.test(v4) && /against your GW\d+ choice/.test(c4t),
+          "verdict «" + v4.slice(0, 200) + "» · behind the reveal «" + c4t.slice(0, 200) + "»");
+      }
       const withBest = function (gain, costPts) {
         const P2 = JSON.parse(JSON.stringify(SP)), H2 = P2.horizons, c2 = H2.candidates.filter(function (c) { return c.key === other.key; })[0];
         c2.score.month = H2.plan.month + gain; c2.score.season = H2.plan.season - costPts; H2.best.month = other.key; return P2;
@@ -1109,8 +1155,8 @@ console.log("--- v110 D2 · the Classic plan panel ---");
       const cDear = rDearO.ok ? part(rDearO.html, "plan-horizons-chase") : "";
       // the free choice is said on first paint; the costly chase is priced in the table and explained behind the reveal, never on first paint
       assert("D2-horizons-moved-a-free-month-best-is-called-a-free-choice-and-a-costly-one-keeps-the-balance-behind-the-reveal",
-        /chasing [^;]*\(\+3\.0\)[^;]*free choice/.test(vFree) && !/chasing/.test(vDear) && rDear.ok && !has(rDear.html, "plan-horizons-chase") && has(rDear.html, "rev-pl-horizons") &&
-          /^Why the plan keeps the balance: chasing [^;]*would add 3\.0 there and take [\d.]+ off the total to GW\d+/.test(cDear),
+        /chasing [^;]*\(\+3\.0\)[^;]*free choice/.test(vFree) && !/chasing [^;]*\(\+3\.0\)/.test(vDear) && rDear.ok && !has(rDear.html, "plan-horizons-chase") && has(rDear.html, "rev-pl-horizons") &&
+          /^Why the plan keeps the balance: chasing [^;]*would add 3\.0 there(, but it plays the wildcard| and take [\d.]+ off the total to GW\d+)/.test(cDear),
         "free «" + vFree.slice(0, 240) + "» · dear «" + vDear.slice(0, 240) + "» · behind the reveal «" + cDear.slice(0, 240) + "»");
       const P3 = JSON.parse(JSON.stringify(SP)); P3.horizons = null;
       const rNone = tryRender("TabPlan", props({ mc: mcWith(P3) }));
@@ -1689,7 +1735,7 @@ console.log("--- v110 D1 · Today: the landing card and the Command tab ---");
   const h0 = r0l.html;
   {
     const lead = kind === "wildcard" ? "Play the Wildcard" : kind === "freehit" ? "Play the Free Hit"
-      : kind === "transfers" ? "Make " + w.in.length + " transfer" + (w.in.length === 1 ? "" : "s") + (w.chip && CHIP[w.chip] ? " and play the " + CHIP[w.chip] : "")
+      : kind === "transfers" ? "Make " + w.in.length + " transfer" + (w.in.length === 1 ? "" : "s") + (w.hits > 0 ? " (−" + 4 * w.hits + ")" : "") + (w.chip && CHIP[w.chip] ? " and play the " + CHIP[w.chip] : "")
         : (w.chip && CHIP[w.chip] ? "Play the " + CHIP[w.chip] : "Roll the free transfer");
     const bad = [];
     if (h0.indexOf('data-plan="solved"') < 0) bad.push("the card is not marked as the solved plan");
@@ -1797,13 +1843,19 @@ console.log("--- v110 D1 · Today: the landing card and the Command tab ---");
     const WANT = { hash: /precomputed results/, noPre: /precomputed results/, gw: new RegExp("starts at GW" + (gw + 1)), late: /deadline has passed/, lock: /premiums are locked/,
       price: /Odds tab/, flag: /flagged/ };
     const bad = [];
+    // E-180: the lock is a wildcard setting; a plan that opens with a transfer week is not solved on it and stays shown
+    const wholeWeek = w.chip === "wildcard" || w.chip === "freehit";
+    if (!wholeWeek) {
+      if (app(R.lock) || aside(R.lock)) bad.push("lock: a transfer-week plan was set aside by the wildcard lock «" + aside(R.lock) + "»");
+      delete R.lock;
+    }
     Object.keys(R).forEach(function (k) {
       const a = aside(R[k]);
       if (!app(R[k])) bad.push(k + ": the solved card still shows");
       if (!WANT[k].test(a)) bad.push(k + ": the note reads «" + a + "»");
       if (!/^Solved plan set aside/.test(a)) bad.push(k + ": the note does not say the solved plan is set aside");
     });
-    if (R.lock.ok && plain(R.lock.html).indexOf("Premiums locked") < 0) bad.push("lock: the app's own locked card is not the one shown");
+    if (R.lock && R.lock.ok && plain(R.lock.html).indexOf("Premiums locked") < 0) bad.push("lock: the app's own locked card is not the one shown");
     /* The flagged captain may be named only as a player the app's own fifteen drops (the "Not your written fifteen" panel,
        E-161): never as the captain, a pick or a buy. A name inside "The convergence rule drops …" is the card saying he is out. */
     if (R.flag.ok) {
@@ -1831,7 +1883,9 @@ console.log("--- v110 D1 · Today: the landing card and the Command tab ---");
     const bad = [];
     if (!r.ok) bad.push("threw " + (r.err && r.err.message));
     if (!/^Classic\b/.test(why) || why.indexOf(f0(pl.total) + " expected points to GW" + lastGw) < 0) bad.push("why «" + why.slice(0, 120) + "»");
-    if (nw && why.indexOf(sgn(pl.total - nw.total)) < 0) bad.push("why lacks the edge over the best plan that keeps the wildcard, " + sgn(pl.total - nw.total));
+    if (pl.managerChoice && T && okc(T.now)) {   // E-179/E-181: the solver's own best is priced beside the manager's plan
+      if (why.indexOf("with your rules (no chip before GW13") < 0 || why.indexOf(f0(T.now.total) + " (" + sgn(pl.total - T.now.total) + ")") < 0) bad.push("why lacks the solver's own best and the cost of the choice, " + f0(T.now.total) + " (" + sgn(pl.total - T.now.total) + ")");
+    } else if (nw && why.indexOf(sgn(pl.total - nw.total)) < 0) bad.push("why lacks the edge over the best plan that keeps the wildcard, " + sgn(pl.total - nw.total));
     if (!r0 || cost.indexOf(cash(r0.bank)) < 0) bad.push("cost lacks the replayed bank " + (r0 ? cash(r0.bank) : "?"));
     if (r0 && /budget line/.test(cost) !== (r0.bank < 0.35)) bad.push("the budget-line warning against a replayed bank of " + cash(r0.bank));
     if (r0 && kind === "wildcard" && r0.ftAfter === r0.ftBefore && r0.ftBefore > 0 &&
@@ -2132,7 +2186,8 @@ console.log("--- v110 D6 · the Lab tab: method, limits, dated sources ---");
     const dw = SP.draft && Array.isArray(SP.draft.weeks) ? SP.draft.weeks : [], act = MB.draft.activity || {}, runs = (MB.draft.waiverRuns || []).slice().sort(function (a, b) { return a - b; });
     const claims = Object.keys(act).reduce(function (s, t) { return s + (Number(act[t].claims) || 0); }, 0);
     const need = ["Draft roster. Solved the same way to GW" + dw[dw.length - 1], d1(SP.draft.base) + " expected Draft points as the roster stands", d1(SP.draft.value) + " solved",
-      d1(SP.draftIfTaken.value) + " if " + SP.draftAhead, "replays the league's own " + claims + " claims from the GW" + runs[0] + " to GW" + runs[runs.length - 1] + " waiver runs",
+      // the clause exists only when a team sits ahead in the waiver order (23 Oct 2026: waiver pick 1, nobody ahead)
+      SP.draftAhead ? d1(SP.draftIfTaken.value) + " if " + SP.draftAhead : d1(SP.draft.value) + " solved.", "replays the league's own " + claims + " claims from the GW" + runs[0] + " to GW" + runs[runs.length - 1] + " waiver runs",
       "Classic GW" + PR.classicSim.gw + ": " + n0(PR.classicSim.draws) + " runs", "Draft GW" + PR.h2h.gw + " head-to-head: " + n0(PR.h2h.draws) + " runs",
       "Draft claims: " + PR.claims.orderings.length + " lodging orders, " + n0(PR.claims.runs) + " runs each"];
     const bad = miss(M0, need);

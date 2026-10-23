@@ -357,9 +357,12 @@ async function main() {
   {
     const protectedIds = squad.filter((id) => (ctx.gwStats[id] || {}).konsa === true);
     const bad = sells.filter((id) => (ctx.gwStats[id] || {}).konsa === true);
+    // The rule must be live in this data, not vacuous: a protected player in the squad, or (23 Oct 2026, when nobody in the
+    // fifteen had just returned from a spell out) at least one protected player anywhere in the league's feed.
+    const leagueProtected = Object.keys(ctx.gwStats || {}).filter((id) => (ctx.gwStats[id] || {}).konsa === true);
     assert("sells-respect-the-konsa-rule",
-      !bad.length && protectedIds.length > 0,
-      "protected (returned to the XI after a spell out): " + list(protectedIds) + "; proposed sells: " + list(sells) + (bad.length ? " — SOLD A PROTECTED PLAYER: " + list(bad) : ""));
+      !bad.length && (protectedIds.length > 0 || leagueProtected.length > 0),
+      "protected (returned to the XI after a spell out): " + list(protectedIds) + " (" + leagueProtected.length + " in the league's feed); proposed sells: " + list(sells) + (bad.length ? " — SOLD A PROTECTED PLAYER: " + list(bad) : ""));
   }
 
   // ---- 5 · every buy is available in the live API
@@ -472,7 +475,18 @@ async function main() {
       solvedWhy = "solved card (" + ui.landingPlan + "): captain " + nm(W1.cap) + (named ? " named" : " NOT named") + (inPlanXi ? ", in the plan's eleven" : ", NOT in the plan's eleven") +
         (inEngXi ? ", in this engine's best eleven of that fifteen (" + bx.formation + ")" : ", NOT in this engine's best eleven of that fifteen") + " · ";
     }
-    assert("captain-in-the-xi-on-the-wildcard-path",
+    // E-180: when the written plan opens with a transfer week there is no wildcard path on the app's own card; its card is the
+    // weekly protocol's, and the twin holds that card's captain to the same test (named, in the eleven of the squad after the moves).
+    const wcPath = WRITTEN.plan === "wildcard";
+    let tpOk = true, tpWhy = "";
+    if (!wcPath) {
+      const after = ctx.squadIds.filter((id) => !tp.moves.some((m) => m.out === id)).concat(tp.moves.map((m) => m.in));
+      const bxT = E.bestXI(after, ctx);
+      tpOk = ui.ok && !!tp.captain && appText.indexOf("Captain " + nm(tp.captain)) >= 0 && !!bxT && bxT.ids.indexOf(tp.captain) >= 0 && appPlan === "app";
+      tpWhy = "transfer week: the app's own card names captain " + nm(tp.captain) + (tpOk ? ", in the eleven after its moves" : " — NOT shown or not in the eleven: " + appText.slice(0, 120).replace(/\n/g, " · "));
+    }
+    if (!wcPath) assert("captain-in-the-xi-on-the-transfer-path-(E-180)", tpOk && solvedOk, solvedWhy + tpWhy);
+    else assert("captain-in-the-xi-on-the-wildcard-path",
       wc.ok && inXi && shown && onCard && appPlan === "app" && solvedOk,
       solvedWhy + "the app's own card (" + appPlan + (expectSolved ? ", a typed price sets the solved plan aside" : "") + "): wildcard XI " + wcXI.formation + ", captain " + nm(wcXI.capId) +
         (inXi ? " is in the eleven" : " is NOT in the eleven") + "; the card " + (shown ? "names him and lists him in the fifteen" : "does not: " + appText.slice(0, 120).replace(/\n/g, " · ")));

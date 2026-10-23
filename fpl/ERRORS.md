@@ -2121,3 +2121,33 @@ CAUSE: the app, the weekly block and their suites were built while every plan of
 CAUGHT: 21 Oct 2026 19:30 SAST, the first 48-hour refresh (data hash 4b44830282387203). plan_legality 50/50 and verify 34/34 held on that plan.
 RULE: the first week of the plan of record may be a transfer week; the weekly block, the Plan tab and the suites must read the first week's chip and apply the wildcard rules only when it is a wildcard week. Until that is built, a refresh whose plan opens with a transfer week does not republish the app: the plan goes to the manager in the reply, and the tree is left at HEAD.
 TEST: none yet; the rebuild of the weekly block and the Plan tab for a transfer-week opening needs its own checks.
+
+### E-181 · v110 · chips could be planned before GW13, against the manager's new rule
+CAUSE: the solver gated Bench Boost and Triple Captain only by "still in hand", and the GW19 wildcard plan copied the never plan's chip weeks, so the 21 Oct plan carried Bench Boost GW11. The manager, 22 Oct 2026: "Only use all remaining chips from gw 13 onwards as they'll be required as I am also in a last man standing / survivor league as well."
+CAUGHT: 22 Oct 2026, the manager's message.
+RULE: no chip of any kind before GW13. In the solver this is a model constraint, the first ever made inside the reference region: classic() takes `chip_from` (default `solve.SET1_FROM`, 13) and `no_chip`, and records both in `params` as `chipFrom` and `noChip`. plan_legality declares the change as four exact string pairs (E181_DELTA), applies them to the reference region and still demands byte identity, so any other edit inside the region goes red. Three mutations prove it: a one-byte edit, the delta missing, and a pair the reference does not contain. The never case keeps GW19 free (`no_chip=(19,)`) so the manager's GW19 wildcard can always be built. The free hit is priced only in GW13–19. A stored solve whose params differ is always replaced (`solve.replaces`) and never folded into the plan (plan.cjs compares params). The app holds the same numbers in `MANAGER_CHIPS` (src/engine.js), apart from the game's `CHIP_SETS`, and `chipSolver` applies them unless asked for `gameOnly`.
+TEST: plan_legality: "no chip is played before GW13", the free-hit window, the whole-file check over the plan, the timing cases and the horizon lenses and candidates, each with a mutation, and the region check with its three mutations; unit_engine F8-E181.
+
+### E-182 · v110 · the saved squad stayed at GW6 for a week, so the D3 guard blanked the app
+CAUSE: nothing wrote `state/kwezi.json` after the 15 Oct export. The manager made five transfers in GW7, the API's picks moved, the saved fifteen did not (`confirmed_gw` 6), and D3 blocked every recommendation on the 21 Oct build.
+CAUGHT: 21 Oct 2026, the first 48-hour refresh (E-180's run).
+RULE: `node pipeline/state.cjs` runs after the bake on every refresh. It writes the squad from the picks for the gameweek in play, keyed by id, with purchase prices from the transfers feed (`element_in_cost` of the latest transfer in, else `now_cost − cost_change_start`), plus bank, free transfers and `confirmed_gw`. It prints the players in and out, and the reply lists them. It never writes silently, and it writes nothing when the file already matches the feed.
+TEST: unit_engine LIVE-STATE (the saved fifteen equals picks[current_event], `confirmed_gw` equals current_event, the free transfers equal the feed's).
+
+### E-183 · v110 · the 20 Oct "no chip after GW19" check could never fail
+CAUSE: the check filtered `weeks`, the per-week check records, which carry no `chip` field, so it passed on any plan.
+CAUGHT: 22 Oct 2026, reading the suite for E-181 (the design review).
+RULE: a plan rule reads the plan's own weeks (`pf.plan.weeks`). Every plan-level rule ships with a mutation that turns it red.
+TEST: plan_legality mutation "the last week relabelled GW20 with a chip goes red".
+
+### E-184 · v110 · the 48-hour data was blind to a Thursday flag on the armband
+CAUSE: the 21 Oct refresh (deadline − 48 h, the manager's rule E-178) ran before Wednesday's European games. Saka came off at Bayern on 21 Oct, and on 23 Oct the feed has him d 50%. He is captain or vice in most weeks of the plan solved on the 21 Oct data.
+CAUGHT: 23 Oct 2026 05:35Z, the live check (D2) before shipping.
+RULE: D2 binds over the schedule. A new flag on a player the plan recommends (a buy, the captain or the vice) sends the plan back for one fresh pull and re-solve before the deadline. That is the only exception to the 48-hour rule, and the reply names it.
+TEST: weekly.cjs refuses (a conflict, exit 4) a transfer week whose buys, captain or vice are flagged; unit_engine LIVE-WEEKLY-transfer-week-buys-captain-and-vice-are-unflagged-(E-180).
+
+### E-185 · v110 · open · the solved GW8 eleven starts Saka (d 50%) ahead of Barry, against C1 rule 3
+CAUSE: the solver chooses the eleven on expected points, and the flag scales Saka's expected points (3.16) but not the solver's start probability (`start` 0.98). C1 rule 3 says a player under P(start) 0.5 never starts ahead of one at 0.75 or more. Saka is 0.98 × 0.50 ≈ 0.49 and Barry 0.94, so the rule puts Barry in. The autosub makes the difference small, but the rule is a hard gate.
+CAUGHT: 23 Oct 2026, the 390 px screenshot of the Plan tab before shipping.
+RULE: until the eleven is re-picked under rule 3 in the pipeline (weekly.cjs re-ordering the solved eleven with the engine's bestXI, or the export carrying the flag-scaled start probability), the reply names the rule-3 eleven for the gameweek. Open: fix in the next session, with a smoke_wk check that no solved eleven breaks rule 3.
+TEST: none yet (open).

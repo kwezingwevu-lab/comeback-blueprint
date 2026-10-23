@@ -51,7 +51,13 @@ const fh = (PLAN.freeHit || []).filter((f) => f.free).sort((a, b) => b.gain - a.
 const T = PLAN.timing, tol = (pl.gap || 0) * pl.total;
 const wcWeek = pl.weeks.find((x) => x.chip === "wildcard");
 let timing = "";
-if (T && T.later && T.never) {
+const choice = pl.managerChoice && T && T.now ? T.now : null;   // E-179/E-181: the plan of record is the manager's; the solver's best is priced beside it
+const wcOf = (r) => ((r && r.weeks) || []).find((x) => x.chip === "wildcard");
+if (choice && T.never) {
+  timing = " The solver's own best under the GW13 rule plays the wildcard in GW" + ((wcOf(choice) || {}).gw || "—") + ": " + f2(choice.total) + " (" + sgn(choice.total - pl.total) + " against your GW" + (wcWeek ? wcWeek.gw : last) + " choice)." +
+    " Never: " + f2(T.never.total) + " (" + sgn(T.never.total - pl.total) + ")." +
+    " The proof's tolerance is about " + f1(tol) + " points.";
+} else if (T && T.later && T.never) {
   const lw = (T.later.weeks || []).find((x) => x.chip === "wildcard");
   timing = (wc ? " Wildcard in GW" + (lw ? lw.gw : "a later week") + " instead: " + f2(T.later.total) + " (" + sgn(T.later.total - pl.total) + ")."
     : " The wildcard: " + (wcWeek ? "the plan plays it in GW" + wcWeek.gw : "the plan keeps it to GW" + last) + "; the best plan that holds it until GW" + (gw + 1) + " or later is worth " + f2(T.later.total) + (lw ? " (wildcard GW" + lw.gw + ")" : "") + ".") +
@@ -68,7 +74,8 @@ let classic = "**Classic GW" + gw + ": " + lead + "** (deadline " + sast(ev.dl) 
   (wc ? ftAfter + " free transfers kept (a wildcard week keeps the count)." : ftAfter + (ftAfter === 1 ? " free transfer" : " free transfers") + " into GW" + (gw + 1) + ".") +
   (later.length ? " Then " + later.join(", ") + "." : "") +
   (fh ? " The free hit is held (best week GW" + fh.gw + ", " + sgn(fh.gain) + ")." : "") +
-  " The plan is worth " + f2(pl.total) + " Classic expected points to GW" + last + ", proved within " + ((pl.gap || 0) * 100).toFixed(2) + "% of the best possible." + timing +
+  " The plan is worth " + f2(pl.total) + " Classic expected points to GW" + last + (choice ? ", the proven no-wildcard plan (within " + ((pl.gap || 0) * 100).toFixed(2) + "% of the best plan without a wildcard) to GW" + (((wcWeek || {}).gw || last) - 1) + " with the fifteen rebuilt in GW" + ((wcWeek || {}).gw || last) + ", a plan built from a proof, not itself a solve."
+    : ", proved within " + ((pl.gap || 0) * 100).toFixed(2) + "% of the best possible.") + timing +
   (locks.length ? " " + andList(locks) + (locks.length === 1 ? " is the declared lock" : " are the declared locks") + " (at or over the C1.6 rival-ownership gate, kept on purpose)." : "");
 
 /* the gameweek, the month and the season (15 Oct 2026) */
@@ -79,8 +86,10 @@ if (H && H.plan && Array.isArray(H.candidates) && H.best) {
   // per horizon, and what it takes off the total to the chip stop
   const C = H.candidates, byKey = (k) => C.find((c) => c.key === k) || null, b = H.month.banked || 0, mN = H.month.name, span = "GW" + H.month.start + "–" + H.month.stop;
   const costC = (c) => H.plan.season - c.score.season;
+  // E-181: under the manager's choice a candidate that plays the wildcard in another week breaks his rule; never "free"
+  const breaks = (c) => !!choice && !!wcWeek && (c.chips || []).some((x) => x.chip === "wildcard" && x.gw !== wcWeek.gw);
   const bitC = (c, label, mine, best) => !c ? "" : label + " " + f1(mine) + (c.key === "plan" || best - mine <= 0.05 ? " (the best found)" :
-    " (best found " + f1(best) + " with \u201c" + c.label + "\u201d, costing " + f1(costC(c)) + " to GW" + last + (costC(c) <= tol + 1e-9 ? ", inside the tolerance: a free choice" : "") + ")");
+    " (best found " + f1(best) + " with \u201c" + c.label + "\u201d, costing " + f1(costC(c)) + " to GW" + last + (breaks(c) ? ", but it plays the wildcard in GW" + c.chips.find((x) => x.chip === "wildcard").gw + ", against your GW" + wcWeek.gw + " choice" : costC(c) <= tol + 1e-9 ? ", inside the tolerance: a free choice" : "") + ")");
   const bg = byKey(H.best.gameweek), bm = byKey(H.best.month), bs = byKey(H.best.season);
   horizons = "**Gameweek, month and season** (the manager's ask of 15 Oct 2026; Classic expected points, hits off). " +
     [bitC(bg, "GW" + gw, H.plan.gameweek, bg && bg.score.gameweek),
