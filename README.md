@@ -7,3 +7,4 @@ Single-file HTML fitness app for Kwezi (Johannesburg). `dist/ComebackBlueprint.h
 - Calendar: `node tools/calendar-refresh.js --geocode` writes new and moved events for human approval.
 - From the iPhone: `IPHONE.md` (cloud sessions via GitHub, publishing, CI, weekly loop).
 - Memory: `LEDGER.md` (standing rules), `CHANGELOG.md`, `LEARNINGS.md`.
+- Sibling project: `fpl/README.md` (FPL Mission Control; separate app, separate QA, not covered by this file).

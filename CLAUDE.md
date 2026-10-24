@@ -146,3 +146,9 @@ Never edit `dist/` directly. Never use `re.sub` with replacements containing `\u
 ## 9. Backlog
 
 The live list is `IMPROVEMENTS.md` (section K = queued with the reason; section L = not possible from a web app). Every session refreshes it, builds what can be verified, and moves items to "Shipped" only when a named check proves them. Run `node tools/calendar-refresh.js --geocode` once a month and add only the events you have opened at the source.
+
+## 10. Sibling project: FPL Mission Control (fpl/)
+
+- A separate app lives in `fpl/` (FPL Mission Control, v87); nothing in this file's fitness protocol applies to it.
+- It is governed by `fpl/CLAUDE.md` (its master prompt) and `fpl/ERRORS.md` (its append-only error ledger), with `fpl/CONTRACT.md` fixing names and shapes.
+- Its QA runs from `fpl/` (`npm run qa`); its CI is `.github/workflows/gate.yml`, which only triggers on `fpl/**` changes.

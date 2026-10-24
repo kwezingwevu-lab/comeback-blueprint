@@ -1,0 +1,110 @@
+{
+  "version": 87,
+  "exported_at": "2026-09-11T06:21:29Z",
+  "entry": 3546875,
+  "squad": [
+    {
+      "id": 109,
+      "purchase": 45
+    },
+    {
+      "id": 4,
+      "purchase": 80
+    },
+    {
+      "id": 423,
+      "purchase": 45
+    },
+    {
+      "id": 259,
+      "purchase": 40
+    },
+    {
+      "id": 397,
+      "purchase": 85
+    },
+    {
+      "id": 40,
+      "purchase": 75
+    },
+    {
+      "id": 368,
+      "purchase": 70
+    },
+    {
+      "id": 12,
+      "purchase": 95
+    },
+    {
+      "id": 552,
+      "purchase": 60
+    },
+    {
+      "id": 165,
+      "purchase": 75
+    },
+    {
+      "id": 411,
+      "purchase": 155
+    },
+    {
+      "id": 496,
+      "purchase": 45
+    },
+    {
+      "id": 175,
+      "purchase": 40
+    },
+    {
+      "id": 31,
+      "purchase": 45
+    },
+    {
+      "id": 212,
+      "purchase": 45
+    }
+  ],
+  "bank": 0,
+  "ft": 3,
+  "value": 1000,
+  "confirmed_gw": 3,
+  "leagues": [
+    1314671,
+    1683215,
+    26474,
+    512557,
+    989793,
+    512550
+  ],
+  "draft": {
+    "league_id": null,
+    "roster": [
+      209036,
+      446008,
+      222531,
+      204480,
+      482973,
+      517052,
+      212319,
+      108413,
+      221466,
+      153682,
+      494521,
+      489639
+    ],
+    "roster_complete": false,
+    "roster_note": "12 of 15 known (Guéhi, Mbeumo, Gibbs-White, Rice, Igor Jesus, N.Jackson, Richarlison, Hughes, Senesi, Wilson, Truffert, Verbruggen). Three bench slots are unknown: the second goalkeeper, one defender and one further outfield player (by squad shape 2-5-5-3: 1 GKP, 2 DEF/MID/FWD short). Wilson is assumed to be the Leeds midfielder (code 153682); Brentford and Coventry also have a Wilson. Supply the draft league URL and the roster is read from the API.",
+    "watchlist": []
+  },
+  "ui": {
+    "mode": "simple",
+    "tab": "command",
+    "open": {},
+    "reveals": {}
+  },
+  "ledger": [],
+  "refresh": {
+    "pair": "sonnet46",
+    "last": null
+  }
+}
