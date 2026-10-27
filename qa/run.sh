@@ -8,6 +8,7 @@ export TZ=Africa/Johannesburg
 node --check src/app_full.js
 python3 build.py
 cp dist/ComebackBlueprint.html qa/ComebackBlueprint.html
+# The whole suite takes about ten minutes. Run it as a background job and poll the output file: a foreground tool call with a ten-minute limit kills Chromium inside section AE ("Navigating frame was detached").
 # Every FAIL prints on one line (a multi-line detail once pushed the failing check's name out of a tail -3).
 cd qa && node qa_full.js | grep -E '^(FAIL|ALL PASS|RESULT)'
 # Installable/offline acceptance: serves dist/ over local HTTP, installs the service worker, kills the server, reloads.

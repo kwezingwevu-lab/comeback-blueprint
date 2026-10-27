@@ -4,7 +4,7 @@
 const {webkit}=require('playwright');const path=require('path');const fs=require('fs');
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const R=[];const T=(n,ok,d)=>R.push({name:n,ok:!!ok,detail:d});
-(async()=>{const iso=process.argv[2]||'2026-09-12';
+(async()=>{const iso=process.argv[2]||'2026-10-24';
 const b=await webkit.launch();const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
 await ctx.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
 await ctx.addInitScript(iso=>{const R=Date;const fixed=new R(iso+'T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;
@@ -14,8 +14,8 @@ const file=fs.existsSync(path.resolve(__dirname,'ComebackBlueprint.html'))?path.
 await p.goto('file://'+file,{waitUntil:'load'});await wait(1200);
 T('webkit boot: DB + switchView defined',await p.evaluate(()=>typeof DB==='object'&&typeof switchView==='function'));
 T('webkit boot: Day-1 CTA',/Start today.*Legs A/.test(await p.evaluate(()=>document.querySelector('.cta')?.textContent||'')));
-T('webkit dates: Johannesburg zone, dateAdd/todayISO stay on the local day',await p.evaluate(()=>dateAdd(START_ISO,0)===START_ISO&&dateAdd(START_ISO,7)==='2026-09-19'&&todayISO()==='2026-09-12'&&weekStartISO(1)===START_ISO));
-T('webkit copy: run-era copy retired on Lift/Numbers/footer',await p.evaluate(()=>{switchView('lift');const l=document.getElementById('view-lift').innerText;switchView('numbers');const n=document.getElementById('view-numbers').innerText;switchView('guide');const g=document.getElementById('view-guide').innerText;return /six lifting days/.test(l)&&!/Post-race|4 lifting days/.test(l)&&/Maintenance week/.test(n)&&!/Race Block|Race Time Predictor|Goal 10K/.test(n)&&/Pure Muscle · FFMI 25 · Day 1 Sat 12 Sep 2026/.test(g)&&!/Strength \+ Speed/.test(g);}));
+T('webkit dates: Johannesburg zone, dateAdd/todayISO stay on the local day',await p.evaluate(()=>dateAdd(START_ISO,0)===START_ISO&&dateAdd(START_ISO,7)==='2026-10-31'&&todayISO()==='2026-10-24'&&weekStartISO(1)===START_ISO));
+T('webkit copy: run-era copy retired on Lift/Numbers/footer',await p.evaluate(()=>{switchView('lift');const l=document.getElementById('view-lift').innerText;switchView('numbers');const n=document.getElementById('view-numbers').innerText;switchView('guide');const g=document.getElementById('view-guide').innerText;return /six lifting days/.test(l)&&!/Post-race|4 lifting days/.test(l)&&/Maintenance week/.test(n)&&!/Race Block|Race Time Predictor|Goal 10K/.test(n)&&/Pure Muscle · FFMI 25 · Day 1 Sat 24 Oct 2026/.test(g)&&!/Strength \+ Speed/.test(g);}));
 for(const v of ['home','lift','run','roadmap','fuel','numbers','track','guide']){await p.evaluate(n=>switchView(n),v);await wait(150);
   T('webkit view: '+v,await p.evaluate(n=>{const e=document.getElementById('view-'+n);return e&&e.offsetParent!==null&&e.innerHTML.length>500;},v));}
 // Storage path 1: real input → DB.save → localStorage + IndexedDB mirror + account mirror (window.storage mock).
@@ -75,10 +75,10 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  T('webkit lift: guided Next lands on the current exercise below the header, first set row on screen',!g.err&&g.top>=g.hb-2&&g.top<422&&g.row<=g.nt,JSON.stringify(g));}
 // A South African keypad types "88,4": the log fields are text fields with a decimal keypad, so Safari keeps the comma; refusals are named and save nothing.
 {await p.evaluate(()=>{switchView('track');document.querySelector('[data-tp="weight"]').click();});await wait(300);
- await p.fill('#wDate','2026-09-11');await p.fill('#wVal','88,9');await p.click('#wAdd');await wait(300);
- const c1=await p.evaluate(()=>({has:DB.weight.some(x=>x.date==='2026-09-11'&&x.v===88.9),typ:document.getElementById('wVal')?document.getElementById('wVal').type:'gone'}));
- await p.fill('#wDate','2026-09-10');await p.fill('#wVal','886');await p.click('#wAdd');await wait(300);
- const c2=await p.evaluate(()=>({none:!DB.weight.some(x=>x.date==='2026-09-10'),err:/^err/.test(document.getElementById('toast').className),msg:document.getElementById('toast').innerText}));
+ await p.fill('#wDate','2026-10-23');await p.fill('#wVal','88,9');await p.click('#wAdd');await wait(300);
+ const c1=await p.evaluate(()=>({has:DB.weight.some(x=>x.date==='2026-10-23'&&x.v===88.9),typ:document.getElementById('wVal')?document.getElementById('wVal').type:'gone'}));
+ await p.fill('#wDate','2026-10-22');await p.fill('#wVal','886');await p.click('#wAdd');await wait(300);
+ const c2=await p.evaluate(()=>({none:!DB.weight.some(x=>x.date==='2026-10-22'),err:/^err/.test(document.getElementById('toast').className),msg:document.getElementById('toast').innerText}));
  T('webkit data: "88,9" is read as 88.9 kg from a text field with a decimal keypad; 886 kg is refused with an error toast and nothing is saved',c1.has&&c2.none&&c2.err&&/between 30 and 250/.test(c2.msg),JSON.stringify({c1,c2}));}
 // Round-2 audit (27 Sep 2026): the toast, macro tiles and lean-tier tiles as Safari lays them out (WebKit clipped the Fat tile).
 {const u=await p.evaluate(async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('home');undoToast('Weigh-in deleted',()=>{});await W(450);const t=document.getElementById('toast'),sp=t.querySelector('span');const o={tw:Math.round(t.getBoundingClientRect().width),th:Math.round(sp.getBoundingClientRect().height)};t.className='';
@@ -96,20 +96,20 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
    await c.addInitScript(init);return c;};
  const open=async(c)=>{const pg=await c.newPage();pg.__errs=[];pg.on('pageerror',e=>pg.__errs.push(e.message));pg.on('console',m=>{if(m.type()==='error')pg.__errs.push(m.text());});await pg.goto('file://'+file,{waitUntil:'load'});await wait(1200);return pg;};
  // fonts and the policy
- {const c=await mkctx(MOCKS('2026-09-28')+CSPW,true);const pg=await open(c);let r=null;
+ {const c=await mkctx(MOCKS('2026-11-09')+CSPW,true);const pg=await open(c);let r=null;
   for(let i=0;i<50&&!(r&&r.mano&&r.media==='all');i++){await wait(150);r=await safe(pg,()=>{const L=[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/['"]/g,''));const lk=document.querySelector('link[rel=stylesheet][href*="fonts.googleapis"]');return {mano:L.includes('Manrope'),media:lk?lk.media:'none',csp:window.__csp.length};});}
   const bootErrs=pg.__errs.length;const n=await safe(pg,async()=>{const m=document.querySelector('meta[http-equiv="Content-Security-Policy"]');let f='allowed';try{await fetch('data:text/plain,hi');}catch(e){f='blocked';}await new Promise(r=>setTimeout(r,200));return {pol:m?m.content:'',fetch:f,viol:window.__csp.filter(v=>/^connect-src/.test(v)).length};});
   T('webkit CSP: the page policy allows the Google Fonts stylesheet and font files (Manrope loads, inline onload swap runs), boot raises no violation, and fetch is refused',!!r&&r.mano&&r.media==='all'&&r.csp===0&&!!n&&/connect-src 'none'/.test(n.pol||'')&&n.fetch==='blocked'&&n.viol>=1&&bootErrs===0,JSON.stringify({r,n,bootErrs,e:pg.__errs.join('|').slice(0,160)}));await c.close();}
  // a corrupt store already on the device
  {const BAD={cb2_weight:'[null,{},{"date":5,"v":"x"}]',cb2_sessions:'"abc"',cb2_measure:'{"a":1}',cb2_profile:'[]',cb2_bulk:'"zzz"',cb2_steps:'{oops',cb2_ceilbf:'1e999'};
-  const c=await mkctx(MOCKS('2026-09-28')+RAWS(BAD));const pg=await open(c);
+  const c=await mkctx(MOCKS('2026-11-09')+RAWS(BAD));const pg=await open(c);
   const v=await safe(pg,async(V)=>{const o=[];for(const x of V){try{switchView(x);await new Promise(r=>setTimeout(r,90));const e=document.getElementById('view-'+x);o.push(e&&e.innerHTML.length>500?1:0);}catch(err){o.push('E');}}const ban=document.getElementById('storageWarnAll');return {o,ban:ban.classList.contains('show')&&/could not be read/.test(ban.textContent),bad:Object.keys(_bad).length,w:DB.weight.length,mode:bulkMode};},['home','lift','run','roadmap','fuel','numbers','track','guide']);
   T('webkit boot: seven keys holding the wrong shape still boot in Safari; all eight views render on the defaults and one banner says what was set aside',!!v&&Array.isArray(v.o)&&v.o.every(x=>x===1)&&v.ban&&v.bad>=6&&v.w===0&&v.mode==='aggr'&&pg.__errs.length===0,JSON.stringify(v)+pg.__errs.join('|').slice(0,120));
   const rr=await safe(pg,()=>{const snap=()=>{const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);o[k]=localStorage.getItem(k);}return JSON.stringify(o);};window.confirm=()=>true;const before=snap();doRestore();const ta=document.getElementById('dataTa');if(ta)ta.value='{"cb2_weight":[null,{},{"date":5,"v":"x"}]}';const ap=document.getElementById('dataApply');if(ap)ap.click();const t=document.getElementById('toast');const a={err:/^err/.test(t.className),msg:t.innerText.slice(0,70),same:snap()===before};
-    doRestore();if(ta)ta.value='\uFEFF'+JSON.stringify({cb2_weight:[{date:'2026-09-22',v:87.7}]})+'\r\n';if(ap)ap.click();a.bom=/87\.7/.test(localStorage.getItem('cb2_weight')||'');return a;});
+    doRestore();if(ta)ta.value='\uFEFF'+JSON.stringify({cb2_weight:[{date:'2026-11-03',v:87.7}]})+'\r\n';if(ap)ap.click();a.bom=/87\.7/.test(localStorage.getItem('cb2_weight')||'');return a;});
   T('webkit restore: a wrong-shaped file is refused with nothing written, and a pasted file that starts with a byte-order mark restores',!!rr&&rr.err&&/valid backup/.test(rr.msg||'')&&rr.same&&rr.bom,JSON.stringify(rr));await c.close();}
  // full storage, and the vault connection
- {const c=await mkctx(MOCKS('2026-09-28')+RAWS({cb2_pure:'true',cb2_weight:'[{"date":"2026-09-20","v":88.4}]'}));const pg=await open(c);
+ {const c=await mkctx(MOCKS('2026-11-09')+RAWS({cb2_pure:'true',cb2_weight:'[{"date":"2026-11-01","v":88.4}]'}));const pg=await open(c);
   const r=await safe(pg,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const out={};const orig=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(/^cb2_/.test(k))throw new DOMException('quota','QuotaExceededError');return orig.call(this,k,v);};
     const el=document.getElementById('qW');if(el){el.value='90.5';quickLogWeight();}await W(80);const t=document.getElementById('toast');out.toast=t.className+'|'+t.innerText;out.undo=!!t.querySelector('.undo');const ban=document.getElementById('storageWarnAll');out.ban=ban.classList.contains('show')&&/full or refusing/.test(ban.textContent);
     Storage.prototype.setItem=orig;switchView('track');await W(150);const w2=document.getElementById('wVal');if(w2){w2.value='90.7';const ad2=document.getElementById('wAdd');if(ad2)ad2.click();}await W(80);out.ok=document.getElementById('toast').className;out.banGone=!document.getElementById('storageWarnAll').classList.contains('show');
@@ -118,8 +118,8 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
     out.del=await new Promise(res=>{const d=indexedDB.deleteDatabase('cb2');d.onsuccess=()=>res('deleted');d.onblocked=()=>res('blocked');d.onerror=()=>res('error');setTimeout(()=>res('timeout'),3000);});return out;});
   T('webkit storage: with the store full a log says "Not saved" with no Undo and the banner shows; the banner clears when writes work again; the vault connection is closed after each save',!!r&&/^err/.test(r.toast||'')&&/Not saved/.test(r.toast||'')&&r.undo===false&&r.ban===true&&!/^err/.test(r.ok||'')&&r.banGone===true&&r.opened>=3&&r.stillOpen===0&&r.del==='deleted',JSON.stringify(r));await c.close();}
  // two open copies
- {const c=await mkctx(MOCKS('2026-09-28')+"if(!sessionStorage.getItem('__s')){sessionStorage.setItem('__s','1');}");const A=await open(c);
-  await safe(A,()=>{localStorage.setItem('cb2_weight',JSON.stringify([{date:'2026-09-20',v:88.4}]));reloadDB();});
+ {const c=await mkctx(MOCKS('2026-11-09')+"if(!sessionStorage.getItem('__s')){sessionStorage.setItem('__s','1');}");const A=await open(c);
+  await safe(A,()=>{localStorage.setItem('cb2_weight',JSON.stringify([{date:'2026-11-01',v:88.4}]));reloadDB();});
   const B2=await open(c);
   await safe(B2,async()=>{const el=document.getElementById('qW');if(el){el.value='91,0';quickLogWeight();}await new Promise(r=>setTimeout(r,120));});
   let ra=null;for(let i=0;i<30&&!(ra&&ra.n===2);i++){await wait(120);ra=await safe(A,()=>({n:DB.weight.length,toast:document.getElementById('toast').innerText}));}
@@ -127,29 +127,29 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
 }
 // Round-3 stage S2 (29 Sep 2026): the Lift's logging states as Safari runs them -- Fill is a suggestion until the tick, a tap selects the cell (iOS ignores a synchronous select), gym and home sets are two records in localStorage, the Lift tab keeps its place, a resumed page redraws Home.
 {const MOCKS=iso=>"(function(){var R=Date;var base=new R('"+iso+"T09:00:00+02:00').getTime();window.__off=0;class M extends R{constructor(...a){if(a.length===0)super(base+window.__off);else super(...a);}static now(){return base+window.__off;}}window.Date=M;})();";
- const SEEDW='localStorage.clear();localStorage.setItem("cb2_pure","true");localStorage.setItem("cb2_sessions",JSON.stringify([{id:"w1",dateISO:"2026-09-21",day:"pullA",loc:"gym",entries:{la1:[{r:"10",w:"80"},{r:"10",w:"80"},{r:"9",w:"80"}]}}]));';
+ const SEEDW='localStorage.clear();localStorage.setItem("cb2_pure","true");localStorage.setItem("cb2_sessions",JSON.stringify([{id:"w1",dateISO:"2026-11-02",day:"pullA",loc:"gym",entries:{la1:[{r:"10",w:"80"},{r:"10",w:"80"},{r:"9",w:"80"}]}}]));';
  const safe=async(pg,fn,arg)=>{try{return await pg.evaluate(fn,arg);}catch(e){return {err:String(e&&e.message||e).slice(0,140)};}};
  const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
  await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
- await c.addInitScript(MOCKS('2026-09-28')+SEEDW);
+ await c.addInitScript(MOCKS('2026-11-09')+SEEDW);
  const pg=await c.newPage();const perr=[];pg.on('pageerror',e=>perr.push(e.message));pg.on('console',m=>{if(m.type()==='error')perr.push(m.text());});
  await pg.goto('file://'+file,{waitUntil:'load'});await wait(1200);
  const cell=(ex,i,f)=>'input[data-ex="'+ex+'"][data-i="'+i+'"][data-f="'+f+'"]';
  await safe(pg,()=>goToLift());await wait(300);
  await safe(pg,()=>fillFromLast('la1'));await wait(200);
- const f0=await safe(pg,()=>{const raw=JSON.parse(localStorage.getItem('cb2_sessions')||'[]');return {today:raw.filter(x=>x.dateISO==='2026-09-28').length,pend:document.querySelectorAll('#liftBody tr.set-row.pending').length,on:document.querySelectorAll('#liftBody .chk.on').length};});
+ const f0=await safe(pg,()=>{const raw=JSON.parse(localStorage.getItem('cb2_sessions')||'[]');return {today:raw.filter(x=>x.dateISO==='2026-11-09').length,pend:document.querySelectorAll('#liftBody tr.set-row.pending').length,on:document.querySelectorAll('#liftBody .chk.on').length};});
  await safe(pg,()=>document.querySelector('#liftBody .chk[data-chk="la1"][data-i="0"]').click());await wait(250);
- const f1=await safe(pg,()=>{const raw=JSON.parse(localStorage.getItem('cb2_sessions')||'[]').filter(x=>x.dateISO==='2026-09-28');return {n:raw.length,la:raw[0]&&raw[0].entries.la1?JSON.stringify(raw[0].entries.la1):null,pend:document.querySelectorAll('#liftBody tr.set-row.pending').length};});
+ const f1=await safe(pg,()=>{const raw=JSON.parse(localStorage.getItem('cb2_sessions')||'[]').filter(x=>x.dateISO==='2026-11-09');return {n:raw.length,la:raw[0]&&raw[0].entries.la1?JSON.stringify(raw[0].entries.la1):null,pend:document.querySelectorAll('#liftBody tr.set-row.pending').length};});
  T('webkit lift: Fill prefills dashed rows that are not in localStorage; the tick writes exactly that set',!!f0&&f0.today===0&&f0.pend===3&&f0.on===0&&!!f1&&f1.n===1&&f1.la==='[{"r":"10","w":"80"}]'&&f1.pend===2,JSON.stringify({f0,f1}));
  // a tap on a filled cell selects it (iOS ignores a synchronous select, so the handler also selects on a timer)
- await pg.click(cell('la1',0,'w'));let sel=null;for(let i=0;i<20;i++){await wait(60);sel=await safe(pg,()=>{const e=document.activeElement;return {f:e&&e.dataset&&e.dataset.f,a:e&&e.selectionStart,b:e&&e.selectionEnd,n:e&&e.value.length};});if(sel&&sel.n===2&&sel.a===0&&sel.b===2)break;}
+ const _wc=await pg.$(cell('la1',0,'w'));if(_wc)await _wc.click();else console.log('FAIL WebKit lift weight cell missing (la1 row 0): the seeded session is not on Day 1 any more');let sel=null;for(let i=0;i<20;i++){await wait(60);sel=await safe(pg,()=>{const e=document.activeElement;return {f:e&&e.dataset&&e.dataset.f,a:e&&e.selectionStart,b:e&&e.selectionEnd,n:e&&e.value.length};});if(sel&&sel.n===2&&sel.a===0&&sel.b===2)break;}
  T('webkit lift: tapping a filled cell selects its contents in Safari, so typing replaces it',!!sel&&sel.f==='w'&&sel.a===0&&sel.b===sel.n&&sel.n===2,JSON.stringify(sel));
  // gym set, switch to home, home set: two records, each with its own loc, in localStorage
  await safe(pg,()=>{const e=document.querySelector('input[data-ex="la1"][data-i="1"][data-f="r"]');e.value='9';e.dispatchEvent(new Event('input',{bubbles:true}));const w=document.querySelector('input[data-ex="la1"][data-i="1"][data-f="w"]');w.value='82.5';w.dispatchEvent(new Event('input',{bubbles:true}));});
  await safe(pg,()=>document.querySelector('#locSeg button[data-loc="home"]').click());await wait(300);
  const h0=await safe(pg,()=>({r0:document.querySelector('input[data-ex="la1"][data-i="0"][data-f="r"]').value,toast:document.getElementById('toast').innerText}));
  await safe(pg,()=>{const e=document.querySelector('input[data-ex="la1"][data-i="0"][data-f="r"]');e.value='12';e.dispatchEvent(new Event('input',{bubbles:true}));const w=document.querySelector('input[data-ex="la1"][data-i="0"][data-f="w"]');w.value='15';w.dispatchEvent(new Event('input',{bubbles:true}));});await wait(200);
- const h1=await safe(pg,()=>{const raw=JSON.parse(localStorage.getItem('cb2_sessions')||'[]').filter(x=>x.dateISO==='2026-09-28');return raw.map(x=>x.loc+':'+x.entries.la1.map(q=>q.r+'x'+q.w).join('/')).sort().join(' | ');});
+ const h1=await safe(pg,()=>{const raw=JSON.parse(localStorage.getItem('cb2_sessions')||'[]').filter(x=>x.dateISO==='2026-11-09');return raw.map(x=>x.loc+':'+x.entries.la1.map(q=>q.r+'x'+q.w).join('/')).sort().join(' | ');});
  T('webkit lift: after gym sets, Home opens its own empty grid and its own record; localStorage holds one record per place',!!h0&&h0.r0===''&&/Commercial Gym log/.test(h0.toast||'')&&h1==='gym:10x80/9x82.5 | home:12x15',JSON.stringify({h0,h1}));
  // the Lift tab: a re-tap changes nothing, and a round trip through Fuel comes back to the same place
  await safe(pg,()=>document.querySelector('#locSeg button[data-loc="gym"]').click());await wait(300);
@@ -163,7 +163,7 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  await safe(pg,()=>switchView('home'));await wait(250);
  await safe(pg,()=>{window.__off=20*60*1000+15*3600*1000;window.dispatchEvent(new Event('pageshow'));});await wait(300);
  const d1=await safe(pg,()=>({today:todayISO(),cta:(document.querySelector('#view-home .cta')||{}).textContent}));
- T('webkit home: a resumed page (pageshow) after the date has moved redraws Home for the new day',!!d1&&d1.today==='2026-09-29'&&/Legs B/.test(d1.cta||''),JSON.stringify(d1));
+ T('webkit home: a resumed page (pageshow) after the date has moved redraws Home for the new day',!!d1&&d1.today==='2026-11-10'&&/Legs B/.test(d1.cta||''),JSON.stringify(d1));
  T('webkit S2: no page errors in these steps',perr.length===0,perr.join('|').slice(0,200));
  await c.close();}
 // Round-3 stage S3 (29 Sep 2026): accessibility as Safari runs it -- the keyboard pattern on the tab bar and the custom accordion buttons, the focus ring (Safari's own default ring was 2.94:1 on the segment buttons), the toast live region, the Lift toggles keeping the page in place, and the tab bar's layout unchanged by the new tablist wrapper.
@@ -172,7 +172,7 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  const safe=async(pg,fn,arg)=>{try{return await pg.evaluate(fn,arg);}catch(e){return {err:String(e&&e.message||e).slice(0,140)};}};
  const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
  await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
- await c.addInitScript(MOCKS('2026-09-28')+'try{localStorage.clear();}catch(e){}'+DEMO);
+ await c.addInitScript(MOCKS('2026-11-09')+'try{localStorage.clear();}catch(e){}'+DEMO);
  const pg=await c.newPage();const perr=[];pg.on('pageerror',e=>perr.push(e.message));pg.on('console',m=>{if(m.type()==='error')perr.push(m.text());});
  await pg.goto('file://'+file,{waitUntil:'load'});await wait(1200);
  // tab bar layout: eight equal columns edge to edge (the tablist wrapper must not change the layout)

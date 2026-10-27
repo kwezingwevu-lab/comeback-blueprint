@@ -6,7 +6,7 @@ var SETS={ga1:4,ga7:4,pa1:4,pa6:4,la1:4,gb1:4,gb4:4,gb6:4,pb1:4,pb5:4,lb1:4};
 var DOW=["pullA","legsB","pushB","pullB","extras","legsA","pushA"]; // index = (UTC day + 6) % 7 → Mon..Sun
 function iso(t){return new Date(t).toISOString().slice(0,10);}
 function rnd(i){return ((i*9301+49297)%233280)/233280;}
-var D1=Date.UTC(2026,8,12),MIL=Date.UTC(2027,2,6),E=Date.parse(END+"T00:00:00Z"),DAY=864e5;
+var D1=Date.UTC(2026,9,24),MIL=Date.UTC(2027,2,6),E=Date.parse(END+"T00:00:00Z"),DAY=864e5;
 var W=[],S=[],M=[],SL=[],bw=88,i=0;
 for(var t=D1-DAY;t<E;t+=DAY){i++;var w=Math.floor((t-D1)/DAY/7)+1;
   var rate=t<=MIL+13*DAY?0.4:(w<=33?-0.5:0.3);bw+=rate/7;
