@@ -171,16 +171,16 @@ Also shipped with round 2: a 624-render sweep (dates × seeds × modes × routes
 | K3 | Weekly volume auto-tuning per region (add a set where recovery allows) | Same: needs logged soreness or performance trend, not guesses |
 | K5 | Calendar helper: more sources (Webtickets, Howler, EntryNinja) | Those pages render with scripts; needs a browser-driven scraper and a test fixture for each |
 | K6 | Auto-add to the app from the helper's report | Deliberately not done: a human approves every event (standing rule) |
-| K7 | Check-day capture form for 5–7 March (weight, five tapes, photos, one screen) | Scheduled for a February session so it can be tested against real baseline data |
+| K7 | Moot since 24 Oct 2026: the soft milestone, routes and peak week were removed (LEDGER 8-9). | Closed. |
 | K8 | Protein-per-meal tracker | Only worth it if you will log meals; say the word |
 | K9 | Heart-rate-variability readiness | Needs HRV in the Shortcut export (Garmin writes it to Apple Health on some models) |
 | K10 | Dark/light theme switch | App is dark-only by design; low value for the effort |
 | K11 | Home Screen reminders at 04:30 and 20:00 | Web push on iPhone needs a push server; the Shortcuts app can do it today (see IPHONE.md) |
 | K12 | Split the 380 KB single file into modules | Only if the file becomes hard to edit; single-file is a feature for the phone |
-| K15 | Start Mini-Cut I one week earlier (W27, 13 Mar) instead of W28 (20 Mar) | Your call, not mine: today the two weeks after the check weekend run at Maximum, then the cut. Starting a week earlier trims ~0.3 kg of fat gain and costs a week of building. Say which and it is a one-line change |
+| K15 | Moot since 24 Oct 2026: the soft milestone, routes and peak week were removed (LEDGER 8-9). | Closed. |
 | K16 | A third look at what the two audits still did not open | Still unexamined (from the critics): the iPhone keyboard covering the set grid while you log; the Events tab once the calendar snapshot goes stale (late 2027); corrupt, legacy or hand-edited backups; the share-sheet and download fallbacks; switching Gym and Home in the middle of a session; catching up a missed day; the Claude-account mirror states; VoiceOver (the set-done ticks and delete icons have no text label); a cold launch offline; a year of watch history imported in one paste; the installed Home Screen app opening with the data still in Safari. Worth one more round once there is real data |
 | K17 | Specialisation blocks: take the other muscles to maintenance? | Yours to decide. The Guide says the block's muscle takes 16-20 hard sets and everything else 6-8; built literally, weekly hard sets fall from about 177 to 101-121 and a Push B becomes seven single sets, which also contradicts the Guide's "total weekly work stays about the same". Shipped: the block's muscle takes the Guide's dose and is never trimmed; the rest keeps its base dose. If you want the literal version it is one edit (the batch is kept), and the Guide sentence would say so |
-| K18 | Waist brake in the two Maximum weeks (26-27) | Yours to decide. After the check the brake is the Maximum +3 cm, but the band route plans about +5 cm by March, so a lifter exactly on plan is told to "cut 300 kcal from the surplus" for two weeks. Options: hold the route's +5 cm until Mini-Cut I starts on 20 Mar, or start Mini-Cut I a week earlier (K15) |
+| K18 | Moot since 24 Oct 2026: the soft milestone, routes and peak week were removed (LEDGER 8-9). | Closed. |
 | K14 | Check the visual round on your iPhone | The sandbox WebKit is Playwright’s build, not iOS Safari; open the published app on the phone and report anything that looks off |
 
 ## L. Not possible from a web app (and the honest alternative)
@@ -191,3 +191,9 @@ Also shipped with round 2: a 624-render sweep (dates × seeds × modes × routes
 - Vibration on iPhone: Safari has no vibration API; the rest timer beeps instead.
 - Calling Claude from inside the app: a single-file app would have to carry an API key, which is unsafe. The check-in text is the safe bridge.
 - Certifying a score of 100 or more: the score is 96/100 and only your logged data can close the remaining gaps.
+
+
+## X. Open decisions after the 24 Oct re-anchor
+- Takealot-only supplements and Woolworths-only food are approved but not built (LEDGER 24-25). Needs two answers from Kwezi: (1) premium picks where no certified product exists (say so, or buy marketplace-claimed ones); (2) cost omega-3 and D3 at the app's "highest dose" (3 g, 4,000 IU) or its "how" dose (1-2 g, 1,000-2,000 IU) - the two lines in the app disagree.
+- sci-07 magnesium ceiling (350-400 mg vs the 350 mg upper level it quotes) and a possible collagen dose of 30 g are dose changes, Kwezi's call.
+- Round-3 stages 4-6 not yet rebuilt after the container reset: update bar, wake-lock race, chart-registry cap, wording items sci-01/02/05/06/10/11/15, and the four small additions (neck in the baseline, Brief D3 caveat, sleep in Quick log, which-copy line).
