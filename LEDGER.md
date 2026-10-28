@@ -26,3 +26,6 @@
 
 24. Supplements are to be sourced only from Takealot (24 Oct 2026). Not yet built: the app still names its earlier shops. Research is in the session scratch only.
 25. Food is to be sourced only from Woolworths (24 Oct 2026). Not yet built.
+26. Strength (28 Oct 2026, "make sure the program increases my strength to the highest natural and legal limit"): heavy top set (3-5 reps, 1-2 in reserve) plus back-offs on the six main lifts, load rising by double progression, a 3-week ramp-in after the layoff, strength tests on the week-12/24/36/48 deloads. No limit is promised; strength is tracked. Being built.
+27. Overall health is a primary objective alongside muscle and strength (28 Oct 2026, "make sure overall health is the primary objective as well"). Approved additions: yearly check-up reminders (reminders only, never medical advice), a daily walking target, one easy cardio session a week on Friday, and a sleep, stress and alcohol habits card in the Weekly Review. Running stays retired. Where muscle and health pull apart, the conflict is shown with numbers and Kwezi chooses. Being designed.
+28. Every progress update to Kwezi ends with the estimated time remaining (28 Oct 2026).
