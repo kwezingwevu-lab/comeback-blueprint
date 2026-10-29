@@ -1,0 +1,8 @@
+{"date":"2000-01-01","note":"Self-test fixture only (made-up products, never quoted by the app).","records":[
+ {"shop":"Takealot","productId":"PLID111","title":"Fixture creatine","price":100},
+ {"shop":"Takealot","productId":"PLID222","title":"Fixture whey","price":100},
+ {"shop":"Takealot","productId":"PLID333","title":"Fixture caffeine","price":50},
+ {"shop":"Woolworths","productId":"9990001","title":"Fixture oats","size":"Fixture oats","price":47.99},
+ {"shop":"Woolworths","productId":"9990002","title":"Fixture eggs","size":"Fixture eggs","price":31.99},
+ {"shop":"Woolworths","productId":"9990003","title":"Fixture milk","size":"Fixture milk","price":99.99}
+]}

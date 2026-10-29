@@ -1,5 +1,17 @@
 # CHANGELOG.md — what has shipped (newest first)
 
+## 2026-10-29 - Strength top set + back-offs; Takealot supplements and Woolworths food with verified prices
+Kwezi asked for a strength programme that builds maximal strength within the natural and legal limit, supplements sourced only from Takealot, and food only from Woolworths. Verified on the merged build: gate 493/493 (run.sh), PWA 11/11, calendar and price self-tests PASS, WebKit 50/50, sweep clean at 390 and 375 px (512 renders each).
+- Strength: the six main lifts (back squat, deadlift, bench, heavy overhead press, barbell row, heavy pull-up or pulldown) open with one top set of 3-5 reps at 1-2 reps in reserve, then back-offs of 5-8 reps at about 90%. Total sets are unchanged.
+- Top-set progression: +2.5 kg upper body, +5 kg squat and deadlift, after 5 reps at RIR 2 or more. A missing RPE holds the load. Weeks 1-3 run the top set at RIR 3.
+- Strength test on the deload weeks 12, 24, 36 and 48 (9 Jan 2027, 3 Apr, 26 Jun, 18 Sep), logged into Tested 1-rep max. Gated: fewer than 4 lift days the week before, sleep averaging under 7 h, or a Weekly Review flag. Short nights and warnings do not take a test.
+- Home mode unchanged; heavy work needs the gym.
+- Supplements: Takealot only, each with a standard pick and a premium pick where Takealot lists one. Costs at the how-to doses (omega-3 1-2 g, D3 1,000-2,000 IU only if low). "No certified version on Takealot" where no listing names Informed Sport or Informed Choice. Prices read "verified 28 Oct 2026".
+- Food: Woolworths only, with verified prices. The weekly grocery total is computed from its 18 lines (R1,339.26). Day totals stay within 2% of the earlier plan.
+- Science wording: ashwagandha liver caution (the "8 weeks on, 2 off" cycle is gone); caffeine 3-6 mg/kg with a cap of about 400 mg a day; collagen 15 g is a floor; D3 is a ceiling, not a target; magnesium wording only.
+- tools/price-refresh.js re-queries both shops (curl, no new dependencies), reports drift and never edits the app. Its self-test runs in qa/run.sh; npm run prices.
+- Not done: the health features (check-up reminders, step target, Friday cardio option, sleep and habits card) are designed and approved but not built yet; they follow in the next build. Prices are a snapshot and will drift; run npm run prices to check them.
+
 ## 2026-10-28 - Day 1 is Sat 24 Oct 2026; no soft milestone, routes or peak week
 Kwezi re-anchored the plan to start today and dropped the soft milestone completely. Verified: Chromium 457/457, PWA 11/11, WebKit 49/49, sweep clean at 390 and 375 px (512 renders), calendar self-test pass, CI green.
 - Day 1 = Sat 24 Oct 2026 (Legs A). Deload weeks start 28 Nov, 9 Jan, 20 Feb, 3 Apr.

@@ -15,3 +15,5 @@ cd qa && node qa_full.js | grep -E '^(FAIL|ALL PASS|RESULT)'
 node pwa.js | tail -2
 # Calendar refresh helper: parser and diff self-test (the live sweep is run by hand: node tools/calendar-refresh.js --geocode).
 node ../tools/calendar-refresh.js --selftest | tail -1
+# Price drift helper: offline self-test against tools/prices/fixture (the live check is run by hand: node tools/price-refresh.js).
+node ../tools/price-refresh.js --selftest | tail -1

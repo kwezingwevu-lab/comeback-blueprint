@@ -140,7 +140,7 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  const f0=await safe(pg,()=>{const raw=JSON.parse(localStorage.getItem('cb2_sessions')||'[]');return {today:raw.filter(x=>x.dateISO==='2026-11-09').length,pend:document.querySelectorAll('#liftBody tr.set-row.pending').length,on:document.querySelectorAll('#liftBody .chk.on').length};});
  await safe(pg,()=>document.querySelector('#liftBody .chk[data-chk="la1"][data-i="0"]').click());await wait(250);
  const f1=await safe(pg,()=>{const raw=JSON.parse(localStorage.getItem('cb2_sessions')||'[]').filter(x=>x.dateISO==='2026-11-09');return {n:raw.length,la:raw[0]&&raw[0].entries.la1?JSON.stringify(raw[0].entries.la1):null,pend:document.querySelectorAll('#liftBody tr.set-row.pending').length};});
- T('webkit lift: Fill prefills dashed rows that are not in localStorage; the tick writes exactly that set',!!f0&&f0.today===0&&f0.pend===3&&f0.on===0&&!!f1&&f1.n===1&&f1.la==='[{"r":"10","w":"80"}]'&&f1.pend===2,JSON.stringify({f0,f1}));
+ T('webkit lift: Fill prefills dashed rows that are not in localStorage; the tick writes exactly that set',!!f0&&f0.today===0&&f0.pend===3&&f0.on===0&&!!f1&&f1.n===1&&f1.la==='[{"r":"5","w":"80"}]'&&f1.pend===2,JSON.stringify({f0,f1}));
  // a tap on a filled cell selects it (iOS ignores a synchronous select, so the handler also selects on a timer)
  const _wc=await pg.$(cell('la1',0,'w'));if(_wc)await _wc.click();else console.log('FAIL WebKit lift weight cell missing (la1 row 0): the seeded session is not on Day 1 any more');let sel=null;for(let i=0;i<20;i++){await wait(60);sel=await safe(pg,()=>{const e=document.activeElement;return {f:e&&e.dataset&&e.dataset.f,a:e&&e.selectionStart,b:e&&e.selectionEnd,n:e&&e.value.length};});if(sel&&sel.n===2&&sel.a===0&&sel.b===2)break;}
  T('webkit lift: tapping a filled cell selects its contents in Safari, so typing replaces it',!!sel&&sel.f==='w'&&sel.a===0&&sel.b===sel.n&&sel.n===2,JSON.stringify(sel));
@@ -150,7 +150,7 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  const h0=await safe(pg,()=>({r0:document.querySelector('input[data-ex="la1"][data-i="0"][data-f="r"]').value,toast:document.getElementById('toast').innerText}));
  await safe(pg,()=>{const e=document.querySelector('input[data-ex="la1"][data-i="0"][data-f="r"]');e.value='12';e.dispatchEvent(new Event('input',{bubbles:true}));const w=document.querySelector('input[data-ex="la1"][data-i="0"][data-f="w"]');w.value='15';w.dispatchEvent(new Event('input',{bubbles:true}));});await wait(200);
  const h1=await safe(pg,()=>{const raw=JSON.parse(localStorage.getItem('cb2_sessions')||'[]').filter(x=>x.dateISO==='2026-11-09');return raw.map(x=>x.loc+':'+x.entries.la1.map(q=>q.r+'x'+q.w).join('/')).sort().join(' | ');});
- T('webkit lift: after gym sets, Home opens its own empty grid and its own record; localStorage holds one record per place',!!h0&&h0.r0===''&&/Commercial Gym log/.test(h0.toast||'')&&h1==='gym:10x80/9x82.5 | home:12x15',JSON.stringify({h0,h1}));
+ T('webkit lift: after gym sets, Home opens its own empty grid and its own record; localStorage holds one record per place',!!h0&&h0.r0===''&&/Commercial Gym log/.test(h0.toast||'')&&h1==='gym:5x80/9x82.5 | home:12x15',JSON.stringify({h0,h1}));
  // the Lift tab: a re-tap changes nothing, and a round trip through Fuel comes back to the same place
  await safe(pg,()=>document.querySelector('#locSeg button[data-loc="gym"]').click());await wait(300);
  const y=await safe(pg,()=>{const x=document.querySelectorAll('#liftBody .ex')[3];const y=Math.round(x.getBoundingClientRect().top+scrollY-120);window.scrollTo(0,y);document.getElementById('liftBody').dataset.mark='1';return y;});await wait(150);
@@ -208,6 +208,18 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  const t1=await safe(pg,()=>{const b=window.__ub;if(b)b.click();return {u:window.__u,btns:document.querySelectorAll('#toast button').length};});
  T('webkit a11y: the toast is a live region from first paint (alert for errors); a faded toast leaves no words or Undo, and a stale Undo runs nothing',!!t0&&t0.fresh==='status/polite'&&t0.bad==='alert/assertive'&&gone&&!!t1&&t1.u===0&&t1.btns===0,JSON.stringify({t0,gone,t1}));
  T('webkit a11y: no page errors in these steps',perr.length===0,perr.join('|').slice(0,200));
+ await c.close();}
+// Strength (28 Oct 2026): the Lift set grid in Safari's engine -- a Top row, back-off rows, the 90% back-off suggestion, the top-set rest
+{const MOCKS=iso=>"(function(){var R=Date;var base=new R('"+iso+"T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(base);else super(...a);}static now(){return base;}}window.Date=M;})();";
+ const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
+ await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
+ await c.addInitScript(MOCKS('2026-11-21')+'localStorage.clear();localStorage.setItem("cb2_pure","true");');
+ const pg=await c.newPage();const perr=[];pg.on('pageerror',e=>perr.push(e.message));
+ await pg.goto('file://'+file,{waitUntil:'load'});await wait(1200);
+ let g=null;try{g=await pg.evaluate(()=>{switchView('lift');curDay='legsA';renderDayPills();renderLiftDay();const ex=document.querySelector('#liftBody .ex');const rows=[...ex.querySelectorAll('.set-row')];const w=document.querySelector('input[data-ex="ga1"][data-i="0"][data-f="w"]'),r=document.querySelector('input[data-ex="ga1"][data-i="0"][data-f="r"]');
+  r.value='5';r.dispatchEvent(new Event('input',{bubbles:true}));w.value='100';w.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#liftBody .chk[data-chk="ga1"][data-i="0"]').click();
+  return {n:rows.length,l0:rows[0].querySelector('.set-no').textContent,l1:rows[1].querySelector('.set-no').textContent,top:!!ex.querySelector('.set-sep[data-kind="top"]'),sug:(ex.querySelector('.bo-sug')||{}).textContent,ph:document.querySelector('input[data-ex="ga1"][data-i="1"][data-f="w"]').placeholder,rest:_restLeft,stop:/Stop the set, and the session/.test(ex.innerText)};});}catch(e){g={err:String(e.message).slice(0,140)};}
+ T('webkit strength: Legs A squat draws Top + back-off rows, suggests about 90 kg after a 100 kg top set, starts a 4-minute rest and shows the stop rules',!!g&&g.n===6&&g.l0==='Top'&&g.l1==='B1'&&g.top&&/^about 90 kg/.test(g.sug||'')&&g.ph==='90'&&g.rest===240&&g.stop&&perr.length===0,JSON.stringify({g,perr}));
  await c.close();}
 T('webkit: no page/console errors',errs.length===0,errs.join('|').slice(0,300));
 await b.close();
