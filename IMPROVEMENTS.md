@@ -183,6 +183,9 @@ Also shipped with round 2: a 624-render sweep (dates × seeds × modes × routes
 | K18 | Moot since 24 Oct 2026: the soft milestone, routes and peak week were removed (LEDGER 8-9). | Closed. |
 | K14 | Check the visual round on your iPhone | The sandbox WebKit is Playwright’s build, not iOS Safari; open the published app on the phone and report anything that looks off |
 
+- **K19 Second heavy exposure for bench and squat.** Both are heavy once a week (Push A, Legs A). A second top-set day adds exercises and volume, so it is Kwezi's call. Queued 29 Oct 2026.
+- **K20 Strength decisions to confirm (29 Oct 2026).** (1) A missing RPE holds the top-set load. (2) The test gate: fewer than 4 lift days the week before, sleep under 7 h, or a review flag. (3) Tests only in weeks 12/24/36/48. (4) Roadmap re-test tags moved to those weeks. (5) Home mode still shows RIR 0. (6) The two whey picks are costed on different bases (per shake versus per gram of protein); cosmetic.
+
 ## L. Not possible from a web app (and the honest alternative)
 
 - Direct Garmin or Apple Health sync: no web access to either. Route stays Garmin → Apple Health → Shortcut → paste.

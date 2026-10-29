@@ -66,3 +66,7 @@ See CLAUDE.md §6 for the numbered list. Additions:
 - 2026-10-28: A test section added after `await b.close()` runs against a closed browser (ConnectionClosedError). Put new sections before the close, and run the whole Chromium suite as a background job: it takes about 10 minutes and a foreground command at the tool's 10-minute limit kills Chromium mid-run ("Navigating frame was detached").
 - 2026-10-28: When a re-anchor shifts every plan date, shift from the ORIGINAL test file with one rule, not by hand on a half-migrated copy; real-world dated tests (events, calendar tool, import-parser formats) keep their absolute dates. Deleting a function means grepping qa/ as well as src/.
 - 2026-10-28: Removing a card can silently remove things that lived inside it (here the baseline-tapes row and the ETA waypoints); a test per surviving feature caught both.
+
+## 29 Oct 2026
+- Two stages built from the same base merge cleanly with `git merge-file` against the shared base. Test sections that both append before `await b.close();` conflict only at that spot; a union merge keeps both. Run the full gate on the merged tree, never trust the two stage gates alone (merged 493 = 482 + 11).
+- Background agents and workflows stop on the 5-hour usage limit mid-task; their work survives in the sandbox. Resume with SendMessage or resumeFromRunId after the reset instead of restarting.
