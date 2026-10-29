@@ -1,6 +1,6 @@
 # LEDGER.md — standing rules set by Kwezi (verbatim intent; do not soften)
 
-1. "Make this purely about gaining muscle now." Running retired outright. Muscle is the entire point.
+1. "Make this purely about gaining muscle now." Running retired outright. Muscle is the point, and since 28 Oct 2026 overall health stands beside it (rule 27). Nothing in the health layer may cut training, food or recovery that muscle needs without showing the conflict with numbers.
 2. "Target FFMI = 25." Goal 102.3 kg @ 24% encodes exactly FFMI 25.00. Natural ceiling 77.7 kg lean.
 3. "At any cost that's legal." Anabolics excluded by the user's own rule. Legal, natural, aggressive.
 4. Honest scoring. Never certify >100. Score held at 96/100; moves only when a named gap opens/closes.
@@ -17,7 +17,7 @@
 15. Storage: four copies (device store, IndexedDB vault, Claude account when inside Claude, backup file to iCloud Drive/Google Drive via share sheet). Weekly backup file; age indicator turns red at 7 days.
 16. Address: Bellcanto Estate, North Riding (coordinates only in code; no house number in the app).
 17. "Never ever hallucinate." "Never make the same error more than once."
-18. "Have minimal rest days — only enough to promote maximum and optimal muscle growth": Friday is active recovery by default (Extras pump, RIR 2, 30–40 min); full rest only in deload weeks or when the Weekly Review flags stalls/sleep; never a seventh lifting day; rest between compound sets stays 2–3 min.
+18. "Have minimal rest days — only enough to promote maximum and optimal muscle growth": Friday is active recovery: the Extras pump and/or 30 min easy cardio, chosen each week (reworded 28 Oct 2026, D1); never a seventh lifting day; full rest only in deload weeks or on Weekly Review flags (stalls/sleep); rest between compound sets stays 2–3 min.
 19. The project must be buildable from the iPhone: repo on GitHub, Claude app → Code → cloud session, kickoff prompt, dist file opened in Safari. Never report a QA step that did not run.
 20. Style: SA English, warm-direct, own errors, no hyperlinks in drafts, AI Invisibility Standard.
 21. "Think of an exhaustive list of improvements, enhancements, upgrades and refinements across the board and implement all" (26 Sep 2026): every session refreshes IMPROVEMENTS.md, builds everything on it that can be verified, and states why the rest waits. Shipped means a named check proves it.
@@ -26,3 +26,6 @@
 
 24. Supplements are to be sourced only from Takealot (24 Oct 2026). Not yet built: the app still names its earlier shops. Research is in the session scratch only.
 25. Food is to be sourced only from Woolworths (24 Oct 2026). Not yet built.
+26. Strength (28 Oct 2026, "make sure the program increases my strength to the highest natural and legal limit"): heavy top set (3-5 reps, 1-2 in reserve) plus back-offs on the six main lifts, load rising by double progression, a 3-week ramp-in after the layoff, strength tests on the week-12/24/36/48 deloads. No limit is promised; strength is tracked. Being built.
+27. Overall health is a primary objective alongside muscle and strength (28 Oct 2026, "make sure overall health is the primary objective as well"). Approved additions: yearly check-up reminders (reminders only, never medical advice), a daily walking target, one easy cardio session a week on Friday, and a sleep, stress and alcohol habits card in the Weekly Review. Running stays retired. Where muscle and health pull apart, the conflict is shown with numbers and Kwezi chooses. Built 29 Oct 2026: yearly check-up reminder, walking target of 10,000 steps from cb2_steps (Kwezi D2; the evidence plateau is 8,000-10,000), optional easy cardio on Friday (30 min, conversational), sleep-stress-drinks card read by the Weekly Review (stress never moves the deload, D4). Reminders only; no medical advice or result ranges. Caffeine default shown 3 mg/kg with a BP/heart-rhythm caution (D3).
+28. Every progress update to Kwezi ends with the estimated time remaining (28 Oct 2026).

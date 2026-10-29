@@ -152,7 +152,7 @@ const d5=await tt('2027-02-16');T('time: mid-Feb 2027 = Posterior specialization
  const st=await q.evaluate(()=>({w:DB.weight.length,profile:DB.profile.weight,sleep:DB.sleep.length,rhr:DB.rhr.length,steps:DB.steps.length,ls:JSON.parse(localStorage.getItem('cb2_sleep')||'[]').length,dedupe:DB.sleep.filter(x=>x.date==='2026-10-24').length}));
  T('import: merged into DB + persisted + profile synced to latest weight',st.w===4&&+st.profile===88.4&&st.sleep===5&&st.rhr===4&&st.steps===3&&st.ls===5&&st.dedupe===1,JSON.stringify(st));
  await q.evaluate(()=>renderHome());await wait(300);
- const rc=await q.evaluate(()=>{const t=document.body.innerText;const v=weeklyReview();return {chips:/7\.4 h/.test(t)&&/52 bpm/.test(t)&&/8,200|8 200/.test(t),sleepRule:/Sleep averaged/.test(v.verdict),avg:+((DB.sleep.filter(x=>x.date>=dateAdd(todayISO(),-7)).reduce((a,x)=>a+x.h,0))/5).toFixed(2)};});
+ const rc=await q.evaluate(()=>{const t=document.body.innerText;const v=weeklyReview();return {chips:/7\.4 h/.test(t)&&/52 bpm/.test(t)&&/8,200|8 200/.test(t)&&/target 10,000/.test(t),sleepRule:/Sleep averaged/.test(v.verdict),avg:+((DB.sleep.filter(x=>x.date>=dateAdd(todayISO(),-7)).reduce((a,x)=>a+x.h,0))/5).toFixed(2)};});
  T('recovery: chips on Home (sleep, rhr, steps)',rc.chips);T('review: sleep < 7 h avg ⇒ recovery verdict',rc.sleepRule,JSON.stringify(rc));
  T('import: UI present in Data card',await q.evaluate(()=>!!document.getElementById('healthTa')&&document.body.innerText.includes('Watch data')));
  await q.evaluate(()=>switchView('guide'));await wait(300);T('guide: watch recipe card',await q.evaluate(()=>document.body.innerText.includes('Connect Apple Watch & Garmin')));
@@ -233,8 +233,8 @@ const d5=await tt('2027-02-16');T('time: mid-Feb 2027 = Posterior specialization
  await q.evaluate(()=>switchView('guide'));await wait(300);T('rest: doctrine in Guide',await q.evaluate(()=>document.body.innerText.includes('minimal by design, and why not zero')));
  T('V: no errors',q.__errs.length===0,q.__errs.join('|'));await q.close();}
 {const q=await page(b,'2026-12-04',()=>{localStorage.clear();localStorage.setItem('cb2_pure',JSON.stringify(true));});
- const d=await q.evaluate(()=>({deload:isDeloadWeek(),dow:DOW[new Date().getDay()],title:document.body.innerText.includes('Rest Day — Deload Week'),cta:document.querySelector('.cta')?.textContent||''}));
- T('rest: deload-week Friday = full rest',d.deload&&d.dow==='Fri'&&d.title&&/Deload week rest day/.test(d.cta),JSON.stringify(d));await q.close();}
+ const d=await q.evaluate(()=>({deload:isDeloadWeek(),dow:DOW[new Date().getDay()],title:document.body.innerText.includes('Rest Day — Deload Week'),cardio:document.body.innerText.includes('Easy cardio'),cta:document.querySelector('.cta')?.textContent||''}));
+ T('rest: deload-week Friday = full rest',d.deload&&d.dow==='Fri'&&d.title&&!d.cardio&&/Deload week rest day/.test(d.cta),JSON.stringify(d));await q.close();}
 
 // ===== W. Pure-muscle copy retired, Johannesburg-zone dates, date-aware calendar, focus-aware time estimate (11 Sep 2026) =====
 {const q=await page(b,'2026-10-24',()=>{localStorage.clear();localStorage.setItem('cb2_pure',JSON.stringify(true));});
@@ -263,7 +263,7 @@ const d5=await tt('2027-02-16');T('time: mid-Feb 2027 = Posterior specialization
  T('numbers: profile save still works without the 10K field',await q.evaluate(()=>DB.profile.weight===88.5&&!!document.getElementById('rCal').textContent.match(/\d/)));
  await q.evaluate(()=>switchView('guide'));await wait(300);
  const g=await q.evaluate(()=>({t:document.getElementById('view-guide').innerText,h:document.getElementById('view-guide').innerHTML}));
- T('guide: interference card rewritten, six-day split, footer re-anchored to Day 1',/Why Running Is Retired \(the interference effect\)/.test(g.t)&&/six-day split/.test(g.t)&&/Pure Muscle · FFMI 25 · Day 1 Sat 24 Oct 2026/.test(g.t)&&/Add load gradually/.test(g.t)&&!/Four lifting days, two runs|Running Is Trimmed|Strength \+ Speed|Built for 24 September|Build running volume/.test(g.t),g.t.slice(-300));
+ T('guide: interference card rewritten, six-day split, footer re-anchored to Day 1',/Why Running Is Retired \(the interference effect\)/.test(g.t)&&/six-day split/.test(g.t)&&/Muscle · Strength · Health · FFMI 25 · Day 1 Sat 24 Oct 2026/.test(g.t)&&/Add load gradually/.test(g.t)&&!/Four lifting days, two runs|Running Is Trimmed|Strength \+ Speed|Built for 24 September|Build running volume/.test(g.t),g.t.slice(-300));
  T('guide: region card explains the deliberate lower-back band',/held in the gold band on purpose/.test(g.h));
  await q.evaluate(()=>switchView('fuel'));await wait(300);
  const f=await q.evaluate(()=>document.getElementById('view-fuel').innerHTML);
@@ -305,7 +305,7 @@ for(const [iso,lab] of [['2026-11-08','Push A'],['2026-11-10','Legs B'],['2026-1
  T('home '+iso+': no errors',q.__errs.length===0,q.__errs.join('|'));await done(q);}
 // X3 Deload Friday: Brief says full rest, Today card has no pump buttons; X4 week strip labels
 {const q=await ctxPage('2026-12-04');const h=await q.evaluate(()=>({t:document.getElementById('view-home').innerText,h:document.getElementById('view-home').innerHTML}));
- T('deload Friday: Brief = full rest, no Extras Pump button',/Today: Full rest — deload week/.test(h.t)&&!/goToExtras\(\)">[^<]*<svg[\s\S]{0,400}Extras Pump/.test(h.h)&&!/Main day instead/.test(h.t),h.t.match(/Today:[^\n]*/)+'');
+ T('deload Friday: Brief = full rest, no Extras Pump button',/Today: Full rest — deload week/.test(h.t)&&!/goToExtras\(\)">[^<]*<svg[\s\S]{0,400}Extras Pump/.test(h.h)&&!/Main day instead/.test(h.t)&&!/Easy cardio/.test(h.t),h.t.match(/Today:[^\n]*/)+'');
  T('strip: deload-week Friday reads Rest',/FRI(\s+TODAY)?\s*\n?\s*Rest/i.test(h.t.replace(/\n+/g,'\n')),'');await done(q);}
 {const q=await ctxPage('2026-11-07');const h=await q.evaluate(()=>document.getElementById('view-home').innerText);
  T('strip: normal Friday reads Pump; Jump In says Events, not Run Plan',/FRI\s*\n?\s*Pump/i.test(h.replace(/\n+/g,'\n'))&&/Events/.test(h)&&!/Run Plan/.test(h));
@@ -455,7 +455,7 @@ const nextT=async q=>q.evaluate(()=>[...document.querySelectorAll('#liftBody .ne
  T('Y readiness reaches Lift: short-night note and no aggressive +1 set',r.note&&!r.plus,JSON.stringify(r));await done(q);}
 {const q=await ctxPage('2026-11-28');await q.evaluate(()=>switchView('run'));await wait(300);const t=await q.evaluate(()=>document.getElementById('view-run').innerText);
  T('Y calendar: HYROX stays listed on its third day as "on now"; estate name not rendered; parkrun distances computed',/Virgin Active HYROX Johannesburg[\s\S]{0,300}on now/i.test(t)&&!/Bellcanto/.test(t)&&/Nearest by straight line: Golden Harvest ~3 km/.test(t),'');
- T('Y backup keys: one global list, every setting included',await q.evaluate(()=>Array.isArray(BACKUP_KEYS)&&['cb2_wakelock','cb2_loc','cb2_fuelq','cb2_focuslb','cb2_radius','cb2_march','cb2_bulk'].every(k=>BACKUP_KEYS.includes(k))));await done(q);}
+ T('Y backup keys: one global list, every setting included',await q.evaluate(()=>Array.isArray(BACKUP_KEYS)&&['cb2_wakelock','cb2_loc','cb2_fuelq','cb2_focuslb','cb2_radius','cb2_march','cb2_bulk','cb2_health'].every(k=>BACKUP_KEYS.includes(k))));await done(q);}
 // ===== Z. Visual layer (26 Sep 2026): true-scale charts, a text floor, finger-sized targets, undo on delete. Measured at 390 px, the phone width. =====
 {const VSEED={cb2_weight:[{date:'2026-10-24',v:88},{date:'2026-10-31',v:88.4},{date:'2026-11-06',v:88.8}],cb2_measure:[{date:'2026-10-24',waist:92,neck:39,arm:37},{date:'2026-11-07',waist:92.4,neck:39,arm:37.3}],cb2_sessions:[S('2026-10-24','legsA',{ga1:sets([[8,100],[8,100]])}),S('2026-10-31','legsA',{ga1:sets([[8,102.5],[8,102.5]])})]};
  const q=await ctxPage('2026-11-07',VSEED);await q.setViewport({width:390,height:844});await wait(300);
@@ -674,7 +674,7 @@ const nextT=async q=>q.evaluate(()=>[...document.querySelectorAll('#liftBody .ne
  {const q=await ctxPage('2026-11-08',{},DEMO+"localStorage.setItem('cb2_measure',JSON.stringify([{date:'2026-10-23',waist:92},{date:'2026-11-07',waist:97.5}]));");const a=await H(q);
   T('AC coach-02 a red verdict: the Brief points at the Weekly Review instead of saying "All engines fed"',/Waist is \+5\.5/.test(a.review)&&/Weekly Review below has one correction/.test(a.brief)&&!/All engines fed/.test(a.brief),JSON.stringify({b:(a.brief||'').slice(-260),r:(a.review||'').slice(0,200)}));await fin(q);}
  {const sl=[];for(let i=1;i<=6;i++)sl.push({date:addD('2026-11-13',-i),h:6});const q=await ctxPage('2026-11-13',{cb2_sessions:week('2026-11-07',ORD.slice(0,6)),cb2_sleep:sl});const a=await H(q);
-  T('AC coach-02 sleep verdict on a Friday: Today card, CTA, week strip and Brief all say full rest (no gold pump button)',/^Full Rest/.test(a.title)&&/^Full rest today/.test(a.cta)&&!/Extras pump/.test(a.cta)&&/Fri( today)?Rest/.test(a.strip)&&/Today: Full rest/.test(a.brief)&&/Sleep averaged 6\.0/.test(a.review),JSON.stringify({t:a.title,c:a.cta,s:a.strip,b:(a.brief||'').slice(0,160)}));
+  T('AC coach-02 sleep verdict on a Friday: Today card, CTA, week strip and Brief all say full rest (no gold pump button)',/^Full Rest/.test(a.title)&&/^Full rest today/.test(a.cta)&&!/Extras pump/.test(a.cta)&&/Fri( today)?Rest/.test(a.strip)&&/Today: Full rest/.test(a.brief)&&/Sleep averaged 6\.0/.test(a.review)&&!/Easy cardio/.test(JSON.stringify(a)),JSON.stringify({t:a.title,c:a.cta,s:a.strip,b:(a.brief||'').slice(0,160)}));
   await q.evaluate(()=>{window.scrollTo(0,0);const c=document.querySelector('#view-home .cta');if(c)c.click();});await wait(900);const y=await q.evaluate(()=>{const r=document.getElementById('reviewCard');return r?Math.round(r.getBoundingClientRect().top):null;});
   T('AC coach-02 the full-rest CTA scrolls to the Weekly Review',y!==null&&y>=-5&&y<220,String(y));await fin(q);}
  // coach-03 / cal-02: the waist brake in a cut, after the check and after the cut
@@ -1780,5 +1780,104 @@ const GOODSLEEP=[{date:'2027-01-04',h:7.6},{date:'2027-01-05',h:7.4},{date:'2027
  T('AG fit: picks and the price guide wrap inside the card at 390 and 375 px (no overflow, no sideways scroll)',[390,375].every(w=>fit[w]&&!fit[w].err&&fit[w].over===0&&fit[w].page&&fit[w].n===12),JSON.stringify(fit));
  T('AG: no page errors',q.__errs.length===0,q.__errs.join('|').slice(0,300));
  await done(q);}
+// ===== HX. Health layer (28 Oct 2026): mission copy, check-up, walking, Friday cardio, habits, rules, backup, copy greps =====
+// Self-contained (own hx* helpers) so the section can also run alone for mutation proofs. Every step is null-safe.
+{const hxSeed=o=>'localStorage.clear();'+Object.entries(Object.assign({cb2_pure:true},o)).map(([k,v])=>'localStorage.setItem('+JSON.stringify(k)+','+JSON.stringify(JSON.stringify(v))+');').join('');
+ const hxCtx=async(iso,seed)=>{const c=await b.createBrowserContext();const q=await page(c,iso,hxSeed(seed||{}));q.__ctx=c;return q;};
+ const hxDone=async q=>{try{await q.__ctx.close();}catch(e){}};
+ const hxEv=async(q,f,a)=>{try{return await q.evaluate(f,a);}catch(e){return {err:String(e&&e.message||e).slice(0,160)};}};
+ const hxD=(iso,n)=>{const d=new Date(iso+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+ const hxSets=a=>a.map(([r,w])=>({r:String(r),w:String(w)}));
+ const HXEX={legsA:'ga1',pushA:'pa1',pullA:'la1',legsB:'gb1',pushB:'pb1',pullB:'lb1'},HXORD=['legsA','pushA','pullA','legsB','pushB','pullB'];
+ const hxWeek=sat=>HXORD.map((d,i)=>({id:'hx'+sat+d,dateISO:hxD(sat,i),day:d,loc:'gym',entries:{[HXEX[d]]:hxSets([[8,100],[8,100],[8,100]])}}));
+ const HC0={last:null,bp:null,snooze:null,off:false};
+ const hxH=(wk,hc)=>({hc:Object.assign({},HC0,hc||{}),wk:wk||[]});
+ // HX1 mission copy
+ {const q=await hxCtx('2026-11-07');const m=await hxEv(q,()=>{switchView('home');const hr=document.querySelector('.hero-race');const s=document.querySelector('.hr-s');switchView('run');const ev=document.getElementById('view-run').innerText;switchView('guide');const g=document.getElementById('view-guide').innerText;switchView('home');
+   return {hero:s?s.textContent:'',fit:hr?hr.scrollWidth<=hr.clientWidth+1:false,page:document.documentElement.scrollWidth<=innerWidth,title:document.title,ev,g};});
+  T('HX mission: hero reads "Muscle, strength, health · Aggressive to 30 Apr 2027"',/Muscle, strength, health · Aggressive to 30 Apr 2027/.test(m.hero||''),m.hero||m.err);
+  T('HX mission: title, Events sub and Guide carry the health wording; hero fits at 390 px',/<title>The Comeback Blueprint — Muscle, Strength, Health<\/title>/.test(fs.readFileSync('ComebackBlueprint.html','utf8'))&&/muscle, strength and health/.test(m.ev||'')&&/Running is retired/.test(m.ev||'')&&/Health sits beside it/.test(m.g||'')&&/Muscle · Strength · Health · FFMI 25 · Day 1 Sat 24 Oct 2026/.test(m.g||'')&&m.fit&&m.page,JSON.stringify({t:m.title,fit:m.fit,page:m.page,err:m.err}));
+  await hxDone(q);}
+ {const q=await hxCtx('2027-05-10');const h=await hxEv(q,()=>{const s=document.querySelector('.hr-s');return s?s.textContent:'';});
+  T('HX mission: after 30 Apr 2027 the hero reads "as fast as the law allows"',/Muscle, strength, health · as fast as the law allows/.test(h||''),String(h));await hxDone(q);}
+ // HX2 guardrail copy in the shipped file
+ {const html=fs.readFileSync('ComebackBlueprint.html','utf8');
+  T('HX copy: "about 12 drinks" present; "3–4 L of water" gone; no mmHg/mmol anywhere',/about 12 drinks/.test(html)&&!/3[–-]4 L of water|3\\u20134 L of water/.test(html)&&!/mmHg|mmol/.test(html),'');}
+ // HX3 check-up: baseline nudge, Not now (persisted), Done + Undo, review has no line
+ {const q=await hxCtx('2026-11-14');const a=await hxEv(q,()=>{switchView('home');const t0=document.getElementById('view-home').innerText;const rv=(document.getElementById('reviewCard')||{}).innerText||'';
+    const nn=[...document.querySelectorAll('#view-home .verdict button')].find(x=>x.textContent==='Not now');if(nn)nn.click();
+    const t1=document.getElementById('view-home').innerText,ls=JSON.parse(localStorage.getItem('cb2_health')||'{}');reloadDB();renderHome();const t2=document.getElementById('view-home').innerText;
+    return {base:/Baseline check-up: book it in your first month/.test(t0),rv:/check-up/i.test(rv),gone:!/Baseline check-up/.test(t1),snooze:ls.hc&&ls.hc.snooze,want:dateAdd(todayISO(),30),after:!/Baseline check-up/.test(t2)};});
+  T('HX check-up: week 2 with no record shows the baseline nudge on Home, none in the Weekly Review',a.base&&!a.rv,JSON.stringify(a));
+  T('HX check-up: "Not now" hides it, snoozes 30 days, still hidden after a reload',a.gone&&a.snooze===a.want&&a.after,JSON.stringify(a));await hxDone(q);}
+ {const q=await hxCtx('2026-11-14');const a=await hxEv(q,()=>{switchView('home');const d=[...document.querySelectorAll('#view-home .verdict button')].find(x=>x.textContent==='Done');if(d)d.click();const last=DB.health.hc.last,bp=DB.health.hc.bp;const u=document.querySelector('#toast .undo');if(u)u.click();return {clicked:!!d,last,bp,today:todayISO(),undone:DB.health.hc.last,undoBtn:!!u};});
+  T('HX check-up: nudge "Done" sets last and blood pressure to today; Undo restores',a.clicked&&a.last===a.today&&a.bp===a.today&&a.undoBtn&&a.undone===null,JSON.stringify(a));await hxDone(q);}
+ {const q=await hxCtx('2026-11-07',{cb2_health:hxH([],{last:'2025-10-01'})});const a=await hxEv(q,()=>/A year since your last check-up/.test(document.getElementById('view-home').innerText));
+  const q2=await hxCtx('2026-11-07',{cb2_health:hxH([],{last:'2025-10-01',off:true})});const b2=await hxEv(q2,()=>/check-up/i.test(document.getElementById('view-home').innerText));
+  T('HX check-up: a year after the last one the nudge returns; reminders off silences it',a===true&&b2===false,JSON.stringify({a,b2}));await hxDone(q);await hxDone(q2);}
+ {const q=await hxCtx('2026-11-07');const a=await hxEv(q,()=>{switchView('guide');const c=document.getElementById('checkupCard');const t=c?c.innerText:'';const g=document.getElementById('view-guide').innerText;
+    const b1=c&&[...c.querySelectorAll('button')].find(x=>x.textContent==='Mark done today');if(b1)b1.click();const last=DB.health.hc.last;const u=document.querySelector('#toast .undo');if(u)u.click();
+    return {card:/Yearly check-up/.test(t)&&/Lipid panel/.test(t)&&/total and free testosterone/.test(t)&&/Reminders only\. Your doctor decides/.test(t)&&/Last done: not yet/.test(t),doc:/When to see a doctor/.test(g),noRun:!/\b(run|jog|running)\b/i.test(t),last,today:todayISO(),undone:DB.health.hc.last};});
+  T('HX guide: check-up card lists the tests, no ranges; "When to see a doctor" present; Mark done + Undo work',a.card&&a.doc&&a.noRun&&a.last===a.today&&a.undone===null,JSON.stringify(a));await hxDone(q);}
+ // HX4 walking
+ {const q=await hxCtx('2026-11-07',{cb2_steps:[{date:'2026-11-06',n:10500},{date:'2026-11-05',n:9000},{date:'2026-11-04',n:6000}]});const a=await hxEv(q,()=>document.getElementById('view-home').innerText);
+  const q2=await hxCtx('2026-11-07');const b2=await hxEv(q2,()=>document.getElementById('view-home').innerText);
+  T('HX walking: chip reads "Steps 10,500 · target 10,000 ✓"; no chip without steps',/Steps 10,500 · target 10,000 ✓/.test(a||'')&&!/target 10,000/.test(b2||''),String(a).match(/Steps[^\n]*/)+'');await hxDone(q);await hxDone(q2);}
+ {const st=[0,1,2,3,4,5].map(i=>({date:hxD('2026-11-07',i),n:7150}));
+  const q=await hxCtx('2026-11-13',{cb2_steps:st,cb2_weight:[{date:'2026-11-08',v:88.4}]});const a=await hxEv(q,()=>{const rv=(document.getElementById('reviewCard')||{}).innerText||'';const r1=weeklyReview();const s=DB.steps;DB.steps=[];const r2=weeklyReview();DB.steps=s;
+    switchView('track');const tb=document.querySelector('.track-tabs button[data-tp="regions"]');if(tb)tb.click();const tr=(document.getElementById('tp-regions')||{}).innerText||'';
+    return {line:/Walking: averaged 7,150 steps on 6 logged days \(target 10,000\)/.test(rv),same:r1.rule===r2.rule&&r1.cls===r2.cls&&r1.verdict===r2.verdict,track:/Walking: 0 of 6 logged days at 10,000\+ this week \(avg 7,150\)/.test(tr)};});
+  const q2=await hxCtx('2026-11-13',{cb2_steps:st.slice(0,2),cb2_weight:[{date:'2026-11-08',v:88.4}]});const b2=await hxEv(q2,()=>{const rv=(document.getElementById('reviewCard')||{}).innerText||'';switchView('track');return {rv:/Walking: averaged/.test(rv)};});
+  const q3=await hxCtx('2026-11-13');const c3=await hxEv(q3,()=>{switchView('track');return /Walking:/.test((document.getElementById('tp-regions')||{}).innerHTML||'');});
+  T('HX walking: Review info line at 6 logged days, none at 2; verdict identical with and without steps',a.line&&a.same&&b2.rv===false,JSON.stringify({a,b2}));
+  T('HX walking: Track Regions shows the walking line, absent with no steps',a.track&&c3===false,JSON.stringify({a,c3}));await hxDone(q);await hxDone(q2);await hxDone(q3);}
+ // HX5 Friday easy cardio
+ {const q=await hxCtx('2026-11-06');const a=await hxEv(q,()=>{switchView('home');const s0=JSON.stringify(DB.sessions);const l0=sessionsThisWeek().lifts;const t=document.querySelector('#view-home .today-body');const tt=t?t.innerText:'';const cta=(document.querySelector('#view-home .cta')||{}).textContent||'';
+    const btn=[...document.querySelectorAll('#view-home .today-body button')].find(x=>x.textContent==='Easy cardio done');if(btn)btn.click();
+    const toastT=document.getElementById('toast').innerText;const ls=JSON.parse(localStorage.getItem('cb2_health')||'{}');reloadDB();renderHome();
+    const row=(DB.health.wk||[]).find(x=>x.wk===weekStartISO(planWeek()));const after=(document.querySelector('#view-home .today-body')||{}).innerText||'';
+    return {copy:/Pump, easy cardio, or both if you have the time/.test(tt),noRun:!/\b(run|jog|running)\b/i.test(tt),cta:/Active recovery — Extras pump, 30 min/.test(cta),clicked:!!btn,toast:/Easy cardio logged/.test(toastT)&&/Undo/.test(toastT),ls:!!(ls.wk&&ls.wk.some(x=>x.cardio===todayISO())),row:row&&row.cardio,today:todayISO(),tick:/Easy cardio ✓/.test(after),bk:/"cb2_health"/.test(backupJSON())&&/"cardio":"2026-11-06"/.test(backupJSON()),sess:JSON.stringify(DB.sessions)===s0&&sessionsThisWeek().lifts===l0};});
+  T('HX cardio: normal Friday offers easy cardio after the pump; CTA still the Extras pump',a.copy&&a.noRun&&a.cta&&a.clicked,JSON.stringify(a));
+  T('HX cardio: tap logs to cb2_health with an Undo toast, survives reload, in the backup; sessions untouched',a.toast&&a.ls&&a.row===a.today&&a.tick&&a.bk&&a.sess,JSON.stringify(a));
+  await hxDone(q);}
+ {const q=await hxCtx('2026-11-06');const a=await hxEv(q,()=>{const btn=[...document.querySelectorAll('#view-home .today-body button')].find(x=>x.textContent==='Easy cardio done');if(btn)btn.click();const u=document.querySelector('#toast .undo');if(u)u.click();const r=(DB.health.wk||[]).find(x=>x.wk===weekStartISO(planWeek()));return {u:!!u,c:r?r.cardio:'none'};});
+  T('HX cardio: Undo clears the record',a.u&&a.c===null,JSON.stringify(a));await hxDone(q);}
+ {const q=await hxCtx('2026-12-04');const a=await hxEv(q,()=>document.getElementById('view-home').innerText);
+  T('HX cardio: deload Friday shows no easy cardio',!/Easy cardio/.test(a||'')&&/Deload/.test(a||''),'');await hxDone(q);}
+ // HX6 habits card
+ {const q=await hxCtx('2026-11-13',{cb2_sleep:[{date:'2026-11-12',h:7.4},{date:'2026-11-11',h:7.6},{date:'2026-11-10',h:7.2}]});
+  const a=await hxEv(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('home');const c=()=>document.getElementById('habitsCard');const t0=c()?c().innerText:'';
+    const set=(s,d)=>{const b=c()&&[...c().querySelectorAll('[aria-pressed]')].find(x=>x.textContent===String(s));if(b)b.click();const i=document.getElementById('hbDrinks');if(i){i.value=d;i.dispatchEvent(new Event('input',{bubbles:true}));}const sv=document.getElementById('hbSave');if(sv)sv.click();};
+    set(5,'3');const ws=weekStartISO(planWeek());const r1=JSON.parse(JSON.stringify(DB.health.wk.filter(x=>x.wk===ws)));const toast1=document.getElementById('toast').innerText;
+    set(2,'3,0');const r2=JSON.parse(JSON.stringify(DB.health.wk.filter(x=>x.wk===ws)));
+    set(4,'99');const r3=JSON.parse(JSON.stringify(DB.health.wk.filter(x=>x.wk===ws)));const toast3=document.getElementById('toast');
+    return {sleep:/Sleep this week: 7\.4 h a night \(3 nights logged\)/.test(t0),title:/Sleep, stress and drink — Week 3/.test(t0),safe:!/safe[^.]{0,20}\d/i.test(t0),noRun:!/\b(run|jog|running)\b/i.test(t0),r1,toast1,r2,r3,bad:toast3.className.includes('err')};});
+  T('HX habits: card shows the week\'s sleep average from 3 nights, no "safe" number',a.sleep&&a.title&&a.safe&&a.noRun,JSON.stringify(a).slice(0,300));
+  T('HX habits: stress 5 + drinks 3 saves one row; a second save replaces it ("3,0" = 3)',a.r1&&a.r1.length===1&&a.r1[0].stress===5&&a.r1[0].drinks===3&&/Week 3 habits saved/.test(a.toast1)&&a.r2.length===1&&a.r2[0].stress===2&&a.r2[0].drinks===3,JSON.stringify({r1:a.r1,r2:a.r2,t:a.toast1}));
+  T('HX habits: "99" drinks is refused with an error toast and saves nothing',a.bad&&a.r3&&a.r3.length===1&&a.r3[0].stress===2&&a.r3[0].drinks===3,JSON.stringify(a.r3));await hxDone(q);}
+ // HX7 Weekly Review rules
+ {const ws='2026-11-07',W8=[{date:'2026-11-08',v:88.4}],sl6=[1,2,3].map(i=>({date:hxD('2026-11-13',-i),h:6}));
+  const rule=async(seed)=>{const q=await hxCtx('2026-11-13',seed);const r=await hxEv(q,()=>{const v=weeklyReview();return {rule:v.rule,verdict:v.verdict};});await hxDone(q);return r||{};};
+  const sess=hxWeek('2026-10-31').concat(hxWeek('2026-11-07'));
+  const a=await rule({cb2_weight:W8,cb2_health:hxH([{wk:ws,stress:5,drinks:null,cardio:null,at:1}])});
+  const b1=await rule({cb2_weight:W8,cb2_sleep:sl6,cb2_health:hxH([{wk:ws,stress:5,drinks:null,cardio:null,at:1}])});
+  const c=await rule({cb2_weight:W8,cb2_sessions:sess,cb2_health:hxH([{wk:ws,stress:null,drinks:4,cardio:null,at:1}])});
+  const d=await rule({cb2_weight:W8,cb2_sessions:sess,cb2_health:hxH([{wk:ws,stress:null,drinks:0,cardio:null,at:1}])});
+  const e=await rule({cb2_weight:W8,cb2_measure:[{date:'2026-10-24',waist:92},{date:'2026-11-08',waist:101}],cb2_health:hxH([{wk:ws,stress:5,drinks:null,cardio:null,at:1}])});
+  T('HX rules: stress 5 alone gives the stress verdict ("5 of 5 outside the gym")',a.rule==='stress'&&/5 of 5 outside the gym/.test(a.verdict||''),JSON.stringify(a));
+  T('HX rules: short sleep outranks stress',b1.rule==='sleep',JSON.stringify(b1));
+  T('HX rules: drinks 4 with a stall gives alcohol; drinks 0 with the same stall gives stall',c.rule==='alcohol'&&d.rule==='stall',JSON.stringify({c,d}));
+  T('HX rules: the waist brake outranks stress',e.rule==='waist',JSON.stringify(e));}
+ // HX8 backup
+ {const q=await hxCtx('2026-11-07',{cb2_health:hxH([{wk:'2026-11-07',stress:3,drinks:2,cardio:'2026-11-06',at:5}],{last:'2026-11-01',bp:'2026-11-01'})});
+  const a=await hxEv(q,()=>{const j=backupJSON();const P=parseBackup(j);const h=P.ok&&P.data.cb2_health;
+    const S=parseBackup(JSON.stringify({cb2_health:{hc:{last:'bad'},wk:[]}}));
+    const M=parseBackup(JSON.stringify({cb2_health:{hc:{last:null},wk:[{wk:'2026-11-07',stress:9},{wk:'2026-11-14',stress:3,drinks:1}]}}));
+    return {rt:!!h&&h.hc.last==='2026-11-01'&&h.wk.length===1&&h.wk[0].drinks===2&&h.wk[0].cardio==='2026-11-06',strict:!S.ok&&/health/.test(S.msg||''),msg:S.msg,mal:M.ok&&M.data.cb2_health.wk.length===1&&M.data.cb2_health.wk[0].wk==='2026-11-14'};});
+  T('HX backup: cb2_health round-trips through the backup file',a.rt,JSON.stringify(a));
+  T('HX backup: a strict restore refuses a bad check-up date with a health error',a.strict,JSON.stringify(a));
+  T('HX backup: a malformed weekly row is dropped and the valid row kept',a.mal,JSON.stringify(a));
+  T('HX: no page errors',q.__errs.length===0,q.__errs.join('|').slice(0,200));await hxDone(q);}
+}
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+String(x.detail||'').replace(/\s+/g,' ').slice(0,400)).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));process.exit(pass===R.length?0:1);})().catch(e=>{const m=String(e&&e.message||e);if(/detached|Target closed|Session closed|Connection closed|Protocol error/i.test(m))console.error('QA CRASH: the browser went away mid-run ('+m.slice(0,80)+'). The suite takes about ten minutes: a foreground command with a ten-minute limit kills Chromium during section AE. Run qa/run.sh as a background job and poll its output file.');console.error('QA CRASH:',e&&e.stack||e);process.exit(2);});

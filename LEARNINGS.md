@@ -70,3 +70,9 @@ See CLAUDE.md §6 for the numbered list. Additions:
 ## 29 Oct 2026
 - Two stages built from the same base merge cleanly with `git merge-file` against the shared base. Test sections that both append before `await b.close();` conflict only at that spot; a union merge keeps both. Run the full gate on the merged tree, never trust the two stage gates alone (merged 493 = 482 + 11).
 - Background agents and workflows stop on the 5-hour usage limit mid-task; their work survives in the sandbox. Resume with SendMessage or resumeFromRunId after the reset instead of restarting.
+- 2026-10-29: A merge dropped LEDGER rules 26-28, and the spec assumed they were there. Before amending a numbered rule, grep that it exists, and restore from git (`git show <rev>:LEDGER.md`) instead of re-adding it.
+- 2026-10-29: document.title is set per view ("Home · The Comeback Blueprint"); assert the shell title against the built file's <title>, not document.title.
+- 2026-10-29: DB.save() writes every key, so an unseeded cb2_sessions becomes "[]" after any save; compare DB.sessions before and after, not the raw localStorage string.
+- 2026-10-29: A new section that defines its own hx* helpers (instead of the mid-file ctxPage/S/week) can be sliced out and run alone, so a mutation proof takes minutes, not seven full ten-minute runs.
+- 2026-10-29: A sandbox copy without node_modules fails at require('puppeteer') before any check runs; link or install node_modules first and read the first error line, not the tail.
+- 2026-10-29: AD-S1 "restoring an older backup is not undone" is timing-flaky: run alone, the pre-change build failed it 1 time in 3 (the account copy was not yet rewritten when its 7.5 s poll ended). A single FAIL there is not proof of a regression; rerun the block alone against old and new builds before blaming the change.
