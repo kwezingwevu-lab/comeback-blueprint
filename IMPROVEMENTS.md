@@ -162,6 +162,24 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then 
 
 Also shipped with round 2: a 624-render sweep (dates × seeds × modes × routes, 390 and 375 px) run by hand; it is not part of run.sh yet.
 
+## R3. Round-3 polish (29 Oct 2026): shipped, each proven by a section R3 check that fails under a mutation
+| # | Item | Status |
+|---|---|---|
+| sw-01 | Page fetch waits at most 3.5 s, then serves the cached app | Already in sw.js before this round; PWA suite covers it |
+| sw-02 | `#updBar` "New version ready · tap to reload" (`updBarShow()`, wired in `pwaBoot` to a waiting/installed worker or a controller change) | Shipped · R3 sw-02 |
+| perf-01/10 | `_tips` capped at 60 (`TIPS_MAX`, `tipCap()`), oldest dropped, the chart just drawn kept | Shipped · R3 perf-01 |
+| perf-02 | `isDeloadWeek()` cached per date and mode | Shipped · R3 perf-02 |
+| wake-01 | A wake-lock release that arrives while the request is pending is honoured (`_wlPending`, `wakeWant()`) | Shipped · R3 wake-01 |
+| visual-04 | Boot placeholder in every view section of the shell | Shipped · R3 visual-04 |
+| dead-code-11 | Four locals with no other reference (ffmiOf, xs, _nxD, d0) removed | Shipped (esprima scan + grep) |
+| sci-08 | Baseline note: every monthly tape compares like with like | Shipped · R3 sci-08 |
+| sci-10/11 | Muscle-memory card stated as a model, not a promise | Shipped · R3 sci-10/11 |
+| new | Neck in the baseline tapes row (5 tapes) with a placement note | Shipped · R3 neck |
+| new | Brief: D3 only if a blood test shows low | Shipped · R3 Brief |
+| new | Quick log Sleep row into `cb2_sleep` (no new key) | Shipped · R3 Quick log |
+| new | Data card "This copy" line (`thisCopyHTML()`) | Shipped · R3 Data card |
+| vis3-04, vis3-06, vis3-07 | Not built: no defect could be located from the brief (vis3-07: the 12-month list never contains a past month) | Open, needs a screenshot or anchor |
+
 ## K. Queued (not built yet) — what each needs
 
 | # | Item | Why it waits |

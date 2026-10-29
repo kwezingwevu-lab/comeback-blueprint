@@ -366,6 +366,9 @@ svg[data-tip]:focus-visible{outline:2px solid var(--gold);outline-offset:4px;bor
 .disclaimer{background:rgba(240,136,62,.07);border:1px solid rgba(240,136,62,.22);border-radius:var(--r);padding:13px 15px;font-size:12.5px;color:#f3c393;line-height:1.6;margin-top:14px}
 .disclaimer b{color:var(--warn)}
 
+.boot-ph{margin:24px 0;color:var(--text-3);font-size:14px;text-align:center}
+#updBar{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:150;display:none;padding:12px 16px;border-radius:14px;border:1px solid var(--cyan-deep);background:var(--panel-2);color:var(--text);font:inherit;font-size:14px;text-align:center;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.4)}#updBar.show{display:block}
+@media(min-width:760px){#updBar{left:auto;right:24px;bottom:24px;max-width:360px}}
 #toast{position:fixed;left:50%;bottom:calc(108px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:var(--panel-2);border:1px solid var(--line-2);border-radius:18px;padding:11px 20px;font-size:13.5px;font-weight:600;color:var(--text);z-index:200;box-shadow:var(--sh-lg);opacity:0;pointer-events:none;transition:.3s;white-space:normal;text-align:left;display:flex;align-items:center;gap:8px;width:max-content;max-width:calc(100vw - 32px)}
 #toast span{min-width:0}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -652,14 +655,14 @@ input::placeholder,textarea::placeholder{color:var(--text-3);opacity:1}
 
 <main class="wrap" id="main" tabindex="-1">
   <div class="storage-warn" id="storageWarnAll" role="alert"></div>
-  <section class="view active" id="view-home" role="tabpanel" aria-labelledby="tab-home"></section>
-  <section class="view" id="view-lift" role="tabpanel" aria-labelledby="tab-lift"></section>
-  <section class="view" id="view-run" role="tabpanel" aria-labelledby="tab-run"></section>
-  <section class="view" id="view-numbers" role="tabpanel" aria-labelledby="tab-numbers"></section>
-  <section class="view" id="view-track" role="tabpanel" aria-labelledby="tab-track"></section>
-  <section class="view" id="view-roadmap" role="tabpanel" aria-labelledby="tab-roadmap"></section>
-  <section class="view" id="view-fuel" role="tabpanel" aria-labelledby="tab-fuel"></section>
-  <section class="view" id="view-guide" role="tabpanel" aria-labelledby="tab-guide"></section>
+  <section class="view active" id="view-home" role="tabpanel" aria-labelledby="tab-home"><p class="boot-ph">Loading…</p></section>
+  <section class="view" id="view-lift" role="tabpanel" aria-labelledby="tab-lift"><p class="boot-ph">Loading…</p></section>
+  <section class="view" id="view-run" role="tabpanel" aria-labelledby="tab-run"><p class="boot-ph">Loading…</p></section>
+  <section class="view" id="view-numbers" role="tabpanel" aria-labelledby="tab-numbers"><p class="boot-ph">Loading…</p></section>
+  <section class="view" id="view-track" role="tabpanel" aria-labelledby="tab-track"><p class="boot-ph">Loading…</p></section>
+  <section class="view" id="view-roadmap" role="tabpanel" aria-labelledby="tab-roadmap"><p class="boot-ph">Loading…</p></section>
+  <section class="view" id="view-fuel" role="tabpanel" aria-labelledby="tab-fuel"><p class="boot-ph">Loading…</p></section>
+  <section class="view" id="view-guide" role="tabpanel" aria-labelledby="tab-guide"><p class="boot-ph">Loading…</p></section>
 </main>
 <div id="restTimer" role="group" aria-label="Rest timer"><button id="restEnd" aria-label="End rest">✕</button><div class="rt-mid"><span class="rt-lab">REST</span><b id="restTime">1:30</b></div><button id="restPlus" aria-label="Add 15 seconds">+15s</button></div>
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>

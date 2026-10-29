@@ -1,5 +1,13 @@
 # CHANGELOG.md — what has shipped (newest first)
 
+## 2026-10-29 - Round-3 polish: update bar, wake-lock race, caches, Quick-log sleep, neck tape, "This copy"
+Polish only: no programme, dose, phase or safety rule changed.
+- Engineering: `#updBar` "New version ready · tap to reload" (`updBarShow()`, wired in `pwaBoot`); `_tips` capped at 60 (`TIPS_MAX`, `tipCap()`); `isDeloadWeek()` cached per date and mode; a wake-lock release that arrives while the request is pending now releases the lock when it lands (`_wlPending`, `wakeWant()`); a boot placeholder in each view section of the shell; four unused locals removed (ffmiOf, xs, _nxD, d0; esprima scan, each referenced once in the file). The 3.5 s network budget in sw.js (sw-01) was already in place.
+- Copy: the baseline note says every monthly tape compares like with like; the muscle-memory card is stated as a model, not a promise; the Brief's supplement line takes D3 only if a blood test shows low.
+- Additions: neck joins the baseline tapes row (5 tapes) with a placement note; Quick log has a Sleep row saved to the existing `cb2_sleep` (1-16 h, no new key); the Data card has a "This copy" line.
+- QA: new section R3 (17 checks, real UI). A mutation run applied 12 mutations, each exactly once, and every one failed at least one R3 check.
+- Not built: vis3-04, vis3-06, vis3-07 (no defect could be located from the brief).
+
 ## 2026-10-29 - Health layer: check-up reminder, walking target, Friday easy cardio, weekly habits
 Kwezi made overall health a primary objective beside muscle and strength (LEDGER 27). His answers D1-D6 (28 Oct) are built as given. Muscle targets, set counts, phase timing and safety limits are unchanged.
 - New backup key cb2_health ({hc:{last,bp,snooze,off}, wk:[{wk,stress,drinks,cardio,at}]}), mirrored to the vault and the account copy. A strict restore refuses a bad check-up date. A malformed weekly row is dropped and the valid rows are kept.

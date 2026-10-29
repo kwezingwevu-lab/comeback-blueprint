@@ -123,7 +123,7 @@ const d5=await tt('2027-02-16');T('time: mid-Feb 2027 = Posterior specialization
  const qw=await q.evaluate(()=>({n:DB.weight.length,v:DB.weight[0]&&DB.weight[0].v,today:document.body.innerText.includes('88.6 kg today'),profile:DB.profile.weight,counter:document.body.innerText.includes('1/3')}));
  T('quick: weight saves + shows ✓ today + profile synced + counter 1/3',qw.n===1&&+qw.v===88.6&&qw.today&&+qw.profile===88.6&&qw.counter,JSON.stringify(qw));
  await q.evaluate(()=>{document.getElementById('qWa').value='86';quickLogWaist();});await wait(350);
- T('quick: waist saves + baseline row 1/4',await q.evaluate(()=>DB.measure.some(x=>x.waist===86)&&document.body.innerText.includes('Baseline tapes 1/4')));
+ T('quick: waist saves + baseline row 1/4',await q.evaluate(()=>DB.measure.some(x=>x.waist===86)&&document.body.innerText.includes('Baseline tapes 1/5')));
  await q.evaluate(()=>switchView('lift'));await wait(300);await q.evaluate(()=>{[...document.querySelectorAll('#dayPills .pill')].find(x=>x.textContent==='Legs A').click();});await wait(300);
  T('fill: button shown when last-time exists',await q.evaluate(()=>!!document.querySelector('button[onclick="fillFromLast(\'ga1\')"]')));
  await q.evaluate(()=>fillFromLast('ga1'));await wait(400);
@@ -1878,6 +1878,72 @@ const GOODSLEEP=[{date:'2027-01-04',h:7.6},{date:'2027-01-05',h:7.4},{date:'2027
   T('HX backup: a strict restore refuses a bad check-up date with a health error',a.strict,JSON.stringify(a));
   T('HX backup: a malformed weekly row is dropped and the valid row kept',a.mal,JSON.stringify(a));
   T('HX: no page errors',q.__errs.length===0,q.__errs.join('|').slice(0,200));await hxDone(q);}
+}
+// ===== R3. Round-3 polish (29 Oct 2026): boot placeholders, _tips cap, deload cache, wake-lock race, update bar, baseline neck + tape wording,
+// muscle-memory copy, Brief D3 line, Quick-log sleep, "This copy". Each group has its own browser context; every step is null-safe.
+{const r3e=async(q,f,a)=>{try{return await q.evaluate(f,a);}catch(e){return {err:String(e&&e.message||e).slice(0,160)};}};
+ const R3DEMO=fs.readFileSync(path.join(__dirname,'fixtures/demo.setup.js'),'utf8').trim().split('\n').pop();const R3ERR=[];const r3fin=async q=>{R3ERR.push(...(q.__errs||[]));try{await done(q);}catch(e){}};
+ const views=['home','lift','run','numbers','track','roadmap','fuel','guide'];
+ // visual-04
+ {const html=fs.readFileSync(path.resolve('ComebackBlueprint.html'),'utf8');const ph=views.filter(v=>new RegExp('id="view-'+v+'"[^>]*><p class="boot-ph">').test(html));
+  T('R3 visual-04: every view section ships a boot placeholder, so nothing is an empty box before the script runs',ph.length===8,ph.join(','));
+  const q=await ctxPage('2026-11-07',{},R3DEMO);
+  const a=await r3e(q,async vs=>{const out={};for(const v of vs){switchView(v);await new Promise(r=>setTimeout(r,60));out[v]=document.querySelectorAll('#view-'+v+' .boot-ph').length;}return out;},views);
+  T('R3 visual-04: after boot and one visit to each view no placeholder is left',a&&!a.err&&Object.keys(a).length===8&&Object.values(a).every(n=>n===0),JSON.stringify(a));
+  // perf-01/10
+  const t=await r3e(q,async()=>{for(let i=0;i<14;i++){for(const v of ['home','track','roadmap']){switchView(v);await new Promise(r=>setTimeout(r,25));}}
+    const live=[...document.querySelectorAll('.view.active svg[data-tip]')];const s0=live[0];let read='';if(s0){tipAt(s0,0);const r=document.getElementById(s0.dataset.tip+'r');read=r?r.textContent:'';}
+    return {n:Object.keys(_tips).length,live:live.length,missing:live.filter(s=>!_tips[s.dataset.tip]).length,read};});
+  T('R3 perf-01: after 42 view renders _tips holds 60 charts or fewer, and every chart on screen still has its readout',t&&!t.err&&t.n<=60&&t.n>=20&&t.live>0&&t.missing===0&&t.read.length>0&&!/Touch the chart/.test(t.read),JSON.stringify(t));
+  await r3fin(q);}
+ // perf-02
+ {const q=await ctxPage('2026-11-28',{});
+  const a=await r3e(q,()=>{const o=window.buildRoadmap;let n=0;window.buildRoadmap=function(){n++;return o.apply(this,arguments);};const v1=isDeloadWeek();n=0;for(let i=0;i<40;i++)isDeloadWeek();const calls=n;window.buildRoadmap=o;
+    switchView('home');return {v1,calls,ui:/Deload week/.test(document.getElementById('view-home').innerText)};});
+  T('R3 perf-02: isDeloadWeek is computed once per date (40 repeat calls rebuild the roadmap 0 times) and still reads the deload week on Home',a&&a.v1===true&&a.calls===0&&a.ui,JSON.stringify(a));
+  await r3fin(q);
+  const q2=await ctxPage('2026-11-21',{});const b2=await r3e(q2,()=>({v:isDeloadWeek(),ui:/Deload week/.test(document.getElementById('view-home').innerText)}));
+  T('R3 perf-02: a week later the cache gives the ordinary answer (not a deload week)',b2&&b2.v===false&&!b2.ui,JSON.stringify(b2));await r3fin(q2);}
+ // wake-01
+ {const WL="window.__wl={req:0,rel:0,res:null};Object.defineProperty(navigator,'wakeLock',{configurable:true,value:{request:()=>{window.__wl.req++;return new Promise(r=>{window.__wl.res=()=>r({addEventListener(){},release:async()=>{window.__wl.rel++;}});});}}});";
+  const q=await ctxPage('2026-11-07',{},WL);
+  const a=await r3e(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const w=window.__wl;w.req=0;w.rel=0;w.res=null;switchView('lift');await W(60);const pend=!!w.res;switchView('home');await W(60);if(w.res)w.res();await W(60);return {pend,req:w.req,rel:w.rel,held:_wl!==null};});
+  T('R3 wake-01: leaving Lift while the wake-lock request is still pending releases the lock the moment it arrives',a&&a.pend&&a.req===1&&a.rel===1&&a.held===false,JSON.stringify(a));
+  const b2=await r3e(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const w=window.__wl;w.req=0;w.rel=0;w.res=null;switchView('lift');await W(60);if(w.res)w.res();await W(60);const held=_wl!==null;switchView('home');await W(60);return {req:w.req,held,rel:w.rel,after:_wl!==null};});
+  T('R3 wake-01: entering Lift and staying holds one lock; leaving releases it',b2&&b2.req===1&&b2.held&&b2.rel===1&&b2.after===false,JSON.stringify(b2));
+  await r3fin(q);}
+ // sw-02
+ {const q=await ctxPage('2026-11-07',{});
+  const a=await r3e(q,()=>{updBarShow();updBarShow();const b=document.getElementById('updBar');if(!b)return {none:true};const r=b.getBoundingClientRect(),tb=document.querySelector('nav.tabs');const tr=tb?tb.getBoundingClientRect():{top:innerHeight};
+    return {n:document.querySelectorAll('#updBar').length,vis:getComputedStyle(b).display!=='none'&&r.height>0,txt:b.textContent,inside:r.left>=0&&r.right<=innerWidth,above:r.bottom<=tr.top+1,tag:b.tagName};});
+  T('R3 sw-02: the update bar appears once as a button reading "New version ready", inside the screen and above the tab bar',a&&a.n===1&&a.vis&&/New version ready/.test(a.txt||'')&&a.inside&&a.above&&a.tag==='BUTTON',JSON.stringify(a));
+  await r3e(q,()=>{window.__r3mark=1;});const nav=q.waitForNavigation({timeout:8000}).catch(()=>null);await r3e(q,()=>{const b=document.getElementById('updBar');if(b)b.click();});await nav;await wait(700);
+  const m=await r3e(q,()=>({mark:window.__r3mark===undefined,bar:!!document.getElementById('updBar')}));
+  T('R3 sw-02: tapping the bar reloads the app (fresh page, bar gone)',m&&m.mark===true&&m.bar===false,JSON.stringify(m));
+  await r3fin(q);}
+ // neck + sci-08
+ {const q=await ctxPage('2026-11-07',{cb2_measure:[{date:'2026-11-01',waist:90,arm:38,chest:104,thigh:60}]});
+  const a=await r3e(q,()=>{switchView('home');const t=document.getElementById('view-home').innerText;return {four:/Baseline tapes 4\/5/.test(t),neck:/! neck/.test(t),place:/Neck goes just below the Adam’s apple/.test(t)};});
+  T('R3 neck: the baseline row counts five tapes, flags neck as missing and says where the tape goes',a&&a.four&&a.neck&&a.place,JSON.stringify(a));
+  const b2=await r3e(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('track');await W(150);const tb=document.querySelector('.track-tabs button[data-tp="measure"]');if(tb)tb.click();await W(150);const n=document.getElementById('meNeck'),d=document.getElementById('meDate'),add=document.getElementById('meAdd');if(!n||!add)return {missing:true};if(d)d.value='2026-11-07';n.value='40';n.dispatchEvent(new Event('input',{bubbles:true}));add.click();await W(200);switchView('home');await W(150);const t=document.getElementById('view-home').innerText;
+    return {five:/Baseline tapes 5\/5/.test(t),like:/every monthly tape compares like with like/.test(t),saved:DB.measure.some(x=>+x.neck===40)};});
+  T('R3 sci-08: logging neck in Track completes the baseline (5/5) and the note says every monthly tape compares like with like',b2&&b2.five&&b2.like&&b2.saved,JSON.stringify(b2));
+  await r3fin(q);}
+ // sci-10/11, Brief D3, Quick-log sleep, This copy
+ {const q=await ctxPage('2026-11-07',{});
+  const g=await r3e(q,()=>{switchView('guide');const h=document.getElementById('view-guide').innerHTML;return {model:/model, not a promise/.test(h),guide:/a guide, not a date/.test(h),own:/stays a model until your own weigh-ins/.test(h),old:/double the speed|permanently changed/.test(h)};});
+  T('R3 sci-10/11: the muscle-memory card is stated as a model (no "double the speed", no "permanently changed")',g&&g.model&&g.guide&&g.own&&!g.old,JSON.stringify(g));
+  const d=await r3e(q,()=>{switchView('home');const t=document.getElementById('view-home').innerText;return {d3:/D3 \(only if a blood test shows you are low\)/.test(t)};});
+  T('R3 Brief: the supplement line takes D3 only if a blood test shows low',d&&d.d3,JSON.stringify(d));
+  const s1=await r3e(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const el=document.getElementById('qS');if(!el)return {missing:true};el.value='7,5';el.dispatchEvent(new Event('input',{bubbles:true}));const btn=el.nextElementSibling;if(btn)btn.click();await W(250);
+    const ls=JSON.parse(localStorage.getItem('cb2_sleep')||'[]');const t=document.getElementById('view-home').innerText;return {db:DB.sleep.filter(x=>x.date==='2026-11-07').map(x=>x.h),ls:ls.filter(x=>x.date==='2026-11-07').map(x=>x.h),row:/✓ 7\.5 h today/.test(t),toast:(document.getElementById('toast')||{}).textContent||'',keys:Object.keys(localStorage).filter(k=>/sleep/i.test(k))};});
+  T('R3 Quick log: "7,5" in Sleep saves 7.5 h for today in the existing sleep store (cb2_sleep, no new key) and the row shows it',s1&&!s1.missing&&s1.db.length===1&&s1.db[0]===7.5&&s1.ls.length===1&&s1.ls[0]===7.5&&s1.row&&/Sleep logged/.test(s1.toast)&&s1.keys.join()==='cb2_sleep',JSON.stringify(s1));
+  const s2=await r3e(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const row=[...document.querySelectorAll('#view-home button')].find(b=>b.textContent==='Edit'&&b.parentElement&&/Sleep/.test(b.parentElement.textContent));if(!row)return {noedit:true};row.click();await W(60);const el=document.getElementById('qS');if(!el)return {missing:true};el.value='20';row.click();await W(250);const t=document.getElementById('toast');return {h:DB.sleep.filter(x=>x.date==='2026-11-07').map(x=>x.h),bad:!!t&&/err|bad|warn/.test(t.className)};});
+  T('R3 Quick log: 20 h of sleep is refused with a warning and saves nothing',s2&&!s2.noedit&&s2.h&&s2.h.length===1&&s2.h[0]===7.5&&s2.bad,JSON.stringify(s2));
+  const c=await r3e(q,()=>{switchView('home');const e=document.getElementById('thisCopy');return {txt:e?e.innerText:'',lives:!!document.getElementById('dataLives')};});
+  T('R3 Data card: a "This copy" line says where this data lives (the file opened on this device)',c&&/This copy: the file ComebackBlueprint\.html opened on this device/.test(c.txt)&&c.lives,JSON.stringify(c));
+  await r3fin(q);}
+ T('R3: no page errors across the round-3 checks',R3ERR.length===0,R3ERR.join('|').slice(0,300));
 }
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+String(x.detail||'').replace(/\s+/g,' ').slice(0,400)).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));process.exit(pass===R.length?0:1);})().catch(e=>{const m=String(e&&e.message||e);if(/detached|Target closed|Session closed|Connection closed|Protocol error/i.test(m))console.error('QA CRASH: the browser went away mid-run ('+m.slice(0,80)+'). The suite takes about ten minutes: a foreground command with a ten-minute limit kills Chromium during section AE. Run qa/run.sh as a background job and poll its output file.');console.error('QA CRASH:',e&&e.stack||e);process.exit(2);});

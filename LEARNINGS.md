@@ -76,3 +76,6 @@ See CLAUDE.md §6 for the numbered list. Additions:
 - 2026-10-29: A new section that defines its own hx* helpers (instead of the mid-file ctxPage/S/week) can be sliced out and run alone, so a mutation proof takes minutes, not seven full ten-minute runs.
 - 2026-10-29: A sandbox copy without node_modules fails at require('puppeteer') before any check runs; link or install node_modules first and read the first error line, not the tail.
 - 2026-10-29: AD-S1 "restoring an older backup is not undone" is timing-flaky: run alone, the pre-change build failed it 1 time in 3 (the account copy was not yet rewritten when its 7.5 s poll ended). A single FAIL there is not proof of a regression; rerun the block alone against old and new builds before blaming the change.
+- 2026-10-29: sw.js calls skipWaiting() on install, so `registration.waiting` is almost never set; an update bar must also listen for controllerchange (only when the page already had a controller, or the first install would show it).
+- 2026-10-29: Re-registering a chart under an existing `_tips` key keeps its old insertion slot; a size cap must move the id to the end before trimming, or it drops the chart on screen.
+- 2026-10-29: Section R3 follows the HX pattern: sliced out with the preamble and the ctxPage helpers into qa/_r3mini.js, it runs alone in about a minute for the mutation proof.
