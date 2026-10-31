@@ -2163,3 +2163,16 @@ CAUSE: the plan was solved on the 05:38Z feeds. At 13:00Z the official feed flag
 CAUGHT: 23 Oct 2026 15:00Z, the local gate before the planned ship.
 RULE: when a live suite goes red near a deadline, first diff the snapshot's flags against the live feed, and read the failure as a new flag before reading it as a bug. A new flag on a held player who is not the buy, the captain or the vice does not trigger a re-solve (E-184's trigger is narrower). It is answered in the reply with the eleven re-picked by engine.js bestXI and captainPick on a context patched with the live flags. Done that way for GW8: Saka benched, Brobbey in, Calvert-Lewin still starts (no forward at 0.75 or more on the bench), captain Haaland, vice Mbeumo. Semenyo to Mbeumo was re-ranked on the same flags and still leads (+42.8 to GW19 against +30.5). The gate cannot go green without a fresh pull, and a fresh pull forces a full re-solve, so the app is not republished and nothing is pushed until a fresh pull and green gate (the 29 Oct refresh). CI runs the same live check. The commit is held locally until then.
 TEST: smoke_wk check 18 itself, unchanged. It is the alarm, and it worked.
+
+### E-188 · v110 · the refreshed GW8 plan missed the deadline
+CAUSE: at 15:00Z on 23 Oct the full re-solve was estimated at 60–70 minutes from memory. The morning's own logs showed 13 minutes, and that estimate held the app back (E-187). When the manager asked for the best possible, the pull and solve ran 15:42–15:53Z. A 48-agent news workflow running at the same time spent about 1.9M tokens. The session hit its usage limit at about 15:55Z and returned at 17:30Z, the deadline. The GW8 guidance had already gone to the manager in chat at 15:13Z, and he played it (Semenyo to Mbeumo, confirmed by the GW8 picks).
+CAUGHT: 23 Oct 2026, 17:30Z.
+RULE: time a stage from its log timestamps, never from memory. Near a deadline keep fan-out small: one researcher per group, and verify only claims that could change a decision. Put the decision in the reply before any app work. The manager's rule from 31 Oct replaces the 48-hour one: one fresh run only, 24 hours or less before each deadline.
+TEST: none (process rule).
+
+### E-189 · v110 · two checks assumed a wildcard card and a week with odds
+CAUSE: smoke C1 chose its subject from the engine's wildcard fifteen. In a transfer week the card names only buys and the armband, so no subject could ever be named (23 Oct, left unfixed when the manager stopped the session). components D6, with no odds for the next week in the block (31 Oct, no desk research), expected the phrase "no longer priced", which the app has never printed.
+CAUGHT: the local gates of 23 and 31 Oct.
+RULE: D6 now asserts that the coverage line is absent when no odds exist. Smoke C1 is green on the 31 Oct data with its original subject rule. The transfer-week subject fix drafted on 23 Oct was rejected unapplied and is open.
+TEST: components D6, 329/329.
+

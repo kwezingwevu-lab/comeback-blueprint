@@ -1,6 +1,6 @@
-backtest GW3,4,5,6,7 in 0.6s · points given a start: ρ 0.166 v naive 0.079 (n 1100) · minutes Brier 0.137 v naive 0.160 (n 2014) · team goals log-lik -152.5 v naive -154.3 (n 50)
-  pos 1: n 100 pred 3.28 act 3.64 ratio 1.111 [0.976, 1.249] ρ 0.210 v 0.026 MAE 2.20 v 2.59 → factor 1
-  pos 2: n 423 pred 3.38 act 3.61 ratio 1.069 [0.994, 1.147] ρ 0.181 v 0.061 MAE 2.50 v 2.90 → factor 1
-  pos 3: n 475 pred 3.23 act 3.59 ratio 1.113 [1.046, 1.182] ρ 0.165 v 0.025 MAE 2.09 v 2.73 → factor 1.057
-  pos 4: n 102 pred 3.81 act 4.15 ratio 1.087 [0.950, 1.249] ρ 0.149 v 0.159 MAE 2.69 v 2.99 → factor 1
-  minutes buckets: 0-0.2: 595 pred 9% act 13% | 0.2-0.4: 162 pred 29% act 24% | 0.4-0.6: 227 pred 50% act 44% | 0.6-0.8: 212 pred 71% act 69% | 0.8-1: 818 pred 91% act 89%
+backtest GW3,4,5,6,7,8 in 0.5s · points given a start: ρ 0.138 v naive 0.048 (n 1320) · minutes Brier 0.142 v naive 0.171 (n 2463) · team goals log-lik -179.7 v naive -181.5 (n 60)
+  pos 1: n 120 pred 3.28 act 3.75 ratio 1.145 [1.022, 1.263] ρ 0.166 v 0.023 MAE 2.29 v 2.65 → factor 1.072
+  pos 2: n 505 pred 3.37 act 3.71 ratio 1.100 [1.032, 1.173] ρ 0.165 v 0.048 MAE 2.55 v 2.92 → factor 1.05
+  pos 3: n 574 pred 3.20 act 3.56 ratio 1.111 [1.051, 1.175] ρ 0.122 v -0.029 MAE 2.03 v 2.75 → factor 1.055
+  pos 4: n 121 pred 3.81 act 4.19 ratio 1.098 [0.961, 1.233] ρ 0.144 v 0.150 MAE 2.66 v 2.96 → factor 1
+  minutes buckets: 0-0.2: 729 pred 9% act 13% | 0.2-0.4: 223 pred 29% act 26% | 0.4-0.6: 274 pred 49% act 46% | 0.6-0.8: 278 pred 71% act 67% | 0.8-1: 959 pred 91% act 88%

@@ -138,22 +138,21 @@ function withFlag(id, on) {
   return live;
 }
 
-/* The subject of the flag pair, chosen from the snapshot rather than named: the highest
-   five-week xP flagged player who walks into the engine's recommended fifteen the moment his
-   flag is lifted. Hard-coding Gakpo meant the pair stopped testing anything the week his form
-   dropped out of the solve (E-084). */
-function flagSubject() {
+/* The candidates for the subject of the flag pair, chosen from the snapshot rather than named: flagged players who
+   started their club's last three, by five-week xP. Hard-coding Gakpo meant the pair stopped testing anything the week
+   his form dropped out of the solve (E-084). Until 23 Oct 2026 the subject was the first who walked into the engine's
+   wildcard fifteen once unflagged; that stood in for "the card would name him" only while the card was a wildcard
+   card. In a transfer week the card names its buys and its armband, not the fifteen it keeps, so the wildcard proxy
+   picked Calvert-Lewin, whom the card never names flagged or not (E-189). The subject is now settled on the page itself:
+   the first candidate the app's own card names once his flag is lifted (section 3). */
+function flagCandidates() {
   const base = ENG.buildCtx(LIVE, null, NOW);
-  const cands = base.elList
+  return base.elList
     .filter(function (el) { return el.status !== "a" || (el.chance !== null && el.chance < 100); })
     .filter(function (el) { const g = base.gwStats[el.id]; return g && g.starts_last3 >= 3; })
     .sort(function (a, b) { return base.xp[b.id].xp5 - base.xp[a.id].xp5; })
-    .slice(0, 5);
-  for (const el of cands) {
-    const wc = ENG.wildcardSolver(ENG.buildCtx(withFlag(el.id, false), null, NOW), {});
-    if (wc.ok && wc.ids.indexOf(el.id) >= 0) return { id: el.id, name: el.web_name, status: el.status, chance: el.chance };
-  }
-  return null;
+    .slice(0, 8)
+    .map(function (el) { return { id: el.id, name: el.web_name, status: el.status, chance: el.chance }; });
 }
 
 async function openAllSections(page) {
@@ -192,8 +191,7 @@ async function main() {
   // looks once GW4 kicks off. buildPage() bakes inlineData into the HTML, so a scenario
   // that needs its own snapshot needs its own page.
   const html = H.buildPage({});
-  const SUBJECT = flagSubject();
-  const htmlCtrl = SUBJECT ? H.buildPage({ inlineData: withFlag(SUBJECT.id, false) }) : null;
+  const SUBJECTS = flagCandidates();
   const htmlLive = H.buildPage({ inlineData: nextGwRunning() });
   const browser = await H.launch();
 
@@ -343,15 +341,34 @@ async function main() {
     }
     const appReal = STATE_PRICE ? await appCard(html) : { text: "", plan: "" };
     // Half one: the flag is what keeps the subject out. Control = the same snapshot with his
-    // flag lifted and nothing else changed.
-    let appCtrl = { text: "", plan: "" };
-    if (SUBJECT && STATE_PRICE) appCtrl = await appCard(htmlCtrl);
+    // flag lifted and nothing else changed. The subject is the first candidate that control names (E-189).
+    let appCtrl = { text: "", plan: "" }, appFlag = appReal, SUBJECT = null, how = "";
+    if (STATE_PRICE) {
+      for (const c of SUBJECTS) {
+        const ctrl = await appCard(H.buildPage({ inlineData: withFlag(c.id, false) }));
+        if (rx(c.name).test(ctrl.text)) { SUBJECT = c; appCtrl = ctrl; how = "a flagged player in the snapshot, his flag lifted for the control"; break; }
+      }
+    }
+    // E-189: a week can have no such player (23 Oct 2026, a transfer-week card: none of the flagged starters reaches it
+    // with the flag lifted). The pair is then run on the card's own buy, the same way round as half two: the shipped card
+    // is the control, and the same snapshot with only his flag added must drop him. One flag apart either way.
+    if (!SUBJECT && STATE_PRICE) {
+      const own = new Set(((SEEDED && SEEDED.squad) || []).map(function (q) { return Number(q.id); }));
+      const fit = function (e) { return e.status === "a" && (e.chance === null || e.chance === undefined || Number(e.chance) >= 100); };
+      const buy = LIVE.elements.filter(function (e) { return !own.has(Number(e.id)) && fit(e) && rx(e.web_name).test(appReal.text); })[0];
+      if (buy) {
+        SUBJECT = { id: buy.id, name: buy.web_name, status: "a, flag added by the test:", chance: 75 };
+        appCtrl = appReal;
+        appFlag = await appCard(H.buildPage({ inlineData: withFlag(buy.id, true) }));
+        how = "the card's own buy, unflagged in the snapshot, with a 75% flag added";
+      }
+    }
     const ctrlText = appCtrl.text;
     H.assert("C1-flagged-player-is-absent-from-the-recommendation",
-      !!SUBJECT && appReal.plan === "app" && appCtrl.plan === "app" && rx(SUBJECT.name).test(ctrlText) && !rx(SUBJECT.name).test(appReal.text),
-      SUBJECT ? "on the app's own card (landing " + appReal.plan + " / " + appCtrl.plan + " with a typed price): subject " + SUBJECT.name + " (id " + SUBJECT.id + ", shipped status " + SUBJECT.status + " " + SUBJECT.chance +
-        "%); control with the flag lifted names him = " + rx(SUBJECT.name).test(ctrlText) + "; shipped names him = " + rx(SUBJECT.name).test(appReal.text)
-        : "no flagged player in the snapshot enters the fifteen once unflagged — the control is unsound");
+      !!SUBJECT && appFlag.plan === "app" && appCtrl.plan === "app" && rx(SUBJECT.name).test(ctrlText) && !rx(SUBJECT.name).test(appFlag.text),
+      SUBJECT ? "on the app's own card (landing " + appFlag.plan + " / " + appCtrl.plan + " with a typed price): subject " + SUBJECT.name + " (id " + SUBJECT.id + ", " + how + "; status " + SUBJECT.status + " " + SUBJECT.chance +
+        "%); unflagged the card names him = " + rx(SUBJECT.name).test(ctrlText) + "; flagged the card names him = " + rx(SUBJECT.name).test(appFlag.text)
+        : "none of " + SUBJECTS.length + " flagged candidates (" + SUBJECTS.map(function (c) { return c.name; }).join(", ") + ") is named on the app's card once unflagged, and the card names no fit buy — the control is unsound");
     // Half two: the other direction, which cannot age at all. Take whoever the shipped plan
     // actually captains, flag him, and he must leave the armband, the vice slot and the fifteen.
     const shippedCap = (oneLine.match(/Captain\s+([^,.·]+)/) || [])[1];

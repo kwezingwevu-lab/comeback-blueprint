@@ -1,0 +1,7 @@
+never (from GW9) Optimization terminated successfully. (HiGHS Status 7: Optimal) 76.9 s · gap 0.003999405906055482 · total 666.92
+latest wildcard GW19: total 669.32 (never 666.92, +2.40) · the never plan to GW18, then the wildcard in GW19 (the set-1 limit), the new fifteen held after: 7 changes for +2.41 points that week · written to /tmp/fixed_week_521/solver_timing.json
+fixed_week.cjs · GW8: Semenyo out, Mbeumo in · 0 hit(s) · bank 2.7 · FT into GW9 1 · eleven 4-3-3, captain Haaland, vice Mbeumo · GW8 45.69 · never 712.61 · GW19 wildcard 715.01 · wrote data/solver_timing.json
+
+real	1m24.281s
+user	1m19.822s
+sys	0m0.649s

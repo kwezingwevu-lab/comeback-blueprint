@@ -2266,7 +2266,10 @@ console.log("--- v110 D6 · the Lab tab: method, limits, dated sources ---");
     const next = MB.gw.next;
     const mv = withMC(function (m) { const k = String(next); m.intel.odds[k] = (m.intel.odds[k] || []).slice(3); m.gw.lastDone += 1; });
     const L1 = text("lab-limits", mv), c1 = coverOf(mv.MC).filter(function (c) { return c.g === next; })[0];
-    const bad = miss(L1, [c1 ? "GW" + next + " (" + c1.have + " of " + c1.all + " matches)" : "GW" + next + " no longer priced", "A sample of " + mv.MC.gw.lastDone + " played gameweek"]);
+    // E-189: with no odds for the next week in the block (a refresh with no desk research, 31 Oct 2026) the coverage line is
+    // absent rather than reworded; the old fallback expected a phrase the app has never printed.
+    const bad = miss(L1, [c1 ? "GW" + next + " (" + c1.have + " of " + c1.all + " matches)" : null, "A sample of " + mv.MC.gw.lastDone + " played gameweek"].filter(Boolean));
+    if (!c1 && L1.indexOf("GW" + next + " (") >= 0) bad.push("GW" + next + " still shows a coverage line with no odds left");
     assert("D6-lab-limits-moves-with-the-bookmaker-coverage-and-the-played-weeks", bad.length === 0, bad.join(", "));
   }
 

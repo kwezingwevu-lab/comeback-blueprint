@@ -801,3 +801,9 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
 - **Draft, from the Draft API at 15:05Z.** Murillo and Tielemans are status a, unowned, and waivers have been processed. Affengruber and King are still on the roster. Draft flags: Janelt s, Isidor d 50%. Separately, `state/kwezi.json` draft.roster dates from 26 Sep and differs from the live roster. That is a follow-up.
 - **Why the app was not republished.** smoke_wk check 18 is red on the Calvert-Lewin flag, correctly. Turning it green needs a fresh pull, and a fresh pull forces the full re-solve chain, which runs past the 16:45Z hard stop. The one D2 exception (E-184) was already used today. CI runs the same live check, so the commit is held locally and goes out with the 29 Oct refresh.
 
+## 31 Oct 2026, GW9 (feeds about 08:55Z; one fresh run inside 24 hours of the deadline, the manager's rule)
+
+- **GW8 as played.** Semenyo out, Mbeumo in (state.cjs, GW8 picks). Bank £2.7m, 1 free transfer.
+- **The plan.** Wildcard GW19, Bench Boost GW13. 682.28 to GW19, against the solver's 684.62. GW9 is 4 transfers for −12, captain Haaland, vice Gabriel.
+- **Gate, local.** plan_legality 60/60 and reference 67/67, unit_engine 275/275, components 329/329 (after E-189), smoke 73/73, smoke_wk 39/39, mc_full 325/325, verify 34/34, privacy 27/27. WebKit, iOS and browser.py run on CI only.
+
