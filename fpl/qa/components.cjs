@@ -1608,6 +1608,17 @@ console.log("--- v110 D3 · the Draft tab ---");
       r2.ok && new RegExp(Lg.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + " Leader's chips: .+? \\+12 — ").test(S2) && /You lead by 12/.test(S2) &&
         S2.indexOf(Lo.name + " Leader's chips: ? ") >= 0 && /not in this build's data/.test(S2),
       r2.ok ? "«" + S2.slice(0, 600) + "»" : String(r2.err && r2.err.message));
+    // E-186: the survivor panel. With no block it says the standings arrive with the refresh; with one it shows who is
+    // still in, the manager's state and a risk band, never a bare percentage.
+    const svOpen = function (live) { const p = rivProps({ ctx: ctxOf(live, baseState) }); p.ui = { mode: "full", tab: "rivals", open: { "rv-survivor": true }, reveals: {} }; return tryRender("TabRivals", p); };
+    const L3 = JSON.parse(JSON.stringify(LIVE)); delete L3.survivor;
+    const s0 = svOpen(L3), T0 = s0.ok ? txt(secOf(s0.html, "rv-survivor")) : "";
+    const L4 = JSON.parse(JSON.stringify(LIVE)); const cur = Number(L4.current_event);
+    L4.survivor = { id: 817455, members: [me, 11, 12, 13].map(function (e, i) { const gws = []; for (let g = 1; g <= cur; g++) gws.push([g, 50 + 5 * i + (g % 3), 0]); return { entry: e, gws: gws }; }) };
+    const s1 = svOpen(L4), T1 = s1.ok ? txt(secOf(s1.html, "rv-survivor")) : "";
+    assert("SURVIVOR-panel-waits-for-its-data-then-shows-alive-count-state-and-a-band",
+      s0.ok && /arrive with the next refresh/.test(T0) && s1.ok && /Still in 4 of 4/.test(T1) && /You alive/.test(T1) && /(low|medium|high)/.test(T1) && !/\d+(\.\d+)?%(?! \))/.test(T1.replace(/under 5%|over 15%/g, "")),
+      "«" + T0.slice(0, 160) + "» «" + T1.slice(0, 400) + "»" + (s1.ok ? "" : " " + String(s1.err && s1.err.message)));
   }
 
   // the Draft race: the engine's own titleRace on the same draws and seed, rows by expected points, and what first takes

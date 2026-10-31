@@ -76,6 +76,7 @@ All numeric strings from the API are converted to numbers. Prices stay in tenths
   "ft_available": 3,                                   // derived: 1 + banked unused (cap 5); GW1 excluded; hits subtract
   "leagues": [ { "id","name","size","rank","last_rank",
                  "standings": [ {entry,player_name,entry_name,total,rank} ] } ],        // the six winnable leagues, ids in §4
+  "survivor": { "id": 817455, "members": [ { "entry": 123, "gws": [[event, points, hitCost], ...] } ] },   // E-186, ids and scores only; absent until a refresh writes it
   "rivals": { "<entryId>": { "event": 3, "active_chip": null, "picks": [ {element,is_captain,multiplier,position} ],
                              "gws": [ [event, points, event_transfers_cost] ], "chips": [ {name, event} ] } },   // every rival in those leagues;
                              // gws and chips (15 Oct 2026) come from entry/{id}/history/ and are absent when that call failed

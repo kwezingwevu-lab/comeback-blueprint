@@ -807,3 +807,24 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
 - **The plan.** Wildcard GW19, Bench Boost GW13. 682.28 to GW19, against the solver's 684.62. GW9 is 4 transfers for −12, captain Haaland, vice Gabriel.
 - **Gate, local.** plan_legality 60/60 and reference 67/67, unit_engine 275/275, components 329/329 (after E-189), smoke 73/73, smoke_wk 39/39, mc_full 325/325, verify 34/34, privacy 27/27. WebKit, iOS and browser.py run on CI only.
 
+## 31 Oct 2026, 09:50Z: the survivor league built (E-186), smoke C1 confirmed, two totality fixes
+
+- **Survivor league.**
+  - Data: the `fetch_live` survivor block (league 817455, entry ids and scores only).
+  - Engine: replay from GW13, with ties assumed all out.
+  - Risk: a normal-model risk band, with a walk-forward Brier check against a flat guess.
+  - App: the Rivals tab's `rv-survivor` panel. Its data arrives with the next 24-hour refresh, so the panel says so until then.
+- **Fixes.** `survivorPhi` and the existing `routeOvertake` returned NaN on junk input (mc_full P05). Both are now total.
+- **GW9 check, official feed, 09:21Z.** No flag on the planned fifteen or on the Draft targets. The search index carried no news from this week.
+- **Gate, local.**
+
+  | Suite | Result |
+  |---|---|
+  | unit_engine | 277/277 |
+  | components | 330/330 |
+  | mc_full | 333/333 |
+  | smoke | 73/73 |
+  | smoke_wk | 39/39 |
+
+  All 34 suites pass, except WebKit, iOS and browser.py, which run on CI only.
+

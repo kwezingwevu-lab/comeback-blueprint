@@ -2734,6 +2734,22 @@ if (!LIVE) {
   // state/kwezi.json is the state of record. These checks prove it against the snapshot rather
   // than against a typed list, so a refresh that moves the squad on moves them with it.
 
+  // E-186: the survivor league
+  check("SURVIVOR-replay-eliminates-from-GW13-net-of-hits-ties-all-out-and-skips-unscored-weeks", function () {
+    const M = [{ entry: 1, gws: [[12, 5, 0], [13, 50, 0], [14, 60, 0]] }, { entry: 2, gws: [[13, 40, 0], [14, 70, 0]] },
+      { entry: 3, gws: [[13, 44, 4], [14, 30, 0]] }, { entry: 4, gws: [[13, 60, 0], [14, 61, 0]] }, { entry: 5, gws: [[13, 70, 0]] }];
+    const r = E.survivorReplay(M, 15);
+    // GW12 does not count; GW13 net 40 and 44-4=40 tie, both out; GW14 entry 5 unscored, so nobody goes; GW15 unscored.
+    const junk = E.survivorReplay(null, "x");
+    return { ok: JSON.stringify(r.alive) === "[1,4,5]" && r.out.map((o) => o.entry + "@" + o.gw).join(",") === "2@13,3@13" && Array.isArray(junk.alive) && junk.alive.length === 0, detail: JSON.stringify(r) + " junk " + JSON.stringify(junk) };
+  });
+  check("SURVIVOR-risk-is-a-probability-ordered-by-form-and-banded", function () {
+    const lo = E.survivorLowest({ mu: 70, sd: 12 }, [{ mu: 50, sd: 12 }, { mu: 52, sd: 12 }]);
+    const hi = E.survivorLowest({ mu: 40, sd: 12 }, [{ mu: 60, sd: 12 }, { mu: 62, sd: 12 }]);
+    const okRisk = lo >= 0 && hi <= 1 && hi > 0.5 && lo < 0.05 && E.survivorBand(lo) === "low" && E.survivorBand(hi) === "high" && E.survivorLowest(null, []) === 0;
+    const bt = E.survivorBacktest([{ entry: 1, gws: [[1, 50, 0], [2, 60, 0], [3, 40, 0], [4, 45, 0]] }, { entry: 2, gws: [[1, 70, 0], [2, 65, 0], [3, 72, 0], [4, 68, 0]] }, { entry: 3, gws: [[1, 55, 0], [2, 58, 0], [3, 60, 0], [4, 61, 0]] }], 4);
+    return { ok: okRisk && bt.weeks === 2 && bt.brier >= 0 && bt.brier < bt.naive, detail: lo.toFixed(3) + " " + hi.toFixed(3) + " " + JSON.stringify(bt) };
+  });
   check("LIVE-STATE-the-saved-fifteen-is-the-entry's-own-latest-picks", function () {
     const mine = (LSTATE.squad || []).map(function (s) { return Number(s.id); }).sort(function (a, b) { return a - b; });
     const api = LIVE.picks[String(LIVE.current_event)].picks.map(function (p) { return Number(p.element); }).sort(function (a, b) { return a - b; });

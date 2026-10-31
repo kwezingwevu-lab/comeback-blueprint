@@ -2453,7 +2453,8 @@ function routeOvertake(gap, edge, next, end, weeksLeft) {
     var gw = next + Math.ceil(gap / edge - 1e-9) - 1;
     if (gw <= end) return { gw: gw, short: 0 };
   }
-  return { gw: null, short: gap - edge * weeksLeft };
+  var short = gap - edge * weeksLeft;               // a junk edge or Infinity − Infinity keeps the plain gap, never NaN
+  return { gw: null, short: isNaN(short) ? gap : short };
 }
 function leagueRoute(ctx, opts) {
   var res = { ok: false, next: 0, end: 19, weeksLeft: 0, planPerWeek: null, gamePace: null, mine: null, chipsHeldByLeaders: 0, leagues: [], note: "" };
@@ -5611,6 +5612,109 @@ function logScoreDiscrete(dist, y) {
   } catch (e) { return -Math.log(LOG_SCORE_FLOOR); }
 }
 
+// ---------------------------------------------------------------- survivor league (E-186)
+/* The manager's last-man-standing league (23 Oct 2026): from SURVIVOR.from, the lowest gameweek score after hits among the
+   managers still in is eliminated each week. The tie rule is not published; every manager on the lowest score is assumed
+   to go out (SURVIVOR.ties, shown with the panel). members: [{ entry, gws: [[event, points, hitCost], ...] }]. */
+var SURVIVOR = { id: 817455, from: 13, ties: "all on the lowest score go out (assumed; confirm with the league)" };
+function survivorNet(m, gw) {
+  var r = arr(m && m.gws).filter(function (x) { return Array.isArray(x) && intOf(x[0], -1) === gw; })[0];
+  return r ? num(r[1], 0) - num(r[2], 0) : null;
+}
+function survivorReplay(members, upTo, from) {
+  var res = { alive: [], out: [], from: intOf(from, SURVIVOR.from), upTo: intOf(upTo, 0) };
+  try {
+    var alive = arr(members).filter(function (m) { return isObj(m) && intOf(m.entry, 0) > 0; }).map(function (m) { return m; });
+    for (var g = res.from; g <= res.upTo; g++) {
+      var sc = alive.map(function (m) { return { m: m, v: survivorNet(m, g) }; }).filter(function (x) { return x.v !== null; });
+      if (sc.length < 2 || sc.length < alive.length) continue;          // a week not fully scored eliminates nobody
+      var low = Math.min.apply(null, sc.map(function (x) { return x.v; }));
+      var gone = sc.filter(function (x) { return x.v === low; });
+      if (gone.length === alive.length) continue;                        // everyone level: nobody can be singled out
+      gone.forEach(function (x) { res.out.push({ entry: intOf(x.m.entry, 0), gw: g, net: low }); });
+      alive = alive.filter(function (m) { return !gone.some(function (x) { return x.m === m; }); });
+    }
+    res.alive = alive.map(function (m) { return intOf(m.entry, 0); });
+  } catch (e) { /* total */ }
+  return res;
+}
+function survivorPhi(z) { z = num(z, NaN); if (!isFinite(z)) return isNaN(z) ? 0.5 : (z > 0 ? 1 : 0); var t = 1 / (1 + 0.2316419 * Math.abs(z)), d = 0.3989423 * Math.exp(-z * z / 2);
+  var p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return z > 0 ? 1 - p : p; }
+/* P(the first entry is strictly lowest) for independent normals [{mu, sd}], by quadrature over the first one's score. */
+function survivorLowest(me, rivals) {
+  try {
+    var mu = num(me && me.mu, NaN), sd = Math.max(1, num(me && me.sd, 13));
+    var R = arr(rivals).filter(function (r) { return isObj(r) && isFinite(num(r.mu, NaN)); });
+    if (!isFinite(mu) || !R.length) return 0;
+    var tot = 0, w = 0;
+    for (var k = -60; k <= 60; k++) {
+      var z = k / 10, x = mu + z * sd, f = Math.exp(-z * z / 2), q = 1;
+      R.forEach(function (r) { q *= 1 - survivorPhi((x - num(r.mu, 0)) / Math.max(1, num(r.sd, 13))); });
+      tot += f * q; w += f;
+    }
+    return clamp(w > 0 ? tot / w : 0, 0, 1);
+  } catch (e) { return 0; }
+}
+/* A member's mean and spread from his own net scores before gameweek `before`, the spread shrunk to the league's. */
+function survivorForm(m, before, poolSd) {
+  var v = arr(m && m.gws).filter(function (x) { return Array.isArray(x) && intOf(x[0], 0) < before; }).map(function (x) { return num(x[1], 0) - num(x[2], 0); });
+  if (!v.length) return null;
+  var mu = v.reduce(function (a, b) { return a + b; }, 0) / v.length;
+  var own = v.length > 1 ? Math.sqrt(v.reduce(function (a, b) { return a + (b - mu) * (b - mu); }, 0) / (v.length - 1)) : poolSd;
+  var w = v.length / (v.length + 4);
+  return { mu: mu, sd: w * own + (1 - w) * poolSd, n: v.length };
+}
+function survivorBand(p) { return p > 0.15 ? "high" : p >= 0.05 ? "medium" : "low"; }
+/* Walk-forward check of the elimination model on the weeks played: for each week from the third, every member's chance of
+   the lowest score from data before it, scored by Brier against who actually was lowest, beside the flat 1/N. */
+function survivorBacktest(members, lastDone) {
+  var res = { weeks: 0, brier: null, naive: null };
+  try {
+    var M = arr(members).filter(function (m) { return isObj(m) && arr(m.gws).length; });
+    var b = 0, n0 = 0, cnt = 0;
+    for (var g = 3; g <= intOf(lastDone, 0); g++) {
+      var all = []; M.forEach(function (m) { var v = survivorNet(m, g); if (v !== null) all.push(v); });
+      if (all.length < 3) continue;
+      var mu0 = all.reduce(function (a, c) { return a + c; }, 0) / all.length;
+      var pool = Math.sqrt(all.reduce(function (a, c) { return a + (c - mu0) * (c - mu0); }, 0) / all.length) || 13;
+      var F = M.map(function (m) { return { m: m, f: survivorForm(m, g, pool), v: survivorNet(m, g) }; }).filter(function (x) { return x.f && x.v !== null; });
+      if (F.length < 3) continue;
+      var low = Math.min.apply(null, F.map(function (x) { return x.v; }));
+      F.forEach(function (x, i) {
+        var p = survivorLowest(x.f, F.filter(function (y, j) { return j !== i; }).map(function (y) { return y.f; }));
+        var o = x.v === low ? 1 : 0;
+        b += (p - o) * (p - o); n0 += (1 / F.length - o) * (1 / F.length - o); cnt++;
+      });
+      res.weeks++;
+    }
+    if (cnt) { res.brier = b / cnt; res.naive = n0 / cnt; }
+  } catch (e) { /* total */ }
+  return res;
+}
+/* The panel's figures: who is alive, the week's risk band for the manager (his planned expected score against each alive
+   rival's own form), and the backtest. myMu is the plan's expected points for the coming week, net of hits. */
+function survivorView(live, myEntry, nextGw, myMu, lastDone) {
+  var out = { ok: false, alive: 0, total: 0, meAlive: true, from: SURVIVOR.from, p: null, band: null, backtest: null, ties: SURVIVOR.ties };
+  try {
+    var S = isObj(live) && isObj(live.survivor) ? live.survivor : null;
+    if (!S || !arr(S.members).length) return out;
+    var M = arr(S.members), done = intOf(lastDone, 0);
+    var rep = survivorReplay(M, done, SURVIVOR.from);
+    out.total = M.length; out.alive = rep.alive.length; out.meAlive = rep.alive.indexOf(intOf(myEntry, 0)) >= 0;
+    out.backtest = survivorBacktest(M, done);
+    var all = []; M.forEach(function (m) { var v = survivorNet(m, done); if (v !== null) all.push(v); });
+    var mu0 = all.length ? all.reduce(function (a, c) { return a + c; }, 0) / all.length : 55;
+    var pool = all.length ? (Math.sqrt(all.reduce(function (a, c) { return a + (c - mu0) * (c - mu0); }, 0) / all.length) || 13) : 13;
+    var me = M.filter(function (m) { return intOf(m.entry, 0) === intOf(myEntry, 0); })[0];
+    var mf = me ? survivorForm(me, done + 1, pool) : null;
+    if (mf && isFinite(num(myMu, NaN))) mf.mu = num(myMu, mf.mu);
+    var R = M.filter(function (m) { return m !== me && rep.alive.indexOf(intOf(m.entry, 0)) >= 0; }).map(function (m) { return survivorForm(m, done + 1, pool); }).filter(Boolean);
+    if (mf && R.length) { out.p = survivorLowest(mf, R); out.band = survivorBand(out.p); }
+    out.ok = true;
+  } catch (e) { /* total */ }
+  return out;
+}
+
 // ---------------------------------------------------------------- exports
 
 if (typeof module !== "undefined" && module.exports) {
@@ -5651,7 +5755,7 @@ if (typeof module !== "undefined" && module.exports) {
     dcMatches: dcMatches, dixonColes: dixonColes, dcLambdas: dcLambdas, dcPcs: dcPcs,
     cleanSheetCalibration: cleanSheetCalibration,
     logGamma: logGamma, nbDispersion: nbDispersion, pointsPmf: pointsPmf, crpsDiscrete: crpsDiscrete, logScoreDiscrete: logScoreDiscrete,
-    MINUTES_FEATURES: MINUTES_FEATURES, CHIP_SETS: CHIP_SETS, MANAGER_CHIPS: MANAGER_CHIPS, CHIP_NAMES: CHIP_NAMES, PROMOTION_HOLDOUT_WEEKS: PROMOTION_HOLDOUT_WEEKS,
+    MINUTES_FEATURES: MINUTES_FEATURES, CHIP_SETS: CHIP_SETS, MANAGER_CHIPS: MANAGER_CHIPS, SURVIVOR: SURVIVOR, survivorReplay: survivorReplay, survivorLowest: survivorLowest, survivorBacktest: survivorBacktest, survivorView: survivorView, survivorBand: survivorBand, CHIP_NAMES: CHIP_NAMES, PROMOTION_HOLDOUT_WEEKS: PROMOTION_HOLDOUT_WEEKS,
     TOURNAMENT_PROMOTE_AT: TOURNAMENT_PROMOTE_AT, MC_MIN_GWS_FOR_PWIN: MC_MIN_GWS_FOR_PWIN,
     WINNABLE_MAX_SIZE: WINNABLE_MAX_SIZE, WINPROB_TOP_N: WINPROB_TOP_N, AUTOSUB_MAX_BLANKS: AUTOSUB_MAX_BLANKS,
     DC_DECAY_PER_DAY: DC_DECAY_PER_DAY, PTS_DIST_MIN: PTS_DIST_MIN, PTS_DIST_MAX: PTS_DIST_MAX, SHRINK_K: SHRINK_K
@@ -9103,6 +9207,22 @@ function TabRivals(props) {
           </div>
         ) : null}
         </Guard>
+      </Section>
+      <Section id="rv-survivor" game="Classic" title="Survivor league" open={sec("rv-survivor")} onToggle={on.sec}>
+        {(function () {
+          const sv = sec("rv-survivor") ? survivorView(ctx.live, me, Number(ctx.live.next_event), solvedW ? Number(solvedW.epNet) : NaN, Number(ctx.live.current_event)) : null;
+          if (!sv) return null;
+          if (!sv.ok) return <div className="dim">Champions League Survivor (lowest score after hits goes out each week from GW{SURVIVOR.from}). Its standings arrive with the next refresh. <Tier k="model" /></div>;
+          const bt = sv.backtest || {};
+          return (
+            <div>
+              <KV k="Still in" v={sv.alive + " of " + sv.total} />
+              <KV k="You" v={sv.meAlive ? "alive" : "out"} tone={sv.meAlive ? "go" : "out"} />
+              <KV k={"Next week's risk" + (Number(ctx.live.next_event) < sv.from ? " (no eliminations before GW" + sv.from + ")" : "")} v={sv.band ? sv.band : "—"} tone={sv.band === "high" ? "out" : ""} />
+              <div className="dim">A model, not a promise: your planned score against each alive rival's own form, shown as a band (low under 5%, high over 15%). Checked on the weeks played: Brier {bt.brier === null || bt.brier === undefined ? "—" : bt.brier.toFixed(3)} against {bt.naive === null || bt.naive === undefined ? "—" : bt.naive.toFixed(3)} for a flat guess, over {bt.weeks || 0} weeks; too few to steer anything. Ties: {sv.ties}. <Tier k="model" /></div>
+            </div>
+          );
+        })()}
       </Section>
     </div>
   );

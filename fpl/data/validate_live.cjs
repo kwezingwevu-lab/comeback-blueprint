@@ -15,6 +15,8 @@ const ok = (name, cond, detail) => { if (cond) { pass++; console.log(`PASS ${nam
 
 const KEYS = ["fetched_at","source","next_event","current_event","total_players","events","teams","elements","fixtures","gw","entry","history","picks","ft_available","leagues","rivals","draft"];
 for (const k of KEYS) ok(`key ${k}`, k in L);
+// E-186: the survivor league block, when a refresh has written it, holds entry ids and scores only.
+if (L.survivor) ok("survivor block is ids and scores only", Array.isArray(L.survivor.members) && L.survivor.members.every((m) => Object.keys(m).sort().join(",") === "entry,gws" && Number.isInteger(m.entry) && m.gws.every((r) => Array.isArray(r) && r.length === 3 && r.every(Number.isFinite))), String(L.survivor.members && L.survivor.members.length));
 ok("fetched_at ISO UTC", /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(L.fetched_at), L.fetched_at);
 // frozen-ok: the Premier League is twenty clubs. That is the competition's shape, not an
 // observation of one pull, and if it ever changes the whole model changes with it.

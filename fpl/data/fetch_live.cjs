@@ -344,6 +344,27 @@ async function main() {
     R.chips = (Array.isArray(x.h.chips) ? x.h.chips : []).filter((c) => c && typeof c.name === "string" && Number.isInteger(c.event)).map((c) => ({ name: c.name, event: c.event }));
   }
 
+  // Survivor league (E-186): kept apart from LEAGUE_IDS so it never enters the convergence gate or the six-league table.
+  // Only entry ids and each member's week-by-week points and hit cost are kept; no name of any kind.
+  const SURVIVOR_IDS = [817455];
+  let survivor = null;
+  for (const id of SURVIVOR_IDS) {
+    try {
+      let page = 1, ents = [];
+      for (;;) {
+        const L = await getJSON(`${CLASSIC}/leagues-classic/${id}/standings/?page_standings=${page}`);
+        ents = ents.concat(L.standings.results.map((r) => Number(r.entry)));
+        if (!L.standings.has_next) break;
+        page++;
+      }
+      const hs = await pool(ents, async (eid) => {
+        try { const h = await getJSON(`${CLASSIC}/entry/${eid}/history/`); return { entry: eid, gws: (h.current || []).filter((c) => Number.isInteger(c.event)).map((c) => [c.event, Number(c.points) || 0, Number(c.event_transfers_cost) || 0]) }; }
+        catch (e) { warnings.push(`survivor ${eid} history: ${e.message}`); return { entry: eid, gws: [] }; }
+      });
+      survivor = { id, members: hs.filter(Boolean) };
+    } catch (e) { warnings.push(`survivor league ${id}: ${e.message}`); }
+  }
+
   // Draft: ids differ from classic for some players — carry code, and map team via team code
   const teamIdByCode = new Map(bootstrap.teams.map((t) => [t.code, t.id]));
   const draftTeamCode = new Map((draftBoot.teams || []).map((t) => [t.id, t.code]));
@@ -443,7 +464,7 @@ async function main() {
     },
     picks,
     ft_available: deriveFt(history),
-    leagues, rivals, draft,
+    leagues, rivals, draft, survivor,
   };
 
   // Belt and braces over the field-by-field mapping above: the whole payload goes through the

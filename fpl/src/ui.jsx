@@ -2911,6 +2911,22 @@ function TabRivals(props) {
         ) : null}
         </Guard>
       </Section>
+      <Section id="rv-survivor" game="Classic" title="Survivor league" open={sec("rv-survivor")} onToggle={on.sec}>
+        {(function () {
+          const sv = sec("rv-survivor") ? survivorView(ctx.live, me, Number(ctx.live.next_event), solvedW ? Number(solvedW.epNet) : NaN, Number(ctx.live.current_event)) : null;
+          if (!sv) return null;
+          if (!sv.ok) return <div className="dim">Champions League Survivor (lowest score after hits goes out each week from GW{SURVIVOR.from}). Its standings arrive with the next refresh. <Tier k="model" /></div>;
+          const bt = sv.backtest || {};
+          return (
+            <div>
+              <KV k="Still in" v={sv.alive + " of " + sv.total} />
+              <KV k="You" v={sv.meAlive ? "alive" : "out"} tone={sv.meAlive ? "go" : "out"} />
+              <KV k={"Next week's risk" + (Number(ctx.live.next_event) < sv.from ? " (no eliminations before GW" + sv.from + ")" : "")} v={sv.band ? sv.band : "—"} tone={sv.band === "high" ? "out" : ""} />
+              <div className="dim">A model, not a promise: your planned score against each alive rival's own form, shown as a band (low under 5%, high over 15%). Checked on the weeks played: Brier {bt.brier === null || bt.brier === undefined ? "—" : bt.brier.toFixed(3)} against {bt.naive === null || bt.naive === undefined ? "—" : bt.naive.toFixed(3)} for a flat guess, over {bt.weeks || 0} weeks; too few to steer anything. Ties: {sv.ties}. <Tier k="model" /></div>
+            </div>
+          );
+        })()}
+      </Section>
     </div>
   );
 }

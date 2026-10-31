@@ -434,6 +434,10 @@ point: a rule in a prompt that no function names is a rule nobody applies.
   constraint: classic()'s `chip_from`, the one declared change to the reference region, which plan_legality applies before
   its byte-identity check); the free hit is priced only in GW13–19; the "never" case keeps GW19 free for the wildcard
   (`no_chip`). In the app, `MANAGER_CHIPS` (src/engine.js) holds the same two numbers apart from the game's `CHIP_SETS`.
+  **The survivor league (23 Oct 2026, E-186):** Champions League Survivor (id 817455). From GW13 the lowest gameweek score after hits
+  among those still in goes out each week. Ties are assumed to put every manager on that score out. `data/fetch_live.cjs` carries it as `live.survivor`
+  (entry ids and scores only, kept out of `LEAGUE_IDS`). `survivorReplay`/`survivorView` in src/engine.js replay it and band the week's
+  risk, and the Rivals tab's `rv-survivor` panel shows it with a walk-forward Brier check. It drives nothing until enough weeks are scored.
 - **Selling price.** The price paid plus half of any rise, rounded down to £0.1m; a fall is taken in
   full. Price paid is `now_cost − cost_change_start` for the original fifteen and `element_in_cost`
   from `/api/entry/{id}/transfers/` for anyone bought since. A screenshot is not a source: prices
