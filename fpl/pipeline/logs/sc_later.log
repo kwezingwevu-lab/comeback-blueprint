@@ -1,1 +1,1 @@
-later Optimization terminated successfully. (HiGHS Status 7: Optimal) 62.5 s · gap 0.0039707873922473136 · total 683.85 · obj 540.69 · stored objective was 540.69 · not better on the same params, the file is unchanged
+later Optimization terminated successfully. (HiGHS Status 7: Optimal) 66.8 s · gap 0.0037688170758562343 · total 688.18 · obj 541.7 · stored objective was 540.38 · folded into /home/user/comeback-blueprint/fpl/data/solver_timing.json

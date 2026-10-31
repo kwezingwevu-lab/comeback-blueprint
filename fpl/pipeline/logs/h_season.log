@@ -1,1 +1,1 @@
-season: Optimization terminated successfully. (HiGHS Status 7: Optimal) · 62.8 s · gap 0.004958605707449457 · GW9 48.38 · October (GW6-9) 48.38 · to GW19 683.53 · written to /home/user/comeback-blueprint/fpl/data/solver_horizons.json
+season: Optimization terminated successfully. (HiGHS Status 7: Optimal) · 93.0 s · gap 0.002170238169714518 · GW9 48.38 · October (GW6-9) 48.38 · to GW19 684.48 · written to /home/user/comeback-blueprint/fpl/data/solver_horizons.json

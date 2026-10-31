@@ -828,3 +828,16 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
 
   All 34 suites pass, except WebKit, iOS and browser.py, which run on CI only.
 
+## 31 Oct 2026, 10:30Z: the full version (second run inside the 24-hour window, at the manager's request)
+
+- **Survivor data is live.** 26 members, all scored, ids and scores only (validate_live 104/104).
+  - All 26 are still in, since nothing is eliminated before GW13.
+  - Your GW9 risk band: medium (8.6%).
+  - Walk-forward check over 6 weeks: Brier 0.0430 against 0.0429 for a flat guess. It shows no skill yet and drives nothing.
+- **The solver input is unchanged** (hash af6802de1c04c7e3), but the re-solve found a better GW9.
+  - Old plan: 4 transfers for −12, 682.28 to GW19.
+  - New plan: 3 transfers for −8, 685.03 to GW19. Diop, Saka and van Ewijk out; Gabriel, Tavernier and Silva in; Guéhi kept.
+  - Captain Haaland and vice Gabriel are unchanged, as are the bench and the chip weeks (Bench Boost GW13, Wildcard GW19).
+- **Gate, local.** All 34 suites green, except WebKit, iOS and browser.py, which run on CI only.
+- **Not done.** No GW9 bookmaker odds. There was no time to verify them before the deadline.
+

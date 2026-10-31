@@ -2,10 +2,10 @@
 // change the inputs and re-run it after pipeline/plan.cjs. Classic entries are FPL element ids; Draft entries are
 // player codes (join on code, never on id). The figures in the comments and the why lines are the plan's own at
 // the moment of writing; the app's engines recompute every figure it shows.
-// Plan af6802de1c04c7e3 (the manager's choice: wildcard GW19 (built from the never plan)), block baked 2026-10-31T08:54:14.985Z, live snapshot 2026-10-31T08:54:09Z.
+// Plan af6802de1c04c7e3 (the manager's choice: wildcard GW19 (built from the never plan)), block baked 2026-10-31T10:08:06.322Z, live snapshot 2026-10-31T10:08:03Z.
 const WEEKLY = {
   version: 110, gw: 9, written: "2026-10-31", hash: "af6802de1c04c7e3",
-  source: "pipeline/plan.cjs on data/mc_data.json baked 2026-10-31T08:54:14.985Z (export hash af6802de1c04c7e3); data/live.json fetched 2026-10-31T08:54:09Z",
+  source: "pipeline/plan.cjs on data/mc_data.json baked 2026-10-31T10:08:06.322Z (export hash af6802de1c04c7e3); data/live.json fetched 2026-10-31T10:08:03Z",
 
   // The plan this block replaces, recorded rather than deleted (v89 rule). `previous` carries the one before it.
   superseded: {
@@ -29,38 +29,38 @@ const WEEKLY = {
 
   classic: {
     plan: "transfers",                                   // "wildcard" | "transfers" | "hold"
-    // data/plan.json weeks[0].squad: Gabriel, Konsa, Rogers, Tavernier, Janelt, Verbruggen, De Cuyper, Gomez, Tarkowski, Calvert-Lewin, Haaland, Mbeumo, Kinsky, Brobbey, Silva.
-    // Buys Gabriel, Konsa, Tavernier, Silva; sells Diop, Guéhi, Saka, van Ewijk.
-    wildcard15: [4, 31, 40, 68, 98, 109, 115, 127, 229, 346, 411, 427, 496, 552, 566],
+    // data/plan.json weeks[0].squad: Gabriel, Rogers, Tavernier, Janelt, Verbruggen, De Cuyper, Gomez, Tarkowski, Calvert-Lewin, Guéhi, Haaland, Mbeumo, Kinsky, Brobbey, Silva.
+    // Buys Gabriel, Tavernier, Silva; sells Diop, Saka, van Ewijk.
+    wildcard15: [4, 40, 68, 98, 109, 115, 127, 229, 346, 388, 411, 427, 496, 552, 566],
     // Rule C1.6's only exemption, declared (smoke_wk reads it): the fifteen's players at or over the 60% rival-ownership
     // gate. The plan keeps them because they maximise expected points (v110 §1.2).
-    locks: [31, 40, 109, 115, 411],
+    locks: [40, 109, 115, 411],
     // The fifteen's cost at today's prices, recorded so the Plan tab reads it out of the block (E-088).
-    wildcard15_cost_written: 975,
+    wildcard15_cost_written: 988,
     captain: 411, vice: 4,                            // Haaland, Gabriel — the plan's own armband for GW9
     // Without the chip: the plan of record's own GW9 week (no chip is played in it).
     fallback: {
-      moves: [{out: 388, in: 4}, {out: 259, in: 566}, {out: 175, in: 31}, {out: 12, in: 68}],
+      moves: [{out: 259, in: 4}, {out: 175, in: 566}, {out: 12, in: 68}],
       captain: 411, vice: 4                            // Haaland, Gabriel
     },
     chip: null,
     // The week's own ledger, replayed from the rules (data/plan.json replay), never the solver's variables (E-180).
-    transfers: [{out: 388, in: 4}, {out: 259, in: 566}, {out: 175, in: 31}, {out: 12, in: 68}],
-    hits: 3, ft_before: 1, ft_after: 1, bank_after: 18,
+    transfers: [{out: 259, in: 4}, {out: 175, in: 566}, {out: 12, in: 68}],
+    hits: 2, ft_before: 1, ft_after: 1, bank_after: 5,
     manager_choice: "wildcard GW19",
     notes: [
-      "The plan of record is the manager's choice (wildcard GW19): the optimiser's no-wildcard plan (pipeline/solve.py, HiGHS), proved within 0.35% of the best plan without a wildcard, with the fifteen rebuilt in GW19: 682.28 Classic expected points from GW9 to GW19, 3 hits.",
-      "Chips in the plan: BB GW13, WC GW19; the best free-hit week is GW15 at +5.08, not taken.",
+      "The plan of record is the manager's choice (wildcard GW19): the optimiser's no-wildcard plan (pipeline/solve.py, HiGHS), proved within 0.32% of the best plan without a wildcard, with the fifteen rebuilt in GW19: 685.03 Classic expected points from GW9 to GW19, 2 hits.",
+      "Chips in the plan: BB GW13, WC GW19; the best free-hit week is GW15 at +4.58, not taken.",
       "Free transfers come from the replayed ledger (data/plan.json replay), never the solver's own variables: 1 into GW9, 1 after it.",
       "No chip before GW13 (the manager's rule of 22 Oct 2026: chips are kept for his last-man-standing league too) and Wildcard 1 in GW19 (his choice of 20 Oct 2026).",
       "No flagged player is kept outside the eleven.",
-      "Konsa, Rogers, Verbruggen, De Cuyper, Haaland are at or over the 60% rival-ownership gate and kept on purpose; the rule-pure search on the Plan tab prices the difference."
+      "Rogers, Verbruggen, De Cuyper, Haaland are at or over the 60% rival-ownership gate and kept on purpose; the rule-pure search on the Plan tab prices the difference."
     ],
     why: [
-      "The cost of the manager's rules: the solver's own best plan under the GW13 rule plays the wildcard in GW13 for 684.62 Classic expected points to GW19; the plan of record (wildcard GW19) is 682.28, 2.34 less.",
-      "Timing (data/plan.json timing): wildcard at the solver's week (GW13) 684.62, later (GW14) 683.85, never 680.69 Classic expected points to GW19.",
-      "The wildcard as late as the rules allow, GW19 (the last deadline before set one expires): the no-wildcard plan to the week before, then the fifteen rebuilt for that week (6 changes, 1.61 that week), worth 682.28 Classic expected points, which is 0.00 below the plan, so waiting to the end costs at most that plus the proof tolerance. It is a plan built from a proven one and replayed against the rules, and a floor, not a proved best. Points are counted only to GW19, so a wildcard played in the last week is credited with that week alone and none after it: the cost is what waiting gives up, not the whole comparison.",
-      "Without the wildcard the best plan found is 681.17, so the chip is worth 1.11 over the window.",
+      "The cost of the manager's rules: the solver's own best plan under the GW13 rule plays the wildcard in GW13 for 683.44 Classic expected points to GW19; the plan of record (wildcard GW19) is 685.03, -1.59 less.",
+      "Timing (data/plan.json timing): wildcard at the solver's week (GW13) 683.44, later (GW15) 688.18, never 682.63 Classic expected points to GW19.",
+      "The wildcard as late as the rules allow, GW19 (the last deadline before set one expires): the no-wildcard plan to the week before, then the fifteen rebuilt for that week (7 changes, 2.39 that week), worth 685.03 Classic expected points, which is 0.00 below the plan, so waiting to the end costs at most that plus the proof tolerance. It is a plan built from a proven one and replayed against the rules, and a floor, not a proved best. Points are counted only to GW19, so a wildcard played in the last week is credited with that week alone and none after it: the cost is what waiting gives up, not the whole comparison.",
+      "Without the wildcard the best plan found is 682.63, so the chip is worth 2.40 over the window.",
       "The app's own timing model (src/engine.js wildcardTiming) puts the five-gameweek deficit of the current fifteen at 15.4 and the break-even for waiting at 24.0 by GW19."
     ]
   },
@@ -99,5 +99,5 @@ const WEEKLY = {
 
   // wildcardTiming(ctx) — the app engine's note; `solved` is the optimiser's (data/plan.json timing).
   timing: { now_vs_later: { by_gw19: 24, by_gw38: 24, breakeven_double_gw17: null, breakeven_later_value: 24 },
-    solved: { now: 684.62, later: 683.85, later_gw: 14, never: 680.69, latest: 682.28, latest_gw: 19 } }
+    solved: { now: 683.44, later: 688.18, later_gw: 15, never: 682.63, latest: 685.03, latest_gw: 19 } }
 };
