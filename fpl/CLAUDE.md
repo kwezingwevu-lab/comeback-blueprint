@@ -483,6 +483,18 @@ point: a rule in a prompt that no function names is a rule nobody applies.
   league it is event 21, so the horizon is GW20 — read, not assumed (§7.12).
 - **Rivals' elevens** publish at the deadline.
 
+## N2b. The as-is eleven, every week (the manager's standing rule of 31 Oct 2026)
+
+Every gameweek reply, and the app, carry an **as-is, no-transfer** starting eleven and bench for **both** games, beside the
+plan's own:
+- **Classic.** The saved fifteen as it stands (state/kwezi.json), with no transfers. Use engine.js `bestXI` and `captainPick`
+  (C1 rules 2 and 3), the bench in `bestXI` order, and the second goalkeeper named.
+- **Draft.** The live roster with no signings. Use the best legal eleven on the gameweek's expected points (one keeper, at
+  least 3 DEF, 2 MID and 1 FWD), and order the bench by expected points.
+
+Each is labelled with its game and never summed across games (N3). The app panel for it is built at the next refresh (open
+until then).
+
 ## N3. Two games, two currencies
 
 Classic and Draft are separate games. Never add, average, net or compare a Classic figure with a
