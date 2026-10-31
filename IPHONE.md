@@ -48,6 +48,10 @@ The GitHub app is for browsing; uploading a file is done on the website.
 
 ---
 
+## Part 5b — Open the app in one tap (the everyday way)
+
+Open https://claude.ai/artifact/NDrDPTJAEX2L8CX2AHeT3L in the Claude app or any browser where you are signed in to Claude. It opens straight into the app. Your logs are kept in this browser and in your Claude account, so the same link on your laptop picks them up. Backups save through the Save prompt Claude shows. If you have logs in an older copy (the app file or the web link), save a backup there and use Home → Data → Restore in the artifact once.
+
 ## Part 6 — Run the app on the phone (installed, works offline)
 
 GitHub shows HTML files as text, so opening the file in the GitHub app does not run it. It has to be served as a web page, and once it is, it installs to your Home Screen and keeps working with no signal.

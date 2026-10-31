@@ -1945,5 +1945,67 @@ const GOODSLEEP=[{date:'2027-01-04',h:7.6},{date:'2027-01-05',h:7.4},{date:'2027
   await r3fin(q);}
  T('R3: no page errors across the round-3 checks',R3ERR.length===0,R3ERR.join('|').slice(0,300));
 }
+// ===== AI. Claude artifact (31 Oct 2026): the one-tap link (LEDGER 29) =====
+// dist/artifact.html runs inside a frame like the viewer's: sandbox without allow-modals (confirm() returns false), a
+// mock window.claude.use with an in-memory db, user and downloads. Proves the account copy, the in-page dialog, the
+// downloads route and the artifact shape.
+{const http=require('http');const ART=fs.readFileSync(path.resolve('../dist/artifact.html'),'utf8');
+ const MOCKC=`(function(){var T=window.top;T.__mdb=T.__mdb||{};T.__saves=T.__saves||[];
+  function ref(p){return {get:function(){var e=Object.prototype.hasOwnProperty.call(T.__mdb,p);return Promise.resolve({id:p.split('/').pop(),exists:e,data:function(){return e?T.__mdb[p]:undefined;},metadata:{fromCache:false,hasPendingWrites:false}});},
+   set:function(d){var s=JSON.stringify(d);if(s.length>262144)return Promise.reject({code:'invalid_argument',message:'too big'});T.__mdb[p]=JSON.parse(s);return Promise.resolve();},
+   delete:function(){delete T.__mdb[p];return Promise.resolve();}};}
+  var db={doc:function(p){return ref(p);},collection:function(c){if(c.split('/').length%2!==1)throw new TypeError('parity');return {doc:function(id){return ref(c+'/'+id);}};}};
+  var user={id:function(){return Promise.resolve(T.__uid===undefined?'u1':T.__uid);}};
+  var dl={save:function(r){T.__saves.push({filename:r.filename,len:String(r.data).length});return T.__decline?Promise.reject({code:'declined',message:'no'}):Promise.resolve({status:'saved'});}};
+  if(!T.__noclaude)window.claude={use:function(n){return new Promise(function(res){setTimeout(function(){res(T.__nouse?null:n==='db'?db:n==='user'?user:n==='downloads'?dl:null);},40);});}};
+  if(T.__preStorage)window.storage={__mock:1,get:function(k){return Promise.reject(new Error('nf'));},set:function(){return Promise.resolve();}};})();`;
+ const FRAME=iso=>'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style><script>('+MOCK.toString()+')("'+iso+'");'+MOCKC+'</script></head><body>'+ART+'</body></html>';
+ const srv=http.createServer((rq,rs)=>{if(rq.url.startsWith('/frame'))return rs.writeHead(200,{'content-type':'text/html'}),rs.end(FRAME('2026-11-08'));rs.writeHead(200,{'content-type':'text/html'});rs.end('<!doctype html><html><body style="margin:0"><iframe id="f" sandbox="allow-scripts allow-same-origin" src="/frame.html" style="width:390px;height:844px;border:0"></iframe></body></html>');});
+ await new Promise(r=>srv.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+srv.address().port;
+ const W=ms=>new Promise(r=>setTimeout(r,ms));
+ const host=async(pre)=>{const c=await b.createBrowserContext();const q=await c.newPage();await q.setRequestInterception(true);q.on('request',r=>{const u=r.url();if(u.startsWith(base)||u.startsWith('data:')||u.startsWith('blob:')||u.startsWith('about:'))r.continue();else r.respond({status:200,contentType:'text/css',body:''});});
+   q.__errs=[];q.on('pageerror',e=>q.__errs.push(e.message));if(pre)await q.evaluateOnNewDocument(pre);await q.setViewport({width:390,height:844});await q.goto(base+'/',{waitUntil:'load'});
+   const fr=async()=>{for(let i=0;i<60;i++){const f=q.frames().find(x=>x.url().includes('/frame'));if(f){const ok=await f.evaluate(()=>typeof DB!=='undefined'&&!!document.getElementById('view-home')).catch(()=>false);if(ok)return f;}await W(100);}return null;};
+   q.frameNow=fr;q.__ctx=c;return q;};
+ const ev=async(f,fn,a)=>{if(!f)return {err:'no frame'};try{return await f.evaluate(fn,a);}catch(e){return {err:String(e&&e.message||e).slice(0,160)};}};
+ const poll=async(f,fn,ms)=>{const t=Date.now();let v;while(Date.now()-t<(ms||6000)){v=await ev(f,fn);if(v&&!v.err&&v!==false)return v;await W(150);}return v;};
+ // shape
+ const shape={doctype:/<!doctype/i.test(ART),html:/<html[\s>]/i.test(ART),head:/<head[\s>]/i.test(ART),body:/<body[\s>]/i.test(ART),title:(ART.match(/<title>([^<]*)<\/title>/)||[])[1],sheets:(ART.match(/<link[^>]*rel="stylesheet"[^>]*>/g)||[]).length,first:ART.slice(0,7)};
+ T('AI shape: dist/artifact.html has no doctype/html/head/body, starts with its <title>, the title is the name only, one font stylesheet',!shape.doctype&&!shape.html&&!shape.head&&!shape.body&&shape.title==='The Comeback Blueprint'&&shape.sheets===1&&shape.first==='<title>',JSON.stringify(shape));
+ // 1. account copy: a weigh-in typed into Quick log reaches the private db subtree; wipe + reload restores it
+ {const q=await host();let f=await q.frameNow();
+  const pre=await ev(f,()=>({confirmBlocked:confirm('x')===false,manifest:!!document.querySelector('link[rel="manifest"]')}));
+  const conn=await poll(f,()=>!!(window.storage&&!window.storage.__mock)&&cloudOK(),8000);
+  const typed=await ev(f,()=>{const i=document.getElementById('qW');if(!i)return 'no input';i.value='91.4';i.dispatchEvent(new Event('input',{bubbles:true}));quickLogWeight();return 'ok';});
+  const mani=await poll(f,()=>{const m=window.top.__mdb['data/users/u1/cb2_all'];if(!m||!m.gen)return false;let v='';for(let i=0;i<m.parts;i++){const p=window.top.__mdb['data/users/u1/cb2_all~'+m.gen+'~'+i];if(!p)return false;v+=p.v;}return /91\.4/.test(v)&&v.length===m.len?{parts:m.parts,len:m.len}:false;},8000);
+  const copy=await ev(f,()=>{const e=document.getElementById('thisCopy');return e?e.innerText:'';});
+  T('AI frame: confirm() is blocked in a viewer-like frame, and the app adds no manifest or service worker there',pre.confirmBlocked===true&&pre.manifest===false,JSON.stringify(pre));
+  T('AI account: inside the artifact the account copy connects through db + user, and a Quick-log weigh-in lands in data/users/<id>/cb2_all (manifest + parts)',conn===true&&typed==='ok'&&mani&&mani.parts>=1,JSON.stringify({conn,typed,mani}));
+  T('AI This copy: names the Claude artifact and the Claude account, never the sandbox host',/Claude artifact/.test(copy)&&/Claude account/.test(copy)&&!/127\.0\.0\.1/.test(copy),copy);
+  await ev(f,()=>new Promise(r=>{localStorage.clear();const d=indexedDB.deleteDatabase('cb2');d.onsuccess=d.onerror=d.onblocked=()=>r(1);}));
+  await ev(f,()=>location.reload());await W(400);f=await q.frameNow();
+  const back=await poll(f,()=>{const w=localStorage.getItem('cb2_weight')||'';return /91\.4/.test(w)?{w:w.slice(0,80),toast:(document.getElementById('toast')||{}).innerText||''}:false;},10000);
+  T('AI account: with this browser wiped mid-session, the page-close flush does not overwrite the account copy, and reopening the link restores the logs from it',back&&/91\.4/.test(back.w),JSON.stringify(back));
+  // chunking + generation cleanup + serial writes
+  const ch=await ev(f,async()=>{const s=window.storage;const big='x'.repeat(130001),mid='y'.repeat(70000);const p1=s.set('cbx',big),p2=s.set('cbx',mid);await p1;await p2;const keys=Object.keys(window.top.__mdb).filter(k=>k.startsWith('data/users/u1/cbx'));const m=window.top.__mdb['data/users/u1/cbx'];const got=await s.get('cbx');return {parts:m.parts,keys:keys.length,eq:got.value===mid,len:m.len};});
+  T('AI account: a copy over 60,000 characters is split into parts, a newer save always wins, and the older generation is deleted',ch&&ch.eq&&ch.parts===2&&ch.keys===3,JSON.stringify(ch));
+  const torn=await ev(f,async()=>{const M=window.top.__mdb,b='data/users/u1/';M[b+'cbt']={gen:'zz',parts:2,len:10,at:1};M[b+'cbt~zz~0']={v:'abcde'};let a='',z='';try{await window.storage.get('cbt');a='read';}catch(e){a=e.message;}try{await window.storage.get('cbnone');z='read';}catch(e){z=e.message;}return {a,z};});
+  T('AI account: a torn account copy (a part missing) reads as unreachable, never as "no copy", so an older device cannot write over it',torn&&torn.a==='cloud-timeout'&&torn.z==='nf',JSON.stringify(torn));
+  // in-page dialog: Cancel changes nothing, Restore applies
+  const bk=JSON.stringify({app:'ComebackBlueprint',version:2,weight:[{date:'2026-11-01',v:77.7}]});
+  const can=await ev(f,async bk=>{doRestore();const ta=document.getElementById('dataTa');ta.value=bk;document.getElementById('dataApply').click();await new Promise(r=>setTimeout(r,60));const d=document.getElementById('askDlg');const info={dlg:!!d,role:d&&d.querySelector('[role="dialog"]')?1:0,focus:document.activeElement&&document.activeElement.textContent,font:d?parseFloat(getComputedStyle(d.querySelector('p')).fontSize):0,btnH:d?Math.round(d.querySelector('[data-a="1"]').getBoundingClientRect().height):0};if(d)d.querySelector('[data-a="0"]').click();await new Promise(r=>setTimeout(r,60));info.after=!!document.getElementById('askDlg');info.w=localStorage.getItem('cb2_weight')||'';return info;},bk);
+  T('AI dialog: Restore inside the artifact asks in an in-page dialog (focus on Cancel, 16 px text, 44 px buttons); Cancel closes it and changes nothing',can&&can.dlg&&can.role===1&&can.focus==='Cancel'&&can.font>=16&&can.btnH>=44&&!can.after&&/91\.4/.test(can.w)&&!/77\.7/.test(can.w),JSON.stringify(can));
+  const okr=await ev(f,async bk=>{doRestore();document.getElementById('dataTa').value=bk;document.getElementById('dataApply').click();await new Promise(r=>setTimeout(r,60));const d=document.getElementById('askDlg');if(!d)return {dlg:false};d.querySelector('[data-a="1"]').click();return {dlg:true};},bk);
+  await W(800);f=await q.frameNow();const wOK=await poll(f,()=>{const w=localStorage.getItem('cb2_weight')||'';return /77\.7/.test(w)?w.slice(0,60):false;},6000);
+  T('AI dialog: tapping Restore in the in-page dialog applies the backup',okr&&okr.dlg&&wOK&&/77\.7/.test(wOK),JSON.stringify({okr,wOK}));
+  // backups through the downloads capability
+  const sv=await ev(f,async()=>{const before=localStorage.getItem('cb2_lastbackup');await shareBackup();const a=window.top.__saves.slice();const after=localStorage.getItem('cb2_lastbackup');window.top.__decline=true;const lb=localStorage.getItem('cb2_lastbackup');await downloadBackup();const t=document.getElementById('toast');return {saves:a,changed:before!==after,lbSame:localStorage.getItem('cb2_lastbackup')===lb,warn:/^err|bad/.test(t.className)||/cancelled/.test(t.innerText),msg:t.innerText.slice(0,80),n:window.top.__saves.length};});
+  T('AI backup: Save backup goes through the downloads capability (a .json file), records the backup; a declined save warns and records nothing',sv&&sv.saves&&sv.saves.length===1&&/^comeback-backup-\d{4}-\d\d-\d\d\.json$/.test(sv.saves[0].filename)&&sv.saves[0].len>50&&sv.changed&&sv.lbSame&&/cancelled/.test(sv.msg)&&sv.n===2,JSON.stringify(sv));
+  T('AI frame: no page errors',q.__errs.length===0,q.__errs.join(' | ').slice(0,300));
+  await done(q);}
+ // 2. absence: use() null, id() null, or a pre-existing window.storage → no adapter, no errors
+ {const r={};for(const [k,pre] of [['nouse','window.__nouse=true'],['noid','window.__uid=null'],['pre','window.__preStorage=true']]){const q=await host(pre);const f=await q.frameNow();await W(1500);r[k]=await ev(f,()=>({st:!!window.storage,mock:!!(window.storage&&window.storage.__mock),db:Object.keys(window.top.__mdb).length}));r[k].errs=q.__errs.length;await done(q);}
+  T('AI absence: no db (use() null) or no viewer id leaves the account copy off with no errors; an existing window.storage is never replaced',r.nouse&&!r.nouse.st&&r.nouse.errs===0&&r.noid&&!r.noid.st&&r.noid.db===0&&r.noid.errs===0&&r.pre&&r.pre.mock&&r.pre.db===0,JSON.stringify(r));}
+ srv.close();}
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+String(x.detail||'').replace(/\s+/g,' ').slice(0,400)).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));process.exit(pass===R.length?0:1);})().catch(e=>{const m=String(e&&e.message||e);if(/detached|Target closed|Session closed|Connection closed|Protocol error/i.test(m))console.error('QA CRASH: the browser went away mid-run ('+m.slice(0,80)+'). The suite takes about ten minutes: a foreground command with a ten-minute limit kills Chromium during section AE. Run qa/run.sh as a background job and poll its output file.');console.error('QA CRASH:',e&&e.stack||e);process.exit(2);});

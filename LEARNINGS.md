@@ -79,3 +79,7 @@ See CLAUDE.md §6 for the numbered list. Additions:
 - 2026-10-29: sw.js calls skipWaiting() on install, so `registration.waiting` is almost never set; an update bar must also listen for controllerchange (only when the page already had a controller, or the first install would show it).
 - 2026-10-29: Re-registering a chart under an existing `_tips` key keeps its old insertion slot; a size cap must move the id to the end before trimming, or it drops the chart on screen.
 - 2026-10-29: Section R3 follows the HX pattern: sliced out with the preamble and the ctxPage helpers into qa/_r3mini.js, it runs alone in about a minute for the mutation proof.
+- 2026-10-31: An HTML file sent as a chat attachment shows as source code in the Claude app. The one-tap deliverable is a published artifact link (LEDGER 29), republished to the same URL.
+- 2026-10-31: The artifact viewer wraps the file in its own doctype/head/body, blocks confirm()/alert()/prompt() (confirm returns false at once), blocks <a download> and Web Share, and refuses service workers. Build a separate artifact-shaped file and route confirms, saves and storage through in-page UI and claude.use() capabilities.
+- 2026-10-31: backupJSON() reads localStorage, not the in-memory DB, and pagehide flushes it to the account copy. A mid-session storage wipe therefore produced an 18-character empty copy that overwrote the account. Guard on the payload's own logs (hasLogs), not on dbEmpty(), which reads memory. The test caught it.
+

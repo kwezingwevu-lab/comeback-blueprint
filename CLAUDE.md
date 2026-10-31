@@ -24,6 +24,8 @@ You are continuing a long-running build of **The Comeback Blueprint**, a single-
 
 ## 2b. Building from the iPhone
 
+**The deliverable is the artifact link** https://claude.ai/artifact/NDrDPTJAEX2L8CX2AHeT3L (LEDGER 29). After every green build, publish `dist/artifact.html` to that link (the Artifact tool with `url` from a new session, capabilities `{db:{}, user:{}, downloads:true}`); never send the HTML file itself, which the Claude app shows as code. Inside the artifact `inArtifact()` is true: `askOK()` replaces `confirm()` (blocked there), backups go through `artifactSave()` (the downloads capability), `claudeStoreBoot()`/`acctStore()` keep the account copy in `data/users/<id>` (60,000-character parts per generation, writes serialised, a copy with no logs never overwrites it), and `pwaBoot` stays off.
+
 See `IPHONE.md`. Cloud sessions run from the GitHub repo; the phone only steers. In the Claude Code cloud sandbox (Ubuntu, root) WebKit installs with `npx playwright install webkit && npx playwright install-deps webkit` (verified 11 Sep 2026); then `node qa/webkit.js`. If either install is refused, run the Chromium suite and state plainly that WebKit acceptance was not run — never report a check that did not execute. The sandbox has no outbound web access from the browser: the two QA suites answer the Google Fonts request with empty CSS (fallback fonts), while the screenshot helpers serve the real typefaces from qa/fonts, so judge text fit only from helper shots.
 
 ## 3. Repo layout and build
@@ -33,6 +35,7 @@ src/app_full.js        # the ONLY source of app logic (single source of truth)
 src/blueprint.html     # shell: CSS + HTML + a <script> containing the placeholder
 src/pwa/               # install layer: manifest.webmanifest, sw.js (stamped __BUILD__), icons, make-icons.js
 build.py               # injects app_full.js into the shell -> dist/ComebackBlueprint.html; copies the install layer; stamps sw.js
+dist/artifact.html     # the same app shaped for the claude.ai artifact viewer (no doctype/head/body; name-only title); published to the LEDGER 29 link
 dist/                  # the shipped app + install layer + index.html redirect (never edit by hand; CI checks dist == build(src))
 qa/qa_full.js          # 220+ functional checks (Puppeteer, headless Chromium, Africa/Johannesburg time)
 qa/pwa.js              # install/offline acceptance: local HTTP server, service worker, server killed, app still boots

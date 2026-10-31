@@ -1,5 +1,14 @@
 # CHANGELOG.md — what has shipped (newest first)
 
+## 2026-10-31 - One-tap app: the claude.ai artifact link, with the account copy, in-app confirm and backups
+Kwezi asked for a one-tap view instead of an HTML file that the Claude app shows as code. The app now ships as a private artifact at https://claude.ai/artifact/NDrDPTJAEX2L8CX2AHeT3L (LEDGER 29), built as `dist/artifact.html` (no doctype/head/body, name-only title, one font stylesheet, dark form controls, the header no longer doubles the top safe-area inset).
+- Inside the artifact the viewer blocks confirm() and file downloads. Restore and Import now ask in an in-page dialog (focus starts on Cancel, Escape cancels, 44 px buttons); Save backup goes through Claude's Save prompt and records the backup only when the viewer accepts.
+- Logs are copied to Kwezi's Claude account through the artifact's private per-person store (`data/users/<id>`, readable by nobody else). The copy is cut into 60,000-character parts per generation with the manifest written last; writes run one at a time; a copy with no logs never overwrites it (the page-close flush could otherwise write an empty copy after this browser's storage was cleared). A wiped browser or a second device restores from it on open.
+- A two-lens review (runtime contract, data safety; each finding re-verified) found three real problems, now fixed: a torn or unreadable account copy now counts as unreachable rather than "no copy", so an older device can never write over it; Save photos and the unreadable-data export now go through the Save prompt inside the artifact (both were silently inert there). Parts never split an emoji, and a failed write removes its own parts.
+- Outside an artifact nothing changes: native confirm, file download and the old `window.storage` path behave as before.
+- Tests: section AI (12 checks) runs `dist/artifact.html` inside a sandboxed viewer-like frame against mock db, user and downloads; each feature check was shown to fail under a deliberate break.
+- Not verified here: a real iPhone opening the link in the Claude app, and the real viewer's frame flags (the harness imitates them from the platform contract).
+
 ## 2026-10-29 - Round-3 polish: update bar, wake-lock race, caches, Quick-log sleep, neck tape, "This copy"
 Polish only: no programme, dose, phase or safety rule changed.
 - Engineering: `#updBar` "New version ready · tap to reload" (`updBarShow()`, wired in `pwaBoot`); `_tips` capped at 60 (`TIPS_MAX`, `tipCap()`); `isDeloadWeek()` cached per date and mode; a wake-lock release that arrives while the request is pending now releases the lock when it lands (`_wlPending`, `wakeWant()`); a boot placeholder in each view section of the shell; four unused locals removed (ffmiOf, xs, _nxD, d0; esprima scan, each referenced once in the file). The 3.5 s network budget in sw.js (sw-01) was already in place.
