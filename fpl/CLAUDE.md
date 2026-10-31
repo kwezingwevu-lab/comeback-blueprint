@@ -492,8 +492,8 @@ plan's own:
 - **Draft.** The live roster with no signings. Use the best legal eleven on the gameweek's expected points (one keeper, at
   least 3 DEF, 2 MID and 1 FWD), and order the bench by expected points.
 
-Each is labelled with its game and never summed across games (N3). The app panel for it is built at the next refresh (open
-until then).
+Each is labelled with its game and never summed across games (N3). In the app: the Squad tab's `sq-asis` and the Draft tab's
+`df-asis` panels (src/ui.jsx `asIsClassic` / `asIsDraft`, built 31 Oct 2026), held by components `N2b-as-is-elevens-and-benches-show-in-both-games`.
 
 ## N3. Two games, two currencies
 

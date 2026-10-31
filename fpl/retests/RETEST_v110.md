@@ -841,3 +841,24 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
 - **Gate, local.** All 34 suites green, except WebKit, iOS and browser.py, which run on CI only.
 - **Not done.** No GW9 bookmaker odds. There was no time to verify them before the deadline.
 
+## 31 Oct 2026, 10:45Z: as-is panels (N2b), both games
+
+- **The new panels.**
+  - Squad tab `sq-asis`: the eleven, captain and bench from the fifteen owned today, with no transfer.
+  - Draft tab `df-asis`: the eleven and bench from the roster owned today, with no signing.
+  - Both are held by the components check `N2b-as-is-elevens-and-benches-show-in-both-games`.
+- **Totality fixes (E-190).** survivorReplay, survivorBacktest, routeOvertake and routeWord.
+- **Gate, local.** These suites ran in parallel to meet the manager's 15-minute window; the full `run.sh` runs on CI for this push.
+
+  | Suite | Result |
+  |---|---|
+  | components | 331/331 |
+  | mc_full | 335/335 |
+  | smoke | 73/73 |
+  | smoke_wk | 39/39 |
+  | unit_engine | 277/277 |
+  | visual | 56/56 |
+  | privacy | 27/27 |
+  | buttons | 10/10 |
+  | tdz | clean |
+

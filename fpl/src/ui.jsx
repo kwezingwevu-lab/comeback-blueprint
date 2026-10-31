@@ -2610,6 +2610,25 @@ function TabPlan(props) {
 
 /* ------------------------------------------------------------------ tab: squad */
 
+/* N2b (the manager, 31 Oct 2026): every gameweek shows an as-is, no-transfer eleven and bench beside the plan's, in both games. */
+function asIsClassic(ctx) {
+  try {
+    const sq = ctx.squadIds.slice();
+    const bx = bestXI(sq, ctx), cp = captainPick(bx.ids, ctx);
+    const rest = sq.filter(function (i) { return bx.ids.indexOf(i) < 0; });
+    const gk2 = rest.filter(function (i) { return ctx.els[i].element_type === 1; });
+    const order = (bx.bench || []).filter(function (i) { return rest.indexOf(i) >= 0 && gk2.indexOf(i) < 0; });
+    const bench = order.concat(rest.filter(function (i) { return gk2.indexOf(i) < 0 && order.indexOf(i) < 0; }));
+    return { ok: bx.ids.length === 11, formation: String(bx.formation || ""), xi: bx.ids.slice(), bench: bench, gk2: gk2, cap: cp.capId, vice: cp.viceId };
+  } catch (e) { return { ok: false, formation: "", xi: [], bench: [], gk2: [], cap: null, vice: null }; }
+}
+function asIsDraft(codes, ctx) {
+  try {
+    const r = draftXIBase(codes, ctx);
+    return { ok: r.ids.length === 11, formation: String(r.formation || ""), xi: r.ids.slice(), bench: r.benchIds.slice() };
+  } catch (e) { return { ok: false, formation: "", xi: [], bench: [] }; }
+}
+
 function TabSquad(props) {
   const ctx = props.ctx, ui = props.ui, on = props.on;
   const sec = function (id) { return openOf(ui, "squad", id); };
@@ -2677,6 +2696,22 @@ function TabSquad(props) {
           </div>
         )}
       </Section>
+      <Section id="sq-asis" game="Classic" title="As is, no transfers" open={sec("sq-asis")} onToggle={on.sec}>
+        {(function () {
+          const v = sec("sq-asis") ? asIsClassic(ctx) : null;
+          if (!v) return null;
+          const nm = function (i) { return ctx.els[i] ? ctx.els[i].web_name : "#" + i; };
+          if (!v.ok) return <div className="dim">No legal eleven from the fifteen as it stands.</div>;
+          return (
+            <div>
+              <KV k={"Starting eleven (" + v.formation + ")"} v={v.xi.map(nm).join(", ")} />
+              <KV k="Captain, vice" v={nm(v.cap) + ", " + nm(v.vice)} />
+              <KV k="Bench, in order" v={v.bench.map(nm).join(", ") + (v.gk2.length ? "; second keeper " + v.gk2.map(nm).join(", ") : "")} />
+              <div className="dim">The fifteen you own today with no transfer, picked by the same rules as the plan (C1 rules 2 and 3). The plan's own eleven is on the Plan tab. <Tier k="model" /></div>
+            </div>
+          );
+        })()}
+      </Section>
     </div>
   );
 }
@@ -2690,7 +2725,7 @@ function TabSquad(props) {
    winning: under eight gameweeks of data that number compounds a short edge into false certainty (E4, E-020), so the
    route is told in points, wins and average finishing places. Total: junk gives ok:false with a note. */
 function draftRouteParams() { return { draws: DRAFT_ROUTE_DRAWS, seed: DRAFT_ROUTE_SEED }; }
-function routeWord(n, sing, many) { return n === 1 ? sing : many; }
+function routeWord(n, sing, many) { const w = n === 1 ? sing : many; return typeof w === "string" ? w : ""; }   // total on junk (mc_full P05/P07): only a word comes back
 // total on junk (mc_full P01, P07): only non-empty strings are joined; a non-list is "?" for chips and nothing for names
 function strList(a) { return Array.isArray(a) ? a.filter(function (x) { return typeof x === "string" && x !== ""; }) : null; }
 function chipList(a) { const xs = strList(a); return xs === null ? "?" : xs.length ? xs.join(" ") : "none"; }
@@ -3606,6 +3641,21 @@ function TabDraft(props) {
         ) : null}
         <div className="dim">It is the number in the address when you open the league in the draft app. Your own entry number works too.</div>
         <div className="dim">With it the roster, the free agents, the claim order and this week's opponent come from the draft API instead of being typed in. The next refresh of the snapshot picks it up.</div>
+      </Section>
+      <Section id="df-asis" game="Draft" title="As is, no signings" open={sec("df-asis")} onToggle={on.sec}>
+        {(function () {
+          const v = sec("df-asis") ? asIsDraft(roster, ctx) : null;
+          if (!v) return null;
+          const nm = function (i) { return ctx.els[i] ? ctx.els[i].web_name : "#" + i; };
+          if (!v.ok) return <div className="dim">No legal eleven from the roster as it stands.</div>;
+          return (
+            <div>
+              <KV k={"Starting eleven (" + v.formation + ")"} v={v.xi.map(nm).join(", ")} />
+              <KV k="Bench, in order" v={v.bench.map(nm).join(", ")} />
+              <div className="dim">The roster you own today with no signing: the best legal eleven on this gameweek's expected points (no captain in Draft). <Tier k="model" /></div>
+            </div>
+          );
+        })()}
       </Section>
     </div>
   );

@@ -5613,7 +5613,7 @@ function survivorNet(m, gw) {
   return r ? num(r[1], 0) - num(r[2], 0) : null;
 }
 function survivorReplay(members, upTo, from) {
-  var res = { alive: [], out: [], from: intOf(from, SURVIVOR.from), upTo: intOf(upTo, 0) };
+  var res = { alive: [], out: [], from: clamp(intOf(from, SURVIVOR.from), 1, 38), upTo: clamp(intOf(upTo, 0), 0, 38) };   // a season has 38 gameweeks; a junk bound must not loop for ever
   try {
     var alive = arr(members).filter(function (m) { return isObj(m) && intOf(m.entry, 0) > 0; }).map(function (m) { return m; });
     for (var g = res.from; g <= res.upTo; g++) {
@@ -5663,7 +5663,7 @@ function survivorBacktest(members, lastDone) {
   try {
     var M = arr(members).filter(function (m) { return isObj(m) && arr(m.gws).length; });
     var b = 0, n0 = 0, cnt = 0;
-    for (var g = 3; g <= intOf(lastDone, 0); g++) {
+    for (var g = 3; g <= clamp(intOf(lastDone, 0), 0, 38); g++) {
       var all = []; M.forEach(function (m) { var v = survivorNet(m, g); if (v !== null) all.push(v); });
       if (all.length < 3) continue;
       var mu0 = all.reduce(function (a, c) { return a + c; }, 0) / all.length;

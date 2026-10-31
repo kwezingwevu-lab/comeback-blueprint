@@ -1616,6 +1616,15 @@ console.log("--- v110 D3 · the Draft tab ---");
     const L4 = JSON.parse(JSON.stringify(LIVE)); const cur = Number(L4.current_event);
     L4.survivor = { id: 817455, members: [me, 11, 12, 13].map(function (e, i) { const gws = []; for (let g = 1; g <= cur; g++) gws.push([g, 50 + 5 * i + (g % 3), 0]); return { entry: e, gws: gws }; }) };
     const s1 = svOpen(L4), T1 = s1.ok ? txt(secOf(s1.html, "rv-survivor")) : "";
+    // N2b: the as-is panels. Classic: eleven, captain and bench from the fifteen owned today; Draft: eleven and bench from the roster.
+    const asIs = function (tab, sid) { const p = {}; Object.keys(FIX[tab].props).forEach(function (k) { p[k] = FIX[tab].props[k]; });
+      p.ui = { mode: "full", tab: tab === "TabSquad" ? "squad" : "draft", open: {}, reveals: {} }; p.ui.open[sid] = true; return tryRender(tab, p); };
+    const aC = asIs("TabSquad", "sq-asis"), TC = aC.ok ? txt(secOf(aC.html, "sq-asis")) : "";
+    const aD = asIs("TabDraft", "df-asis"), TD = aD.ok ? txt(secOf(aD.html, "df-asis")) : "";
+    const elevenOf = function (t) { const m = t.match(/Starting eleven \(([0-9-]+)\) ([^]*?)(Captain|Bench)/); return m ? m[2].split(",").map(function (x) { return x.trim(); }).filter(Boolean) : []; };
+    assert("N2b-as-is-elevens-and-benches-show-in-both-games",
+      aC.ok && elevenOf(TC).length === 11 && /Captain, vice \S/.test(TC) && /Bench, in order \S/.test(TC) && aD.ok && elevenOf(TD).length === 11 && /Bench, in order \S/.test(TD) && !/Captain/.test(TD),
+      "Classic «" + TC.slice(0, 300) + "» Draft «" + TD.slice(0, 300) + "»" + (aC.ok ? "" : " C " + String(aC.err && aC.err.message)) + (aD.ok ? "" : " D " + String(aD.err && aD.err.message)));
     assert("SURVIVOR-panel-waits-for-its-data-then-shows-alive-count-state-and-a-band",
       s0.ok && /arrive with the next refresh/.test(T0) && s1.ok && /Still in 4 of 4/.test(T1) && /You alive/.test(T1) && /(low|medium|high)/.test(T1) && !/\d+(\.\d+)?%(?! \))/.test(T1.replace(/under 5%|over 15%/g, "")),
       "«" + T0.slice(0, 160) + "» «" + T1.slice(0, 400) + "»" + (s1.ok ? "" : " " + String(s1.err && s1.err.message)));

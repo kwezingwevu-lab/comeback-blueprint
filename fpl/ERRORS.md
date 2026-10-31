@@ -2176,3 +2176,17 @@ CAUGHT: the local gates of 23 and 31 Oct.
 RULE: D6 now asserts that the coverage line is absent when no odds exist. Smoke C1 now picks the first flagged candidate the card names once unflagged, and falls back to flagging the card's own buy (with the flag he must leave the card, without it he must be on it). Both are in qa/smoke.cjs, and smoke is 73/73 on the 31 Oct data (corrected 31 Oct 09:25Z; the earlier line called it unapplied).
 TEST: components D6, 329/329.
 
+### E-190 · v110 · a junk gameweek bound froze the survivor replay; two old functions passed NaN through
+CAUSE:
+- survivorReplay and survivorBacktest looped up to whatever bound they were given. mc_full fed in a huge number, and the worker hung (watchdog, trial 1872).
+- routeOvertake returned NaN from Infinity − Infinity.
+- routeWord passed a junk argument straight back.
+- Both NaN cases had been latent. They surfaced when adding functions shifted the fuzz seeds.
+
+CAUGHT: mc_full, 31 Oct 2026.
+RULE:
+- Every loop over gameweeks is bounded by the 38-week season, whatever bound it is handed.
+- A function that returns a number or a word returns one of its own making, never a junk input.
+
+TEST: mc_full P04 (terminates) and P05 (no NaN), 335/335.
+

@@ -31197,7 +31197,7 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
     return r2 ? num(r2[1], 0) - num(r2[2], 0) : null;
   }
   function survivorReplay(members, upTo, from2) {
-    var res = { alive: [], out: [], from: intOf(from2, SURVIVOR.from), upTo: intOf(upTo, 0) };
+    var res = { alive: [], out: [], from: clamp(intOf(from2, SURVIVOR.from), 1, 38), upTo: clamp(intOf(upTo, 0), 0, 38) };
     try {
       for (var alive = arr(members).filter(function(m) {
         return isObj(m) && intOf(m.entry, 0) > 0;
@@ -31275,7 +31275,7 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
     try {
       for (var M = arr(members).filter(function(m) {
         return isObj(m) && arr(m.gws).length;
-      }), b = 0, n0 = 0, cnt = 0, g = 3; g <= intOf(lastDone, 0); g++) {
+      }), b = 0, n0 = 0, cnt = 0, g = 3; g <= clamp(intOf(lastDone, 0), 0, 38); g++) {
         var all = [];
         if (M.forEach(function(m) {
           var v = survivorNet(m, g);
@@ -35261,6 +35261,30 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
       ] })
     ] });
   }
+  function asIsClassic(ctx) {
+    try {
+      let sq = ctx.squadIds.slice(), bx = bestXI(sq, ctx), cp = captainPick(bx.ids, ctx), rest = sq.filter(function(i) {
+        return bx.ids.indexOf(i) < 0;
+      }), gk2 = rest.filter(function(i) {
+        return ctx.els[i].element_type === 1;
+      }), order = (bx.bench || []).filter(function(i) {
+        return rest.indexOf(i) >= 0 && gk2.indexOf(i) < 0;
+      }), bench = order.concat(rest.filter(function(i) {
+        return gk2.indexOf(i) < 0 && order.indexOf(i) < 0;
+      }));
+      return { ok: bx.ids.length === 11, formation: String(bx.formation || ""), xi: bx.ids.slice(), bench, gk2, cap: cp.capId, vice: cp.viceId };
+    } catch {
+      return { ok: !1, formation: "", xi: [], bench: [], gk2: [], cap: null, vice: null };
+    }
+  }
+  function asIsDraft(codes, ctx) {
+    try {
+      let r2 = draftXIBase(codes, ctx);
+      return { ok: r2.ids.length === 11, formation: String(r2.formation || ""), xi: r2.ids.slice(), bench: r2.benchIds.slice() };
+    } catch {
+      return { ok: !1, formation: "", xi: [], bench: [] };
+    }
+  }
   function TabSquad(props) {
     let ctx = props.ctx, ui = props.ui, on = props.on, sec = function(id) {
       return openOf(ui, "squad", id);
@@ -35355,11 +35379,28 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
           "Nothing to confirm. The check runs again on every snapshot. ",
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tier, { k: "T0" })
         ] })
-      ] }) })
+      ] }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, { id: "sq-asis", game: "Classic", title: "As is, no transfers", open: sec("sq-asis"), onToggle: on.sec, children: (function() {
+        let v = sec("sq-asis") ? asIsClassic(ctx) : null;
+        if (!v) return null;
+        let nm = function(i) {
+          return ctx.els[i] ? ctx.els[i].web_name : "#" + i;
+        };
+        return v.ok ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KV, { k: "Starting eleven (" + v.formation + ")", v: v.xi.map(nm).join(", ") }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KV, { k: "Captain, vice", v: nm(v.cap) + ", " + nm(v.vice) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KV, { k: "Bench, in order", v: v.bench.map(nm).join(", ") + (v.gk2.length ? "; second keeper " + v.gk2.map(nm).join(", ") : "") }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dim", children: [
+            "The fifteen you own today with no transfer, picked by the same rules as the plan (C1 rules 2 and 3). The plan's own eleven is on the Plan tab. ",
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tier, { k: "model" })
+          ] })
+        ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: "No legal eleven from the fifteen as it stands." });
+      })() })
     ] });
   }
   function routeWord(n, sing, many) {
-    return n === 1 ? sing : many;
+    let w = n === 1 ? sing : many;
+    return typeof w == "string" ? w : "";
   }
   function strList(a) {
     return Array.isArray(a) ? a.filter(function(x) {
@@ -36458,7 +36499,22 @@ textarea.inp{min-height:88px;line-height:1.4;resize:vertical}
         ) : null,
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: "It is the number in the address when you open the league in the draft app. Your own entry number works too." }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: "With it the roster, the free agents, the claim order and this week's opponent come from the draft API instead of being typed in. The next refresh of the snapshot picks it up." })
-      ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Section, { id: "df-asis", game: "Draft", title: "As is, no signings", open: sec("df-asis"), onToggle: on.sec, children: (function() {
+        let v = sec("df-asis") ? asIsDraft(roster, ctx) : null;
+        if (!v) return null;
+        let nm = function(i) {
+          return ctx.els[i] ? ctx.els[i].web_name : "#" + i;
+        };
+        return v.ok ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KV, { k: "Starting eleven (" + v.formation + ")", v: v.xi.map(nm).join(", ") }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(KV, { k: "Bench, in order", v: v.bench.map(nm).join(", ") }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dim", children: [
+            "The roster you own today with no signing: the best legal eleven on this gameweek's expected points (no captain in Draft). ",
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tier, { k: "model" })
+          ] })
+        ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dim", children: "No legal eleven from the roster as it stands." });
+      })() })
     ] });
   }
   function TabChips(props) {
