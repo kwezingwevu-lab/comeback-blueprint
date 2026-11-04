@@ -2536,7 +2536,7 @@ var HEALTH_CHECKS=[
 function checkupLogged(){const h=DB.health&&DB.health.hc;return !!(h&&h.last!=null);}
 function checkupDue(){const h=DB.health.hc,t=todayISO();
   if(h.off||(h.snooze&&t<h.snooze))return {due:false,why:"",label:""};
-  if(!checkupLogged()&&planStarted()&&planWeek()>=1&&planWeek()<=4)return {due:true,why:"baseline",label:"Baseline check-up: book it in your first month."};
+  if(!checkupLogged()&&(rampDay()>0||planStarted())&&planWeek()>=1&&planWeek()<=4)return {due:true,why:"baseline",label:"Baseline check-up: book it in your first month."};
   if(checkupLogged()&&dayDiff(h.last,t)>=365)return {due:true,why:"yearly",label:"A year since your last check-up: time to book the next one."};
   return {due:false,why:"",label:""};}
 function renderHealthCards(){try{renderHome();}catch(e){}try{renderGuide();}catch(e){}}
