@@ -2196,3 +2196,9 @@ CAUSE: pickXI (src/engine.js) sorts each position by start tier before expected 
 CAUGHT: the GW10 Draft-only check, 5 Nov 2026 18:41Z. The reply overrode the engine by hand; the app was not rebuilt (the manager asked for the Draft team only).
 RULE: Open. For Draft (auto-subs, no captain), order by xp1 within position. Keep the tier only as a tie-break, or only where no valid bench cover exists.
 TEST: none yet. The fix lands with a components check: a tier-1 forward with the higher xp1 starts, and a tier-2 forward of the same position is first on the bench.
+
+### E-192 · v110 · a locked player was advised as an instant signing
+CAUSE: the GW10 Draft-only check used an ad-hoc scratch script. It treated "owner null" as signable and never read element-status `status`. Mbeumo had been dropped by a rival during that night's waiver run, which gave him status `l` (locked: unsignable until the next waiver run). The reply of 5 Nov 18:41Z told the manager to sign him instantly. The app was not affected: src/engine.js already requires owner null and status "a" (line 115).
+CAUGHT: the manager's own screenshot of the available-players list (20:44 SAST). Mbeumo was absent from it.
+RULE: never reimplement the engine's Draft free-agent rule in a scratch script. Use the engine's own function. If a script must read element-status directly, a free agent is owner null AND status "a". Players dropped in a waiver run are `l` until the next one.
+TEST: none new. The engine path is already correct, and the error was outside the shipped code.
