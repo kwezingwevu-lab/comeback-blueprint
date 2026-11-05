@@ -2190,3 +2190,9 @@ RULE:
 
 TEST: mc_full P04 (terminates) and P05 (no NaN), 335/335.
 
+
+### E-191 · v110 · the Draft XI picker benched the higher-xP striker, ignoring Draft auto-subs
+CAUSE: pickXI (src/engine.js) sorts each position by start tier before expected points (`tierOf`: ≥0.75 is tier 2). On the GW10 roster it started McBurnie (P(start) 0.95, xp1 2.02) and benched N.Jackson (P(start) 0.72, xp1 3.09; season model 3.91 vs 2.34). xp1 already prices the non-start, and Draft auto-subs bring the bench striker in on a zero-minute week. So starting the higher-xP player with the safer one first on the bench dominates. The tier rule cost about 1 xP here.
+CAUGHT: the GW10 Draft-only check, 5 Nov 2026 18:41Z. The reply overrode the engine by hand; the app was not rebuilt (the manager asked for the Draft team only).
+RULE: Open. For Draft (auto-subs, no captain), order by xp1 within position. Keep the tier only as a tie-break, or only where no valid bench cover exists.
+TEST: none yet. The fix lands with a components check: a tier-1 forward with the higher xp1 starts, and a tier-2 forward of the same position is first on the bench.
