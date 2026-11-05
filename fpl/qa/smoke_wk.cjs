@@ -726,6 +726,23 @@ async function main() {
       claims.length + " lines, waivers " + (settled ? "settled" : "not yet run") + ": " + claims.map((c) => c.in + " " + (st[c.in] || "?")).join(", ") + (bad.length ? " — " + bad.join("; ") : ""));
   }
 
+  // ---- 25c · once waivers have settled, the written Draft eleven holds only players the manager owns or can sign before
+  // the deadline (status a). A locked player (status l) waits for the next run and cannot play this gameweek (5 Nov 2026:
+  // the eleven listed Mbeumo, McAtee and Tonali, all locked; the open weekly.cjs defect named in RETEST_v110, 31 Oct).
+  {
+    const D = WEEKLY.draft || {}, x = D.xi || {};
+    const codes = [].concat(x.gk ? [x.gk] : [], x.def || [], x.mid || [], x.fwd || []);
+    const settled = !!(LIVE.draft && LIVE.draft.game && LIVE.draft.game.waivers_processed);
+    // data/draft_league.cjs translates element-status owners to the league-entry id at the boundary (E-063), so that is the id compared
+    const me = LIVE.draft && LIVE.draft.me ? LIVE.draft.me.leagueEntryId : null;
+    const own = {}; ((LIVE.draft && LIVE.draft.ownership) || []).forEach((o) => { own[o.code] = o; });
+    const bad = codes.filter((c) => { const o = own[c]; return !o || !((o.owner === me && o.status === "o") || o.status === "a"); });
+    assert("draft-eleven-holds-only-owned-or-signable-players-after-waivers",
+      codes.length === 11 && (!settled || !bad.length),
+      codes.length + " in the eleven, waivers " + (settled ? "settled" : "not yet run (claims may still land)") +
+        (bad.length ? "; not playable this gameweek: " + bad.map((c) => c + " (" + ((own[c] || {}).status || "?") + ")").join(", ") : ""));
+  }
+
   // ---- 26 · and the size of that mismatch reconciles against the live API, not a frozen number
   //
   // This check used to assert "59 of 655" as a constant. The game added a player on

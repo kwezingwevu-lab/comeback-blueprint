@@ -2196,9 +2196,35 @@ CAUSE: pickXI (src/engine.js) sorts each position by start tier before expected 
 CAUGHT: the GW10 Draft-only check, 5 Nov 2026 18:41Z. The reply overrode the engine by hand; the app was not rebuilt (the manager asked for the Draft team only).
 RULE: Open. For Draft (auto-subs, no captain), order by xp1 within position. Keep the tier only as a tie-break, or only where no valid bench cover exists.
 TEST: none yet. The fix lands with a components check: a tier-1 forward with the higher xp1 starts, and a tier-2 forward of the same position is first on the bench.
+CLOSED (5 Nov 2026, 19:35Z): pickXI now holds back only P(start) < 0.5 (`(b.tier > 0) - (a.tier > 0)` before the points), which is C1 rule 3 as written; between 0.5 and 0.75 the expected points decide, in Classic `bestXI` and Draft `draftXIBase` alike. TEST: unit_engine `E191-C1R3-a-0.72-starter-with-more-xp-starts-and-a-sub-0.5-one-never-does` (fails on the old engine, 277/278; passes on the fix, 278/278); it also holds that a 0.30 defender with the most xp never starts.
 
 ### E-192 · v110 · a locked player was advised as an instant signing
 CAUSE: the GW10 Draft-only check used an ad-hoc scratch script. It treated "owner null" as signable and never read element-status `status`. Mbeumo had been dropped by a rival during that night's waiver run, which gave him status `l` (locked: unsignable until the next waiver run). The reply of 5 Nov 18:41Z told the manager to sign him instantly. The app was not affected: src/engine.js already requires owner null and status "a" (line 115).
 CAUGHT: the manager's own screenshot of the available-players list (20:44 SAST). Mbeumo was absent from it.
 RULE: never reimplement the engine's Draft free-agent rule in a scratch script. Use the engine's own function. If a script must read element-status directly, a free agent is owner null AND status "a". Players dropped in a waiver run are `l` until the next one.
 TEST: none new. The engine path is already correct, and the error was outside the shipped code.
+
+### E-193 · v110 · two live checks froze a dated observation again (a recurrence of E-084)
+CAUSE: on the 5 Nov 2026 feeds, unit_engine went red on two LIVE checks while the app was right.
+- `LIVE-Hull-...` asserted Hull's UNDER tag. The tag needs conceding 0.5 a game below xGA, and by GW9 Hull were 0.37 below (10 from 13.29).
+- `LIVE-Joao-Pedro-is-convergent...` asserted at least 0.60 rival ownership. CLAUDE.md E3's September figure was 89–92%; by GW9 the most any league's rivals held was 0.46.
+Both encoded a fact about the world at one date, not a rule of the app.
+CAUGHT: the GW10 refresh, 5 Nov 2026.
+RULE: E-084's rule, applied to two more checks: a live check asserts the property, never the reading of the day.
+- The Hull check now asserts that the tag follows the published ±0.5 threshold, and that conceding under xGA makes the goals model rate the defence better than xG does (E-011).
+- The João Pedro check (renamed `...-convergence-flag-follows-the-0.60-rule`) asserts that the convergence flag fires exactly when rival ownership reaches 0.60 (C1.6).
+TEST: both pass on the 5 Nov data; unit_engine 278/278.
+
+### E-194 · v110 · three gate checks assumed this week would look like the last one
+CAUSE: the GW10 refresh (5 Nov 2026) put a manager-fixed week of one free transfer into the plan. Three checks went red although the app was right.
+- **smoke C1 (solved landing).** It flags the plan's vice and wants his name gone from the card. On 31 Oct the vice was a buy (Gabriel); now he is an owned player (Mbeumo). Flagged, he becomes a forced sale (C2 step 1), and the card correctly reads "Sell Mbeumo".
+- **plan_legality ("at least as good as keeping the wildcard").** It compared the plan with the solver's unconstrained no-wildcard plan. With the first week fixed by the manager, the like-for-like plan is the no-wildcard plan solved from that same week (timing.never, 619.42). On 23 Oct (E-186) the fixed week happened to win, so the gap never showed.
+- **mc_separation (no Classic+Draft sum on screen).** It matched the sum 884 inside "out 6 884", the transfers-out count 6,884 written with a space as the thousands separator.
+
+CAUGHT: `bash qa/run.sh`, 5 Nov 2026 19:50Z (RED 6 of 39: these three, plus WebKit, iOS and browser.py, which are CI-only, E-170).
+RULE: a check asserts the rule, never a feature of the week it was written in.
+- A flagged owned player may be named as a sale, but never as captain, vice or a buy.
+- A manager-fixed plan is compared with the plan solved from the same fixed week. The unconstrained total is still printed, so the cost of his choice shows.
+- A number search ignores the tail of a grouped number: a digit followed by a separator before the match.
+
+TEST: smoke 73/73, plan_legality 61/61 and mc_separation 43/43 on the 5 Nov data. Each fix keeps its failure case: a flagged vice still named as captain or vice goes red; a fixed plan below its own never plan goes red; "total 884 points" is still found.

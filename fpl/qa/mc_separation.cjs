@@ -166,7 +166,7 @@ const livePf = (() => {
 })();
 const liveTotal = LIVE.entry ? LIVE.entry.summary_overall_points : null;
 const SUMS = [...new Set([MC.classic.total + draftPf, liveTotal != null && livePf != null ? liveTotal + livePf : null].filter((x) => typeof x === "number" && isFinite(x)))];
-const numRe = (n) => { const s = String(n), grouped = s.replace(/\B(?=(\d{3})+(?!\d))/g, "[ ,  ]?"); return new RegExp("(?<![\\d.,£])" + grouped + "(?![\\d]|[.,]\\d)"); };
+const numRe = (n) => { const s = String(n), grouped = s.replace(/\B(?=(\d{3})+(?!\d))/g, "[ ,  ]?"); return new RegExp("(?<![\\d.,£])(?<!\\d[ ,  ])" + grouped + "(?![\\d]|[.,]\\d)"); };   // E-194: "6 884" is 6,884 (a grouped number), not 884
 const sumHits = (text) => SUMS.filter((n) => numRe(n).test(text));
 const N_SUM = (label) => "the Classic season total plus the Draft points-for (" + SUMS.join(" and ") + ") appears nowhere on the " + label;
 ok("the sum to look for is computed from the blocks: Classic " + MC.classic.total + " + Draft " + draftPf + (liveTotal != null ? ", and live Classic " + liveTotal + " + Draft " + livePf : ""),

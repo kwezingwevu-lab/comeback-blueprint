@@ -1065,7 +1065,9 @@ function pickXI(ids, ctx, valueOf) {
     var p = ctx.xp[id] ? ctx.xp[id].pstart : pStart(el, ctx.gwStats);
     by[t].push({ id: id, v: num(scoreOf(el), 0), p: p, tier: tierOf(p), starts: num(el.starts, 0), min: num(el.minutes, 0) });
   });
-  [1, 2, 3, 4].forEach(function (t) { by[t].sort(function (a, b) { return b.tier - a.tier || b.v - a.v || b.starts - a.starts || b.min - a.min; }); });
+  // E-191: only a P(start) < 0.5 player is held back (C1 rule 3). Between 0.5–0.75 and >= 0.75 the expected points decide,
+  // because xp1 already prices the non-start and auto-subs cover a zero-minute week (it once benched N.Jackson 3.09 for McBurnie 2.02).
+  [1, 2, 3, 4].forEach(function (t) { by[t].sort(function (a, b) { return (b.tier > 0) - (a.tier > 0) || b.v - a.v || b.starts - a.starts || b.min - a.min; }); });
   if (!by[1].length) return res;
   var best = null;
   FORMATIONS.forEach(function (f) {

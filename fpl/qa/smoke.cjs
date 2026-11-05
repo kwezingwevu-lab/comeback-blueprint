@@ -426,7 +426,10 @@ async function main() {
       }
       H.assert("C1-the-solved-landing-names-only-unflagged-players-and-a-new-flag-on-one-sets-it-aside",
         expectSolved && !!simple && simple.plan === "solved" && recIds.length > 0 && flaggedRec.length === 0 && unnamed.length === 0 &&
-          !!vEl && vPlan === "app" && !rx(vEl.web_name).test(vText),
+          // E-194: when the vice is an owned player, a flag makes him a forced sale (C2 step 1), and "Sell <him>" is the card
+          // putting him out, as "The convergence rule drops …" is (E-161). He must never be captain, vice or a buy.
+          !!vEl && vPlan === "app" && !new RegExp("(Captain|vice)\\s+" + vEl.web_name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(vText) &&
+          !rx(vEl.web_name).test(outSaid(vText).replace(new RegExp("Sell\\s+" + vEl.web_name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), "")),
         "data says solved " + expectSolved + ", landing " + (simple ? simple.plan : "?") + "; " + recIds.length + " recommended, flagged " + (flaggedRec.join(",") || "none") +
           ", not named " + (unnamed.join(",") || "none") + "; vice " + (vEl ? vEl.web_name : "?") + " flagged → landing " + vPlan + " «" + vText.slice(0, 90) + "»");
     }

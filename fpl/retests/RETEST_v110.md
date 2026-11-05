@@ -862,3 +862,42 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
   | buttons | 10/10 |
   | tdz | clean |
 
+
+## 5 Nov 2026, about 19:55Z: GW10, Draft first, then Classic (the 24-hour window; deadline Fri 6 Nov 18:30Z)
+
+- **Draft (league 46148).**
+  - Waivers, pick 1. All three claims landed: King for Tielemans, Bassey for Mukiele, Bobb for McAtee.
+  - **The reply's error (E-192).** At 18:41Z the reply said to sign Mbeumo instantly. He was status `l`, locked until the next run.
+  - **GW10 XI, chosen for GW10 points only (the manager's ask), 4-5-1:**
+    - Sels; Silva, Hill, Bassey, Murillo; Gomez, King, Bobb, Cunha, Xhaka; N.Jackson.
+    - Bench: Tzolakis; Guéhi, McBurnie, Isidor.
+  - **Auto-sub check.** A simulation of the auto-subs found no signable free agent worth more than 0.2 xP this week.
+- **Classic (3546875).**
+  - Squad unchanged since GW9: 2 free transfers, £2.7m in the bank.
+  - **The manager's ask:** one free transfer, as aggressively as possible.
+  - **The move:** Guéhi out, Gabriel in, pinned with `fixed_week.cjs`; no hit, £0.7m left, 2 free transfers into GW11.
+  - **XI, 3-4-3:** Verbruggen; De Cuyper, Gabriel, Tarkowski; Mbeumo, Gomez, Rogers, Janelt; Haaland, Brobbey, Calvert-Lewin.
+  - **Bench:** Kinsky; Diop, van Ewijk, Saka. Captain Haaland, vice Mbeumo.
+  - **Plan:** 622.02 to GW19, against 626.18 for the solver's no-wildcard plan.
+- **Team news.** Workflows wf_78fbb6f6-603 and wf_12a39202-c2c researched it and checked each finding independently.
+  - Saka is out 6–8 weeks.
+  - Calvert-Lewin is a doubt (a foot setback; Farke is hopeful he trains Friday).
+  - Guéhi and Hill are rotation risks.
+  - Everyone else in either XI is fit.
+- **Fixes.**
+  - E-191: the XI picker now holds back only P(start) < 0.5.
+  - Draft eleven (weekly.cjs): after waivers it uses only signable players; smoke_wk check `draft-eleven-holds-only-owned-or-signable-players-after-waivers`.
+  - E-193: two live checks re-stated as rules.
+  - E-194: three gate checks re-stated as rules.
+- **Gate, local.** The first run was RED 6 of 39. After the fixes:
+
+  | Suite | Result |
+  |---|---|
+  | smoke | 73/73 |
+  | plan_legality | 61/61 |
+  | mc_separation | 43/43 |
+  | unit_engine | 278/278 |
+  | components | 331/331 |
+  | smoke_wk | 40/40 |
+
+  The other 30 steps passed in the first run. WebKit, iOS and browser.py cannot run in this container (E-170); they run on CI.

@@ -1,136 +1,181 @@
 {
- "at": "2026-10-31T09:03:53.629Z",
- "hash": "af6802de1c04c7e3",
+ "at": "2026-11-05T19:37:24.745Z",
+ "hash": "6c51306894a03e66",
  "claims": {
   "game": "draft",
   "sheet": [
    {
-    "add": 486,
-    "drop": 41,
-    "gain": 7.70765241966874,
-    "kind": "first"
-   },
-   {
-    "add": 127,
+    "add": 427,
     "drop": 268,
-    "gain": 4.208371229596537,
+    "gain": 21.38233703358341,
     "kind": "first"
    },
    {
-    "add": 558,
-    "drop": 41,
-    "gain": 4.83892616165631,
+    "add": 486,
+    "drop": 264,
+    "gain": 7.445139478754889,
+    "kind": "first"
+   },
+   {
+    "add": 650,
+    "drop": 257,
+    "gain": 6.6462995507364155,
+    "kind": "first"
+   },
+   {
+    "add": 202,
+    "drop": 388,
+    "gain": 3.6558346250529183,
+    "kind": "first"
+   },
+   {
+    "add": 455,
+    "drop": 127,
+    "gain": 0.8090977186690793,
+    "kind": "first"
+   },
+   {
+    "add": 45,
+    "drop": 268,
+    "gain": 3.5499278817382063,
     "kind": "backup",
-    "of": 486
+    "of": 427
    }
   ],
   "strategy": "firsts",
-  "altValue": 509.8052405276541,
+  "altValue": 477.73707144951106,
   "sim": [
    {
     "round": 1,
-    "add": 486,
-    "drop": 41,
+    "add": 427,
+    "drop": 268,
     "ok": true,
     "why": null
    },
    {
     "round": 2,
-    "add": 127,
-    "drop": 268,
+    "add": 486,
+    "drop": 264,
     "ok": false,
     "why": "already claimed"
    },
    {
     "round": 2,
-    "add": 558,
-    "drop": 41,
+    "add": 650,
+    "drop": 257,
+    "ok": false,
+    "why": "already claimed"
+   },
+   {
+    "round": 2,
+    "add": 202,
+    "drop": 388,
+    "ok": false,
+    "why": "already claimed"
+   },
+   {
+    "round": 2,
+    "add": 455,
+    "drop": 127,
+    "ok": false,
+    "why": "already claimed"
+   },
+   {
+    "round": 2,
+    "add": 45,
+    "drop": 268,
     "ok": false,
     "why": "drop already gone"
    }
   ],
   "landed": [
-   486
+   427
   ],
   "lost": [
-   127
+   486,
+   650,
+   202,
+   455
   ],
-  "valueNow": 504.8951550635256,
-  "valueStress": 509.8052405276541,
-  "valueAll": 512.8732033681617,
-  "allFirst": 512.8732033681617,
+  "valueNow": 456.561563853636,
+  "valueStress": 477.73707144951106,
+  "valueAll": 490.30915804362513,
+  "allFirst": 490.30915804362513,
   "held": [],
   "rivals": {
    "Muggles & Wizards": [
-    486,
-    173,
-    127
-   ],
-   "Sizobona Phambili FC": [
-    486,
-    173,
-    202
-   ],
-   "Isak at this game": [
-    173,
-    486,
-    127
-   ],
-   "Saka Potatoes": [
-    173,
-    202,
-    650
-   ],
-   "Penderentials FC": [
-    486,
-    173,
-    127
-   ],
-   "Thabz Appeal": [
-    173,
-    202,
+    427,
+    650,
     486
    ],
-   "Unique Stars": [
+   "Sizobona Phambili FC": [
+    427,
+    650,
+    486
+   ],
+   "Isak at this game": [
+    427,
+    650,
+    486
+   ],
+   "Saka Potatoes": [
+    427,
+    650,
+    202
+   ],
+   "Penderentials FC": [
+    427,
     486,
-    173,
-    127
+    650
+   ],
+   "Thabz Appeal": [
+    427,
+    650,
+    202
+   ],
+   "Unique Stars": [
+    427,
+    486,
+    650
    ]
   },
   "orderings": [
    {
     "name": "all first choices, then backups",
-    "mean": 510.9628851728111,
-    "p10": 509.8052405276541,
-    "p90": 512.8732033681617
+    "mean": 481.4524642122942,
+    "p10": 478.54616916818014,
+    "p90": 485.6521073837873
    },
    {
     "name": "each backup under its first choice",
-    "mean": 510.9628851728111,
-    "p10": 509.8052405276541,
-    "p90": 512.8732033681617
+    "mean": 481.4524642122942,
+    "p10": 478.54616916818014,
+    "p90": 485.6521073837873
    },
    {
     "name": "highest expected gain first",
-    "mean": 510.9628851728111,
-    "p10": 509.8052405276541,
-    "p90": 512.8732033681617
+    "mean": 481.12604496764914,
+    "p10": 478.54616916818014,
+    "p90": 485.01134684138356
    },
    {
     "name": "likeliest to land first",
-    "mean": 510.9628851728111,
-    "p10": 509.8052405276541,
-    "p90": 512.8732033681617
+    "mean": 480.6717722169113,
+    "p10": 478.54616916818014,
+    "p90": 485.01134684138356
    }
   ],
   "land": {
-   "127": 0.37733333333333335,
-   "486": 1,
-   "558": 0
+   "45": 0,
+   "202": 0.44266666666666665,
+   "427": 1,
+   "455": 0.5533333333333333,
+   "486": 0.2613333333333333,
+   "650": 0.16133333333333333
   },
-  "meanValue": 510.9628851728111,
-  "p10": 509.8052405276541,
-  "p90": 512.8732033681617,
+  "meanValue": 481.4524642122942,
+  "p10": 478.54616916818014,
+  "p90": 485.6521073837873,
   "runs": 1500
  },
  "trades": {
@@ -138,290 +183,306 @@
   "both": [],
   "ask": [
    {
-    "rival": "Thabz Appeal",
-    "get": 335,
-    "give": 428,
-    "mine": 3.180314611827896,
-    "theirs": -0.8210725841362887,
+    "rival": "Sizobona Phambili FC",
+    "get": 350,
+    "give": 467,
+    "mine": 4.5395264180302775,
+    "theirs": -1.3127770326497625,
     "both": false
    },
    {
-    "rival": "Thabz Appeal",
-    "get": 335,
-    "give": 43,
-    "mine": 2.926764372867922,
-    "theirs": -0.9105393006039435,
+    "rival": "Sizobona Phambili FC",
+    "get": 109,
+    "give": 572,
+    "mine": 4.626716408808591,
+    "theirs": -1.3999670234280757,
     "both": false
    },
    {
-    "rival": "Thabz Appeal",
-    "get": 138,
-    "give": 295,
-    "mine": 2.330895433463354,
-    "theirs": -0.6573955101900992,
+    "rival": "Sizobona Phambili FC",
+    "get": 350,
+    "give": 572,
+    "mine": 4.741866252282705,
+    "theirs": -1.5994502079706763,
+    "both": false
+   },
+   {
+    "rival": "Sizobona Phambili FC",
+    "get": 109,
+    "give": 467,
+    "mine": 4.34004323348762,
+    "theirs": -1.197627189175705,
     "both": false
    },
    {
     "rival": "Penderentials FC",
     "get": 384,
     "give": 467,
-    "mine": 1.3489197245454534,
+    "mine": 1.812499906628375,
     "theirs": 0,
-    "both": false
-   },
-   {
-    "rival": "Thabz Appeal",
-    "get": 399,
-    "give": 268,
-    "mine": 1.1757731626885288,
-    "theirs": 0.016362003490883126,
-    "both": false
-   },
-   {
-    "rival": "Thabz Appeal",
-    "get": 399,
-    "give": 41,
-    "mine": 2.490448527542071,
-    "theirs": -1.406575605622777,
     "both": false
    },
    {
     "rival": "Isak at this game",
     "get": 226,
     "give": 467,
-    "mine": 1.4115554292197885,
-    "theirs": -0.3574641691326974,
+    "mine": 2.1635020758739074,
+    "theirs": -0.8416745481612224,
+    "both": false
+   },
+   {
+    "rival": "Penderentials FC",
+    "get": 384,
+    "give": 572,
+    "mine": 1.0624820423349775,
+    "theirs": 0,
+    "both": false
+   },
+   {
+    "rival": "Isak at this game",
+    "get": 226,
+    "give": 572,
+    "mine": 1.6520089191118927,
+    "theirs": -0.7110442294439849,
+    "both": false
+   },
+   {
+    "rival": "Thabz Appeal",
+    "get": 335,
+    "give": 264,
+    "mine": 2.6381160709555616,
+    "theirs": -1.8932571529377924,
+    "both": false
+   },
+   {
+    "rival": "Thabz Appeal",
+    "get": 335,
+    "give": 268,
+    "mine": 2.6403273033974415,
+    "theirs": -1.8957764009355742,
     "both": false
    },
    {
     "rival": "Thabz Appeal",
     "get": 597,
     "give": 572,
-    "mine": 2.507502697426389,
-    "theirs": -1.8508419747522566,
+    "mine": 2.0579947899058766,
+    "theirs": -1.4743361919837525,
     "both": false
    },
    {
-    "rival": "Muggles & Wizards",
-    "get": 366,
-    "give": 268,
-    "mine": 2.3461149425646113,
-    "theirs": -1.7085161689866482,
-    "both": false
-   },
-   {
-    "rival": "Thabz Appeal",
-    "get": 138,
-    "give": 553,
-    "mine": 2.7540051548145925,
-    "theirs": -2.1250996148555714,
-    "both": false
-   },
-   {
-    "rival": "Muggles & Wizards",
-    "get": 367,
-    "give": 268,
-    "mine": 2.857457548319701,
-    "theirs": -2.262200409931893,
-    "both": false
-   },
-   {
-    "rival": "Isak at this game",
-    "get": 115,
-    "give": 533,
-    "mine": 2.4329488527836816,
-    "theirs": -1.9201329834323815,
-    "both": false
-   },
-   {
-    "rival": "Thabz Appeal",
-    "get": 106,
-    "give": 166,
-    "mine": 2.5170006658845523,
-    "theirs": -2.108070294073059,
-    "both": false
-   },
-   {
-    "rival": "Muggles & Wizards",
-    "get": 237,
-    "give": 268,
-    "mine": 2.113844864148973,
-    "theirs": -1.725097751673161,
+    "rival": "Penderentials FC",
+    "get": 400,
+    "give": 127,
+    "mine": 1.2731622410112209,
+    "theirs": -1.0068602376103968,
     "both": false
    },
    {
     "rival": "Penderentials FC",
     "get": 79,
     "give": 166,
-    "mine": 1.881951225783098,
-    "theirs": -1.7114185470300072,
+    "mine": 1.6755365028016627,
+    "theirs": -1.492797255406856,
+    "both": false
+   },
+   {
+    "rival": "Unique Stars",
+    "get": 129,
+    "give": 264,
+    "mine": 1.231432463065289,
+    "theirs": -1.068920202411391,
     "both": false
    },
    {
     "rival": "Sizobona Phambili FC",
-    "get": 453,
+    "get": 67,
     "give": 428,
-    "mine": 1.2986559125545796,
-    "theirs": -1.2063154140097367,
+    "mine": 2.441373808804144,
+    "theirs": -2.3107023586164814,
+    "both": false
+   },
+   {
+    "rival": "Sizobona Phambili FC",
+    "get": 67,
+    "give": 544,
+    "mine": 1.916725239150992,
+    "theirs": -1.8027876278286499,
+    "both": false
+   },
+   {
+    "rival": "Unique Stars",
+    "get": 129,
+    "give": 268,
+    "mine": 1.233643695507169,
+    "theirs": -1.148068333059996,
     "both": false
    },
    {
     "rival": "Sizobona Phambili FC",
     "get": 156,
-    "give": 428,
-    "mine": 2.2011015325340395,
-    "theirs": -2.1144360037455954,
+    "give": 127,
+    "mine": 2.125024383899813,
+    "theirs": -2.1029127911410797,
     "both": false
    },
    {
-    "rival": "Sizobona Phambili FC",
-    "get": 156,
-    "give": 43,
-    "mine": 2.022327814572634,
-    "theirs": -1.9367866587872413,
-    "both": false
-   },
-   {
-    "rival": "Sizobona Phambili FC",
-    "get": 453,
-    "give": 43,
-    "mine": 1.095635668438149,
-    "theirs": -1.0286660690513258,
+    "rival": "Thabz Appeal",
+    "get": 106,
+    "give": 166,
+    "mine": 1.75642975941048,
+    "theirs": -1.7564297594103664,
     "both": false
    },
    {
     "rival": "Saka Potatoes",
     "get": 31,
-    "give": 472,
-    "mine": 2.1934616503963866,
-    "theirs": -2.193461650396273,
-    "both": false
-   },
-   {
-    "rival": "Penderentials FC",
-    "get": 356,
-    "give": 472,
-    "mine": 1.8316654825498517,
-    "theirs": -1.8316654825497949,
-    "both": false
-   },
-   {
-    "rival": "Saka Potatoes",
-    "get": 346,
-    "give": 166,
-    "mine": 1.6564945153805866,
-    "theirs": -1.6564945153805866,
-    "both": false
-   },
-   {
-    "rival": "Unique Stars",
-    "get": 229,
-    "give": 472,
-    "mine": 1.5739159905058955,
-    "theirs": -1.5739159905058955,
-    "both": false
-   },
-   {
-    "rival": "Isak at this game",
-    "get": 591,
-    "give": 268,
-    "mine": 2.4817457539941756,
-    "theirs": -2.4851839742856896,
+    "give": 566,
+    "mine": 2.2574074806847193,
+    "theirs": -2.2574074806846625,
     "both": false
    },
    {
     "rival": "Muggles & Wizards",
-    "get": 94,
-    "give": 268,
-    "mine": 1.6064088231304936,
-    "theirs": -1.639471585812089,
+    "get": 367,
+    "give": 127,
+    "mine": 1.1666630345067688,
+    "theirs": -1.1666630345068256,
     "both": false
    },
    {
     "rival": "Unique Stars",
-    "get": 112,
-    "give": 388,
-    "mine": 2.0359857362312255,
-    "theirs": -2.2783659889610703,
+    "get": 261,
+    "give": 127,
+    "mine": 1.0946648456022672,
+    "theirs": -1.0946648456023809,
     "both": false
    },
    {
-    "rival": "Saka Potatoes",
-    "get": 53,
-    "give": 268,
-    "mine": 1.2193313509865789,
-    "theirs": -1.5672624467378569,
+    "rival": "Thabz Appeal",
+    "get": 277,
+    "give": 257,
+    "mine": 1.0214428619328828,
+    "theirs": -1.1158487087548679,
+    "both": false
+   },
+   {
+    "rival": "Sizobona Phambili FC",
+    "get": 233,
+    "give": 257,
+    "mine": 1.394472469359357,
+    "theirs": -1.61827996958948,
+    "both": false
+   },
+   {
+    "rival": "Thabz Appeal",
+    "get": 138,
+    "give": 295,
+    "mine": 1.1216606977956758,
+    "theirs": -1.3804980784709073,
+    "both": false
+   },
+   {
+    "rival": "Sizobona Phambili FC",
+    "get": 552,
+    "give": 553,
+    "mine": 1.773901475193668,
+    "theirs": -2.1175853808954344,
+    "both": false
+   },
+   {
+    "rival": "Sizobona Phambili FC",
+    "get": 401,
+    "give": 553,
+    "mine": 1.2430555893526503,
+    "theirs": -1.9749693200349725,
+    "both": false
+   },
+   {
+    "rival": "Thabz Appeal",
+    "get": 597,
+    "give": 467,
+    "mine": 1.0877560973039522,
+    "theirs": -2.082677853621419,
     "both": false
    }
   ]
  },
  "transfers": {
   "game": "classic",
-  "gw": 9,
+  "gw": 10,
   "horizonEnd": 19,
-  "maxMoves": 1,
+  "maxMoves": 2,
   "moves": [
    {
     "out": 388,
     "inn": 4,
     "label": "Guéhi -> Gabriel",
-    "gain": 28.423292059140863,
-    "gainNext": 1.8686729953564551,
+    "gain": 30.550124128527273,
+    "gainNext": 4.18354221924379,
     "bankAfter": 0.7
+   },
+   {
+    "out": 12,
+    "inn": 68,
+    "label": "Saka -> Tavernier",
+    "gain": 14.908770153540786,
+    "gainNext": 2.524272111794275,
+    "bankAfter": 3.6
    }
   ],
-  "value": 612.0356448202228,
-  "baseValue": 583.612352761082,
-  "bank": 0.7
+  "value": 569.6745562338937,
+  "baseValue": 524.2156619518256,
+  "bank": 3.6
  },
  "classicSim": {
   "game": "classic",
-  "gw": 9,
+  "gw": 10,
   "saved": false,
   "draws": 20000,
   "seed": 11,
-  "mean": 50.92365,
-  "sd": 12.420854265206506,
+  "mean": 51.1472,
+  "sd": 12.846747921556414,
   "p10": 36,
   "p25": 42,
   "p50": 50,
   "p75": 59,
   "p90": 68,
-  "min": 18,
-  "max": 121
+  "min": 13,
+  "max": 111
  },
  "h2h": {
   "game": "draft",
-  "gw": 9,
-  "opp": "Penderentials FC",
+  "gw": 10,
+  "opp": "Sizobona Phambili FC",
   "mySaved": false,
   "theirSaved": false,
   "draws": 30000,
   "seed": 5,
-  "win": 0.617,
-  "draw": 0.029933333333333333,
-  "lose": 0.35306666666666664,
+  "win": 0.38056666666666666,
+  "draw": 0.027666666666666666,
+  "lose": 0.5917666666666667,
   "me": {
-   "mean": 43.0696,
-   "sd": 9.996590544114254,
-   "p10": 31,
-   "p25": 36,
+   "mean": 42.341966666666664,
+   "sd": 10.129561958226965,
+   "p10": 30,
+   "p25": 35,
    "p50": 42,
-   "p75": 50,
+   "p75": 49,
    "p90": 56,
-   "min": 16,
-   "max": 99
+   "min": 13,
+   "max": 101
   },
   "them": {
-   "mean": 38.5302,
-   "sd": 8.605600189798919,
-   "p10": 28,
-   "p25": 32,
-   "p50": 38,
-   "p75": 44,
-   "p90": 50,
-   "min": 13,
-   "max": 83
+   "mean": 46.01226666666667,
+   "sd": 9.817262832831384,
+   "p10": 34,
+   "p25": 39,
+   "p50": 45,
+   "p75": 52,
+   "p90": 59,
+   "min": 17,
+   "max": 88
   },
   "n": 30000
  },
@@ -430,57 +491,6 @@
    "game": "classic",
    "weeks": 5,
    "rows": [
-    {
-     "gw": 4,
-     "pts": 71,
-     "avg": 69,
-     "rank": 4763136,
-     "bench": 14,
-     "tx": 0,
-     "hit": 0,
-     "chip": null,
-     "cap": {
-      "n": "Haaland",
-      "pts": 9
-     },
-     "bestCap": {
-      "n": "João Pedro",
-      "pts": 12
-     },
-     "capGap": 3,
-     "xiPts": 62,
-     "bestXiPts": 68,
-     "leftOnBench": 6,
-     "top": [
-      {
-       "n": "João Pedro",
-       "pts": 12
-      },
-      {
-       "n": "Gabriel",
-       "pts": 9
-      },
-      {
-       "n": "Haaland",
-       "pts": 9
-      }
-     ],
-     "blanks": [
-      "Diop",
-      "van Ewijk",
-      "Brobbey"
-     ],
-     "benchBest": [
-      {
-       "n": "Kinsky",
-       "pts": 7
-      },
-      {
-       "n": "Konsa",
-       "pts": 6
-      }
-     ]
-    },
     {
      "gw": 5,
      "pts": 62,
@@ -698,13 +708,66 @@
        "pts": 2
       }
      ]
+    },
+    {
+     "gw": 9,
+     "pts": 54,
+     "avg": 47,
+     "rank": 4041693,
+     "bench": 10,
+     "tx": 0,
+     "hit": 0,
+     "chip": null,
+     "cap": {
+      "n": "Haaland",
+      "pts": 2
+     },
+     "bestCap": {
+      "n": "Verbruggen",
+      "pts": 11
+     },
+     "capGap": 9,
+     "xiPts": 52,
+     "bestXiPts": 55,
+     "leftOnBench": 3,
+     "top": [
+      {
+       "n": "Verbruggen",
+       "pts": 11
+      },
+      {
+       "n": "De Cuyper",
+       "pts": 9
+      },
+      {
+       "n": "Rogers",
+       "pts": 9
+      }
+     ],
+     "blanks": [
+      "Diop",
+      "Mbeumo",
+      "Haaland",
+      "Brobbey",
+      "Calvert-Lewin"
+     ],
+     "benchBest": [
+      {
+       "n": "Kinsky",
+       "pts": 6
+      },
+      {
+       "n": "van Ewijk",
+       "pts": 4
+      }
+     ]
     }
    ],
-   "benchScored": 42,
-   "avoidable": 25,
-   "captainGap": 22,
+   "benchScored": 38,
+   "avoidable": 22,
+   "captainGap": 28,
    "captainBest": 1,
-   "vsAverage": 9,
+   "vsAverage": 14,
    "noTransfers": false,
    "flags": {
     "captain": true,
@@ -716,41 +779,6 @@
    "game": "draft",
    "weeks": 5,
    "rows": [
-    {
-     "gw": 4,
-     "mine": 47,
-     "opp": 49,
-     "oppName": "Unique Stars",
-     "res": "L",
-     "xiPts": 47,
-     "bestXiPts": 55,
-     "leftOnBench": 8,
-     "flip": true,
-     "top": [
-      {
-       "n": "Bogle",
-       "pts": 15
-      },
-      {
-       "n": "Verbruggen",
-       "pts": 8
-      },
-      {
-       "n": "Igor Jesus",
-       "pts": 7
-      }
-     ],
-     "benchBest": [
-      {
-       "n": "Verbruggen",
-       "pts": 8
-      },
-      {
-       "n": "Egan",
-       "pts": 2
-      }
-     ]
-    },
     {
      "gw": 5,
      "mine": 35,
@@ -890,13 +918,44 @@
        "pts": 6
       }
      ]
+    },
+    {
+     "gw": 9,
+     "mine": 52,
+     "opp": 43,
+     "oppName": "Penderentials FC",
+     "res": "W",
+     "xiPts": 52,
+     "bestXiPts": 52,
+     "leftOnBench": 0,
+     "flip": false,
+     "top": [
+      {
+       "n": "McBurnie",
+       "pts": 12
+      },
+      {
+       "n": "N.Jackson",
+       "pts": 9
+      },
+      {
+       "n": "Silva",
+       "pts": 8
+      }
+     ],
+     "benchBest": [
+      {
+       "n": "Sels",
+       "pts": 1
+      },
+      {
+       "n": "Guéhi",
+       "pts": 0
+      }
+     ]
     }
    ],
    "perWeek": [
-    {
-     "gw": 4,
-     "benchScored": 11
-    },
     {
      "gw": 5,
      "benchScored": 13
@@ -912,17 +971,20 @@
     {
      "gw": 8,
      "benchScored": 16
+    },
+    {
+     "gw": 9,
+     "benchScored": 1
     }
    ],
-   "benchScored": 60,
-   "avoidable": 40,
+   "benchScored": 50,
+   "avoidable": 32,
    "flipped": [
-    4,
     8
    ],
-   "wins": 1,
+   "wins": 2,
    "draws": 0,
-   "losses": 4,
+   "losses": 3,
    "flags": {
     "bench": true,
     "noWins": false,
@@ -932,22 +994,43 @@
  },
  "draftMoves": {
   "game": "draft",
-  "gw": 9,
+  "gw": 10,
   "horizonEnd": 20,
   "top": [
    {
-    "add": 486,
-    "drop": 41,
-    "how": "free",
-    "gain": 4.910085464128542,
-    "gainNext": 0.17304407872017435
+    "add": 427,
+    "drop": 268,
+    "how": "waiver",
+    "gain": 21.175507595875047,
+    "gainNext": 1.972854197560494
    },
    {
-    "add": 127,
-    "drop": 268,
+    "add": 486,
+    "drop": 264,
+    "how": "waiver",
+    "gain": 7.31524693925337,
+    "gainNext": -0.11164006036150909
+   },
+   {
+    "add": 650,
+    "drop": 257,
     "how": "free",
-    "gain": 3.7173122631422757,
-    "gainNext": -0.1039702891223584
+    "gain": 5.619273529681436,
+    "gainNext": 0.5855414924520375
+   },
+   {
+    "add": 202,
+    "drop": 388,
+    "how": "free",
+    "gain": 1.874384852435412,
+    "gainNext": 0
+   },
+   {
+    "add": 455,
+    "drop": 127,
+    "how": "waiver",
+    "gain": 0.8090977186691362,
+    "gainNext": -0.05225577691882677
    }
   ],
   "ahead": [],

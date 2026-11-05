@@ -173,7 +173,13 @@ const claims = sheet.sheet.map((c) => ({
 }));
 const rosterNow = M.draftRoster().map((p) => p.id);
 const after = rosterNow.slice();
-sheet.sim.filter((x) => x.ok).forEach((x) => { const k = after.indexOf(x.drop); if (k >= 0) after[k] = x.add; });
+if (settled) {
+  // Waivers have run (CLAUDE.md N2): only a free agent can be signed before this deadline. A locked player waits for the next
+  // run, so he can never be in this gameweek's eleven (5 Nov 2026: the eleven listed Mbeumo, McAtee and Tonali, all locked).
+  sheet.sheet.forEach((c) => { if (M.howToGet(P[c.add]) !== "free") return; const k = after.indexOf(c.drop); if (k >= 0 && after.indexOf(c.add) < 0) after[k] = c.add; });
+} else {
+  sheet.sim.filter((x) => x.ok).forEach((x) => { const k = after.indexOf(x.drop); if (k >= 0) after[k] = x.add; });
+}
 const dxi = M.bestXI(after.map((id) => P[id]).filter(Boolean), next);
 const byP = (k) => dxi.xi.filter((p) => p.p === k).map((p) => code(p.id));
 // Every written claim is forced (out not status a, or no start in three) or a gain to the Draft horizon under the

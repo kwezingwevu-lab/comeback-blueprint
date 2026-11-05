@@ -305,6 +305,28 @@ const LEGAL_ELS = SYN.elements;
 
 const E1_MID = { id: 9001, element_type: 3, team: 1, total_points: 21, starts: 3, status: "a", chance: null, now_cost: 70 };
 
+// E-191 (5 Nov 2026): the XI picker sorted by start tier before expected points, so a 0.72 forward with the higher
+// xp1 (N.Jackson 3.09) sat behind a 0.95 one (McBurnie 2.02). C1 rule 3 only holds back P(start) < 0.5.
+check("E191-C1R3-a-0.72-starter-with-more-xp-starts-and-a-sub-0.5-one-never-does", function () {
+  const byT = { 1: [], 2: [], 3: [], 4: [] };
+  Object.keys(CTX.els).forEach(function (k) { const t = CTX.els[k].element_type; if (byT[t] && byT[t].length < ({ 1: 2, 2: 5, 3: 5, 4: 3 })[t]) byT[t].push(+k); });
+  const ids = [].concat(byT[1], byT[2], byT[3], byT[4]);
+  if (ids.length !== 15) return { ok: false, detail: "synthetic pool gave " + ids.length + " players, not 15" };
+  const xp = Object.assign({}, CTX.xp);
+  const set = function (id, ps, v) { xp[id] = Object.assign({}, CTX.xp[id] || {}, { pstart: ps, xp1: v }); };
+  byT[1].forEach(function (id, i) { set(id, 0.95, i === 0 ? 3 : 1); });
+  byT[3].forEach(function (id) { set(id, 0.95, 6); });                       // five strong mids: the XI wants one forward
+  set(byT[2][0], 0.30, 9); [1, 2, 3, 4].forEach(function (i) { set(byT[2][i], 0.95, 2.5); });   // a tier-0 defender with the most xp; the rest beat McBurnie
+  set(byT[4][0], 0.95, 2.02); set(byT[4][1], 0.72, 3.09); set(byT[4][2], 0.13, 0.9);          // McBurnie, Jackson, Isidor
+  const C = Object.assign({}, CTX, { xp: xp });
+  const r = E.pickXI(ids, C, function (el) { return xp[el.id].xp1; });
+  const startsJackson = r.ids.indexOf(byT[4][1]) >= 0, startsMcBurnie = r.ids.indexOf(byT[4][0]) >= 0;
+  const tier0Starts = r.ids.indexOf(byT[2][0]) >= 0;
+  return { ok: r.ok && startsJackson && !startsMcBurnie && !tier0Starts,
+    detail: "formation " + r.formation + " · 0.72/3.09 forward " + (startsJackson ? "starts" : "benched") + " · 0.95/2.02 forward " + (startsMcBurnie ? "starts" : "benched") +
+      " · 0.30/9.0 defender " + (tier0Starts ? "STARTS (rule 3 broken)" : "benched") };
+});
+
 check("E1-shrunkPps-5.23-worked-example", function () {
   const v = E.shrunkPps(E1_MID);
   return { ok: close(v, 5.23, 0.05), detail: "shrunkPps = " + r4(v) + ", expected 5.23 ±0.05" };
@@ -2512,9 +2534,13 @@ if (!LIVE) {
     // is the one asserted now: they conceded fewer goals than their xGA, and the GOALS model
     // therefore rates their defence better than the xG model does — which is the inversion that
     // cost a captaincy in v74. Lower def is a better defence.
+    // E-193 (5 Nov 2026): the UNDER tag needs a gap of 0.5 a game; by GW9 Hull's was 0.37 (10 conceded from 13.29 xGA),
+    // so asserting the tag froze a dated observation (E-084 again). The E-011 property stands: conceding under xGA makes the
+    // goals model rate the defence better than the xG model does, and the tag follows the published 0.5 threshold.
     check("LIVE-Hull-conceded-fewer-goals-than-xGA-and-the-goals-model-overrates-them", function () {
       const dXg = LCTX.TS[hull.teamId].def, dG = LCTX.TS_GOALS[hull.teamId].def;
-      return { ok: hull.tagAgainst === "UNDER" && hull.ga < hull.xga && dG < dXg,
+      const tagRight = hull.tagAgainst === (hull.diffAgainst <= -0.5 ? "UNDER" : (hull.diffAgainst >= 0.5 ? "OVER" : null));
+      return { ok: tagRight && hull.ga < hull.xga && dG < dXg,
         detail: "xGA " + r2(hull.xga) + " (" + r2(xgaPg) + " per game) against " + hull.ga + " conceded → " + hull.tagAgainst +
           "; def on xG " + r4(dXg) + " vs def on goals " + r4(dG) + " (the goals model rates them " + r2((1 - dG / dXg) * 100) + "% better)" };
     });
@@ -2543,8 +2569,11 @@ if (!LIVE) {
     console.log("João Pedro (id " + jp.id + "): rivalOwn in 1683215 Nineteen45 = " + (own === undefined ? "0" : own) +
       " · captained by " + (cap === undefined ? "0" : cap) + " of the rivals there · highest across the six leagues " + r2(mx.max) + " (league " + mx.league + ")" +
       " · classify " + E.classify(jp, LCTX));
-    check("LIVE-Joao-Pedro-is-convergent-not-a-differential", function () {
-      return { ok: mx.max >= 0.60 && E.convergenceRisk(jp.id, LCTX).risk === true, detail: "max rival ownership " + r2(mx.max) + " ≥ 0.60 → CONVERGENCE" };
+    // E-193 (5 Nov 2026): CLAUDE.md E3's "89-92% rival-owned" was a September observation; by GW9 the rivals held him at
+    // 0.46 at most. The C1.6 rule is what is asserted: the convergence flag fires exactly when rival ownership reaches 0.60.
+    check("LIVE-Joao-Pedro-convergence-flag-follows-the-0.60-rule", function () {
+      const risk = E.convergenceRisk(jp.id, LCTX).risk === true;
+      return { ok: risk === (mx.max >= 0.60), detail: "max rival ownership " + r2(mx.max) + (mx.max >= 0.60 ? " ≥ 0.60 → CONVERGENCE" : " < 0.60 → no convergence") + " · flag " + risk };
     });
   } else {
     console.log("João Pedro: not found by web_name in the snapshot");

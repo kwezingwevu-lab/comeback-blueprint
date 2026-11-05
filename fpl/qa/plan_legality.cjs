@@ -357,7 +357,13 @@ if (OPT.skipGap) {
       readable.every(Boolean) && floorGap !== null && PF.plan.gap >= floorGap - 1e-6 && PF.plan.gap <= (typeof PF.plan.gapOwn === "number" ? PF.plan.gapOwn : PF.plan.gap) + 1e-9,
       "plan gap " + PF.plan.gap + " · floor from " + peers.map((x) => x.label).join(", ") + " " + (floorGap === null ? "none" : floorGap.toFixed(5)) + (readable.every(Boolean) ? "" : " · a raw solver file named by the plan is missing or was solved on other data"));
   }
-  ok("the plan is at least as good as keeping the wildcard", !PF.noWildcard || !PF.noWildcard.ok || PF.plan.total >= PF.noWildcard.total - WC_MARGIN, PF.plan.total + " vs " + (PF.noWildcard || {}).total);
+  /* E-194: when the manager fixes the first week himself (pipeline/fixed_week.cjs, E-186), the like-for-like "keeping the
+     wildcard" plan is the one solved from that same week (timing.never, stitched behind it). The unconstrained no-wildcard
+     plan is still printed, so the price of his choice is shown, never hidden. */
+  const FW = PF.plan.fixedWeek && PF.timing && PF.timing.never && typeof PF.timing.never.total === "number" ? PF.timing.never : null;
+  const NW = FW || PF.noWildcard;
+  ok("the plan is at least as good as keeping the wildcard", !NW || (!FW && !NW.ok) || PF.plan.total >= NW.total - WC_MARGIN,
+    PF.plan.total + " vs " + (NW || {}).total + (FW ? " (the no-wildcard plan from the manager's fixed GW" + PF.plan.fixedWeek.gw + "; unconstrained " + (PF.noWildcard || {}).total + ", so his choice costs " + Math.round(100 * ((PF.noWildcard || {}).total - PF.plan.total)) / 100 + " to GW19 on the model)" : ""));
 }
 
 /* the timing scenarios, when the plan carries them. One function decides whether they are proven, so the check and its
