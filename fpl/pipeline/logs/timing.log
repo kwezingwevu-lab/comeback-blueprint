@@ -1,3 +1,3 @@
-now Optimization terminated successfully. (HiGHS Status 7: Optimal) 61.1 s · gap 0.0039906028369975696 · total 630.27 · wc week 13
-later Optimization terminated successfully. (HiGHS Status 7: Optimal) 73.7 s · gap 0.003991050608824298 · total 628.7 · wc week 15
-never Optimization terminated successfully. (HiGHS Status 7: Optimal) 30.4 s · gap 0.00016843299726258926 · total 626.18 · wc week None
+now Optimization terminated successfully. (HiGHS Status 7: Optimal) 41.8 s · gap 0.003991275787230584 · total 630.34 · wc week 13
+later Optimization terminated successfully. (HiGHS Status 7: Optimal) 68.0 s · gap 0.003992596808452487 · total 627.89 · wc week 15
+never Optimization terminated successfully. (HiGHS Status 7: Optimal) 14.0 s · gap 0.0014866964310291662 · total 628.59 · wc week None

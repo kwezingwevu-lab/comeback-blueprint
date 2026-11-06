@@ -901,3 +901,35 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
   | smoke_wk | 40/40 |
 
   The other 30 steps passed in the first run. WebKit, iOS and browser.py cannot run in this container (E-170); they run on CI.
+
+## 6 Nov 2026, about 09:10Z: GW10 under the manager's hold (no transfer until after GW12, E-195)
+
+- **Fresh pull.** 08:43Z, hash 6729c1ba70f88588, then the full solve chain.
+- **Holds re-pinned.** `fixed_week.cjs --weeks 3` sets GW10–GW12 to no transfers, so free transfers go 2 → 3 → 4, then 5 into GW13.
+- **Plan of record.** 606.56 to GW19, against 630.34 for the solver's own plan.
+  - GW13 uses all five free transfers: Gabriel, Konsa, Tavernier, Barry and Silva in.
+  - Bench Boost in GW16, Wildcard 1 in GW19.
+- **Classic GW10 eleven, no transfer.** The engine's 3-4-3, which simulation also ranks best on the season model: mean 51.3, 90th percentile 68.
+  - XI: Verbruggen; De Cuyper, Tarkowski, Guéhi; Mbeumo, Gomez, Rogers, Janelt; Haaland, Brobbey, Calvert-Lewin.
+  - Bench: Kinsky; Diop, van Ewijk, Saka.
+  - Armband: the rule's captain is Haaland, vice Mbeumo. Mbeumo captain is the differential (0% of rivals against 63–100% for Haaland) for about 0.3 xP.
+- **Draft.**
+  - The manager signed Affengruber for Bassey and Richards for Guéhi at 20:34Z on 5 Nov. Bassey and Guéhi are now locked until the next waiver run.
+  - **Eleven, 4-5-1:** Sels; Silva, Hill, Murillo, Affengruber; Gomez, King, Bobb, Cunha, Xhaka; N.Jackson.
+  - **Bench:** Tzolakis; Richards, McBurnie, Isidor.
+  - **The only signable move both models favour:** Robinson (FUL) for Richards (+0.49 engine, +0.14 model). Antonee Robinson is predicted to start.
+- **News.** Workflow wf_2fb74210-792 read the Friday-morning press conferences and checked each finding independently.
+  - Doubts: Calvert-Lewin (foot; did not train Thursday), Guéhi and Boscagli (rotation).
+  - Out: Saka.
+  - Everyone else in either eleven is fit.
+- **Gate, local.** 36 of 39 steps green; WebKit, iOS and browser.py run on CI only. Notable suites:
+
+  | Suite | Result |
+  |---|---|
+  | components | 331/331 |
+  | smoke | 73/73 |
+  | smoke_wk | 40/40 |
+  | plan_legality | 62/62 |
+  | reference | 67/67 |
+  | unit_engine | 278/278 |
+  | mc_separation | 43/43 |

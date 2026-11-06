@@ -378,6 +378,20 @@ const MCP_WC = (function () {
   return { MC: MCP.MC, PLAN: P2, PRE: MCP.PRE, E: MCP.E };
 })();
 
+/* E-195 (5 Nov 2026): a world whose first week makes transfers. When the manager holds (no transfer in GW10–GW12) the
+   shipped plan opens on a week with none, so the transfer and price-watch panels (plan-changes, pl-changes, plan-price)
+   are rendered from the solver's own plan instead (timing.now, solved on the same data and hash). Absent when the shipped
+   plan already opens with moves, or carries no solved timing.now. */
+const MCP_MOVES = (function () {
+  if (!MCP || !MCP.PLAN || !MCP.PLAN.plan || !Array.isArray(MCP.PLAN.plan.weeks) || !MCP.PLAN.plan.weeks.length) return null;
+  if ((MCP.PLAN.plan.weeks[0].in || []).length) return null;
+  const T = MCP.PLAN.timing && MCP.PLAN.timing.now;
+  if (!T || !T.ok || !Array.isArray(T.weeks) || !T.weeks.length || !(T.weeks[0].in || []).length) return null;
+  const P2 = JSON.parse(JSON.stringify(MCP.PLAN));
+  P2.plan = JSON.parse(JSON.stringify(T)); delete P2.plan.fixedWeek; delete P2.plan.managerChoice;
+  return { MC: MCP.MC, PLAN: P2, PRE: MCP.PRE, E: MCP.E };
+})();
+
 /* A world where chasing the month costs more than the proof's tolerance, so the costly-chase sentence (plan-horizons-chase)
    renders behind its reveal whatever the live data's lenses happen to say (22 Oct 2026: on the GW8 data every chase was free). */
 const MCP_DEAR = (function () {
@@ -455,7 +469,8 @@ const FIX = {
       { ctx: CTX, ui: uiFor("plan", false), on: ON, plan: PLAN, onConfirm: noop, mc: MCP_NOPLAN },
       { ctx: CTX_MKT, ui: uiFor("plan", false), on: ON, plan: PLAN, onConfirm: noop, mc: MCP }]
       .concat(MCP_WC ? [{ ctx: CTX, ui: UI_PLAN_SOLVED, on: ON, plan: PLAN, onConfirm: noop, mc: MCP_WC }] : [])
-      .concat(MCP_DEAR ? [{ ctx: CTX, ui: UI_PLAN_SOLVED, on: ON, plan: PLAN, onConfirm: noop, mc: MCP_DEAR }] : []),
+      .concat(MCP_DEAR ? [{ ctx: CTX, ui: UI_PLAN_SOLVED, on: ON, plan: PLAN, onConfirm: noop, mc: MCP_DEAR }] : [])
+      .concat(MCP_MOVES ? [{ ctx: CTX, ui: UI_PLAN_SOLVED, on: ON, plan: PLAN, onConfirm: noop, mc: MCP_MOVES }] : []),
     fuzz: { ctx: CTX, ui: uiFor("plan", false), on: ON, plan: PLAN, onConfirm: noop, mc: MCP }
   },
   TabSquad: { props: { ctx: CTX, ui: uiFor("squad", true), on: ON, onConfirm: noop, mc: MCP }, text: [] },

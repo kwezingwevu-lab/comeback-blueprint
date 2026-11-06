@@ -2228,3 +2228,17 @@ RULE: a check asserts the rule, never a feature of the week it was written in.
 - A number search ignores the tail of a grouped number: a digit followed by a separator before the match.
 
 TEST: smoke 73/73, plan_legality 61/61 and mc_separation 43/43 on the 5 Nov data. Each fix keeps its failure case: a flagged vice still named as captain or vice goes red; a fixed plan below its own never plan goes red; "total 884 points" is still found.
+
+### E-195 · v110 · the manager's rule: no free transfers until after GW12 (5 Nov 2026)
+CAUSE: a rule, not a fault. At about 20:25Z on 5 Nov the manager wrote "Actually, no free transfers will be used until after GW12". It replaced his ask from an hour earlier (one free transfer in GW10, as aggressively as possible), whose plan (Guéhi out, Gabriel in, 622.02 to GW19) had shipped as app version 29.
+CAUGHT: the manager.
+RULE:
+- No transfer in GW10, GW11 or GW12. The free transfers bank to the cap of 5 for GW13.
+- `pipeline/fixed_week.cjs` takes `--weeks K`: the first fixed week may carry moves, and the rest are holds.
+  - The solve starts after the last fixed week, with its detailed window cut so that GW19 stays a held week. latest_wildcard.py builds the GW19 wildcard only on a held week.
+  - On the 5 Nov data the hold plan is 607.37 to GW19, against 622.02 for the one-transfer plan and 626.18 for the solver's unconstrained no-wildcard plan. The app and the reply state that cost; they never hide it.
+- Re-pin after every pull until the GW12 deadline (CLAUDE.md N1).
+
+TEST: plan_legality `the plan's first week is the week the manager fixed (E-186), and each later fixed week is a hold (E-195)`, with its mutation `a transfer in a held week goes red (E-195)`. The no-rebuy mutation now uses the first week that sells, not week 0, so a hold opening no longer leaves it unbuildable. plan_legality 62/62, reference 67/67.
+- components: the Plan tab's transfer and price-watch panels (plan-changes, pl-changes, plan-price) do not render on a hold week, so components 331/331 went red on `A-TabPlan-renders-every-testid-it-owns` (5 Nov 20:15Z).
+- The fixture now adds `MCP_MOVES`, a variant rendered from the solver's own plan for the same data (timing.now, which opens with transfers), so those panels stay tested while the shipped plan holds. Green again on the 6 Nov data.

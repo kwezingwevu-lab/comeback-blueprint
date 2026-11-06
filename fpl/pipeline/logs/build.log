@@ -1,8 +1,8 @@
-data/pre.json · hash 6c51306894a03e66 · unchanged, at 2026-11-05T19:37:24.745Z kept · 1594 ms · Draft claims 6 (firsts, held 0) · Draft trades 0 both-gain / 28 ask · Classic transfers 2 · Classic sim GW10 · Draft h2h GW10 · Draft moves 5 · changes 7 · claims equal data/weekly.js line for line (6)
-app/FPL_Mission_Control.jsx  2058 kB
-dist/index.html              3405 kB
+data/pre.json · hash 6729c1ba70f88588 · written · 1218 ms · Draft claims 4 (firsts, held 0) · Draft trades 0 both-gain / 29 ask · Classic transfers 2 · Classic sim GW10 · Draft h2h GW10 · Draft moves 3 · changes 7 · claims equal data/weekly.js line for line (4)
+app/FPL_Mission_Control.jsx  2055 kB
+dist/index.html              3402 kB
 dist/manifest.webmanifest    2 kB  theme #0b0e13 (= --bg)
-dist/sw.js                    4 kB  cache fpl-mc-v110-930c9da3c794
+dist/sw.js                    4 kB  cache fpl-mc-v110-dbbe130ea5c1
 dist/icon.svg                0.6 kB  vector, viewBox 512
 dist/icon-32.png                 301 B  IHDR 32x32  depth 8  colour 6 (RGBA)  IHDR+IDAT+IEND  CRCs ok
 dist/icon-48.png                 408 B  IHDR 48x48  depth 8  colour 6 (RGBA)  IHDR+IDAT+IEND  CRCs ok

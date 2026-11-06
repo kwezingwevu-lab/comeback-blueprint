@@ -481,9 +481,16 @@ if (!OPT.noGolden && (OPT.golden || isReferencePlan)) {
 /* ---------------------------------------------------------------- E-186: a week the manager fixed himself */
 const fixedVerdict = (pf) => { const f = pf.plan && pf.plan.fixedWeek, w = pf.plan && pf.plan.weeks[0]; if (!f) return null;
   const same = (a, b) => JSON.stringify((a || []).slice().sort()) === JSON.stringify((b || []).slice().sort());
-  return { ok: !!w && w.gw === f.gw && same(w.in, f.in) && same(w.out, f.out) && w.hits === f.hits, detail: "fixed GW" + f.gw + " in " + f.in + " out " + f.out + " · plan's week in " + (w && w.in) + " out " + (w && w.out) + " hits " + (w && w.hits) }; };
-{ const v = fixedVerdict(PF); if (v) { ok("the plan's first week is the week the manager fixed (E-186)", v.ok, v.detail);
-    const m = JSON.parse(JSON.stringify(PF)); m.plan.weeks[0].in = [999999]; ok("mutation: a first week other than the fixed one goes red (E-186)", !fixedVerdict(m).ok, fixedVerdict(m).detail); } }
+  // E-195: a fixed span of K weeks; the first carries the manager's moves, every later one is a hold with no transfer
+  const K = Number.isInteger(f.weeks) && f.weeks > 1 ? f.weeks : 1, ws = (pf.plan.weeks || []).slice(0, K);
+  const holds = ws.slice(1).every((x, j) => x.gw === f.gw + j + 1 && !(x.in || []).length && !(x.out || []).length && !x.hits && !x.used && !x.chip);
+  return { ok: !!w && w.gw === f.gw && same(w.in, f.in) && same(w.out, f.out) && w.hits === f.hits && ws.length === K && holds && (K === 1 || f.lastGw === f.gw + K - 1),
+    detail: "fixed GW" + f.gw + (K > 1 ? "–GW" + f.lastGw + " (" + K + " weeks)" : "") + " in " + f.in + " out " + f.out + " · plan's first week in " + (w && w.in) + " out " + (w && w.out) + " hits " + (w && w.hits) +
+      (K > 1 ? " · later weeks " + ws.slice(1).map((x) => "GW" + x.gw + " in " + (x.in || []).length + " out " + (x.out || []).length + " used " + x.used).join(", ") : "") }; };
+{ const v = fixedVerdict(PF); if (v) { ok("the plan's first week is the week the manager fixed (E-186)" + (PF.plan.fixedWeek.weeks > 1 ? ", and each later fixed week is a hold (E-195)" : ""), v.ok, v.detail);
+    const m = JSON.parse(JSON.stringify(PF)); m.plan.weeks[0].in = [999999]; ok("mutation: a first week other than the fixed one goes red (E-186)", !fixedVerdict(m).ok, fixedVerdict(m).detail);
+    if (PF.plan.fixedWeek.weeks > 1) { const m2 = JSON.parse(JSON.stringify(PF)); m2.plan.weeks[1].in = [999999]; m2.plan.weeks[1].out = [m2.plan.weeks[1].squad[0]]; m2.plan.weeks[1].used = 1;
+      ok("mutation: a transfer in a held week goes red (E-195)", !fixedVerdict(m2).ok, fixedVerdict(m2).detail); } } }
 
 /* ---------------------------------------------------------------- E-181 across the whole file */
 const earlyAnywhere = (pf) => chipsAnywhere(pf).filter((c) => c.gw < RULES.from || c.gw > RULES.last);
@@ -541,9 +548,11 @@ const earlyAnywhere = (pf) => chipsAnywhere(pf).filter((c) => c.gw < RULES.from 
     const r = findWeekCheck(checkPlan(c, DATA, M), w.gw, "armband");
     ok("mutation: a captain on the bench goes red on 'armband'", !!r && !r.ok, r ? r.detail : "no check");
   }
-  /* 3. a player sold in the first week and bought back in the second (§7.10) */
+  /* 3. a player sold in a week and bought back in the next (§7.10). E-195: the first selling week, which is no longer
+     always the first week now that the manager can hold for several weeks. */
   {
-    const c = clone(PF), a = c.plan.weeks[0], b = c.plan.weeks[1];
+    const c = clone(PF), k = Math.max(0, c.plan.weeks.findIndex((w, i) => (w.out || []).length > 0 && !!c.plan.weeks[i + 1] && !c.plan.weeks[i + 1].chip));
+    const a = c.plan.weeks[k], b = c.plan.weeks[k + 1];
     const back = (a.out || [])[0], victim = back != null && b ? b.squad.find((i) => posOf(i) === posOf(back) && i !== b.cap && i !== b.vice) : null;
     if (victim != null) { swapIn(b, victim, back); if (!b.in.includes(back)) b.in.push(back); b.out = (b.out || []).concat([victim]); }
     const r = victim != null ? findWeekCheck(checkPlan(c, DATA, M), b.gw, "no rebuy") : null;
