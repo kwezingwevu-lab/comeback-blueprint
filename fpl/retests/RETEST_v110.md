@@ -933,3 +933,29 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
   | reference | 67/67 |
   | unit_engine | 278/278 |
   | mc_separation | 43/43 |
+
+## 6 Nov 2026, about 15:45Z: the manager's 4-hour refresh (the last full refresh was at 08:43Z)
+
+- **The manager's own call.** "If the app hasn't completely refreshed in the last 4 hours then update and refresh now." The last pull was 6 h 19 min earlier, so a refresh was due.
+- **Pull.** 15:02:43Z, then the full solve chain (finished 15:13Z). state.cjs: squad unchanged, 2 free transfers.
+- **Hold re-pinned (E-195).** GW10–GW12 are no-transfer weeks; 5 free transfers into GW13.
+- **Plan.** Hash 8c02411311c006fa, 607.42 to GW19 (solver's own plan 630.04). The GW13 moves and chip weeks are as in the morning run.
+- **No live input moved for either eleven since 08:43Z.**
+  - FPL flags unchanged: Calvert-Lewin d 75%, Saka i 0%.
+  - Draft roster unchanged. Engine and season-model values identical.
+  - The Classic simulation again puts 3-4-3 first: mean 51.34, 90th percentile 68.
+- **News.**
+  - The afternoon workflow (wf_e716e53c-580) stalled: both researchers waited over 10 minutes on web tools when the connectors dropped. The release did not wait for it.
+  - A direct check found nothing new. Maresca's press conference gave no team news on Guéhi or Dias. Calvert-Lewin's Friday training is still unconfirmed; Leeds play Saturday at 12:30.
+- **Gate, local.** 36 of 39 steps green; WebKit, iOS and browser.py run on CI only. Notable suites:
+
+  | Suite | Result |
+  |---|---|
+  | components | 331/331 |
+  | smoke | 73/73 |
+  | smoke_wk | 40/40 |
+  | plan_legality | 62/62 |
+  | reference | 67/67 |
+  | unit_engine | 278/278 |
+  | mc_separation | 43/43 |
+  | mc_all | 0 failures |

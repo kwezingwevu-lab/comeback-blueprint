@@ -1,8 +1,8 @@
-weekly.cjs · v110 GW10 · plan 6729c1ba70f88588 · hold (wildcard GW19) · 0 transfer(s), 0 hit(s), FT 2→3, bank 2.7 · captain Haaland, vice Mbeumo · chips BB GW16, WC GW19 · locks Rogers, De Cuyper, Haaland · cost £96.6m of £99.3m · fallback  (captain Haaland, from the optimiser) · Draft 4 claims (firsts), mean 485.9 p10 484.4 p90 489.8, stress 484.4, all first 490.6, now 464.1
+weekly.cjs · v110 GW10 · plan 8c02411311c006fa · hold (wildcard GW19) · 0 transfer(s), 0 hit(s), FT 2→3, bank 2.7 · captain Haaland, vice Mbeumo · chips BB GW16, WC GW19 · locks Rogers, De Cuyper, Haaland · cost £96.6m of £99.3m · fallback  (captain Haaland, from the optimiser) · Draft 4 claims (firsts), mean 485.9 p10 484.4 p90 489.8, stress 484.4, all first 490.6, now 464.1
   1. Mbeumo for King (MID), first choice: +21.4 Draft expected points to GW20, locked until the next waiver run, so lodge it as a claim then
   2. McAtee for Bobb (MID), first choice: +7.4 Draft expected points to GW20, locked until the next waiver run, so lodge it as a claim then
   3. Tonali for Gomez (MID), first choice: +0.8 Draft expected points to GW20, locked until the next waiver run, so lodge it as a claim then
   4. McGinn for King (MID), backup for Mbeumo: +3.6 Draft expected points to GW20, sign now (a free agent until the GW10 deadline)
 note: src/engine.js draftEV (five gameweeks) scores 3 of the claims as no gain: McAtee for Bobb -1.15, Tonali for Gomez -5.31, McGinn for King -5.00
 note: kept but flagged (bench or held, legal in a transfer week): Calvert-Lewin d 75%, Saka i 0%
-wrote data/weekly.js (9020 chars)
+wrote data/weekly.js (9018 chars)
