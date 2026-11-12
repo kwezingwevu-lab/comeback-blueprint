@@ -1,0 +1,35 @@
+// Smoke 4: the same viewer-like frame in WebKit (Playwright's Safari engine): boot, chip -> stream, Stop, Escape, Weekly Review explained, debrief, not_granted.
+const path=require('path');const fs=require('fs');const http=require('http');const {webkit}=require('playwright');
+const {FRAME,W,DEMO}=require('./aih');const SH='shots';
+module.exports=async function(T){let cur={iso:'2026-11-28',seed:DEMO()};
+  const srv=http.createServer((rq,rs)=>{if(rq.url.startsWith('/frame'))return rs.writeHead(200,{'content-type':'text/html'}),rs.end(FRAME(cur.iso,cur.seed));rs.writeHead(200,{'content-type':'text/html'});rs.end('<!doctype html><html><body style="margin:0;background:#0A0D14"><script>window.__ai={delay:120};</script><iframe id="f" sandbox="allow-scripts allow-same-origin" src="/frame.html" style="width:390px;height:844px;border:0;display:block"></iframe></body></html>');});
+  await new Promise(r=>srv.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+srv.address().port;
+  const b=await webkit.launch();const ctx=await b.newContext({viewport:{width:390,height:844}});const q=await ctx.newPage();const errs=[];q.on('pageerror',e=>errs.push(e.message));q.on('console',m=>{if(m.type()==='error')errs.push('console: '+m.text());});
+  await q.route('**/*',r=>{const u=r.request().url();if(u.startsWith(base))return r.continue();return r.fulfill({status:200,contentType:'text/css',body:''});});
+  await q.goto(base+'/',{waitUntil:'load'});let f=null;for(let i=0;i<80;i++){f=q.frames().find(x=>x.url().includes('/frame'));if(f){const ok=await f.evaluate(()=>typeof DB!=='undefined'&&!document.querySelector('#view-home .boot-ph')).catch(()=>false);if(ok)break;}await W(100);}
+  await W(1300);const ev=(fn,a)=>f.evaluate(fn,a).catch(e=>({err:String(e.message||e).slice(0,300)}));const idle=async()=>{for(let i=0;i<60;i++){if(await ev(()=>!aiBusy())===true)return;await W(100);}};
+  const b0=await ev(()=>({ok:aiOK(),brief:!!document.querySelector('#view-home [data-ai-open="home"]'),rev:!!document.querySelector('#reviewCard [data-ai-act="rev"]')}));const c0=await q.evaluate(()=>({calls:window.__aicalls.length,lim:window.__limcalls}));
+  T('WK boot: aiOK, controls painted, no call at load, limits read once',b0.ok&&b0.brief&&b0.rev&&c0.calls===0&&c0.lim===1,JSON.stringify({b0,c0}));
+  await ev(()=>{const x=document.querySelector('#view-home [data-ai-open="home"]');x.focus();x.click();});await W(200);
+  const s=await ev(()=>{const s=document.getElementById('coachSheet'),r=s.getBoundingClientRect();return {role:s.getAttribute('role'),focus:s.contains(document.activeElement),ta:getComputedStyle(document.getElementById('coachQ')).fontSize,bottom:Math.round(window.innerHeight-r.bottom),lock:getComputedStyle(document.body).overflow,hdr:Math.round(document.querySelector('header.app').getBoundingClientRect().top),min:Math.min(...[...s.querySelectorAll('button,textarea')].filter(x=>x.getClientRects().length).map(x=>x.getBoundingClientRect().height))};});
+  T('WK sheet: dialog, focus inside, 16 px textarea, pinned to the bottom, body locked, header stays put, controls 36 px+',s.role==='dialog'&&s.focus&&s.ta==='16px'&&s.bottom===0&&s.lock==='hidden'&&s.hdr===0&&s.min>=36,JSON.stringify(s));
+  await ev(()=>document.querySelector('#coachSheet [data-ai-chip="home:0"]').click());await W(60);const th=await ev(()=>(document.getElementById('aiLive-coach')||{}).textContent);await idle();await W(150);
+  const a=await ev(()=>({turns:_ai.turns.length,txt:(document.querySelector('#coachBody .coach-a .ai-txt')||{}).textContent,lab:(document.querySelector('#coachBody .ai-lab')||{}).textContent}));
+  T('WK chip: Thinking, then the streamed answer with its label',th==='Thinking…'&&a.turns===2&&/Keep today simple/.test(a.txt)&&a.lab==='Claude · advice, not a plan change',JSON.stringify({th,a}));
+  if(process.env.AI_SHOTS)await q.screenshot({path:path.join(process.env.AI_SHOTS,'30-webkit-sheet.png')});
+  await q.evaluate(()=>{window.__ai={hold:true};});await ev(()=>{const t=document.getElementById('coachQ');t.value='And tomorrow?';document.getElementById('coachSend').click();});await W(200);await ev(()=>document.getElementById('coachStop').click());await idle();await W(100);
+  const st=await ev(()=>({turns:_ai.turns.length,note:!!document.getElementById('coachNote'),send:!document.getElementById('coachSend').hidden}));const end=await q.evaluate(()=>window.__aicalls[window.__aicalls.length-1].end);
+  T('WK Stop: cancelled, silent',end==='cancelled'&&st.turns===2&&!st.note&&st.send,JSON.stringify({st,end}));
+  const esc=await ev(()=>{document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));return {gone:!document.getElementById('coachWrap'),lock:getComputedStyle(document.body).overflow,focus:document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.aiOpen};});
+  T('WK Escape closes, unlocks, returns focus to the opener',esc.gone&&esc.lock!=='hidden'&&esc.focus==='home',JSON.stringify(esc));
+  await q.evaluate(()=>{window.__ai={delay:80,chunks:['What happened: on plan.\n\n','Why the app said so: the rate is near target.\n\nOne thing for next week: sleep.']};});
+  await ev(()=>{document.getElementById('reviewCard').scrollIntoView({block:'start'});document.querySelector('#reviewCard [data-ai-act="rev"]').click();});await idle();await W(120);
+  const rv=await ev(()=>({txt:(document.getElementById('aiOut-rev')||{}).textContent,ps:document.querySelectorAll('#aiOut-rev p').length}));T('WK Weekly Review explained',/What happened: on plan/.test(rv.txt||'')&&rv.ps===3,JSON.stringify(rv));
+  await ev(()=>{switchView('lift');});await W(150);await ev(()=>document.querySelector('#aiDebrief [data-ai-act="deb"]').click());await idle();await W(120);
+  const db=await ev(()=>({lines:document.querySelectorAll('#aiNext p[data-ex]').length,out:!!document.getElementById('aiOut-deb')}));T('WK debrief with the engine lines',db.out&&db.lines>=6,JSON.stringify(db));
+  await ev(()=>{document.getElementById('aiDebrief').scrollIntoView({block:'start'});window.scrollBy(0,-70);});await W(100);if(process.env.AI_SHOTS)await q.screenshot({path:path.join(process.env.AI_SHOTS,'31-webkit-debrief.png')});
+  await q.evaluate(()=>{window.__ai={err:'not_granted',delay:40};});await ev(()=>document.querySelector('#view-lift [data-ai-chip="lift:0"]').click());await idle();await W(200);
+  const h=await ev(()=>({ok:aiOK(),n:document.querySelectorAll('[data-ai],[data-ai-chip],[data-ai-open],[data-ai-act],#coachWrap').length,lock:getComputedStyle(document.body).overflow}));T('WK not_granted removes every AI control',!h.ok&&h.n===0&&h.lock!=='hidden',JSON.stringify(h));
+  T('WK: no page errors',errs.length===0,errs.join(' | ').slice(0,400));
+  await b.close();srv.close();
+};

@@ -236,6 +236,25 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  let line='';try{line=await pg.evaluate(()=>{switchView('run');return (document.getElementById('raceLive')||{}).textContent;});}catch(e){}
  T('webkit live: inside a Claude-style view the Strava run lands in cb2_runs, the Data card says synced 09:00 and the Run tab says "Races checked 09:00 · RunningCalendar"',!!g&&g.ok&&/^Strava: synced 09:00 \(1 activity, last 60 days\)$/.test(g.s||'')&&g.runs.join()==='9001'&&line==='Races checked 09:00 · RunningCalendar'&&perr.length===0,JSON.stringify({g,line,perr}));
  await c.close();}
+// Run log (12 Nov 2026): the visible "Log a run" card in Lift's Run section on Safari's engine -- prefilled from the plan, saved to cb2_runs, listed on Track's Runs tab
+{const MOCKS=iso=>"(function(){var R=Date;var base=new R('"+iso+"T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(base);else super(...a);}static now(){return base;}}window.Date=M;})();";
+ const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
+ await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
+ await c.addInitScript(MOCKS('2026-11-15')+'if(!sessionStorage.getItem("wkrl")){sessionStorage.setItem("wkrl","1");localStorage.clear();}');
+ const pg=await c.newPage();const perr=[];pg.on('pageerror',e=>perr.push(e.message));
+ await pg.goto('file://'+file,{waitUntil:'load'});await wait(1200);
+ let g=null;try{g=await pg.evaluate(async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms)),el=id=>document.getElementById(id);switchView('lift');await W(300);
+   const sec=el('runSec'),log=el('runLog');const o={inSec:!!(sec&&log&&sec.contains(log)),vis:!!(log&&log.getClientRects().length),type:(el('rlType')||{}).value,dist:(el('rlDist')||{}).value,date:(el('rlDate')||{}).value,
+     px:['rlDate','rlType','rlDist','rlTime'].map(i=>el(i)?parseFloat(getComputedStyle(el(i)).fontSize):0),wide:document.documentElement.scrollWidth<=document.documentElement.clientWidth+1};
+   const t=el('rlTime'),sv=el('rlSave');if(!t||!sv)return o;t.value='49:00';t.dispatchEvent(new Event('input',{bubbles:true}));sv.click();await W(300);
+   o.ls=JSON.parse(localStorage.getItem('cb2_runs')||'[]');o.toast=((el('toast')||{}).innerText||'').replace(/\s+/g,' ').slice(0,60);
+   switchView('track');await W(300);const tb=document.querySelector('.track-tabs button[data-tp="mileage"]');if(tb)tb.click();await W(300);const pane=el('tp-mileage');
+   o.tab=!!tb;o.pane=!!(pane&&pane.getClientRects().length);o.rows=[...document.querySelectorAll('#runList .log-row')].map(r=>r.innerText.replace(/\s+/g,' ').trim());o.tabsFit=(w=>!!w&&w.scrollWidth<=w.clientWidth+1)(document.querySelector('.track-tabs'));return o;});}catch(e){g={err:String(e&&e.message||e).slice(0,200)};}
+ T('webkit run log: on Sun 15 Nov the Lift tab shows "Log a run" inside the Run section, prefilled Long / 7 km / today with 16 px fields; 49:00 saves one row to cb2_runs with an Undo toast, and Track lists it under a Runs tab that fits at 390 px',
+   !!g&&g.inSec&&g.vis&&g.type==='Long'&&g.dist==='7'&&g.date==='2026-11-15'&&Array.isArray(g.px)&&g.px.every(x=>x>=16)&&g.wide&&Array.isArray(g.ls)&&g.ls.length===1&&g.ls[0].dist===7&&g.ls[0].time===2940&&g.ls[0].type==='Long'&&/^Run logged · 7 km · 7:00\/km/.test(g.toast||'')&&g.tab&&g.pane&&g.tabsFit&&Array.isArray(g.rows)&&g.rows.length===1&&/^15 Nov 7km 7:00\/km · Long · 49:00/.test(g.rows[0]),JSON.stringify(g).slice(0,380)+' '+perr.join('|').slice(0,120));
+ errs.push(...perr);await c.close();}
+// AI layer (LEDGER 36) on Safari's engine: the viewer-like frame with a mock "sample" capability (qa/ai_webkit.js)
+try{await require('./ai_webkit')((n,ok,d)=>T('webkit AI: '+n,ok,d));}catch(e){T('webkit AI: the checks ran to the end',false,String(e&&e.stack||e).slice(0,300));}
 T('webkit: no page/console errors',errs.length===0,errs.join('|').slice(0,300));
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+String(x.detail||'').replace(/\s+/g,' ').slice(0,400)).join('\n')||'WEBKIT ALL PASS');console.log('WEBKIT RESULT:',pass+'/'+R.length);process.exit(pass===R.length?0:1);})().catch(e=>{console.error('WEBKIT CRASH:',e.message);process.exit(2);});

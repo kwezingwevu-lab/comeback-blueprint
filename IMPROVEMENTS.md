@@ -61,6 +61,12 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then 
 | # | Item | Status |
 |---|---|---|
 | E1 | "Copy this week for Claude": a plain-text check-in with weigh-ins, tapes, sleep, every set, sets per region, four questions and a no-guessing instruction; clipboard, share sheet or a selectable box | Shipped · X12, WebKit |
+| E2 | Ask the coach inside the artifact: a sheet with streamed answers, Stop, eight turns of follow-up, grounded on a JSON of his own numbers, read-only tools where the viewer allows them (LEDGER 36) | Shipped 12 Nov 2026 · qa/ai.js core A1-A14, D1-D3 |
+| E3 | The Weekly Review explained in three parts; a second tap makes no call | Shipped 12 Nov 2026 · qa/ai.js core B1-B5 |
+| E4 | Session debrief with the engine's own next targets printed under Claude's points | Shipped 12 Nov 2026 · qa/ai.js core C1-C4 |
+| E5 | Log by a typed or dictated sentence, or from a Garmin/Strava/Health screenshot: preview, confirm, the app's own ranges, Undo | Building (part 2) |
+| E6 | Meal estimate from words or a photo; nutrition labels read as printed; a daily protein tally | Building (part 2) |
+| E7 | "Which races fit my 10K build?" picks rendered from the app's own rows | Building (part 2) |
 
 ## F. Data safety
 
@@ -180,6 +186,10 @@ Also shipped with round 2: a 624-render sweep (dates × seeds × modes × routes
 | new | Data card "This copy" line (`thisCopyHTML()`) | Shipped · R3 Data card |
 | vis3-04, vis3-06, vis3-07 | Not built: no defect could be located from the brief (vis3-07: the 12-month list never contains a past month) | Open, needs a screenshot or anchor |
 
+## AU. Audit fixes (12 Nov 2026): 29 verified findings, 22 unique: 18 fixed, 3 already closed by the 14 Nov build, 1 queued (K22)
+Each is pinned by a section AU check that fails under its own mutation.
+- Brief reads `dayPlan()` (AU1-3). Visible run log on Lift and the Runs tab on Track (AU4-11). Stale copy, numbers from the engine (AU12-19, AU34). Creatine nudge length (AU20). Check-in carries the runs (AU21). Legacy restore keeps what the file lacks; the backup clock moves on his answer (AU22-23). Goal race gone after race day (AU24). Strava held runs merge when the account read settles; honest failed-read line (AU25-26). Race line repaint and saved-list date (AU27-28). Organiser dates beat the aggregator, with a conflict line (AU29-31). Busy saves say wait; photos retry once (AU32-33).
+
 ## K. Queued (not built yet) — what each needs
 
 | # | Item | Why it waits |
@@ -204,6 +214,13 @@ Also shipped with round 2: a 624-render sweep (dates × seeds × modes × routes
 - **K19 Second heavy exposure for bench and squat.** Both are heavy once a week (Push A, Legs A). A second top-set day adds exercises and volume, so it is Kwezi's call. Queued 29 Oct 2026.
 - **K20 Strength decisions to confirm (29 Oct 2026).** (1) A missing RPE holds the top-set load. (2) The test gate: fewer than 4 lift days the week before, sleep under 7 h, or a review flag. (3) Tests only in weeks 12/24/36/48. (4) Roadmap re-test tags moved to those weeks. (5) Home mode still shows RIR 0. (6) The two whey picks are costed on different bases (per shake versus per gram of protein); cosmetic.
 - **K21 Three calls made on 12 Nov 2026 when Day 1 moved to Sat 14 Nov and the race stayed on Fri 12 Feb 2027; each is yours to reverse.** (1) The Base week that went is the old week 5 (8 x 400 m at 5 km pace); the alternative was to drop a Threshold week. (2) 5 km trials on weeks 4, 8 and 11 (Tue 8 Dec, 5 Jan, 26 Jan), by swapping the Tuesday sessions of weeks 7/8 and 10/11; the last trial is 17 days before the race. (3) Week 12 is both the taper and a lifting deload: the taper's runs go as written (not halved), the lifts deload, and the week-12 strength test (from Sat 30 Jan) now sits 13 days before the race. Say so if you would rather skip that test or move it.
+- **K22 Creatine loading against the two-window rule (12 Nov 2026 audit).** The loading copy says "20 g today split across four meals"; your supplement rule is two windows only, 04:30 and 20:00. Options: (1) 10 g + 10 g inside the two windows for the loading week, or (2) keep four doses with meals as a stated loading-week exception. Nothing was changed; the nudge now shows for 7 days and counts them.
+- **K23 The pre-start "Focus" tile.** On the day before Day 1 it reads "Week 0 · Base block" while the Legs & back block starts the next morning. Cosmetic, one day a cycle; queued, not built.
+- **K24 Reading blood-test results with Claude.** Medical data and a medical reading. Not built; needs your yes and a decision on wording ("see your doctor" stays the answer for anything out of range).
+- **K25 In-app evidence check against PubMed.** A real connector call was read on 12 Nov 2026. Its terms need a link beside every article shown; the app's rule is no links in copy. Options: allow DOI links in evidence answers only, or leave it out.
+- **K26 Spoken input and read-aloud inside the page.** The viewer has both, but neither is offered in the iPhone app or Safari today, so on your phone they would be invisible. The keyboard's own dictation already works in every text box.
+- **K27 Not built on purpose.** Judging physique or lifting form from photos (unreliable, and progress photos stay on the device); Claude writing sets, phases or doses (programme changes are yours); Claude pricing a grocery list (prices are verified at the shop, LEDGER 3, 24, 25).
+- **K28 Independent review of the AI layer.** Part 1 was built and tested against a mock capability, and read against the type definitions once more before it shipped; the three-lens adversarial review stopped on a usage limit and is to run with part 2.
 
 ## L. Not possible from a web app (and the honest alternative)
 

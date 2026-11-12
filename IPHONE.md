@@ -52,6 +52,10 @@ The GitHub app is for browsing; uploading a file is done on the website.
 
 Open https://claude.ai/artifact/NDrDPTJAEX2L8CX2AHeT3L in the Claude app or any browser where you are signed in to Claude. It opens straight into the app. Your logs are kept in this browser and in your Claude account, so the same link on your laptop picks them up. Backups save through the Save prompt Claude shows. If you have logs in an older copy (the app file or the web link), save a backup there and use Home → Data → Restore in the artifact once.
 
+## Part 5c — Ask the coach (inside the artifact link only)
+
+In the artifact the Coach's Brief has an "Ask the coach" button, and Lift, Track, Fuel and Events have question chips. The first time you tap one, Claude asks your permission once. After that, a tap sends the question and the numbers it needs to Claude on your own account and the answer appears in the sheet. It is advice: it cannot change your programme, and the next targets always come from the app. "Explain this week" on the Weekly Review and "Debrief this session" on Lift work the same way. Nothing is sent unless you tap, and answers are not saved. If you do not see these buttons, the copy of the app you opened is not the artifact link, or Claude is not available there; everything else works the same.
+
 ## Part 6 — Run the app on the phone (installed, works offline)
 
 GitHub shows HTML files as text, so opening the file in the GitHub app does not run it. It has to be served as a web page, and once it is, it installs to your Home Screen and keeps working with no signal.

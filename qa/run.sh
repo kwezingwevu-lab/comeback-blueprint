@@ -11,6 +11,9 @@ cp dist/ComebackBlueprint.html qa/ComebackBlueprint.html
 # The whole suite takes about ten minutes. Run it as a background job and poll the output file: a foreground tool call with a ten-minute limit kills Chromium inside section AE ("Navigating frame was detached").
 # Every FAIL prints on one line (a multi-line detail once pushed the failing check's name out of a tail -3).
 cd qa && node qa_full.js | grep -E '^(FAIL|ALL PASS|RESULT)'
+# AI layer (LEDGER 36): the artifact build in a viewer-like frame with a mock "sample" capability; Stop, every error class, text never parsed as HTML,
+# the read-only tools, absence, and layout at 390 and 375 px.
+node ai.js | grep -E '^(FAIL|AI ALL PASS|AI RESULT)'
 # Installable/offline acceptance: serves dist/ over local HTTP, installs the service worker, kills the server, reloads.
 node pwa.js | tail -2
 # Calendar refresh helper: parser and diff self-test (the live sweep is run by hand: node tools/calendar-refresh.js --geocode).
