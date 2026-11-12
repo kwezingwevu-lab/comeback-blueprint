@@ -1,0 +1,655 @@
+{
+ "date": "2026-11-12",
+ "home": "HOME_LL [-26.045,27.955]; distances haversine from venue coordinates",
+ "scope": "Every RACES_12M row dated on or after Sat 14 Nov 2026 (37 rows before this round), plus new Gauteng races inside the 60 km radius option.",
+ "sources_read": {
+  "calendar-refresh.js --geocode": "Peak Timing 19 Gauteng events; RaceSpace still 0 events on 1 page for every month 2026/11-2027/10; moved 0, newly dated 0, new 5 (Cotlands 2027, The Heroes Marathon, Midvaal Fast One, Legends Township Marathon, South Africa Day 2027). The tool reads a moved race as \"new\" when the date moves more than 60 days.",
+  "RunningCalendar": "page 1 through Parallel Search web_fetch (acquired 12 Nov 2026, 60 upcoming races). Pages 2 and 3 through the same tool came back as copies acquired 3 Nov 2026 (63 races), so both were re-read live with Firecrawl scrape (maxAge 0): 60 races, Township Marathon now Sun 28 Feb and Verified, Westgate 10km now Verified, Jeppe Marathon Sun 19 Sep 2027 new.",
+  "Peak Timing entry pages": "secure.onreg.com step1 pages fetched with curl through the proxy on 12 Nov 2026 (ids 7618 7790 7844 7846 7920 7921 7969 7970 8017 8030 8086 8089 8096 8101 8110 8142 8146 8148 8149 8168)",
+  "Organiser sites": "sowetomarathon.com, randburgharriers.co.za, hyroxsa.com, ridejoburg.co.za, warrior.co.za, ultratri.co.za, champagneproductionsafrica.com, entryninja (TinMan), racepass (Wally Hayward); cache dates are given per event",
+  "Geocoder": "OpenStreetMap Nominatim search API via curl through the proxy"
+ },
+ "town_centres_added": {
+  "source": "OpenStreetMap Nominatim search API (place points: town or city), rounded to 0.01; queried 12 Nov 2026",
+  "Secunda": [
+   -26.52,
+   29.2
+  ],
+  "Standerton": [
+   -26.94,
+   29.24
+  ],
+  "Volksrust": [
+   -27.36,
+   29.88
+  ],
+  "Ermelo": [
+   -26.52,
+   29.99
+  ],
+  "Bethal": [
+   -26.46,
+   29.47
+  ],
+  "eMkhondo": [
+   -27.01,
+   30.81
+  ],
+  "Wakkerstroom": [
+   -27.35,
+   30.15
+  ],
+  "note": "eMkhondo is filed by Nominatim as Piet Retief. All seven are 130 km or more from home, so their live rows now fall outside every radius instead of the no-distance line."
+ },
+ "not_added": [
+  "The Heroes Marathon (Sat 28 Nov 2026, Isak Steyl Stadium, Vanderbijlpark; https://secure.onreg.com/onreg2/front/step1.php?id=7969): ~73 km, outside the 60 km option",
+  "The Midvaal 2027 Fast One Cycle Challenge (Sun 31 Jan 2027, Henley Model Airfield, Meyerton; https://secure.onreg.com/onreg2/front/step1.php?id=8149): cycling, ~56 km to the Henley on Klip suburb point, the airfield itself is not on Nominatim; left out rather than place it by a suburb at the edge of the radius",
+  "Jeppe Marathon (RunningCalendar, Sun 19 Sep 2027, plain row): aggregator only, no organiser page opened; the live layer shows it in the app",
+  "RunningCalendar-only rows (World Aids Day Race, Wobblers & Wigglers, Berg en Dal Night Race, Varsity Kudus, Pirates Half, Urithi Legacy, Edenvale Marathon, Springs Striders Marathon and the Date TBC rows from March 2027 on): no organiser page opened; the live layer shows them in the app on open"
+ ],
+ "could_not_verify": [
+  "Why the South Africa Day fun run and Cotlands moved: the entry pages give the new dates and no reason.",
+  "The Soweto Marathon page is a one-line notice with no author or date; it is the organiser's domain and two other sources agree, but nothing explains it.",
+  "Boxer Super Run: only the RunningCalendar page (organiser-verified in August) was read, not the Webtickets entry page.",
+  "Ride Joburg, Warrior, TinMan, Joburg Ultra, NPC and Wally Hayward came back as cached copies (dates given per event), not live fetches.",
+  "The eleven expected 2027 rows were checked against the two lists only."
+ ],
+ "counts": {
+  "checked": 37,
+  "opened_at_a_source": 26,
+  "changed": 7,
+  "added": 1,
+  "removed": 1,
+  "unchanged": 29,
+  "town_centres_added": 7
+ },
+ "events": [
+  {
+   "event": "Randburg Harriers Valentine's 10K (goal race)",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=8148",
+    "https://admin.onreg.com/onreg2/templates/users/17/Randburg%20Valentines10K_A5Flyer.pdf (the flyer linked from the entry page; both pages read)",
+    "https://runningcalendar.co.za/events/randburg-harriers-valentine-race",
+    "https://randburgharriers.co.za/",
+    "https://randburgharriers.co.za/upcoming-races/",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg (page 1, Parallel Search web_fetch, acquired 12 Nov 2026)"
+   ],
+   "page_said": "Organiser's entry page on Peak Timing (title 'Randburg Harriers Valentines 10km and 5km Race 2027', contact racedirector@randburgharriers.co.za): Date 12/02/2027, Randburg Sports Complex, 'ENTRIES ARE OFFICIALLY OPEN', 'Friday, 12th February 2027, at 19:00', 10 km and 5 km fun run, venue cnr Republic Rd and Silver Pine Ave. Flyer (Randburg Harriers, CGA): 12 February 2027, 7PM; entries open 19 Oct 2026, close 10 Feb 2027; 10 km R220, grandmaster R160, temporary licence R80, 5 km R110; pack pick-up 10 and 11 Feb 10:00-18:00 and race day; cut-off 21:00; reflective material. RunningCalendar event page (last updated 10 Nov 2026): Fri 12 Feb 2027 19:00, entries open, still 'Awaiting final confirmation', plain (unverified) row. randburgharriers.co.za: home page has no race info; Upcoming Events shows only last year's flyer image (13 February 2026).",
+   "change": "status expected -> confirmed (organiser's entry page and flyer); date text loses '(expected)'; note rewritten with fee, close date and collection; roadmap week-14 tag loses '(expected)'"
+  },
+  {
+   "event": "African Bank Soweto Marathon",
+   "sources": [
+    "https://sowetomarathon.com/ (curl and Firecrawl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/events/soweto-marathon",
+    "https://runningmann.co.za/2026/10/18/november-2026-marathons/",
+    "https://runningcalendar.co.za/races/city/johannesburg (page 1, Parallel Search web_fetch, acquired 12 Nov 2026)"
+   ],
+   "page_said": "Organiser's site: the whole page is one line, 'Soweto Marathon - no event in 2026' (559 bytes, both sowetomarathon.com and www). RunningCalendar (updated 10 Nov 2026): 'Provisional date - not yet confirmed', 'Entries not open yet', date 'estimated from a previous year's event'. The Running Mann's November guide (18 Oct 2026): 'African Bank Soweto Marathon (29-Nov): Incredibly Doubtful' and 'sadly not likely to happen again any time soon'.",
+   "change": "removed from RACES_12M (was confirmed, Sun 29 Nov 2026); added to the new RACES_OFF list so a live RunningCalendar row cannot re-add it, and the Run tab names it under 'Not happening' until 29 Nov"
+  },
+  {
+   "event": "South Africa Day 8 km Fun Run",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=8017",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing entry page, now titled 'South Africa Day 8km Fun Run 2027': Date 02/10/2027, Sophiatown Extreme Park, 8 km non-competitive, start 07:30. No 14 Nov 2026 date is left on the page or the list (it was there on 7 Nov).",
+   "change": "moved Sat 14 Nov 2026 -> Sat 2 Oct 2027 (the page does not say why)"
+  },
+  {
+   "event": "Cotlands Run to Play",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=7920",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing entry page, now titled '... 2027': Date 27/02/2027, 'Saturday, 27 February 2027', Old Parks Sports Club, 1 Garden Rd, Bordeaux; 2 km R100, 5 km R180, 8 km R200; 5 and 8 km 07:30, 2 km 08:00. Same entry id that gave 15/11/2026 on 7 Nov; the list JSON-LD still carries endDate 2026-11-15.",
+   "change": "moved Sun 15 Nov 2026 -> Sat 27 Feb 2027; distances 10/5/2 -> 8/5/2 km; fee added"
+  },
+  {
+   "event": "Johannesburg City Marathon (ex-Jackie Gibson)",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=8096",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg?page=2 and ?page=3 (Firecrawl scrape, maxAge 0, 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing entry page (new since 7 Nov): Date 14/03/2027, Klipriviersberg Recreation Centre, Kibler Park; Johannesburg Harriers Athletics Club; 42.2/21.1/10 km; 06:00 and 07:00; 10 km R190. RunningCalendar: Sun 14 Mar, plain row.",
+   "change": "status expected -> confirmed; venue named; distances 42.2/21.1/10; coordinates now the Nominatim Kibler Park suburb point (-26.312, 28.009), labelled as such (~30 km)"
+  },
+  {
+   "event": "Joburg Ultra Triathlon",
+   "sources": [
+    "https://ultratri.co.za/joburg-race-information/ (Parallel Search web_fetch; cached copy acquired 15 Oct 2026)"
+   ],
+   "page_said": "Organiser: race Sunday 13 Dec 2026, Cradle Moon Lakeside Game Lodge, GPS -25.962274, 27.859445; all entries close 06 Nov 2026; fees R750 to R3,100.",
+   "change": "date and venue unchanged; the 'free entry' wording removed (the organiser charges entry fees); note says entries closed 6 Nov"
+  },
+  {
+   "event": "Biogen Half-Marathon",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=8110",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg (page 1, Parallel Search web_fetch, acquired 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing: 10/01/2027, Virgin Active Bedfordview; '21km and 5km entries available for voucher holders. Normal entries are sold out.' RunningCalendar: Sun 10 Jan, Verified.",
+   "change": "date unchanged; note now says normal entries are sold out"
+  },
+  {
+   "event": "Diepkloof Half Marathon",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=7970",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg (page 1, Parallel Search web_fetch, acquired 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing: 15/11/2026, UJ Soweto Campus; 'Online entries are now closed.' Number collection 12-14 Nov. RunningCalendar: Sun 15 Nov, Verified.",
+   "change": "date unchanged; note now says online entries have closed"
+  },
+  {
+   "event": "Legends Township Marathon",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=8168",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg?page=2 and ?page=3 (Firecrawl scrape, maxAge 0, 12 Nov 2026)",
+    "https://nominatim.openstreetmap.org (Buckingham Avenue, Eldoradopark: -26.29123, 27.900197)"
+   ],
+   "page_said": "Peak Timing entry page: Date 28/02/2027, Eldorado Park Soccer Fields, corner Jan Beam Avenue and Buckingham Avenue, Extension 6; 30th edition; CGA Marathon Championships 2027; 42.2/21.1/10/5 km; 05:30, 05:45, 06:10. RunningCalendar: 'Township Marathon', Sun 28 Feb, Soweto, Verified (it read Mon 22 Feb, unverified, on 7 Nov).",
+   "change": "added, confirmed, Sun 28 Feb 2027; distance ~28 km measured to Buckingham Avenue (Nominatim has neither the fields nor the corner), stated in the note"
+  },
+  {
+   "event": "Glucose Revolution Family Fun Walk/Run",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=8101"
+   ],
+   "page_said": "Peak Timing: 14/11/2026, Johannesburg Zoo, 8 and 5 km at 07:00; online entries close Fri 13 Nov; collection 13 Nov 11:00-18:00 and race morning.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Boxer Super Run — Johannesburg",
+   "sources": [
+    "https://runningcalendar.co.za/events/boxer-super-run-joburg",
+    "https://runningcalendar.co.za/races/city/johannesburg (page 1, Parallel Search web_fetch, acquired 12 Nov 2026)"
+   ],
+   "page_said": "RunningCalendar event page (Verified 7 Aug 2026, updated 10 Nov): Sun 15 Nov 2026, 07:00, Marks Park Sports Club; 5 km and 1 km; R100; organiser Stillwater Sports; entries on Webtickets. The Webtickets page itself was not opened.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Cuba Solidarity Walk",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=7846",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing: 21/11/2026, Sandown High School, 5 km.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Ride Joburg (the 947)",
+   "sources": [
+    "https://www.ridejoburg.co.za/road.html (cached copy acquired 14 Oct 2026)"
+   ],
+   "page_said": "Organiser: road race Sunday 22 November 2026, finish at Kyalami Grand Prix Circuit; unseeded road entries closed 1 November 2026.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Virgin Active HYROX Johannesburg",
+   "sources": [
+    "https://hyroxsa.com/event/virgin-active-hyrox-johannesburg/ (acquired 12 Nov 2026)"
+   ],
+   "page_said": "Organiser: 26 Nov 2026 - 29 Nov 2026, Johannesburg Expo Centre, Nasrec; race schedule printed for Thu 26 to Sun 29 Nov.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Warrior #3 — Cradle",
+   "sources": [
+    "https://warrior.co.za/ (cached copy acquired 7 Nov 2026)"
+   ],
+   "page_said": "Organiser: #3 Cradle, Saturday 28 November 2026, Syringa Park Cradle, Enter Now.",
+   "change": "unchanged"
+  },
+  {
+   "event": "TinMan Joburg #5 Triathlon",
+   "sources": [
+    "https://www.entryninja.com/events/82954-tinman-jhb-5 (cached copy acquired 6 Sep 2026)",
+    "https://tinmantri.co.za/joburg-1"
+   ],
+   "page_said": "Organiser's entry page: Sun 29 Nov 2026, Olifantsfontein, Prime View; 2026 race dates list '5. 29th November'. tinman.co.za is a parked domain; the series site is tinmantri.co.za.",
+   "change": "unchanged"
+  },
+  {
+   "event": "RAC 32km Tough One",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=8030",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg (page 1, Parallel Search web_fetch, acquired 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing: 29/11/2026, Randburg Sports Complex (new venue), 32 km 06:00, 5 km 06:30. RunningCalendar: Sun 29 Nov, Verified.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Jeppe Ten10 Challenge",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=8086",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing: 03/12/2026 - 12/12/2026, Jeppe Quondam; 10 km a day for 10 days.",
+   "change": "unchanged"
+  },
+  {
+   "event": "NPC / IFBB Pro African Championships (bodybuilding)",
+   "sources": [
+    "https://champagneproductionsafrica.com/2026-npc-worldwide-african-pro-qualifier/ (cached copy acquired 31 Jul 2026)"
+   ],
+   "page_said": "Organiser: 5 & 6 December 2026, Silverstar Casino; men Sat 5 Dec 18:00, women Sun 6 Dec 18:00; check-in Fri 4 Dec.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Katlehong AC Road Race",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=7921",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg (page 1, Parallel Search web_fetch, acquired 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing: 06/12/2026, Huntersfield Stadium, Katlehong; 21/10/5 km; 10 km R200. RunningCalendar: Sun 06 Dec, Verified.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Mandela Remembrance Walk & Run",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=8146",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing: 06/12/2026, Union Buildings, Tshwane; 21/10 km run, 5 km walk; 10 km R170.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Sandton Half Marathon",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=7618",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg (page 1, Parallel Search web_fetch, acquired 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing: 13/12/2026, Sandown High School; 21 and 10 km. RunningCalendar: Sun 13 Dec, plain row.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Lesedi Reconciliation Day Half-Marathon",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=7844",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg (page 1, Parallel Search web_fetch, acquired 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing: 16/12/2026, Vosloorus Stadium; 21.1/10/5 km; 10 km R210; entries close 12 Dec. RunningCalendar: Wed 16 Dec, Verified.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Johnson Crane Hire Marathon",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=8089",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg (page 1, Parallel Search web_fetch, acquired 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing: 24/01/2027, Willowmoore Park Main Stadium, Benoni; 44th edition. RunningCalendar: Sun 24 Jan, Verified.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Joburg North City Marathon",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=7790",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg (page 1, Parallel Search web_fetch, acquired 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing: 07/02/2027, Marks Park Sports Ground, Emmarentia; 42/21 km 06:00, 10/5 km 06:15. RunningCalendar: Sun 07 Feb, Verified.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Westgate Race (Westgate Family Run)",
+   "sources": [
+    "https://secure.onreg.com/onreg2/front/step1.php?id=8142",
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg?page=2 and ?page=3 (Firecrawl scrape, maxAge 0, 12 Nov 2026)"
+   ],
+   "page_said": "Peak Timing: 14/02/2027, Westgate Shopping Centre, Entrance 2, Ontdekkers Road; 21/10/5 km; 10 km R170. RunningCalendar: Westgate 10km, Sun 14 Feb, now Verified.",
+   "change": "unchanged"
+  },
+  {
+   "event": "Miway Wally Hayward Marathon",
+   "sources": [
+    "https://racepass.com/za/races/wally-hayward-marathon (cached copy acquired 22 Sep 2026)",
+    "https://runningcalendar.co.za/events/wally-hayward-marathon (search excerpt only)"
+   ],
+   "page_said": "Racepass, the organiser's entry platform (Alpha Centurion Athletics Club): Saturday 1 May 2027, Centurion; entries not open yet. RunningCalendar words it as 'expected to take place on or around' 1 May 2027.",
+   "change": "unchanged (confirmed on the entry platform; the organiser has no 2027 page of its own that I could open)"
+  },
+  {
+   "event": "Expected 2027 rows without a published date (Gauteng Bench Press & Powerlifting Championships, SA Classic Powerlifting, Om Die Dam Ultra, HYROX autumn edition, Arnold Classic Africa, RAC 10 km Road Race, Discovery 702 Walk the Talk, Old Eds, The Wedge, Wanderers, Clearwater Mall)",
+   "sources": [
+    "https://www.peaktiming.co.za/ (event list JSON-LD, curl, 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg (page 1, Parallel Search web_fetch, acquired 12 Nov 2026)",
+    "https://runningcalendar.co.za/races/city/johannesburg?page=2 and ?page=3 (Firecrawl scrape, maxAge 0, 12 Nov 2026)"
+   ],
+   "page_said": "None of the eleven is on the Peak Timing list or on RunningCalendar Johannesburg pages 1-3 with a 2027 date (RunningCalendar has an unrelated \"RAC Road race\", Sun 23 May, Date TBC, half and 10 km). Organiser pages were not opened one by one.",
+   "change": "unchanged: all eleven stay expected with last year's slot (counted as checked against the two lists only, not verified at an organiser)"
+  }
+ ],
+ "previous_round_2026_11_07": {
+  "counts": {
+   "checked": 31,
+   "changed": 5,
+   "added": 8,
+   "removed": 0
+  },
+  "town_centres_added": {
+   "source": "Nominatim place points (town/suburb), rounded to 0.01",
+   "Katlehong": [
+    -26.34,
+    28.15
+   ],
+   "Vosloorus": [
+    -26.36,
+    28.21
+   ],
+   "Springs": [
+    -26.26,
+    28.44
+   ],
+   "Alexandra": [
+    -26.1,
+    28.1
+   ],
+   "Randfontein": [
+    -26.17,
+    27.69
+   ],
+   "Heidelberg": [
+    -26.5,
+    28.36
+   ],
+   "Brakpan": [
+    -26.24,
+    28.37
+   ]
+  },
+  "not_added": [
+   "Cotlands Run to Play 2027 (27 Feb 2027): only the Peak Timing listing; its entry page still shows the 2026 edition",
+   "The Heroes Marathon (Vanderbijlpark, ~73 km, outside 60 km)",
+   "Mpumalanga races on the live list (Secunda, Standerton, Ermelo...): outside the radius, no town centre added",
+   "RunningCalendar-only rows (World Aids Day Race, Wobblers & Wigglers, Varsity Kudus, Pirates Half, Township Marathon, Edenvale Marathon...): no organiser page opened; the live layer shows them in the app on open"
+  ],
+  "events": [
+   {
+    "event": "Johnson Crane Hire Marathon",
+    "sources": [
+     "https://secure.onreg.com/onreg2/front/step1.php?id=8089",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Peak Timing: Date 24/01/2027, Willowmoore Park Main Stadium, Benoni, 44th edition, Benoni Harriers, 42.2/21.1/10/5 km. RunningCalendar: Sun 24 Jan 2027, Benoni.",
+    "change": "moved 28 Feb -> Sun 24 Jan 2027; venue coordinates from Nominatim (Willowmoore Park); distances filled; status confirmed"
+   },
+   {
+    "event": "Biogen Half-Marathon",
+    "sources": [
+     "https://secure.onreg.com/onreg2/front/step1.php?id=8110",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Peak Timing: 10/01/2027, Virgin Active Bedfordview, 21.1 km 06:00 from Riley Road, SmectaGo 5 km 06:30, R270 standard, entries close 21 Dec 2026. RunningCalendar: Sun 10 Jan 2027.",
+    "change": "newly dated Sun 10 Jan 2027; distances 21.1/5 km (10 km dropped); expected -> confirmed"
+   },
+   {
+    "event": "Westgate Race -> Westgate Family Run",
+    "sources": [
+     "https://secure.onreg.com/onreg2/front/step1.php?id=8142",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Peak Timing: 14/02/2027, Westgate Shopping Centre Entrance 2, Ontdekkers Road; Roodepoort AC; 21/10/5 km; 06:00; R170 10 km. RunningCalendar: Sun 14 Feb 2027 (Westgate 10km).",
+    "change": "newly dated Sun 14 Feb 2027; renamed to organiser name; venue coordinates from Nominatim; expected -> confirmed"
+   },
+   {
+    "event": "Johannesburg City Marathon (ex-Jackie Gibson)",
+    "sources": [
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "RunningCalendar: Sun 14 Mar 2027, Johannesburg, plain (unverified) row.",
+    "change": "date 14 Mar 2027 added, status stays expected"
+   },
+   {
+    "event": "Randburg Harriers Valentine's 10K (goal race)",
+    "sources": [
+     "https://runningcalendar.co.za/events/randburg-harriers-valentine-race",
+     "https://randburgharriers.co.za/",
+     "https://randburgharriers.co.za/events",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "RunningCalendar event page (updated 6 Nov 2026): Fri 12 Feb 2027 19:00, Randburg Sports Complex, 10/5 km, entries open on PeakTiming, 'Awaiting final confirmation'. Organiser site home page shows no race info; /events returns 404. Not in the Peak Timing list read by the calendar tool.",
+    "change": "status stays expected; distances 10/5 km; note re-dated with the organiser-site finding"
+   },
+   {
+    "event": "Chillie Runners 5 km & 10 km",
+    "sources": [
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "RunningCalendar: Sun 08 Nov 2026, Midrand, 10/5 km.",
+    "change": "unchanged"
+   },
+   {
+    "event": "Boxer Super Run — Johannesburg",
+    "sources": [
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "RunningCalendar: Sun 15 Nov 2026, Johannesburg, 5/1 km.",
+    "change": "unchanged"
+   },
+   {
+    "event": "African Bank Soweto Marathon",
+    "sources": [
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "RunningCalendar: Sun 29 Nov 2026, Soweto, Date TBC flag.",
+    "change": "unchanged"
+   },
+   {
+    "event": "Sandton Half Marathon",
+    "sources": [
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "RunningCalendar: Sun 13 Dec 2026, Sandton, 21.1/10 km.",
+    "change": "unchanged"
+   },
+   {
+    "event": "Joburg North City Marathon",
+    "sources": [
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "RunningCalendar: Sun 07 Feb 2027, Verified.",
+    "change": "unchanged"
+   },
+   {
+    "event": "Cotlands Run to Play",
+    "sources": [
+     "https://secure.onreg.com/onreg2/front/step1.php?id=7920"
+    ],
+    "page_said": "Peak Timing: 15/11/2026, Old Parks Sports Club, Bordeaux; 10/5/2 km; R100-R200.",
+    "change": "unchanged"
+   },
+   {
+    "event": "South Africa Day 8 km Fun Run",
+    "sources": [
+     "tools/calendar-refresh.js (Peak Timing listing)",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Not on the RunningCalendar Johannesburg pages 1-3 and not flagged by the calendar tool; organiser pages not re-opened this session.",
+    "change": "unchanged (not re-verified this session)"
+   },
+   {
+    "event": "Cuba Solidarity Walk",
+    "sources": [
+     "tools/calendar-refresh.js (Peak Timing listing)",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Not on the RunningCalendar Johannesburg pages 1-3 and not flagged by the calendar tool; organiser pages not re-opened this session.",
+    "change": "unchanged (not re-verified this session)"
+   },
+   {
+    "event": "Ride Joburg (the 947)",
+    "sources": [
+     "tools/calendar-refresh.js (Peak Timing listing)",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Not on the RunningCalendar Johannesburg pages 1-3 and not flagged by the calendar tool; organiser pages not re-opened this session.",
+    "change": "unchanged (not re-verified this session)"
+   },
+   {
+    "event": "Virgin Active HYROX Johannesburg",
+    "sources": [
+     "tools/calendar-refresh.js (Peak Timing listing)",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Not on the RunningCalendar Johannesburg pages 1-3 and not flagged by the calendar tool; organiser pages not re-opened this session.",
+    "change": "unchanged (not re-verified this session)"
+   },
+   {
+    "event": "Warrior #3 — Cradle",
+    "sources": [
+     "tools/calendar-refresh.js (Peak Timing listing)",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Not on the RunningCalendar Johannesburg pages 1-3 and not flagged by the calendar tool; organiser pages not re-opened this session.",
+    "change": "unchanged (not re-verified this session)"
+   },
+   {
+    "event": "TinMan Joburg #5 Triathlon",
+    "sources": [
+     "tools/calendar-refresh.js (Peak Timing listing)",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Not on the RunningCalendar Johannesburg pages 1-3 and not flagged by the calendar tool; organiser pages not re-opened this session.",
+    "change": "unchanged (not re-verified this session)"
+   },
+   {
+    "event": "NPC / IFBB Pro African Championships (bodybuilding)",
+    "sources": [
+     "tools/calendar-refresh.js (Peak Timing listing)",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Not on the RunningCalendar Johannesburg pages 1-3 and not flagged by the calendar tool; organiser pages not re-opened this session.",
+    "change": "unchanged (not re-verified this session)"
+   },
+   {
+    "event": "Joburg Ultra Triathlon",
+    "sources": [
+     "tools/calendar-refresh.js (Peak Timing listing)",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Not on the RunningCalendar Johannesburg pages 1-3 and not flagged by the calendar tool; organiser pages not re-opened this session.",
+    "change": "unchanged (not re-verified this session)"
+   },
+   {
+    "event": "Gauteng Bench Press & Powerlifting Championships",
+    "sources": [
+     "tools/calendar-refresh.js (Peak Timing listing)",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Not on the RunningCalendar Johannesburg pages 1-3 and not flagged by the calendar tool; organiser pages not re-opened this session.",
+    "change": "unchanged (not re-verified this session)"
+   },
+   {
+    "event": "Westgate/others expected 2027 (Om Die Dam, SA Classic Powerlifting, HYROX autumn, Arnold Classic Africa, RAC 10 km, Walk the Talk, Old Eds, The Wedge, Wanderers, Clearwater Mall)",
+    "sources": [
+     "tools/calendar-refresh.js (Peak Timing listing)",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Not on the RunningCalendar Johannesburg pages 1-3 and not flagged by the calendar tool; organiser pages not re-opened this session.",
+    "change": "unchanged (not re-verified this session)"
+   },
+   {
+    "event": "Miway Wally Hayward Marathon",
+    "sources": [
+     "tools/calendar-refresh.js (Peak Timing listing)",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Not on the RunningCalendar Johannesburg pages 1-3 and not flagged by the calendar tool; organiser pages not re-opened this session.",
+    "change": "unchanged (not re-verified this session)"
+   },
+   {
+    "event": "parkrun (weekly)",
+    "sources": [
+     "tools/calendar-refresh.js (Peak Timing listing)",
+     "https://runningcalendar.co.za/races/city/johannesburg (pages 1-3, via Parallel Search web_fetch; curl gets a Cloudflare 403)"
+    ],
+    "page_said": "Not on the RunningCalendar Johannesburg pages 1-3 and not flagged by the calendar tool; organiser pages not re-opened this session.",
+    "change": "unchanged (not re-verified this session)"
+   },
+   {
+    "event": "Alberton Road Race",
+    "sources": [
+     "https://secure.onreg.com/onreg2/front/step1.php?id=7914",
+     "tools/calendar-refresh.js --geocode"
+    ],
+    "page_said": "08/11/2026, Alberton Rugby Stadium, Elandsfontein Drive; 21/10/5 km; sold out",
+    "change": "added; distance to Alberton town centre (stadium not found on Nominatim)"
+   },
+   {
+    "event": "Glucose Revolution Family Fun Walk/Run",
+    "sources": [
+     "https://secure.onreg.com/onreg2/front/step1.php?id=8101",
+     "tools/calendar-refresh.js --geocode"
+    ],
+    "page_said": "14/11/2026, Johannesburg Zoo, GPS -26.166375, 28.038186; 8/5 km 07:00; from R150",
+    "change": "added; coordinates = page GPS"
+   },
+   {
+    "event": "Diepkloof Half Marathon",
+    "sources": [
+     "https://secure.onreg.com/onreg2/front/step1.php?id=7970",
+     "tools/calendar-refresh.js --geocode"
+    ],
+    "page_said": "15/11/2026, UJ Soweto Campus; 21.1/10/5 km",
+    "change": "added; Nominatim -26.261,27.922"
+   },
+   {
+    "event": "RAC 32km Tough One",
+    "sources": [
+     "https://secure.onreg.com/onreg2/front/step1.php?id=8030",
+     "tools/calendar-refresh.js --geocode"
+    ],
+    "page_said": "29/11/2026, Randburg Sports Complex (new venue); 32 km 06:00, 5 km 06:30",
+    "change": "added; Nominatim -26.099,27.985"
+   },
+   {
+    "event": "Jeppe Ten10 Challenge",
+    "sources": [
+     "https://secure.onreg.com/onreg2/front/step1.php?id=8086",
+     "tools/calendar-refresh.js --geocode"
+    ],
+    "page_said": "03/12/2026 - 12/12/2026, Jeppe Quondam; 10 km a day for 10 days",
+    "change": "added; Nominatim -26.166,28.139"
+   },
+   {
+    "event": "Katlehong AC Road Race",
+    "sources": [
+     "https://secure.onreg.com/onreg2/front/step1.php?id=7921",
+     "tools/calendar-refresh.js --geocode"
+    ],
+    "page_said": "06/12/2026, Huntersfield Stadium, Katlehong; 21/10/5 km; R200 10 km",
+    "change": "added; Nominatim -26.304,28.158"
+   },
+   {
+    "event": "Mandela Remembrance Walk & Run",
+    "sources": [
+     "https://secure.onreg.com/onreg2/front/step1.php?id=8146",
+     "tools/calendar-refresh.js --geocode"
+    ],
+    "page_said": "06/12/2026, Union Buildings, Tshwane; 21/10 km run 06:30, 5 km walk 08:30; R170 10 km",
+    "change": "added; Nominatim -25.741,28.213 (~43 km)"
+   },
+   {
+    "event": "Lesedi Reconciliation Day Half-Marathon",
+    "sources": [
+     "https://secure.onreg.com/onreg2/front/step1.php?id=7844",
+     "tools/calendar-refresh.js --geocode"
+    ],
+    "page_said": "16/12/2026, Vosloorus Stadium; 21.1/10/5 km 06:15; R210 10 km",
+    "change": "added; Nominatim -26.354,28.201 (~42 km)"
+   }
+  ]
+ }
+}

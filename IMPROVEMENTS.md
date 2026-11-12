@@ -203,6 +203,7 @@ Also shipped with round 2: a 624-render sweep (dates × seeds × modes × routes
 
 - **K19 Second heavy exposure for bench and squat.** Both are heavy once a week (Push A, Legs A). A second top-set day adds exercises and volume, so it is Kwezi's call. Queued 29 Oct 2026.
 - **K20 Strength decisions to confirm (29 Oct 2026).** (1) A missing RPE holds the top-set load. (2) The test gate: fewer than 4 lift days the week before, sleep under 7 h, or a review flag. (3) Tests only in weeks 12/24/36/48. (4) Roadmap re-test tags moved to those weeks. (5) Home mode still shows RIR 0. (6) The two whey picks are costed on different bases (per shake versus per gram of protein); cosmetic.
+- **K21 Three calls made on 12 Nov 2026 when Day 1 moved to Sat 14 Nov and the race stayed on Fri 12 Feb 2027; each is yours to reverse.** (1) The Base week that went is the old week 5 (8 x 400 m at 5 km pace); the alternative was to drop a Threshold week. (2) 5 km trials on weeks 4, 8 and 11 (Tue 8 Dec, 5 Jan, 26 Jan), by swapping the Tuesday sessions of weeks 7/8 and 10/11; the last trial is 17 days before the race. (3) Week 12 is both the taper and a lifting deload: the taper's runs go as written (not halved), the lifts deload, and the week-12 strength test (from Sat 30 Jan) now sits 13 days before the race. Say so if you would rather skip that test or move it.
 
 ## L. Not possible from a web app (and the honest alternative)
 

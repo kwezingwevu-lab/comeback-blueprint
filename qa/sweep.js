@@ -25,21 +25,21 @@ const long2 = (d) => long(d) + profileSync;
 const planpath = '(function(){var W=[];for(var k=0;k<=23;k++){var d=new Date(Date.UTC(2026,9,24+7*k));W.push({date:d.toISOString().slice(0,10),v:Math.round((88+0.4*k)*10)/10});}localStorage.setItem("cb2_weight",JSON.stringify(W));localStorage.setItem("cb2_profile",JSON.stringify({weight:W[W.length-1].v,height:177,age:38,bf:18,goal:102.3,goalBf:24,act:1.55,goal10k:"55:00",phase:"hyper"}));})();';
 const set = (k, v) => `localStorage.setItem('${k}',${JSON.stringify(JSON.stringify(v))});`;
 
-const DATES = ['2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-17', '2027-02-11', '2027-02-12', '2026-11-22', '2026-12-12', '2027-01-08', '2027-01-23', '2027-02-27', '2027-05-08', '2027-05-14', '2027-05-15', '2027-05-29', '2027-06-26', '2027-10-04', '2028-03-15', '2028-11-04', '2028-11-15'];
-// Day 0 (23 Oct), Day 1 (24 Oct), two deloads (28 Nov, 9 Jan), the specialisation block (13 Feb), the last Aggressive week (30 Apr), Mini-Cut I (1 May to 11 Jun), and the far end (after week 104)
+const DATES = ['2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-17', '2026-11-24', '2027-02-11', '2027-02-12', '2026-11-29', '2026-12-19', '2027-01-15', '2027-01-30', '2027-03-06', '2027-05-15', '2027-05-21', '2027-05-22', '2027-06-05', '2027-07-03', '2027-10-11', '2028-03-22', '2028-11-11', '2028-11-22'];
+// Three pre-start days (11-13 Nov), Day 1 (Sat 14 Nov), the 1 km check (Tue 17 Nov), a block Tuesday, race week (11-12 Feb, real dates), two deloads (19 Dec, 30 Jan), the last Aggressive week and the step-down (15-22 May), and the far end (after week 104). Plan dates moved +7 days on 12 Nov 2026.
 const VIEWS = ['home', 'lift', 'run', 'roadmap', 'fuel', 'numbers', 'track', 'guide'];
 const combos = [];
 for (const d of DATES) {
   combos.push({ d, n: 'empty', seed: '' });
   combos.push({ d, n: 'demo', seed: demo });
-  if (d > '2027-01-26') combos.push({ d, n: 'long', seed: long(d) });
+  if (d > '2027-02-02') combos.push({ d, n: 'long', seed: long(d) });
 }
-for (const d of ['2026-11-22', '2027-05-15', '2027-06-26']) {
+for (const d of ['2026-11-29', '2027-05-22', '2027-07-03']) {
   for (const m of ['cut', 'lean', 'balanced', 'max']) combos.push({ d, n: 'mode-' + m, seed: demo + set('cb2_bulk', m) });
 }
-combos.push({ d: '2026-11-22', n: 'home-gym', seed: demo + set('cb2_loc', 'home') });
-for (const d of ['2027-02-27', '2027-05-08', '2027-05-15', '2027-05-29', '2027-10-04', '2028-11-15']) combos.push({ d, n: 'long2', seed: long2(d) });
-for (const d of ['2027-02-27', '2027-05-08', '2027-05-15']) combos.push({ d, n: 'planpath', seed: planpath });
+combos.push({ d: '2026-11-29', n: 'home-gym', seed: demo + set('cb2_loc', 'home') });
+for (const d of ['2027-03-06', '2027-05-15', '2027-05-22', '2027-06-05', '2027-10-11', '2028-11-22']) combos.push({ d, n: 'long2', seed: long2(d) });
+for (const d of ['2027-03-06', '2027-05-15', '2027-05-22']) combos.push({ d, n: 'planpath', seed: planpath });
 
 const JUNK = /\bNaN\b|\bundefined\b|Infinity|\$\{|\[object|\+-|−−|\bnull\b/;
 // Milestone guard (24 Oct 2026): the soft milestone, the check weekend, peak week and the March routes are retired; any of them on any view fails the sweep
