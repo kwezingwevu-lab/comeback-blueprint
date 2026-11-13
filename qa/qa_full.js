@@ -1451,7 +1451,7 @@ const cpage=async(seed,cloud,mode)=>{const c=await b.createBrowserContext();cons
    T('AD-S3 a11y-06: a redraw after a key press puts focus back on the second exercise\'s Fill button (no id, no data attributes: found by its inline handler), not the first one',got===true&&!!r&&r.same===true,JSON.stringify({got,r}));}
   for(const [sel,view,lab] of [['#locSeg button[data-loc="home"]','lift','Lift Home/Gym toggle'],['#focusSeg button[data-fx="off"]','lift','Legs & Back focus toggle'],['#wakeSeg button[data-wk="off"]','lift','screen-awake toggle']]){
     const r=await press(sel,view);
-    T('AD-S3 a11y-06: the '+lab+' keeps the page in place (no jump to the top) and focus returns to the same control',!!r.got&&!!r.r0&&!!r.r1&&r.r1.same&&Math.abs(r.r1.y-r.r0.y)<=2&&Math.abs(r.r1.top-r.r0.top)<=2&&r.r0.y>50,JSON.stringify(r));}
+    T('AD-S3 a11y-06: the '+lab+' keeps the page in place (no jump to the top) and focus returns to the same control',!!r.got&&!!r.r0&&!!r.r1&&r.r1.same&&Math.abs(r.r1.top-r.r0.top)<=2&&r.r0.y>50&&r.r1.y>50,JSON.stringify(r));}   // the control stays where it was; text above it may re-wrap, so the scroll offset itself is not pinned (CI run 25)
   for(const [sel,view,lab,pre] of [['#dayPills .pill[data-d="legsB"]','lift','a Lift day pill'],['#liftBody [data-add]','lift','Add set'],['#radiusSeg button[data-r="45"]','run','the Events radius'],['#liftPhaseSeg button[data-ph="build"]','lift','the programme toggle']]){
     const r=await press(sel,view);
     T('AD-S3 a11y-06: after Enter on '+lab+' (which redraws its view) focus is back on the equivalent control',!!r.got&&!!r.r1&&r.r1.same&&r.r1.ae!=='BODY',JSON.stringify(r));}

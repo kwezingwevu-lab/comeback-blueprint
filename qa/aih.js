@@ -12,6 +12,7 @@ const MOCKS=`(function(){var T=window.top;T.__mdb=T.__mdb||{};T.__aicalls=T.__ai
   function mk(kind){return function(input,options){var C=T.__ai||{},o=options||{};
     var rec={kind:kind,input:JSON.parse(JSON.stringify(input)),keys:Object.keys(o).sort(),cache:o.cache===undefined?'(omitted)':JSON.parse(JSON.stringify(o.cache)),modelTier:o.modelTier,tools:(o.tools||[]).map(function(t){return t.name;}),signal:!!(o.signal&&typeof o.signal.aborted==='boolean'),onText:typeof o.onText==='function',at:Date.now(),toolRuns:[]};
     T.__aicalls.push(rec);
+    if(kind==='json'&&C.jsonGone){rec.end='capability_removed';return Promise.reject({code:'capability_removed',message:'mock: this viewer has no json verb'});}
     return new Promise(function(res,rej){var done=false,text='';
       function fail(code,t){if(done)return;done=true;var e={code:code,message:'mock '+code+' <b>never shown</b>'};if(t)e.text=t;rec.end=code;rej(e);}
       if(o.signal){if(o.signal.aborted)return fail('cancelled');o.signal.addEventListener('abort',function(){fail('cancelled',text||undefined);});}
@@ -25,8 +26,8 @@ const MOCKS=`(function(){var T=window.top;T.__mdb=T.__mdb||{};T.__aicalls=T.__ai
         var i=0;(function step(){if(done)return;if(i<chunks.length){setTimeout(function(){if(done)return;var delta=chunks[i];text+=delta;i++;try{if(o.onText)o.onText({text:text,delta:delta});}catch(e){}
             if(C.err&&C.errAfter===i)return fail(C.err,C.err==='refused'?undefined:text);if(C.holdAfter===i)return;step();},d);}
           else setTimeout(function(){if(done)return;done=true;rec.end='ok';if(kind==='json'){try{res(JSON.parse(text));}catch(e){rej({code:'invalid_json',message:'no json',text:text});}}else res({text:text,truncated:!!C.truncated,modelTierApplied:o.modelTier||'default'});},d);})();});});};}
-  var sample=mk('text');sample.json=mk('json');sample.limits=function(){T.__limcalls++;var C=T.__ai||{};return C.limErr?Promise.reject({code:'upstream_error',message:'x'}):Promise.resolve(C.limits||{maxPromptBytes:262144});};
-  if(!T.__noclaude)window.claude={use:function(n){T.__usecalls.push(n);return new Promise(function(res){setTimeout(function(){var C=T.__ai||{};res(n==='db'?db:n==='user'?user:n==='sample'?(C.none?null:sample):null);},40);});}};})();`;
+  var sample=mk('text');sample.json=mk('json');var textOnly=mk('text');sample.limits=function(){T.__limcalls++;var C=T.__ai||{};return C.limErr?Promise.reject({code:'upstream_error',message:'x'}):Promise.resolve(C.limits||{maxPromptBytes:262144});};
+  if(!T.__noclaude)window.claude={use:function(n){T.__usecalls.push(n);return new Promise(function(res){setTimeout(function(){var C=T.__ai||{};if(C.noJsonVerb)textOnly.limits=sample.limits;res(n==='db'?db:n==='user'?user:n==='sample'?(C.none?null:(C.noJsonVerb?textOnly:sample)):null);},40);});}};})();`;
 const ART=()=>fs.readFileSync(path.join(__dirname,'..','dist','artifact.html'),'utf8');
 const FRAME=(iso,seed)=>'<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style><script>('+MOCK.toString()+')("'+iso+'");try{localStorage.clear();}catch(e){}'+(seed||'')+';'+MOCKS+'</script></head><body>'+ART()+'</body></html>';
 const W=ms=>new Promise(r=>setTimeout(r,ms));

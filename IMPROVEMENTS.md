@@ -64,9 +64,9 @@ Status on 26 Sep 2026 (plan week 3): 55 items shipped across two sessions, then 
 | E2 | Ask the coach inside the artifact: a sheet with streamed answers, Stop, eight turns of follow-up, grounded on a JSON of his own numbers, read-only tools where the viewer allows them (LEDGER 36) | Shipped 12 Nov 2026 · qa/ai.js core A1-A14, D1-D3 |
 | E3 | The Weekly Review explained in three parts; a second tap makes no call | Shipped 12 Nov 2026 · qa/ai.js core B1-B5 |
 | E4 | Session debrief with the engine's own next targets printed under Claude's points | Shipped 12 Nov 2026 · qa/ai.js core C1-C4 |
-| E5 | Log by a typed or dictated sentence, or from a Garmin/Strava/Health screenshot: preview, confirm, the app's own ranges, Undo | Building (part 2) |
-| E6 | Meal estimate from words or a photo; nutrition labels read as printed; a daily protein tally | Building (part 2) |
-| E7 | "Which races fit my 10K build?" picks rendered from the app's own rows | Building (part 2) |
+| E5 | Log by a typed or dictated sentence, or from a Garmin/Strava/Health screenshot: preview, confirm, the app's own ranges, Undo | Shipped 13 Nov 2026 · qa/ai_log.js L1-L8, S1-S5 |
+| E6 | Meal estimate from words or a photo; nutrition labels read as printed; a daily protein tally (`cb2_meals`) | Shipped 13 Nov 2026 · qa/ai_log.js M1-M7, N1 |
+| E7 | "Which races fit my 10K build?" picks rendered from the app's own rows; "How was my last run?" | Shipped 13 Nov 2026 · qa/ai_log.js F1-F2 |
 
 ## F. Data safety
 
@@ -220,7 +220,9 @@ Each is pinned by a section AU check that fails under its own mutation.
 - **K25 In-app evidence check against PubMed.** A real connector call was read on 12 Nov 2026. Its terms need a link beside every article shown; the app's rule is no links in copy. Options: allow DOI links in evidence answers only, or leave it out.
 - **K26 Spoken input and read-aloud inside the page.** The viewer has both, but neither is offered in the iPhone app or Safari today, so on your phone they would be invisible. The keyboard's own dictation already works in every text box.
 - **K27 Not built on purpose.** Judging physique or lifting form from photos (unreliable, and progress photos stay on the device); Claude writing sets, phases or doses (programme changes are yours); Claude pricing a grocery list (prices are verified at the shop, LEDGER 3, 24, 25).
-- **K28 Independent review of the AI layer.** Part 1 was built and tested against a mock capability, and read against the type definitions once more before it shipped; the three-lens adversarial review stopped on a usage limit and is to run with part 2.
+- **K28 Independent review of the AI layer. Done 13 Nov 2026 for part 2 and the shared call site.** Three lenses (runtime contract, data safety, iPhone use) and an audit of the fixes: 35 findings over two rounds and two more in the fixes themselves, all fixed, each with a check (qa/ai_log.js blocks V, V2, X, Y, Z). The first round's verifier agents were lost to a usage limit; I checked those findings against the code; the second round's audit found nine closed and sent four back, which were fixed again. Part 1's own surfaces (the coach sheet, the explain and debrief boxes) were read as far as part 2 touches them; a full pass on them alone is still worth doing.
+- **K29 Back-dated sets from a note or a notebook photo.** Sets now save under today only, because no screen can edit or delete a past session's sets and a misread would feed the next target. Bringing back-dating back needs a way to open a past session on Track (Lifts) and change or remove its sets, with Undo. No programme change; say the word and I build it.
+- **K30 Two devices, one account copy.** The account copy is whole-state, newest wins. If a device's restore fails and you then log on it, its next successful open can write its short log over the fuller copy (this predates the AI layer and applies to a typed weigh-in as much as anything). The fix is a per-row merge on restore; it changes the storage design, so it is queued for its own round with its own review. Until then: if the Data card ever says the account copy could not be reached, do not log on that device; reopen first.
 
 ## L. Not possible from a web app (and the honest alternative)
 

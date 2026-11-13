@@ -1,4 +1,5 @@
-// Smoke 4: the same viewer-like frame in WebKit (Playwright's Safari engine): boot, chip -> stream, Stop, Escape, Weekly Review explained, debrief, not_granted.
+// AI layer on WebKit (Playwright's Safari engine), run inside qa/webkit.js: the viewer-like frame with the mock "sample": boot, chip -> stream, Stop, Escape,
+// Weekly Review explained, debrief, the sentence log, the meal check, not_granted.
 const path=require('path');const fs=require('fs');const http=require('http');const {webkit}=require('playwright');
 const {FRAME,W,DEMO}=require('./aih');const SH='shots';
 module.exports=async function(T){let cur={iso:'2026-11-28',seed:DEMO()};
@@ -28,6 +29,23 @@ module.exports=async function(T){let cur={iso:'2026-11-28',seed:DEMO()};
   await ev(()=>{switchView('lift');});await W(150);await ev(()=>document.querySelector('#aiDebrief [data-ai-act="deb"]').click());await idle();await W(120);
   const db=await ev(()=>({lines:document.querySelectorAll('#aiNext p[data-ex]').length,out:!!document.getElementById('aiOut-deb')}));T('WK debrief with the engine lines',db.out&&db.lines>=6,JSON.stringify(db));
   await ev(()=>{document.getElementById('aiDebrief').scrollIntoView({block:'start'});window.scrollBy(0,-70);});await W(100);if(process.env.AI_SHOTS)await q.screenshot({path:path.join(process.env.AI_SHOTS,'31-webkit-debrief.png')});
+  // part 2 on Safari's engine: the sentence log (preview, Save, Undo) and the meal check (cb2_meals through backup, wipe and restore)
+  await q.evaluate(()=>{window.__ai={delay:60,chunks:[JSON.stringify({sleep_h:7.5,weight_kg:884,sets:[{ex:'ga1',kg:100,reps:5}]})]};});
+  await ev(()=>{switchView('home');});await W(200);
+  const lg0=await ev(()=>{const t=document.getElementById('aiLogQ');if(!t)return {box:false};const o={box:true,px:getComputedStyle(t).fontSize,sleep0:JSON.stringify(DB.sleep)};t.value='Slept seven and a half hours. Weight 884. Squat 100 for 5.';t.dispatchEvent(new Event('input',{bubbles:true}));const b=document.querySelector('[data-ai-act="logread"]');if(b)b.click();return o;});await idle();await W(150);
+  const lg1=await ev(()=>({rows:[...document.querySelectorAll('#aiLogPrev .ai-li')].map(r=>r.innerText.replace(/\s+/g,' ').trim()),save:(document.getElementById('aiLogSave')||{}).textContent,px:(d=>d?getComputedStyle(d).fontSize:'')(document.getElementById('aiLogDate')),sleepNow:JSON.stringify(DB.sleep)}));
+  await ev(()=>{const b=document.getElementById('aiLogSave');if(b)b.click();});await W(250);
+  const lg2=await ev(()=>({ls:localStorage.getItem('cb2_sleep')||'',undo:!!document.querySelector('#toast .undo')}));await ev(()=>{const u=document.querySelector('#toast .undo');if(u)u.click();});await W(250);
+  const lg3=await ev(()=>JSON.stringify(DB.sleep));
+  T('WK sentence log: a 16 px box in the quick log; the preview keeps what is valid (Save 2 items) and strikes the 884 kg weigh-in; Save writes cb2_sleep; Undo restores the log exactly',lg0.box&&lg0.px==='16px'&&lg1.px==='16px'&&lg1.save==='Save 2 items'&&lg1.rows.some(r=>/^Weight 884 kg Not saved/.test(r))&&lg1.sleepNow===lg0.sleep0&&/"date":"2026-11-28","h":7.5/.test(lg2.ls)&&lg2.undo&&lg3===lg0.sleep0,JSON.stringify({lg0,rows:lg1.rows,save:lg1.save,ls:lg2.ls.slice(-60)}).slice(0,600));
+  await q.evaluate(()=>{window.__ai={delay:60,chunks:[JSON.stringify({kind:'meal',name:'Eggs on toast',items:[{name:'3 eggs',kcal:210,protein_g:18},{name:'toast',kcal:160,protein_g:6}],kcal_low:300,kcal_high:450,protein_low:20,protein_high:28})]};});
+  await ev(()=>{switchView('fuel');});await W(200);
+  await ev(()=>{const t=document.getElementById('aiMealQ');if(!t)return;t.value='3 eggs and 2 slices of toast';t.dispatchEvent(new Event('input',{bubbles:true}));const b=document.querySelector('[data-ai-act="mealread"]');if(b)b.click();});await idle();await W(150);
+  const ml0=await ev(()=>({px:(t=>t?getComputedStyle(t).fontSize:'')(document.getElementById('aiMealQ')),res:((document.getElementById('aiMealRes')||{}).innerText||'').replace(/\s+/g,' ').slice(0,80)}));
+  await ev(()=>{const b=document.getElementById('aiMealAdd');if(b)b.click();});await W(250);
+  const ml1=await ev(()=>{const o={ls:localStorage.getItem('cb2_meals')||'',tally:((document.getElementById('mealTally')||{}).innerText||'').replace(/\s+/g,' ').slice(0,40)};const b=backupJSON();DB.meals=[];DB.save();o.wiped=localStorage.getItem('cb2_meals');applyRestoreText(b);o.back=(DB.meals||[]).length;o.kcal=((DB.meals||[])[0]||{}).kcal;return o;});
+  T('WK meal check: a 16 px box; the estimate (370 kcal · 24 g, summed on the page) is added to today, saved under cb2_meals, and comes back after backup → wipe → restore',ml0.px==='16px'&&/About 370 kcal · 24 g protein/.test(ml0.res)&&/"kcal":370/.test(ml1.ls)&&/^Logged today: 24 g protein/.test(ml1.tally)&&ml1.wiped==='[]'&&ml1.back===1&&ml1.kcal===370,JSON.stringify({ml0,ml1}).slice(0,500));
+  await ev(()=>{switchView('lift');});await W(200);
   await q.evaluate(()=>{window.__ai={err:'not_granted',delay:40};});await ev(()=>document.querySelector('#view-lift [data-ai-chip="lift:0"]').click());await idle();await W(200);
   const h=await ev(()=>({ok:aiOK(),n:document.querySelectorAll('[data-ai],[data-ai-chip],[data-ai-open],[data-ai-act],#coachWrap').length,lock:getComputedStyle(document.body).overflow}));T('WK not_granted removes every AI control',!h.ok&&h.n===0&&h.lock!=='hidden',JSON.stringify(h));
   T('WK: no page errors',errs.length===0,errs.join(' | ').slice(0,400));
