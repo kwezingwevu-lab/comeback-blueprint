@@ -1,6 +1,15 @@
 # LEARNINGS.md — gotchas that must never recur (add the day they happen)
 
 See CLAUDE.md §6 for the numbered list. Additions:
+- 2026-11-14: A late start is a second anchor. Day 1 slipped one day inside week 1; moving `START_ISO` as well would have shifted every plan-week date and the race-week layout. Keep the week anchor, move `DAY1_ISO`, and decide per use (35 uses of `START_ISO`, 20 of `DAY1_ISO`) which one each means. `FIRST_ISO` covers "has the plan started for him".
+- 2026-11-14: A test that read `document.body.innerText.includes('0/5')` passed for the wrong reason (the baseline-tapes row also says 0/5). Read the counter element.
+- 2026-11-14: Three subagents stopped together on the previous model's usage limit, 25 minutes in, and the workflow returned nulls with the reason only in its failures line. Read that line first; relaunch on the current model.
+- 2026-11-14: A failure that appears with nothing else running is not a flake until the old build shows it too. Repeating only that block twelve times on each build settled it in two minutes (old 11/12, new 12/12); that is the evidence to quote, not the word "flaky".
+- 2026-11-14: `run.sh` stops at the first failing stage, so while `qa_full` was red the AI suite never ran and its three date-pinned checks stayed hidden until the main suite went green. After a date move, run `node qa/ai.js` on its own early instead of waiting for the chain.
+- 2026-11-14: A date rule applied to `'2026-11-14'` missed the same date inside JSON expectations (`"date":"2026-11-14"`) and in copy ("under 14 Nov"). Grep every spelling of a date (both quote styles, the short form) before calling a move complete.
+- 2026-11-14: Taking a day out of a denominator (planned lifts) without asking what happens to the numerator (lifts logged that day) gave "5 of 4" in the independent review. When a filter changes one side of a ratio, write the check that logs on the filtered day.
+- 2026-11-14: Moving one test page to a new date changed what the shared IndexedDB vault held for the next blocks (a 15 Nov weigh-in restored into the import block, 5 weights instead of 4). A block that clears localStorage still shares the vault; give it its own context (gotcha 10, 26).
+- 2026-11-14: A batch built from a test file I had already patched once by hand failed its first assert on a stale anchor. That is the protocol working: nothing was written. Rebuild anchors from the file as it stands, never from memory.
 
 - 2026-09-11: `mkdir -p a/{b,c}` does not expand under /bin/sh (dash); create directories explicitly.
 - 2026-09-11: A Python `rep()` batch that asserts before writing is atomic — but a SyntaxError in the batch means *nothing* ran; do not assume partial application. Compile from a file first.

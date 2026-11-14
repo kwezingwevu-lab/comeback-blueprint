@@ -4,7 +4,7 @@
 const {webkit}=require('playwright');const path=require('path');const fs=require('fs');
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const R=[];const T=(n,ok,d)=>R.push({name:n,ok:!!ok,detail:d});
-(async()=>{const iso=process.argv[2]||'2026-11-14';
+(async()=>{const iso=process.argv[2]||'2026-11-21'; // Sat 21 Nov 2026: the first Legs A after Day 1 (Sun 15 Nov)
 const b=await webkit.launch();const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
 await ctx.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
 await ctx.addInitScript(iso=>{const R=Date;const fixed=new R(iso+'T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;
@@ -13,9 +13,9 @@ const p=await ctx.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.messag
 const file=fs.existsSync(path.resolve(__dirname,'ComebackBlueprint.html'))?path.resolve(__dirname,'ComebackBlueprint.html'):path.resolve(__dirname,'../dist/ComebackBlueprint.html');
 await p.goto('file://'+file,{waitUntil:'load'});await wait(1200);
 T('webkit boot: DB + switchView defined',await p.evaluate(()=>typeof DB==='object'&&typeof switchView==='function'));
-T('webkit boot: Day-1 CTA',/Start today.*Legs A/.test(await p.evaluate(()=>document.querySelector('.cta')?.textContent||'')));
-T('webkit dates: Johannesburg zone, dateAdd/todayISO stay on the local day',await p.evaluate(()=>dateAdd(START_ISO,0)===START_ISO&&dateAdd(START_ISO,7)==='2026-11-21'&&todayISO()==='2026-11-14'&&weekStartISO(1)===START_ISO));
-T('webkit copy: run-era copy retired on Lift/Numbers/footer',await p.evaluate(()=>{switchView('lift');const l=document.getElementById('view-lift').innerText;switchView('numbers');const n=document.getElementById('view-numbers').innerText;switchView('guide');const g=document.getElementById('view-guide').innerText;return /five lifting days and three runs/.test(l)&&!/Post-race|4 lifting days|six lifting days/.test(l)&&/Maintenance week/.test(n)&&!/Race Block|Race Time Predictor|Goal 10K/.test(n)&&/Muscle · Strength · Health · FFMI 25 · Day 1 Sat 14 Nov 2026 · week 1 starts the same day/.test(g)&&!/Strength \+ Speed/.test(g);}));
+T('webkit boot: Legs A CTA (Sat 21 Nov)',/Start today.*Legs A/.test(await p.evaluate(()=>document.querySelector('.cta')?.textContent||'')));
+T('webkit dates: Johannesburg zone, dateAdd/todayISO stay on the local day',await p.evaluate(()=>dateAdd(START_ISO,0)===START_ISO&&dateAdd(START_ISO,7)==='2026-11-21'&&todayISO()==='2026-11-21'&&weekStartISO(1)===START_ISO&&weekStartISO(2)==='2026-11-21'));
+T('webkit copy: run-era copy retired on Lift/Numbers/footer',await p.evaluate(()=>{switchView('lift');const l=document.getElementById('view-lift').innerText;switchView('numbers');const n=document.getElementById('view-numbers').innerText;switchView('guide');const g=document.getElementById('view-guide').innerText;return /five lifting days and three runs/.test(l)&&!/Post-race|4 lifting days|six lifting days/.test(l)&&/Maintenance week/.test(n)&&!/Race Block|Race Time Predictor|Goal 10K/.test(n)&&/Muscle · Strength · Health · FFMI 25 · Day 1 Sun 15 Nov 2026 · week 1 from Sat 14 Nov/.test(g)&&!/Strength \+ Speed/.test(g);}));
 for(const v of ['home','lift','run','roadmap','fuel','numbers','track','guide']){await p.evaluate(n=>switchView(n),v);await wait(150);
   T('webkit view: '+v,await p.evaluate(n=>{const e=document.getElementById('view-'+n);return e&&e.offsetParent!==null&&e.innerHTML.length>500;},v));}
 // Storage path 1: real input → DB.save → localStorage + IndexedDB mirror + account mirror (window.storage mock).
@@ -142,7 +142,7 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  const f1=await safe(pg,()=>{const raw=JSON.parse(localStorage.getItem('cb2_sessions')||'[]').filter(x=>x.dateISO==='2026-12-02');return {n:raw.length,la:raw[0]&&raw[0].entries.la1?JSON.stringify(raw[0].entries.la1):null,pend:document.querySelectorAll('#liftBody tr.set-row.pending').length};});
  T('webkit lift: Fill prefills dashed rows that are not in localStorage; the tick writes exactly that set',!!f0&&f0.today===0&&f0.pend===3&&f0.on===0&&!!f1&&f1.n===1&&f1.la==='[{"r":"5","w":"80"}]'&&f1.pend===2,JSON.stringify({f0,f1}));
  // a tap on a filled cell selects it (iOS ignores a synchronous select, so the handler also selects on a timer)
- const _wc=await pg.$(cell('la1',0,'w'));if(_wc)await _wc.click();else console.log('FAIL WebKit lift weight cell missing (la1 row 0): the seeded session is not on Day 1 any more');let sel=null;for(let i=0;i<20;i++){await wait(60);sel=await safe(pg,()=>{const e=document.activeElement;return {f:e&&e.dataset&&e.dataset.f,a:e&&e.selectionStart,b:e&&e.selectionEnd,n:e&&e.value.length};});if(sel&&sel.n===2&&sel.a===0&&sel.b===2)break;}
+ const _wc=await pg.$(cell('la1',0,'w'));if(_wc)await _wc.click();else console.log('FAIL WebKit lift weight cell missing (la1 row 0): the seeded session is not on the mocked day any more');let sel=null;for(let i=0;i<20;i++){await wait(60);sel=await safe(pg,()=>{const e=document.activeElement;return {f:e&&e.dataset&&e.dataset.f,a:e&&e.selectionStart,b:e&&e.selectionEnd,n:e&&e.value.length};});if(sel&&sel.n===2&&sel.a===0&&sel.b===2)break;}
  T('webkit lift: tapping a filled cell selects its contents in Safari, so typing replaces it',!!sel&&sel.f==='w'&&sel.a===0&&sel.b===sel.n&&sel.n===2,JSON.stringify(sel));
  // gym set, switch to home, home set: two records, each with its own loc, in localStorage
  await safe(pg,()=>{const e=document.querySelector('input[data-ex="la1"][data-i="1"][data-f="r"]');e.value='9';e.dispatchEvent(new Event('input',{bubbles:true}));const w=document.querySelector('input[data-ex="la1"][data-i="1"][data-f="w"]');w.value='82.5';w.dispatchEvent(new Event('input',{bubbles:true}));});

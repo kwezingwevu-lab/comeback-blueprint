@@ -25,8 +25,8 @@ const long2 = (d) => long(d) + profileSync;
 const planpath = '(function(){var W=[];for(var k=0;k<=23;k++){var d=new Date(Date.UTC(2026,9,24+7*k));W.push({date:d.toISOString().slice(0,10),v:Math.round((88+0.4*k)*10)/10});}localStorage.setItem("cb2_weight",JSON.stringify(W));localStorage.setItem("cb2_profile",JSON.stringify({weight:W[W.length-1].v,height:177,age:38,bf:18,goal:102.3,goalBf:24,act:1.55,goal10k:"55:00",phase:"hyper"}));})();';
 const set = (k, v) => `localStorage.setItem('${k}',${JSON.stringify(JSON.stringify(v))});`;
 
-const DATES = ['2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-17', '2026-11-24', '2027-02-11', '2027-02-12', '2026-11-29', '2026-12-19', '2027-01-15', '2027-01-30', '2027-03-06', '2027-05-15', '2027-05-21', '2027-05-22', '2027-06-05', '2027-07-03', '2027-10-11', '2028-03-22', '2028-11-11', '2028-11-22'];
-// Three pre-start days (11-13 Nov), Day 1 (Sat 14 Nov), the 1 km check (Tue 17 Nov), a block Tuesday, race week (11-12 Feb, real dates), two deloads (19 Dec, 30 Jan), the last Aggressive week and the step-down (15-22 May), and the far end (after week 104). Plan dates moved +7 days on 12 Nov 2026.
+const DATES = ['2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15', '2026-11-16', '2026-11-17', '2026-11-22', '2026-11-23', '2026-11-24', '2027-02-11', '2027-02-12', '2026-11-29', '2026-12-19', '2027-01-15', '2027-01-30', '2027-03-06', '2027-05-15', '2027-05-21', '2027-05-22', '2027-06-05', '2027-07-03', '2027-10-11', '2028-03-22', '2028-11-11', '2028-11-22'];
+// Pre-start days (11-14 Nov; week 1 opens Sat 14 Nov), Day 1 (Sun 15 Nov), the first lift (Mon 16 Nov), the 1 km check (Tue 17 Nov), the last and first day after the late Day-1 list (22-23 Nov), a block Tuesday, race week (11-12 Feb, real dates), two deloads (19 Dec, 30 Jan), the last Aggressive week and the step-down (15-22 May), and the far end (after week 104). Plan dates moved +7 days on 12 Nov 2026.
 const VIEWS = ['home', 'lift', 'run', 'roadmap', 'fuel', 'numbers', 'track', 'guide'];
 const combos = [];
 for (const d of DATES) {

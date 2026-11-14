@@ -118,7 +118,7 @@ module.exports=async function(T){const H=await start();
   { // ---- F. pre-start day: brief button there, no review card, coach context says before Day 1
     const p=await H.open({iso:'2026-11-12',seed:'',ai:{delay:20}});
     const r=await p.ev(()=>({btn:!!document.querySelector('#view-home [data-ai-open="home"]'),rev:!!document.getElementById('aiReview'),ctx:aiContext('home'),bytes:aiBytes(JSON.stringify(aiContext('home')))}));
-    T('F1 before Day 1: the coach button is there, no review explain, context says so',r.btn&&!r.rev&&r.ctx.today.state==='before Day 1'&&r.ctx.today.days_to_day1===2,JSON.stringify(r).slice(0,700));
+    T('F1 before Day 1 (Thu 12 Nov, 3 days to Sun 15 Nov): the coach button is there, no review explain, context says so',r.btn&&!r.rev&&r.ctx.today.state==='before Day 1'&&r.ctx.today.days_to_day1===3&&r.ctx.today.day1==='2026-11-15',JSON.stringify(r).slice(0,700));
     await p.ev(()=>{const b=document.querySelector('#view-home [data-ai-open="home"]');b.scrollIntoView({block:'center'});});await W(150);await p.shot(path.join(SH,'17-prestart-brief.png'));
     T('F: no page errors',p.errs.length===0,p.errs.join(' | ').slice(0,400));await p.close();}
   await H.close();
