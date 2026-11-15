@@ -53,13 +53,10 @@ T('track: waist saves',await p.evaluate(()=>DB.measure.filter(x=>x.waist!=null).
 await p.evaluate(()=>switchView('home'));await wait(350);
 const sc=await p.evaluate(()=>{const r=weeklyReview();return {wi:r.wi,txt:document.body.innerText.includes('1/3'),verdict:r.verdict.slice(0,40),win:(document.body.innerText.match(/live score (\d)\/3/)||[])[1]};});
 T('home: weigh-in counter 1/3',sc.wi===1&&sc.txt);T('home: win-plan teaser 1/3',await p.evaluate(()=>/The Win Plan — 1\/3 this week/.test(document.body.innerText)));T('home: weekly review no longer "nothing logged"',!/Nothing logged/.test(sc.verdict),sc.verdict);
-// ===== F. Fuel =====
-await p.evaluate(()=>switchView('fuel'));await wait(350);
-const f1=await p.evaluate(()=>({mode:fuelQ,prem:(document.getElementById('suppStack').innerHTML.match(/Premium pick/g)||[]).length,casein:document.body.innerText.includes('Slow protein before bed'),steak:document.body.innerText.includes('rump or sirloin steak'),windows:document.body.innerText.includes('04:30 — the early window')}));
-T('fuel: premium picks ×12',f1.prem===12);T('fuel: casein in 20:00 window',f1.casein);T('fuel: premium dinner swap',f1.steak);T('fuel: two-window schedule',f1.windows);
-await p.evaluate(()=>{[...document.querySelectorAll('#fuelQSeg button')].find(x=>x.dataset.q==='standard').click();});await wait(400);
-T('fuel: standard toggle removes premium',await p.evaluate(()=>fuelQ==='standard'&&(document.getElementById('suppStack').innerHTML.match(/Premium pick/g)||[]).length===0));
-await p.evaluate(()=>{[...document.querySelectorAll('#fuelQSeg button')].find(x=>x.dataset.q==='premium').click();});await wait(300);
+// ===== F. Fuel =====  (each step is null-safe: a Fuel render that throws fails these checks instead of stopping the suite)
+await p.evaluate(()=>{try{switchView('fuel');}catch(e){}});await wait(350);
+const f1=await p.evaluate(()=>{try{const w=document.getElementById('mealPlanWrap');return {seg:!!document.getElementById('fuelQSeg'),best:document.querySelectorAll('#suppStack .tk-best').length,buy:SUPP_TIERS.flatMap(t=>t.items).filter(i=>i.best&&!i.best.none).length,casein:document.body.innerText.includes('Slow protein before bed'),plan:!!w&&MP_DAYS.every(d=>d.meals.every(x=>w.textContent.includes(x.f))),tag:!!w&&/PREMIUM/.test(w.innerHTML),windows:document.body.innerText.includes('04:30 — the early window')};}catch(e){return {err:String(e).slice(0,120)};}});
+T('fuel: one best pick on each of the 10 bought items, no Standard/Premium switch',f1.best===10&&f1.buy===10&&!f1.seg,JSON.stringify(f1));T('fuel: casein in 20:00 window',f1.casein);T('fuel: the meal plan shows one text per meal (the best version), no PREMIUM tag',f1.plan&&!f1.tag);T('fuel: two-window schedule',f1.windows);
 // ===== G. Numbers =====
 await p.evaluate(()=>switchView('numbers'));await wait(350);
 const n1=await p.evaluate(()=>({btns:[...document.querySelectorAll('#bulkSeg button')].map(x=>x.dataset.bm),on:document.querySelector('#bulkSeg button.on')?.dataset.bm,rate:+gainModel('hyper').rateKgWk.toFixed(2),surplus:gainModel('hyper').surplus,pro:macros('hyper').pro,goalFFMI:+compute().goalFFMInorm.toFixed(2),verdict:document.querySelector('#verdict .verdict')?.textContent.slice(0,50)}));
@@ -561,9 +558,9 @@ const nextT=async q=>q.evaluate(()=>[...document.querySelectorAll('#liftBody .ne
  T('AB fuel: the meal plan quotes its own average, names the live mode, fills whey and caffeine from your numbers, and reads for a lifter',r.avgOk&&r.title&&!r.ph&&r.whey&&r.caf&&r.runs.length===0&&!r.bicarbTile,JSON.stringify(r));await done(q);}
 {const q=await ctxPage('2026-11-29',{cb2_bulk:'cut'});const t=await q.evaluate(()=>{switchView('fuel');return document.getElementById('mealPlanWrap').innerText;});
  T('AB fuel cut: the plan is titled Cut and the scaling advice is a cut instruction, not "drop a snack"',/Your Meal Plan — Cut/.test(t)&&/Cut mode: your target is ~\d+ kcal/.test(t)&&/keep every protein source/.test(t),t.slice(0,300));await done(q);}
-{const q=await ctxPage('2026-11-29');await q.setViewport({width:390,height:844});const r=await q.evaluate(async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('fuel');await W(400);const seg=()=>document.getElementById('fuelQSeg');window.scrollTo(0,seg().getBoundingClientRect().top+scrollY-300);await W(30);const t0=seg().getBoundingClientRect().top,q0=fuelQ;[...seg().querySelectorAll('[data-q]')].find(x=>x.dataset.q!==fuelQ).click();await W(80);const t1=seg().getBoundingClientRect().top;
-  switchView('run');await W(400);const rs=()=>document.getElementById('radiusSeg');window.scrollTo(0,rs().getBoundingClientRect().top+scrollY-200);await W(30);const u0=rs().getBoundingClientRect().top;rs().querySelector('[data-r="45"]').click();await W(80);const u1=rs().getBoundingClientRect().top;return {t0,t1,u0,u1,q0,q1:fuelQ,rad:radiusKm};});
- T('AB fuel/events: Standard/Premium and the radius switch without throwing you back to the top',r.q1!==r.q0&&r.rad===45&&Math.abs(r.t1-r.t0)<=1&&Math.abs(r.u1-r.u0)<=1&&r.t0>200&&r.u0>100,JSON.stringify(r));await done(q);}
+{const q=await ctxPage('2026-11-29');await q.setViewport({width:390,height:844});const r=await q.evaluate(async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));
+  switchView('run');await W(400);const rs=()=>document.getElementById('radiusSeg');window.scrollTo(0,rs().getBoundingClientRect().top+scrollY-200);await W(30);const u0=rs().getBoundingClientRect().top;rs().querySelector('[data-r="45"]').click();await W(80);const u1=rs().getBoundingClientRect().top;return {u0,u1,rad:radiusKm};});
+ T('AB events: the radius switch redraws without throwing you back to the top (the Fuel Standard/Premium switch is retired, 15 Nov 2026)',r.rad===45&&Math.abs(r.u1-r.u0)<=1&&r.u0>100,JSON.stringify(r));await done(q);}
 {const q=await ctxPage('2026-09-27');const r=await q.evaluate(()=>{switchView('run');const rows=[...document.querySelectorAll('#view-run div[style*="border-left:3px"]')];const bad=[];let blockish=0;
   for(let i=0;i<rows.length;i++){const b=rows[i].querySelector('b');if(b&&getComputedStyle(b).display==='block')blockish++;if(i&&rows[i].parentNode===rows[i-1].parentNode){const k=n=>{const e=RACES_12M.find(x=>x.name===n);return e?String(e.iso||e.ym+'-99'):/Valentine.{0,3} 10K/.test(n)?RACE_ISO:'';};const a=k(rows[i-1].querySelector('b').textContent),c=k(rows[i].querySelector('b').textContent);if(a>c)bad.push(a+'>'+c);}}
   const out=(([...document.querySelectorAll('#view-run .calc-note')].find(n=>/Just outside/.test(n.textContent))||{}).textContent||'');const kms=(out.match(/~(\d+) km/g)||[]).map(x=>+x.replace(/\D/g,''));
@@ -1432,10 +1429,10 @@ const cpage=async(seed,cloud,mode)=>{const c=await b.createBrowserContext();cons
     return [...new Set(out)];},GUARD.toString());
   T('AD-S3 guard: on all eight views (every Track pane) every visible control has an accessible name, custom buttons are focusable, and aria-expanded / aria-pressed are booleans',Array.isArray(gd)&&gd.length===0,JSON.stringify(gd).slice(0,400));
   // a11y-04 segmented groups
-  const SEGS={home:[],lift:['liftPhaseSeg','locSeg','focusSeg','wakeSeg','dayPills'],run:['radiusSeg'],numbers:['phaseSeg','bulkSeg','ceilBfSeg'],fuel:['fuelQSeg']};
+  const SEGS={home:[],lift:['liftPhaseSeg','locSeg','focusSeg','wakeSeg','dayPills'],run:['radiusSeg'],numbers:['phaseSeg','bulkSeg','ceilBfSeg']};
   const sgr=await tryEval(q,async(S)=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const out={};for(const v of Object.keys(S)){switchView(v);await W(200);for(const id of S[v]){const g=document.getElementById(id);if(!g){out[id]='missing';continue;}const bs=[...g.querySelectorAll('button')];out[id]=(g.getAttribute('role')==='group'&&!!g.getAttribute('aria-label')&&bs.length>1&&bs.every(b=>/^(true|false)$/.test(b.getAttribute('aria-pressed')))&&bs.filter(b=>b.getAttribute('aria-pressed')==='true').length===1&&bs.every(b=>(b.getAttribute('aria-pressed')==='true')===b.classList.contains('on')))?'ok':'BAD '+g.outerHTML.slice(0,140);}}
     switchView('track');await W(150);const tt=document.querySelector('.track-tabs'),tb=[...tt.querySelectorAll('button')];out.trackTabs=(tt.getAttribute('role')==='group'&&tb.length===6&&tb.filter(b=>b.getAttribute('aria-pressed')==='true').length===1)?'ok':'BAD';tb[2].click();await W(60);out.trackMoved=(tb[2].getAttribute('aria-pressed')==='true'&&tb[0].getAttribute('aria-pressed')==='false')?'ok':'BAD';return out;},SEGS);
-  T('AD-S3 a11y-04: all twelve segmented groups are named groups whose buttons carry aria-pressed in step with the .on class (and it follows a click on the Track tabs)',!!sgr&&Object.values(sgr).length>=12&&Object.values(sgr).every(x=>x==='ok'),JSON.stringify(sgr));
+  T('AD-S3 a11y-04: all eleven segmented groups are named groups whose buttons carry aria-pressed in step with the .on class (and it follows a click on the Track tabs)',!!sgr&&Object.values(sgr).length>=11&&Object.values(sgr).every(x=>x==='ok'),JSON.stringify(sgr));
   await done(q);}
  // ---- a11y-06 focus goes back to the equivalent control, and the Lift toggles keep the page where it is ----
  {const q=await ctxPage('2026-11-30',{},DEMO);
@@ -1477,7 +1474,7 @@ const cpage=async(seed,cloud,mode)=>{const c=await b.createBrowserContext();cons
   await done(q);}
  // ---- a11y-14 focus ring on every kind of control ----
  {const q=await ctxPage('2026-11-30',{},DEMO);
-  const kinds=[['lift','#liftBody .chk'],['lift','#liftBody .mini'],['lift','#liftBody .hw-tog'],['lift','#locSeg button'],['lift','#dayPills .pill'],['lift','#toolWarm .tool-h'],['lift','#liftBody .btn'],['fuel','.supp-h'],['fuel','#fuelQSeg button'],['numbers','#pAct'],['roadmap','.rweek-h'],['track','.track-tabs button'],['track','#tp-weight .del'],['track','#wAdd'],['home','.card[role=link]'],['home','.cta']];
+  const kinds=[['lift','#liftBody .chk'],['lift','#liftBody .mini'],['lift','#liftBody .hw-tog'],['lift','#locSeg button'],['lift','#dayPills .pill'],['lift','#toolWarm .tool-h'],['lift','#liftBody .btn'],['fuel','.supp-h'],['numbers','#pAct'],['roadmap','.rweek-h'],['track','.track-tabs button'],['track','#tp-weight .del'],['track','#wAdd'],['home','.card[role=link]'],['home','.cta']];
   const bad=[];
   for(const [v,sel] of kinds){await tryEval(q,x=>switchView(x),v);await wait(220);await key(q,'Shift');
     if(v==='track')await tryEval(q,()=>document.querySelector('.track-tabs [data-tp="weight"]').click());
@@ -1723,71 +1720,107 @@ const GOODSLEEP=[{date:'2027-01-25',h:7.6},{date:'2027-01-26',h:7.4},{date:'2027
  const r=await ev(q,(a)=>{eval(a.H);const bad=[];for(const [d,id] of a.MAIN){showDay(d);const ex=exOf(id);ex.querySelectorAll('.cell').forEach(c=>{if(!/^Set \d+ (reps|weight in kg|RPE), (top set|back-off), \S/.test(c.getAttribute('aria-label')||''))bad.push(c.getAttribute('aria-label'));});ex.querySelectorAll('.chk').forEach(c=>{if(!/^Set \d+ done, (top set|back-off), \S/.test(c.getAttribute('aria-label')||''))bad.push(c.getAttribute('aria-label'));});}return bad.slice(0,3);},{H,MAIN});
  T('AF a11y: every top-set and back-off field and tick is named "Set N … , top set|back-off, <exercise>"',!r.err&&Array.isArray(r)&&r.length===0,JSON.stringify(r));await done(q);}
 }
-// ===== AG. Takealot and Woolworths sourcing (28 Oct 2026) =====
+// ===== AG. The best pick for every item, sourced anywhere (15 Nov 2026, LEDGER 24-25; was Takealot and Woolworths only) =====
 {const tryEvalAG=async(q,fn,arg)=>{try{return await q.evaluate(fn,arg);}catch(e){return {err:String(e&&e.message||e).slice(0,160)};}};
- const OTHER=/Dis-?Chem|Clicks|Biogen|Myprotein|pricecheck|Checkers|Pick n Pay|PnP|Shoprite|\bSpar\b|Makro|Food Lover|Game Stores|Amazon|iHerb|DMC Wholesale|Price Experts|Everlast SA|Faithful to Nature|Wellness Warehouse/i;
- // Drive the real Standard/Premium switch, open every supplement, and read Fuel and the Guide with the home-gym equipment tier removed by element.
- const readMode=async(q,mode)=>tryEvalAG(q,async(mode)=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('fuel');await W(250);
-   const btn=[...document.querySelectorAll('#fuelQSeg button')].find(x=>x.dataset.q===mode);if(btn)btn.click();await W(350);
-   document.querySelectorAll('#suppStack .supp-h').forEach(h=>{if(!h.classList.contains('open'))h.click();});await W(100);
-   const fuel=document.getElementById('view-fuel');const fuelTxt=fuel?fuel.textContent:'';
-   const prices=[...document.querySelectorAll('#suppStack .tk-price')].map(e=>e.textContent.trim());
-   const r={mode:typeof fuelQ!=='undefined'?fuelQ:null,fuelTxt,prices,pick:document.querySelectorAll('#suppStack .tk-pick').length,prem:document.querySelectorAll('#suppStack .tk-prem').length,cert:document.querySelectorAll('#suppStack .tk-cert').length,
-     wantCert:SUPP_TIERS.flatMap(t=>t.items).filter(i=>i.prem&&i.prem.tk&&!i.prem.cert).length,wantPick:SUPP_TIERS.flatMap(t=>t.items).filter(i=>i.std).length,
-     certNames:[...document.querySelectorAll('#suppStack .tk-cert')].map(e=>e.closest('.supp').querySelector('.supp-n').textContent),
-     premTotal:(document.getElementById('premTotal')||{}).textContent||null,sumM:SUPP_TIERS.flatMap(t=>t.items).reduce((a,i)=>a+((i.prem&&i.prem.m)||0),0),
-     verifiedAt:[...fuelTxt.matchAll(/at ([A-Z][A-Za-z-]+) \(verified/g)].map(m=>m[1])};
-   switchView('guide');await W(250);const g=document.getElementById('view-guide');let guideTxt='',kit=0;
-   if(g){const c=g.cloneNode(true);kit=c.querySelectorAll('[data-kit="equipment"]').length;c.querySelectorAll('[data-kit="equipment"]').forEach(e=>e.remove());guideTxt=c.textContent;}
-   r.guideTxt=guideTxt;r.kit=kit;r.kitHasFitArc=!!(g&&g.querySelector('[data-kit="equipment"]')&&/FitArc/.test(g.querySelector('[data-kit="equipment"]').textContent));
-   r.verifiedAt=r.verifiedAt.concat([...guideTxt.matchAll(/at ([A-Z][A-Za-z-]+) \(verified/g)].map(m=>m[1]));return r;},mode);
+ const J=JSON.stringify;
+ const PRICE=/^R[\d,]+(\.\d\d)? at [A-Za-z][\w .'&-]+ \(verified 15 Nov 2026\)$/;
+ // A converted price: the source price in its own currency is the verified figure; the rand figure says est., the rate and the rate's date.
+ const PRICE_EST=/^(\$|£|C\$)\d[\d,]*\.\d\d at [A-Za-z][\w .'&-]+ \(verified 15 Nov 2026\); about R[\d,]+ est\., converted at R\d+\.\d{4} per (US dollar|pound|Canadian dollar) \(ECB reference rate, 13 Nov 2026\)$/;
+ // The page carries an old backup's Standard/Premium setting (cb2_fuelq): it must change nothing.
  const q=await ctxPage('2026-11-18',{cb2_fuelq:'standard'});
- const st=await readMode(q,'standard'),pr=await readMode(q,'premium');
- const bad=x=>x&&!x.err?[(x.fuelTxt.match(OTHER)||[])[0],(x.guideTxt.match(OTHER)||[])[0]].filter(Boolean):['eval error '+(x&&x.err)];
- T('AG retailers: Fuel and the Guide in Standard and Premium name no shop but Takealot (supplements) and Woolworths (food); the home-gym equipment tier is left out by element and is still there',
-   st&&pr&&!st.err&&!pr.err&&st.mode==='standard'&&pr.mode==='premium'&&bad(st).length===0&&bad(pr).length===0&&st.kit===1&&st.kitHasFitArc&&st.verifiedAt.length>0&&pr.verifiedAt.every(x=>x==='Takealot'||x==='Woolworths')&&st.verifiedAt.every(x=>x==='Takealot'||x==='Woolworths')&&/Woolworths/.test(st.fuelTxt)&&!/affordable South African food/.test(st.fuelTxt),
-   JSON.stringify({st:bad(st),pr:bad(pr),kit:st&&st.kit,at:[...new Set([...(st.verifiedAt||[]),...(pr.verifiedAt||[])])]}));
- const PRICE=/^R[\d,]+(\.\d\d)? at Takealot \(verified \d{1,2} [A-Z][a-z]{2} 20\d\d\)$/;
- T('AG prices: every supplement price names Takealot and a verified date (10 standard picks; 20 prices in Premium)',st.prices&&pr.prices&&st.prices.length===10&&pr.prices.length===20&&st.prices.concat(pr.prices).every(x=>PRICE.test(x)),JSON.stringify({s:st.prices&&st.prices.length,p:pr.prices&&pr.prices.length,bad:(st.prices||[]).concat(pr.prices||[]).filter(x=>!PRICE.test(x)).slice(0,3)}));
- T('AG picks: Standard shows a Takealot pick on every bought item and no premium block; Premium adds 12 premium blocks and says "No certified version on Takealot" on each bought item',
-   st.pick===st.wantPick&&st.wantPick===10&&st.prem===0&&st.cert===0&&pr.pick===10&&pr.prem===12&&pr.cert===pr.wantCert&&pr.wantCert===10&&!pr.certNames.includes('Iron')&&!pr.certNames.some(n=>/Carbohydrate/.test(n))&&/No certified version on Takealot/.test(pr.fuelTxt),
-   JSON.stringify({st:[st.pick,st.prem,st.cert],pr:[pr.pick,pr.prem,pr.cert,pr.wantCert]}));
- const shown=pr.premTotal?+pr.premTotal.replace(/[^\d]/g,''):NaN;
- T('AG premium stack: the total shown equals the sum of the monthly costs (R2,348)',shown===pr.sumM&&pr.sumM===2348,JSON.stringify({shown:pr.premTotal,sum:pr.sumM}));
- // Grocery list: every line costed, total = sum of lines
- const gr=await tryEvalAG(q,()=>{switchView('fuel');const rows=[...document.querySelectorAll('#mealPlanWrap .gr-row')].map(r=>({n:r.querySelector('.pt-n').textContent,c:(r.querySelector('.gr-c')||{}).textContent||''}));const tot=(document.getElementById('groceryTotal')||{}).textContent||'';
-   const sw=[...document.querySelectorAll('#mealPlanWrap .swap-row')].map(r=>r.textContent);return {rows,tot,sw,days:MP_DAYS.map(d=>[d.meals.reduce((a,x)=>a+x.kc,0),d.meals.reduce((a,x)=>a+x.p,0)]),plan:document.getElementById('mealPlanWrap').textContent};});
+ const f=await tryEvalAG(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('fuel');await W(300);
+   document.querySelectorAll('#suppStack .supp-h').forEach(h=>{if(!h.classList.contains('open'))h.click();});await W(100);
+   const items=SUPP_TIERS.flatMap(t=>t.items);
+   const cards=[...document.querySelectorAll('#suppStack .supp')].map(c=>{const g=s=>c.querySelectorAll(s).length,tx=s=>(c.querySelector(s)||{}).textContent||'';
+     return {n:tx('.supp-n'),best:g('.tk-best'),none:g('.tk-none'),cert:g('.tk-cert'),nocert:g('.tk-nocert'),price:tx('.tk-best .tk-price').trim(),certTxt:tx('.tk-cert'),m:tx('.tk-best .tk-m')};});
+   const data=items.map(i=>({n:i.n,none:!!(i.best&&i.best.none),buy:!!(i.best&&!i.best.none),cv:!!(i.best&&i.best.cert&&i.best.cert.verified),cn:(i.best&&i.best.cert&&i.best.cert.name)||'',m:i.best&&i.best.m,dose:(i.best&&i.best.dose)||'',est:(i.best&&i.best.est)||null,price:i.best&&i.best.price,shop:i.best&&i.best.shop,pick:i.best&&i.best.pick,old:('std' in i)||('prem' in i)}));
+   const rows=[...document.querySelectorAll('#suppPriceTbl .sp-row')].map(r=>({n:r.querySelector('.pt-n').firstChild.textContent,small:(r.querySelector('.pt-n small')||{}).textContent||'',p:r.querySelector('.pt-p').textContent,g:r.querySelector('.pt-g').textContent}));
+   return {cards,data,rows,estNote:(document.getElementById('estNote')||{}).textContent||'',seg:document.querySelectorAll('#fuelQSeg,#view-fuel [data-q]').length,stackTotal:(document.getElementById('stackTotal')||{}).textContent||null,where:(document.getElementById('whereBuy')||{}).textContent||'',
+     fuelTxt:document.getElementById('view-fuel').textContent,mode:typeof fuelQ,stored:localStorage.getItem('cb2_fuelq')};});
+ const ok=f&&!f.err,buy=ok?f.data.filter(d=>d.buy):[],none=ok?f.data.filter(d=>d.none):[];
+ const card=n=>(ok&&f.cards.find(c=>c.n===n))||{};
+ T('AG picks: each of the 10 bought items shows exactly one best pick, carbohydrate and iron show "Nothing to buy"; no Standard/Premium switch or std/prem data is left, and an old backup\'s cb2_fuelq setting is ignored',
+   ok&&buy.length===10&&buy.every(d=>card(d.n).best===1&&card(d.n).none===0)&&none.length===2&&none.every(d=>card(d.n).best===0&&card(d.n).none===1)&&f.cards.length===12&&f.seg===0&&f.data.every(d=>!d.old)&&f.mode==='undefined'&&f.stored==='"standard"'&&!/Premium pick|Standard picks|Takealot pick|budget open/.test(f.fuelTxt),
+   J(ok?{buy:buy.length,none:none.length,seg:f.seg,mode:f.mode,bad:f.cards.filter(c=>c.best+c.none!==1).map(c=>c.n)}:f));
+ T('AG prices: every best-pick price is "R… at <its shop> (verified 15 Nov 2026)", or a source price in its own currency with the rand figure marked "est." with the rate and its date (and only those carry an est record); the card shows the price the data holds',
+   buy.length===10&&buy.every(d=>(d.est?(PRICE_EST.test(d.price)&&d.price.startsWith(d.est.amt+' at ')&&d.price.includes('converted at '+d.est.rate+' ('+d.est.src+', '+d.est.date+')')):PRICE.test(d.price))&&d.price.includes(' at '+d.shop+' (verified')&&card(d.n).price===d.price),
+   J(buy.filter(d=>!(PRICE.test(d.price)||PRICE_EST.test(d.price))||card(d.n).price!==d.price).map(d=>[d.n,d.price,card(d.n).price])));
+ T('AG certification: a certification line (the mark and the database check) only on the items whose data says verified; every other bought item says plainly it carries none',
+   buy.length===10&&buy.some(d=>d.cv)&&buy.every(d=>{const c=card(d.n);return d.cv?(c.cert===1&&c.nocert===0&&c.certTxt.includes(d.cn)&&/certifier’s own database, checked 15 Nov 2026/.test(c.certTxt)):(c.cert===0&&c.nocert===1);}),
+   J(buy.map(d=>[d.n,d.cv,card(d.n).cert,card(d.n).nocert])));
+ const sum=buy.reduce((a,d)=>a+d.m,0),shown=ok&&f.stackTotal?+f.stackTotal.replace(/[^\d]/g,''):NaN;
+ T('AG stack: #stackTotal equals the sum of the monthly costs',buy.length===10&&sum>0&&shown===sum&&buy.every(d=>Number.isInteger(d.m)),J({shown:ok&&f.stackTotal,sum}));
+ const fmtI=n=>String(n).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+ T('AG dose line: every card states its monthly cost at its own named dose ("About R… a month at 5 g a day"), never "the dose above" (which sits under the highest dose)',
+   buy.length===10&&buy.every(d=>d.dose.length>3&&!/dose above/.test(d.dose)&&card(d.n).m==='About R'+fmtI(d.m)+' a month at '+d.dose),J(buy.filter(d=>card(d.n).m!=='About R'+fmtI(d.m)+' a month at '+d.dose).map(d=>[d.n,card(d.n).m])));
+ T('AG price guide: one row per bought item with the pick, the item and its shop, the shelf price from its card and the same monthly cost',
+   ok&&f.rows.length===10&&f.rows.every((r,i)=>{const d=buy[i];return !!d&&r.n===d.pick&&r.small===d.n+' · '+d.shop&&(d.est?/^≈R[\d,]+ est\.$/.test(r.p)&&d.price.includes('about '+r.p.slice(1)+',')&&/\(verified/.test(d.price):d.price.startsWith(r.p+' at '))&&r.g.replace(/[^\d]/g,'')===String(d.m);}),J(ok&&f.rows.slice(0,2)));
+ const ests=buy.filter(d=>d.est);
+ T('AG estimates: under the price guide one note says a converted figure is an estimate, not a verified price, and gives each one\'s source price, the rate and the rate\'s date',
+   ok&&(ests.length===0?f.estNote==='':(/not a verified price/.test(f.estNote)&&ests.every(d=>f.estNote.includes(d.pick+' ('+d.est.amt+')')&&f.estNote.includes('converted at '+d.est.rate+' ('+d.est.src+', '+d.est.date+')')))),J(ok&&{n:ests.length,note:f.estNote.slice(0,240)}));
+ T('AG where to buy: the note names every shop on the list, says that with Aramex DDP iHerb collects duties, VAT and import fees at checkout and nothing is due on delivery, and that an import takes longer',
+   ok&&[...new Set(buy.map(d=>d.shop))].every(s=>f.where.includes(s))&&(!buy.some(d=>d.shop==='iHerb')||(/Aramex DDP/.test(f.where)&&/collected at checkout and nothing is due on delivery/.test(f.where)&&/checkout total is the real price/.test(f.where)))&&/takes longer than a local delivery/.test(f.where),J(ok&&f.where.slice(0,260)));
+ // Copy from the old rule is gone from Fuel and the Guide (the home-gym equipment tier is left out by element and is still there)
+ const g=await tryEvalAG(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('guide');await W(250);const v=document.getElementById('view-guide');if(!v)return null;const c=v.cloneNode(true);const kit=c.querySelectorAll('[data-kit="equipment"]').length;
+   const fit=!!(v.querySelector('[data-kit="equipment"]')&&/FitArc/.test(v.querySelector('[data-kit="equipment"]').textContent));c.querySelectorAll('[data-kit="equipment"]').forEach(e=>e.remove());return {txt:c.textContent,kit,fit};});
+ const STALE=/Takealot only|priced at Takealot|on Woolworths food|from Woolworths|food at Woolworths|Woolworths item|Premium pick|Standard picks|PREMIUM|budget open|verified 28 Oct 2026|Cheaper Choices|Takealot Price Guide/;
+ T('AG copy: Fuel and the Guide carry no copy from the Takealot/Woolworths rule or the Standard/Premium switch, and the Guide money card quotes the 15 Nov picks',
+   ok&&g&&!g.err&&!STALE.test(f.fuelTxt)&&!STALE.test(g.txt)&&g.kit===1&&g.fit&&/Where Money Actually Buys Muscle/.test(g.txt)&&/verified 15 Nov 2026/.test(g.txt),J({f:ok&&(f.fuelTxt.match(STALE)||[])[0],g:g&&!g.err&&(g.txt.match(STALE)||[])[0],kit:g&&g.kit}));
+ // Grocery list and meal plan
+ const gr=await tryEvalAG(q,()=>{switchView('fuel');const w=document.getElementById('mealPlanWrap');
+   const rows=[...w.querySelectorAll('.gr-row')].map(r=>({n:r.querySelector('.pt-n').firstChild.textContent,shop:(r.querySelector('.gr-shop')||{}).textContent||'',c:(r.querySelector('.gr-c')||{}).textContent||''}));
+   const k=MP_DAYS.map(d=>d.meals.reduce((a,x)=>a+x.kc,0)),p=MP_DAYS.map(d=>d.meals.reduce((a,x)=>a+x.p,0));
+   return {rows,tot:(document.getElementById('groceryTotal')||{}).textContent||'',data:MP_GROCERY.map(x=>({it:x.it,c:x.c,shop:x.shop})),days:[...w.querySelectorAll('.mp-day .mp-tot')].map(e=>e.textContent),want:k.map((x,i)=>x+' kcal · '+p[i]+'g P'),
+     intKP:MP_DAYS.every(d=>d.meals.every(x=>Number.isInteger(x.kc)&&Number.isInteger(x.p)&&!('pf' in x))),st:(w.querySelector('.card-st')||{}).textContent||'',
+     avg:{k:Math.round(k.reduce((a,b)=>a+b,0)/k.length/10)*10,p:Math.round(p.reduce((a,b)=>a+b,0)/p.length)},why:w.querySelectorAll('#mpWhy .why-row').length,swaps:w.querySelectorAll('.swap-row').length,tag:/PREMIUM/.test(w.innerHTML)};});
  const cents=x=>Math.round(parseFloat(String(x).replace(/[^\d.]/g,''))*100);
- T('AG groceries: every Woolworths line has a cost and the weekly total shown is the sum of the lines',gr&&!gr.err&&gr.rows.length>=15&&gr.rows.every(r=>/^R\d+\.\d\d$/.test(r.c))&&cents(gr.tot)===gr.rows.reduce((a,r)=>a+cents(r.c),0)&&/Woolworths/.test(gr.plan)&&!/soya/i.test(gr.plan),JSON.stringify(gr&&{n:gr.rows&&gr.rows.length,tot:gr.tot,sum:gr.rows&&gr.rows.reduce((a,r)=>a+cents(r.c),0)}));
- T('AG swaps and plan: every swap names two Woolworths prices, and the three day plans keep their totals (3,435/184 · 3,410/192 · 3,380/180 kcal/g, within 2%)',gr&&gr.sw&&gr.sw.length>=5&&gr.sw.every(t=>(t.match(/R\d+\.\d\d/g)||[]).length>=2)&&gr.days&&[[3435,184],[3410,192],[3380,180]].every((v,i)=>Math.abs(gr.days[i][0]-v[0])<=v[0]*0.02&&Math.abs(gr.days[i][1]-v[1])<=v[1]*0.02),JSON.stringify(gr&&{sw:gr.sw&&gr.sw.length,days:gr.days}));
+ T('AG groceries: every line names its shop and has a cost, and the weekly total shown is the sum of the lines',
+   gr&&!gr.err&&gr.rows.length>=12&&gr.rows.length===gr.data.length&&gr.rows.every((r,i)=>!!r.shop&&r.shop===gr.data[i].shop&&r.n===gr.data[i].it&&/^R\d+\.\d\d$/.test(r.c)&&cents(r.c)===Math.round(gr.data[i].c*100))&&cents(gr.tot)===gr.rows.reduce((a,r)=>a+cents(r.c),0),
+   J(gr&&!gr.err?{n:gr.rows.length,tot:gr.tot,sum:gr.rows.reduce((a,r)=>a+cents(r.c),0),noShop:gr.rows.filter(r=>!r.shop).map(r=>r.n).slice(0,3)}:gr));
+ T('AG meal plan: one text per meal (no pf, no PREMIUM tag), whole kcal and protein, and each day header and the plan average equal the sums from MP_DAYS; the swap card is now "Why These Picks"',
+   gr&&!gr.err&&gr.intKP&&!gr.tag&&gr.days.length===3&&gr.days.every((t,i)=>t===gr.want[i])&&gr.st.includes('~'+gr.avg.k+' kcal · ~'+gr.avg.p+'g protein per day')&&gr.why>=3&&gr.swaps===0,J(gr&&!gr.err?{days:gr.days,want:gr.want,avg:gr.avg,why:gr.why}:gr));
  // Science wording
  const sc=await tryEvalAG(q,()=>{const h=document.getElementById('suppStack').innerHTML,v=document.getElementById('view-fuel').textContent;return {liver:/yellow eyes or skin/.test(h)&&/dark urine/.test(h)&&/stop and see a doctor/i.test(v),cycle:/8 weeks on, 2 off/.test(v),legal:/most effective legal set/.test(v),notBuy:/what NOT to buy/.test(v)&&/HMB/.test(v),caf:/440–530/.test(h)&&!/tremor/.test(h),coll:/15 g is a floor/.test(h),d3:/Ceiling, not a target/.test(h),mg:/may help sleep onset; the evidence is thin and comes from older adults/.test(h),row:/your urine darkens/.test(v)&&/cap the day at about 400 mg/.test(v)};});
- T('AG science: liver caution on ashwagandha (card and 20:00 row), no "8 weeks on, 2 off", no "most effective legal set", honest caffeine, collagen, D3 and magnesium wording, skip list kept',sc&&sc.liver&&!sc.cycle&&!sc.legal&&sc.notBuy&&sc.caf&&sc.coll&&sc.d3&&sc.mg&&sc.row,JSON.stringify(sc));
- // Evidence file covers every product the app quotes
- const pk=await tryEvalAG(q,()=>({std:SUPP_TIERS.flatMap(t=>t.items).filter(i=>i.std).map(i=>({t:i.std.pick,p:i.std.price})),prem:SUPP_TIERS.flatMap(t=>t.items).filter(i=>i.prem&&i.prem.tk).map(i=>({t:i.prem.pick,p:i.prem.price})),gro:MP_GROCERY.map(x=>({t:x.it,c:x.c,q:x.q})),sw:MP_SWAPS.map(s=>s.cheap+' | '+s.pricey)}));
- let ev=null;try{const dir=path.resolve('../tools/prices');const f=fs.readdirSync(dir).filter(x=>/^\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort().pop();ev=JSON.parse(fs.readFileSync(path.join(dir,f),'utf8'));}catch(e){ev={err:String(e)};}
- const miss=[];if(pk&&!pk.err&&ev&&ev.records){const tkR=ev.records.filter(r=>r.shop==='Takealot'),wwR=ev.records.filter(r=>r.shop==='Woolworths');const num=x=>+String(x).replace(/[^\d.]/g,'');
-   for(const i of pk.std){const r=tkR.find(r=>r.title===i.t);if(!r||num(i.p.split(' at ')[0])!==r.price)miss.push('std '+i.t);}
-   for(const i of pk.prem){const r=tkR.find(r=>r.title===i.t);const pr=num(i.p.split(' at ')[0]);if(r?pr!==r.price:!tkR.some(r=>r.price===pr&&pk.std.some(s=>s.t===r.title)))miss.push('prem '+i.t);}
-   for(const g of pk.gro){const r=wwR.find(r=>r.title.replace(/™/g,'')===g.t);if(!r||Math.abs(r.price*r.qty-g.c)>0.005)miss.push('gro '+g.t);}
-   for(const s of pk.sw)for(const m of s.match(/R\d+\.\d\d/g)||[])if(!wwR.some(r=>Math.abs(r.price-num(m))<0.005))miss.push('swap '+m);
-   if(Math.abs(pk.gro.reduce((a,g)=>a+g.c,0)-ev.weeklyGroceryTotal)>0.005)miss.push('weekly total');}
- T('AG evidence: tools/prices/<date>.json holds every Takealot pick, every Woolworths grocery line and every swap price the app quotes, at the same price',pk&&!pk.err&&ev&&!ev.err&&miss.length===0&&pk.std.length===10&&pk.gro.length>=15,JSON.stringify({miss:miss.slice(0,4),err:ev&&ev.err}));
+ T('AG science: liver caution on ashwagandha (card and 20:00 row), no "8 weeks on, 2 off", no "most effective legal set", honest caffeine, collagen, D3 and magnesium wording, skip list kept',sc&&sc.liver&&!sc.cycle&&!sc.legal&&sc.notBuy&&sc.caf&&sc.coll&&sc.d3&&sc.mg&&sc.row,J(sc));
+ // Evidence file: every price the Fuel tab and the Guide quote, every monthly cost and every grocery line
+ const pk=await tryEvalAG(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('fuel');await W(200);const fuel=document.getElementById('view-fuel').textContent;switchView('guide');await W(200);const guide=document.getElementById('view-guide').textContent;
+   return {txt:fuel+' '+guide,best:SUPP_TIERS.flatMap(t=>t.items).filter(i=>i.best&&!i.best.none).map(i=>({n:i.n,m:i.best.m})),gro:MP_GROCERY.map(x=>({t:x.it,c:x.c,shop:x.shop}))};});
+ let ev=null;try{const dir=path.resolve('../tools/prices');const fl=fs.readdirSync(dir).filter(x=>/^\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort().pop();ev=JSON.parse(fs.readFileSync(path.join(dir,fl),'utf8'));}catch(e){ev={err:String(e)};}
+ const miss=[];let quoted=0;
+ if(pk&&!pk.err&&ev&&ev.records){const CUR={R:'ZAR','$':'USD','£':'GBP','C$':'CAD'};
+   for(const m of pk.txt.matchAll(/(C\$|R|\$|£)([\d,]+(?:\.\d\d)?) at ([A-Za-z][\w .'&-]*?) \(verified 15 Nov 2026\)(; about R([\d,]+) est\., converted at R([\d.]+) per)?/g)){quoted++;const v=+m[2].replace(/,/g,'');
+     const r=ev.records.find(r=>r.shop===m[3]&&(r.currency||'ZAR')===CUR[m[1]]&&Math.abs(r.price-v)<0.005);
+     if(!r)miss.push(m[0].slice(0,70));else if(m[5]&&(Math.round(r.price_zar_est)!==+m[5].replace(/,/g,'')||!r.fx||Math.abs(r.fx.rate-(+m[6]))>0.00005))miss.push('est '+m[0].slice(0,50));}
+   for(const b of pk.best){const r=ev.records.find(r=>r.monthly!=null&&r.item===b.n);if(!r||r.monthly!==b.m)miss.push('monthly '+b.n);}
+   for(const x of pk.gro){const r=ev.records.find(r=>/grocery/.test(r.role)&&r.item===x.t&&r.shop===x.shop);if(!r||Math.abs(r.lineTotal-x.c)>0.005||Math.abs(r.price*r.qty-x.c)>0.005)miss.push('gro '+x.t);}
+   if(Math.abs(pk.gro.reduce((a,x)=>a+x.c,0)-ev.weeklyGroceryTotal)>0.005)miss.push('weekly total');
+   if(ev.date!=='2026-11-15')miss.push('evidence date '+ev.date);}
+ T('AG evidence: tools/prices/2026-11-15.json holds every price the Fuel tab and the Guide quote (shop, currency and amount; estimates at the same rand), every monthly cost and every grocery line',
+   pk&&!pk.err&&ev&&!ev.err&&miss.length===0&&quoted>=20,J({miss:miss.slice(0,4),quoted,err:(ev&&ev.err)||(pk&&pk.err)}));
  // Markup: each supplement sits inside its tier; tier gaps 16 px, item gaps 8 px, at 390 px
  const mk=await tryEvalAG(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('fuel');await W(450);document.querySelectorAll('#suppStack .supp-h.open').forEach(h=>h.click());await W(100);
    const tiers=[...document.querySelectorAll('#suppStack > .supp-tier')];const loose=document.querySelectorAll('#suppStack > .supp').length;const per=tiers.map(t=>t.querySelectorAll(':scope > .supp').length);
    const gapsIn=[],gapsTier=[];tiers.forEach((t,ti)=>{const it=[...t.querySelectorAll(':scope > .supp')];for(let i=1;i<it.length;i++)gapsIn.push(Math.round(it[i].getBoundingClientRect().top-it[i-1].getBoundingClientRect().bottom));if(ti<tiers.length-1&&it.length){const nx=tiers[ti+1].querySelector('.st-label');gapsTier.push(Math.round(nx.getBoundingClientRect().top-it[it.length-1].getBoundingClientRect().bottom));}});
    return {per,loose,gapsIn:[...new Set(gapsIn)],gapsTier:[...new Set(gapsTier)]};});
- T('AG markup: every supplement sits inside its tier (3 · 6 · 3, none loose); 8 px between items, 16 px between tiers',mk&&!mk.err&&mk.loose===0&&JSON.stringify(mk.per)==='[3,6,3]'&&JSON.stringify(mk.gapsIn)==='[8]'&&JSON.stringify(mk.gapsTier)==='[16]',JSON.stringify(mk));
- // Fit: long Takealot titles wrap at 390 and 375 px in Premium with every card open
+ T('AG markup: every supplement sits inside its tier (3 · 6 · 3, none loose); 8 px between items, 16 px between tiers',mk&&!mk.err&&mk.loose===0&&J(mk.per)==='[3,6,3]'&&J(mk.gapsIn)==='[8]'&&J(mk.gapsTier)==='[16]',J(mk));
+ // Fit: long titles and the new lines wrap at 390 and 375 px with every card open
  const fit={};for(const w of [390,375]){await q.setViewport({width:w,height:844});fit[w]=await tryEvalAG(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('fuel');await W(300);
-   const btn=[...document.querySelectorAll('#fuelQSeg button')].find(x=>x.dataset.q==='premium');if(btn)btn.click();await W(300);document.querySelectorAll('#suppStack .supp-h').forEach(h=>{if(!h.classList.contains('open'))h.click();});await W(100);
-   const over=[...document.querySelectorAll('#suppStack .tk-pick,#suppStack .tk-prem,#suppStack .tk-n,#view-fuel .price-tbl .pt-n')].filter(e=>e.scrollWidth>e.clientWidth+1||e.getBoundingClientRect().right>innerWidth+0.5).length;
-   return {over,page:document.documentElement.scrollWidth<=innerWidth,n:document.querySelectorAll('#suppStack .tk-prem').length};});}
+   document.querySelectorAll('#suppStack .supp-h').forEach(h=>{if(!h.classList.contains('open'))h.click();});document.querySelectorAll('#view-fuel .tool').forEach(t=>t.classList.add('open'));await W(100);
+   const over=[...document.querySelectorAll('#suppStack .tk-best,#suppStack .tk-none,#suppStack .tk-n,#suppStack .tk-price,#suppStack .tk-cert,#suppStack .tk-nocert,#suppStack .tk-imp,#suppStack .tk-loc,#stackNote,#whereBuy,#view-fuel .price-tbl .pt-n,#mealPlanWrap .mp-f,#mpWhy .why-row')].filter(e=>e.scrollWidth>e.clientWidth+1||e.getBoundingClientRect().right>innerWidth+0.5).length;
+   return {over,page:document.documentElement.scrollWidth<=innerWidth,n:document.querySelectorAll('#suppStack .tk-best').length,open:document.querySelectorAll('#suppStack .supp-b.open').length};});}
  await q.setViewport({width:390,height:844});
- T('AG fit: picks and the price guide wrap inside the card at 390 and 375 px (no overflow, no sideways scroll)',[390,375].every(w=>fit[w]&&!fit[w].err&&fit[w].over===0&&fit[w].page&&fit[w].n===12),JSON.stringify(fit));
+ T('AG fit: pick titles, certification, import and local lines, the price guide, the grocery list and the meal plan wrap inside their cards at 390 and 375 px with every card open (no overflow, no sideways scroll)',[390,375].every(w=>fit[w]&&!fit[w].err&&fit[w].over===0&&fit[w].page&&fit[w].n===10&&fit[w].open===12),J(fit));
  T('AG: no page errors',q.__errs.length===0,q.__errs.join('|').slice(0,300));
- await done(q);}
+ await done(q);
+ // An old backup that still carries cb2_fuelq:"standard" restores with no error, and Fuel shows the best picks
+ {const q2=await ctxPage('2026-11-18',{});
+  const bk=JSON.stringify({cb2_profile:{weight:88.4,height:177},cb2_weight:[{date:'2026-11-16',v:88.4}],cb2_bulk:'aggr',cb2_fuelq:'standard',cb2_march:'route'});
+  const nav=q2.waitForNavigation({waitUntil:'load',timeout:15000}).catch(()=>null);const rs=await tryEvalAG(q2,t=>applyRestoreText(t),bk);await nav;await wait(900);
+  const r=await tryEvalAG(q2,()=>{switchView('fuel');return {w:DB.weight.length,fq:localStorage.getItem('cb2_fuelq'),best:document.querySelectorAll('#suppStack .tk-best').length,bad:Object.keys(_bad).length,ban:document.getElementById('storageWarnAll').classList.contains('show'),seg:!!document.getElementById('fuelQSeg')};});
+  T('AG restore: an old backup with cb2_fuelq "standard" restores with no error (the weigh-in arrives; the setting is kept, unread) and Fuel shows the 10 best picks',
+    rs===true&&r&&!r.err&&r.w===1&&r.fq==='"standard"'&&r.best===10&&r.bad===0&&!r.ban&&!r.seg&&q2.__errs.length===0,J({rs,r,e:q2.__errs.join('|').slice(0,160)}));
+  await done(q2);}
+}
 // ===== HX. Health layer (28 Oct 2026): mission copy, check-up, walking, Friday cardio, habits, rules, backup, copy greps =====
 // Self-contained (own hx* helpers) so the section can also run alone for mutation proofs. Every step is null-safe.
 {const hxSeed=o=>'localStorage.clear();'+Object.entries(Object.assign({cb2_pure:true},o)).map(([k,v])=>'localStorage.setItem('+JSON.stringify(k)+','+JSON.stringify(JSON.stringify(v))+');').join('');

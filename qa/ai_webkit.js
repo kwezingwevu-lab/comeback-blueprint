@@ -45,6 +45,8 @@ module.exports=async function(T){let cur={iso:'2026-11-28',seed:DEMO()};
   await ev(()=>{const b=document.getElementById('aiMealAdd');if(b)b.click();});await W(250);
   const ml1=await ev(()=>{const o={ls:localStorage.getItem('cb2_meals')||'',tally:((document.getElementById('mealTally')||{}).innerText||'').replace(/\s+/g,' ').slice(0,40)};const b=backupJSON();DB.meals=[];DB.save();o.wiped=localStorage.getItem('cb2_meals');applyRestoreText(b);o.back=(DB.meals||[]).length;o.kcal=((DB.meals||[])[0]||{}).kcal;return o;});
   T('WK meal check: a 16 px box; the estimate (370 kcal · 24 g, summed on the page) is added to today, saved under cb2_meals, and comes back after backup → wipe → restore',ml0.px==='16px'&&/About 370 kcal · 24 g protein/.test(ml0.res)&&/"kcal":370/.test(ml1.ls)&&/^Logged today: 24 g protein/.test(ml1.tally)&&ml1.wiped==='[]'&&ml1.back===1&&ml1.kcal===370,JSON.stringify({ml0,ml1}).slice(0,500));
+  // the meal check's restore reloads the frame up to 2.5 s later: let that reload land before the not_granted step (a read during it threw "execution context destroyed")
+  await W(2700);for(let i=0;i<50;i++){if(await ev(()=>document.readyState==='complete'&&typeof aiOK==='function'&&aiOK())===true)break;await W(150);}
   await ev(()=>{switchView('lift');});await W(200);
   await q.evaluate(()=>{window.__ai={err:'not_granted',delay:40};});await ev(()=>document.querySelector('#view-lift [data-ai-chip="lift:0"]').click());await idle();await W(200);
   const h=await ev(()=>({ok:aiOK(),n:document.querySelectorAll('[data-ai],[data-ai-chip],[data-ai-open],[data-ai-act],#coachWrap').length,lock:getComputedStyle(document.body).overflow}));T('WK not_granted removes every AI control',!h.ok&&h.n===0&&h.lock!=='hidden',JSON.stringify(h));

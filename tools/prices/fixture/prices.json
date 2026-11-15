@@ -1,8 +1,110 @@
-{"date":"2000-01-01","note":"Self-test fixture only (made-up products, never quoted by the app).","records":[
- {"shop":"Takealot","productId":"PLID111","title":"Fixture creatine","price":100},
- {"shop":"Takealot","productId":"PLID222","title":"Fixture whey","price":100},
- {"shop":"Takealot","productId":"PLID333","title":"Fixture caffeine","price":50},
- {"shop":"Woolworths","productId":"9990001","title":"Fixture oats","size":"Fixture oats","price":47.99},
- {"shop":"Woolworths","productId":"9990002","title":"Fixture eggs","size":"Fixture eggs","price":31.99},
- {"shop":"Woolworths","productId":"9990003","title":"Fixture milk","size":"Fixture milk","price":99.99}
-]}
+{
+ "date": "2000-01-01",
+ "note": "Self-test fixture only (made-up products and pages, never quoted by the app).",
+ "records": [
+  {
+   "shop": "Takealot",
+   "productId": "PLID111",
+   "title": "Fixture creatine",
+   "price": 100
+  },
+  {
+   "shop": "Takealot",
+   "productId": "PLID222",
+   "title": "Fixture whey",
+   "price": 100
+  },
+  {
+   "shop": "Takealot",
+   "productId": "PLID333",
+   "title": "Fixture caffeine",
+   "price": 50
+  },
+  {
+   "shop": "Woolworths",
+   "productId": "9990001",
+   "title": "Fixture oats",
+   "size": "Fixture oats",
+   "price": 47.99
+  },
+  {
+   "shop": "Woolworths",
+   "productId": "9990002",
+   "title": "Fixture eggs",
+   "size": "Fixture eggs",
+   "price": 31.99
+  },
+  {
+   "shop": "Woolworths",
+   "productId": "9990003",
+   "title": "Fixture milk",
+   "size": "Fixture milk",
+   "price": 99.99
+  },
+  {
+   "shop": "iHerb",
+   "title": "Fixture casein",
+   "url": "https://fixture.example/ih-casein",
+   "price": 808.34,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Organic Choice",
+   "title": "Fixture chicken",
+   "url": "https://fixture.example/oc-chicken",
+   "price": 299.9,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Momentous",
+   "title": "Fixture D3",
+   "url": "https://fixture.example/mo-d3",
+   "price": 19.99,
+   "currency": "USD"
+  },
+  {
+   "shop": "Virgin City Fields",
+   "title": "Fixture mince",
+   "url": "https://fixture.example/vcf-mince",
+   "price": 130,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "iHerb",
+   "title": "Fixture omega",
+   "url": "https://fixture.example/ih-omega",
+   "price": 961.3,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Virgin City Fields",
+   "title": "Fixture steak",
+   "url": "https://fixture.example/vcf-steak",
+   "price": 155,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "iHerb",
+   "title": "Fixture whey",
+   "url": "https://fixture.example/ih-whey",
+   "price": 3117.16,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Momentous",
+   "title": "Fixture collagen",
+   "url": "https://fixture.example/mo-collagen",
+   "price": 54.99,
+   "currency": "USD"
+  },
+  {
+   "shop": "Momentous",
+   "title": "Fixture shipping quote",
+   "url": "https://fixture.example/cart/shipping_rates.json",
+   "price": 87.2,
+   "currency": "USD",
+   "check": "hand",
+   "why": "a checkout shipping quote, not a product page"
+  }
+ ]
+}

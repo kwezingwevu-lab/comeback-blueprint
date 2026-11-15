@@ -1,2 +1,38 @@
-{"takealot":{"PLID111":{"price":100,"inStock":true},"PLID222":{"price":120,"inStock":true},"PLID333":{"price":50,"inStock":false}},
- "woolworths":{"9990001":{"price":49.99,"inStock":true},"9990003":{"price":99.99,"inStock":true}}}
+{
+ "takealot": {
+  "PLID111": {
+   "price": 100,
+   "inStock": true
+  },
+  "PLID222": {
+   "price": 120,
+   "inStock": true
+  },
+  "PLID333": {
+   "price": 50,
+   "inStock": false
+  }
+ },
+ "woolworths": {
+  "9990001": {
+   "price": 49.99,
+   "inStock": true
+  },
+  "9990003": {
+   "price": 99.99,
+   "inStock": true
+  }
+ },
+ "pages": {
+  "https://fixture.example/ih-casein": "<html><head><script type=\"application/ld&#x2B;json\">{\"@context\": \"https://schema.org\", \"@type\": \"Product\", \"name\": \"Fixture casein\", \"offers\": {\"@type\": \"Offer\", \"price\": \"808.34\", \"priceCurrency\": \"ZAR\", \"availability\": \"https://schema.org/InStock\"}}</script></head></html>",
+  "https://fixture.example/oc-chicken": "<html><script type=\"application/ld+json\">{\"@context\": \"https://schema.org\", \"@graph\": [{\"@type\": \"WebPage\", \"name\": \"x\"}, {\"@type\": \"Product\", \"name\": \"Fixture chicken\", \"offers\": [{\"@type\": \"Offer\", \"price\": \"319.90\", \"priceCurrency\": \"ZAR\", \"availability\": \"http://schema.org/InStock\"}]}]}</script></html>",
+  "https://fixture.example/mo-d3": "<html><script type=\"application/ld+json\">{\"@type\": \"Product\", \"offers\": {\"price\": 19.99, \"priceCurrency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}}</script></html>",
+  "https://fixture.example/vcf-mince": "<html><script type=\"application/ld+json\">not json at all</script><script type=\"application/ld+json\">{\"@type\": [\"Product\"], \"offers\": {\"@type\": \"AggregateOffer\", \"lowPrice\": \"130.00\", \"highPrice\": \"260.00\", \"priceCurrency\": \"ZAR\"}}</script></html>",
+  "https://fixture.example/ih-omega": "<html><script type=\"application/ld&#x2B;json\">{\"@type\": \"Product\", \"offers\": {\"price\": \"961.30\", \"priceCurrency\": \"ZAR\", \"availability\": \"https://schema.org/OutOfStock\"}}</script></html>",
+  "https://fixture.example/vcf-steak": "<html><body><span class=\"price\">R 155.00</span></body></html>",
+  "https://fixture.example/mo-collagen": "<html><script type=\"application/ld+json\">{\"@type\": \"Product\", \"offers\": {\"price\": \"932.82\", \"priceCurrency\": \"ZAR\"}}</script></html>"
+ },
+ "blocked": [
+  "https://fixture.example/ih-whey"
+ ]
+}
