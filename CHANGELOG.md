@@ -1,5 +1,8 @@
 # CHANGELOG.md — what has shipped (newest first)
 
+## 2026-11-15 - An extra lift on a run day counts as planned
+- Kwezi, on Day 1 (Sun 15 Nov): "Let's rather start today with a weights session". He chose an extra session with nothing else moving: Legs A today, the week otherwise as planned, and this week's long run dropped. A lift logged on a day with no planned lift (before Day 1, or an extra session like today) now counts as done and as planned, so today reads 1/5, never 1/4 (`sessionsThisWeek()`). Check DL9. Gate 659/659, AI 115/115, PWA 11/11, both self-tests, WebKit 63/63.
+
 ## 2026-11-14 - Late start: Day 1 is Sun 15 Nov, week 1 still opens Sat 14 Nov (LEDGER 30)
 - Kwezi, on Sat 14 Nov: "I'm starting tomorrow". Day 1 moved one day to Sun 15 Nov (`DAY1_ISO`); the Saturday-start week stayed (`START_ISO` = Sat 14 Nov), so every later date is where it was: deloads from Sat 19 Dec and Sat 30 Jan, strength tests from Sat 30 Jan, the 1 km check on Tue 17 Nov, 5 km trials on 8 Dec, 5 Jan and 26 Jan, Aggressive to 21 May 2027, the race on Fri 12 Feb 2027. `FIRST_ISO` (the later of the two) decides when the plan has started for him.
 - Sat 14 Nov is a day before Day 1 (`preDay1()`): no lift and no run on it, never due, never missed. Week 1 plans four lifts; the Home counter reads 0/4, a missed-week line reads "of 4", and the Track regions pane and the coach text plan only the lift days a week really has (`regionSets(ws)`; this also corrects race week, which has no Legs B).

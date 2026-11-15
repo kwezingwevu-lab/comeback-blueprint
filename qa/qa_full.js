@@ -2543,6 +2543,12 @@ const GOODSLEEP=[{date:'2027-01-25',h:7.6},{date:'2027-01-26',h:7.4},{date:'2027
   const wk2b=await dl('2026-11-21',{cb2_sessions:four.slice(0,3)},()=>({prev:prevWeekLifts(),blk:testBlockers().join(' | ')}));
   T('DL5 week 1 counts: on Day 1 the Home counter reads 0/4 and Saturday in the week strip is not a lift; four logged lifts by Fri 20 Nov are 4 of 4 planned, nothing due; week 2 (from Sat 21 Nov) plans five again; with three of the four logged, "Last week has 3 of 4 lift days logged" (never "of 5"); the Track regions pane and the coach text plan only that week\u2019s lift days (week 1 fewer quad sets than the standard week, week 2 the standard week, race week no Legs B)',
    sun.s.planned===4&&sun.s.due===0&&sun.t&&sun.strip&&!/Legs/.test(sun.strip)&&fri.s.planned===4&&fri.s.lifts===4&&fri.s.due<=4&&fri.home&&wk2.s.planned===5&&wk2.prev===4&&!/Last week has/.test(wk2.blk)&&wk2b.prev===3&&/Last week has 3 of 4 lift days logged/.test(wk2b.blk)&&r1.wk<r1.std&&r1.quads.includes('0 / '+r1.wk)&&r1.coach==='quads 0/'+r1.wk&&r2.wk===r2.std&&r2.quads.includes('0 / '+r2.std)&&r13.wk<r13.std&&sun.errs+fri.errs+wk2.errs+wk2b.errs+r1.errs+r2.errs+r13.errs===0,J({sun,fri,wk2,wk2b,r1,r2,r13}));}
+ // DL9 an extra lift on a day with none planned (Kwezi, Sun 15 Nov: Legs A on Day 1, nothing else moves) counts as done and planned
+ {const sunL=[S('2026-11-15','legsA',{la1:sets([[5,60]])})];
+  const d15=await dl('2026-11-15',{cb2_sessions:sunL},()=>({s:sessionsThisWeek(),c:((document.querySelector('.compcard.lift .cc-v')||{}).textContent||'')}));
+  const d20=await dl('2026-11-20',{cb2_sessions:sunL.concat([S('2026-11-16','pushA',{pa1:sets([[5,60]])})])},()=>({s:sessionsThisWeek()}));
+  T('DL9 extra lift: Legs A logged on Sun 15 Nov (a run day) reads 1/5 that day, never 1/4; by Fri 20 Nov with Push A too it is 2 of 5 planned, never more done than planned',
+   d15.s.planned===5&&d15.s.lifts===1&&d15.c==='1/5'&&d20.s.planned===5&&d20.s.lifts===2&&d15.errs+d20.errs===0,J({d15,d20}));}
  // DL6 what is counted from his first day: the 22-day block, the creatine load and the Day-1 windows
  {const g=()=>({live:p22Live(),day:p22Day(),end:p22End(),span:p22Span(' to '),chip:(document.getElementById('p22Chip')||{}).textContent||'',cre:creLoadDay(),home:document.getElementById('view-home').innerText});
   const d1=await dl('2026-11-15',{},g),d7=await dl('2026-11-21',{},g),d8=await dl('2026-11-22',{},g),d21=await dl('2026-12-05',{},g),d22=await dl('2026-12-06',{},g),d23=await dl('2026-12-07',{},g);

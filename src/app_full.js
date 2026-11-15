@@ -181,7 +181,7 @@ function uniqDay(a){const seen={};return a.filter(x=>{const k=x.dateISO+"|"+x.da
 function sessionsThisWeek(){const wk=planWeek(),s=weekStartISO(wk),e=dateAdd(s,7),t=todayISO(),tmpl=weekTemplate(),tiAt=iso=>tmpl.find(x=>x.day===DOW[new Date(iso+"T12:00:00").getDay()]);
   const logged=x=>x.dateISO>=s&&x.dateISO<e&&Object.values(x.entries||{}).some(arr=>(arr||[]).some(okSet));
   const main=uniqDay(DB.sessions.filter(x=>logged(x)&&(x.day!=="extras"))),pump=uniqDay(DB.sessions.filter(x=>logged(x)&&x.day==="extras")).length;
-  let planned=0,due=0,dueNow=0;for(let i=0;i<7;i++){const d=dateAdd(s,i);if(!liftKeyFor(d)&&!(preDay1(d)&&main.some(x=>x.dateISO===d)))continue;planned++;if(d<t)due++;if(d<=t)dueNow++;} // a session logged before Day 1 is done and planned, never 5 of 4
+  let planned=0,due=0,dueNow=0;for(let i=0;i<7;i++){const d=dateAdd(s,i);if(!liftKeyFor(d)&&!main.some(x=>x.dateISO===d))continue;planned++;if(d<t)due++;if(d<=t)dueNow++;} // a lift logged on a day with none planned (before Day 1, or an extra session) is done and planned, never 5 of 4
   if(DB.profile.phase==="build"){const left=dayDiff(t,e);planned=4;due=Math.max(0,Math.min(4,4-left));dueNow=Math.max(0,Math.min(4,5-left));}
   const runs=DB.runs.filter(x=>x.date>=s&&x.date<e).length;return {lifts:main.length,before:main.filter(x=>x.dateISO<t).length,planned,due,dueNow,pump,runs};}
 function e1rm(w,r){w=parseFloat(w);r=parseFloat(r);if(!w||!r||w<=0||r<=0)return 0;return w*(1+r/30);}
