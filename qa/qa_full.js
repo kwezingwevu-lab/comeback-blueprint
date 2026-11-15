@@ -2549,6 +2549,13 @@ const GOODSLEEP=[{date:'2027-01-25',h:7.6},{date:'2027-01-26',h:7.4},{date:'2027
   const d20=await dl('2026-11-20',{cb2_sessions:sunL.concat([S('2026-11-16','pushA',{pa1:sets([[5,60]])})])},()=>({s:sessionsThisWeek()}));
   T('DL9 extra lift: Legs A logged on Sun 15 Nov (a run day) reads 1/5 that day, never 1/4; by Fri 20 Nov with Push A too it is 2 of 5 planned, never more done than planned',
    d15.s.planned===5&&d15.s.lifts===1&&d15.c==='1/5'&&d20.s.planned===5&&d20.s.lifts===2&&d15.errs+d20.errs===0,J({d15,d20}));}
+ // DL10 lifts are matched by the lift, not the date: a moved session is n of n, and a lift done twice never stands in for the one skipped
+ {const wk2=[S('2026-11-21','legsA',{ga1:sets([[5,60]])}),S('2026-11-23','pushA',{pa1:sets([[5,60]])}),S('2026-11-24','pullA',{la1:sets([[5,60]])})];
+  const moved=await dl('2026-11-24',{cb2_sessions:wk2},()=>({s:sessionsThisWeek(),c:((document.querySelector('.compcard.lift .cc-v')||{}).textContent||'')}));
+  const allMoved=await dl('2026-11-27',{cb2_sessions:wk2.concat([S('2026-11-26','legsB',{gb1:sets([[5,100]])}),S('2026-11-27','upperB',{pb1:sets([[5,40]])})])},()=>({s:sessionsThisWeek(),c:((document.querySelector('.compcard.lift .cc-v')||{}).textContent||'')}));
+  const twice=await dl('2026-11-27',{cb2_sessions:[S('2026-11-21','legsA',{ga1:sets([[5,60]])}),S('2026-11-22','legsA',{ga1:sets([[5,60]])}),S('2026-11-23','pushA',{pa1:sets([[5,60]])}),S('2026-11-25','pullA',{la1:sets([[5,60]])}),S('2026-11-27','upperB',{pb1:sets([[5,40]])})]},()=>({s:sessionsThisWeek(),c:((document.querySelector('.compcard.lift .cc-v')||{}).textContent||'')}));
+  T('DL10 moved and doubled lifts: Pull A done on Tue 24 Nov instead of Wed reads 3/5 that day (never 3/6) and the full week 5/5; Legs A done twice with Legs B skipped is 5 of 6 (the extra never stands in for the skipped lift)',
+   moved.s.planned===5&&moved.s.lifts===3&&moved.c==='3/5'&&allMoved.s.planned===5&&allMoved.s.lifts===5&&allMoved.c==='5/5'&&twice.s.planned===6&&twice.s.lifts===5&&twice.c==='5/6'&&moved.errs+allMoved.errs+twice.errs===0,J({moved,allMoved,twice}));}
  // DL6 what is counted from his first day: the 22-day block, the creatine load and the Day-1 windows
  {const g=()=>({live:p22Live(),day:p22Day(),end:p22End(),span:p22Span(' to '),chip:(document.getElementById('p22Chip')||{}).textContent||'',cre:creLoadDay(),home:document.getElementById('view-home').innerText});
   const d1=await dl('2026-11-15',{},g),d7=await dl('2026-11-21',{},g),d8=await dl('2026-11-22',{},g),d21=await dl('2026-12-05',{},g),d22=await dl('2026-12-06',{},g),d23=await dl('2026-12-07',{},g);

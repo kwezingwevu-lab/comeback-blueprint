@@ -1,5 +1,8 @@
 # CHANGELOG.md — what has shipped (newest first)
 
+## 2026-11-15 - A moved lift counts as the lift it is (DL10)
+- A lift done on a different day from the plan now fills the planned lift it matches: Pull A done on Tuesday instead of Wednesday reads 3 of 5 that day, and a full week is 5 of 5. A lift done twice never stands in for one skipped (Legs A twice with Legs B missed is 5 of 6). Extras still count as done and planned. Check DL10. Gate 660/660, AI 115/115, PWA 11/11, both self-tests, WebKit 63/63.
+
 ## 2026-11-15 - An extra lift on a run day counts as planned
 - Kwezi, on Day 1 (Sun 15 Nov): "Let's rather start today with a weights session". He chose an extra session with nothing else moving: Legs A today, the week otherwise as planned, and this week's long run dropped. A lift logged on a day with no planned lift (before Day 1, or an extra session like today) now counts as done and as planned, so today reads 1/5, never 1/4 (`sessionsThisWeek()`). Check DL9. Gate 659/659, AI 115/115, PWA 11/11, both self-tests, WebKit 63/63.
 
