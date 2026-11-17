@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 // Price drift check for The Comeback Blueprint.
 // Reads the newest tools/prices/YYYY-MM-DD.json (every price the app quotes) and asks each shop for each
-// product again: Takealot and Woolworths through their product APIs, every other shop (iHerb, the brand
-// stores, the specialist food shops) by fetching the product page and reading the JSON-LD offer price with
-// JSON.parse. It prints what moved: changed prices, out of stock, products that can no longer be found, and
-// "check by hand" with the URL for anything it cannot read (a blocked page, no JSON-LD price, a different
-// currency, a shipping quote). Exit 1 when anything moved or needs a hand check, 0 when every price still
+// product again: Takealot and Woolworths through their product APIs, every other shop (Dis-Chem, Wellness
+// Warehouse, Faithful to Nature, the brands' own South African stores) by fetching the product page and reading
+// the JSON-LD offer price with JSON.parse, or, on a Shopify store with no JSON-LD price (Wellness Warehouse and
+// the brand stores), the product's own .js record. It prints what moved: changed prices, out of stock, products
+// that can no longer be found, and "check by hand" with the URL for anything it cannot read (a blocked page, no
+// price, a different currency, a random-mass pack priced per kg, a Dis-Chem page whose offer price is a special
+// while the app quotes the shelf price). Exit 1 when anything moved or needs a hand check, 0 when every price still
 // matches. It never edits the app; a person updates src/app_full.js and writes a new dated evidence file.
 //   node tools/price-refresh.js            live check (needs curl and network)
 //   node tools/price-refresh.js --selftest offline check against tools/prices/fixture/
@@ -86,8 +88,18 @@ const live = {
     }
     return null;
   },
-  page(url) { return pageOffer(curlText(url, { 'User-Agent': UA, Accept: 'text/html' })); }
+  page(url) { return pageOffer(curlText(url, { 'User-Agent': UA, Accept: 'text/html' })); },
+  // Shopify's product record: prices in cents, availability per variant (the first variant is the pack the app quotes).
+  shopify(url) {
+    const t = curlText(url.split('?')[0].replace(/\/$/, '') + '.js', { 'User-Agent': UA, Accept: 'application/json' });
+    if (/^\s*</.test(t)) throw new Error('the store answered with a web page (a bot check?), not its product record');
+    const d = JSON.parse(t);
+    const v = d && d.variants && d.variants[0];
+    return v ? { price: Number(v.price) / 100, inStock: v.available !== false, currency: null } : null;
+  }
 };
+const SHOPIFY = ['wellnesswarehouse.com', 'usn.co.za', 'www.npl.za.com', 'primeself.co.za', 'optimumnutrition.co.za'];
+const isShopify = u => { try { return SHOPIFY.includes(new URL(u).hostname); } catch (e) { return false; } };
 
 // Compare one evidence file against a source of current prices. Returns {moved, hand, same}.
 function check(doc, src) {
@@ -102,11 +114,20 @@ function check(doc, src) {
     let now = null, err = null, viaPage = false;
     try {
       if (r.shop === 'Takealot' && r.productId) now = src.takealot(r.productId);
-      else if (r.shop === 'Woolworths' && r.productId) now = src.woolworths(r.productId, r.title);
-      else { viaPage = true; now = src.page(r.url); }
+      else if (r.shop === 'Woolworths' && r.productId) {
+        now = src.woolworths(r.productId, r.title);
+        // The catalogue search can miss a live product (Organic Potatoes 1.5 kg on 17 Nov 2026): read its own page before calling it missing.
+        if (!now && r.url) { try { now = src.page(r.url); } catch (e) { now = null; } }
+      }
+      else {
+        viaPage = true;
+        try { now = src.page(r.url); } catch (e) { err = e.message; }
+        if (!now && isShopify(r.url) && src.shopify) { err = null; now = src.shopify(r.url); }
+      }
     } catch (e) { err = e.message; }
     if (viaPage && (err || !now)) { hand.push('CHECK BY HAND ' + label + ': ' + (err ? 'page not read (' + err.split('\n')[0] + ')' : 'no JSON-LD price on the page') + ' ' + r.url); continue; }
     if (viaPage && now.currency && now.currency !== cur) { hand.push('CHECK BY HAND ' + label + ': the page prices in ' + now.currency + ', the record in ' + cur + ' ' + r.url); continue; }
+    if (viaPage && r.special != null && Math.abs(Number(now.price) - Number(r.special)) <= 0.004) { hand.push('CHECK BY HAND ' + label + ': the page offers the special ' + sym + now.price + '; the shelf price ' + sym + r.price + ' the app quotes is not in its JSON-LD ' + r.url); continue; }
     if (err) moved.push('ERROR    ' + label + ': ' + err);
     else if (!now) moved.push('MISSING  ' + label + ': not found any more');
     else if (now.inStock === false) moved.push('NO STOCK ' + label + ': ' + sym + now.price + ' but out of stock');
@@ -129,27 +150,33 @@ function selftest() {
   const src = {
     takealot: id => canned.takealot[id] || null,
     woolworths: id => canned.woolworths[id] || null,
-    page: url => { if (canned.blocked && canned.blocked.includes(url)) throw new Error('HTTP 403'); return url in canned.pages ? pageOffer(canned.pages[url]) : null; }
+    page: url => { if (canned.blocked && canned.blocked.includes(url)) throw new Error('HTTP 403'); return url in canned.pages ? pageOffer(canned.pages[url]) : null; },
+    shopify: url => { const v = canned.shopify && canned.shopify[url]; return v ? { price: v.price / 100, inStock: v.available !== false, currency: null } : null; }
   };
   const res = check(doc, src);
   const ok = [];
   const want = (name, cond) => { ok.push([name, !!cond]); };
-  want('unchanged price is quiet', res.same.some(l => l.includes('PLID111')));
+  want('unchanged Takealot price is quiet', res.same.some(l => l.includes('PLID111')));
   want('changed Takealot price reported', res.moved.some(l => /^CHANGED .*PLID222.*R100 -> R120/.test(l)));
   want('out of stock reported', res.moved.some(l => /^NO STOCK .*PLID333/.test(l)));
   want('missing Woolworths product reported', res.moved.some(l => /^MISSING .*9990002/.test(l)));
   want('changed Woolworths price reported', res.moved.some(l => /^CHANGED .*9990001.*R47.99 -> R49.99/.test(l)));
-  want('page shop: same JSON-LD price (iHerb escapes the plus sign) is quiet', res.same.some(l => l.includes('Fixture casein')));
-  want('page shop: a price inside @graph that moved is reported', res.moved.some(l => /^CHANGED .*Fixture chicken.*R299.9 -> R319.9/.test(l)));
-  want('page shop: a foreign price in its own currency is compared as such', res.same.some(l => l.includes('Fixture D3')));
-  want('page shop: AggregateOffer lowPrice is read', res.same.some(l => l.includes('Fixture mince')));
-  want('page shop: out of stock from the offer availability', res.moved.some(l => /^NO STOCK .*Fixture omega/.test(l)));
-  want('page shop: no JSON-LD price means check by hand, with the URL', res.hand.some(l => /^CHECK BY HAND .*Fixture steak.*no JSON-LD price.*https:\/\/fixture\.example\/vcf-steak/.test(l)));
-  want('page shop: a blocked page means check by hand', res.hand.some(l => /^CHECK BY HAND .*Fixture whey.*page not read \(HTTP 403\)/.test(l)));
-  want('page shop: a different currency on the page means check by hand', res.hand.some(l => /^CHECK BY HAND .*Fixture collagen.*prices in ZAR, the record in USD/.test(l)));
-  want('a shipping quote is always a hand check', res.hand.some(l => /^CHECK BY HAND .*Fixture shipping quote/.test(l)));
+  want('a Woolworths product the search misses is read from its own page', res.same.some(l => l.includes('9990005')) && !res.moved.some(l => l.includes('9990005')));
+  want('a Woolworths pack priced per kg is a hand check', res.hand.some(l => /^CHECK BY HAND .*Fixture chicken per kg.*priced per kg/.test(l)));
+  want('Dis-Chem: the same JSON-LD shelf price is quiet', res.same.some(l => l.includes('Fixture caffeine DC')));
+  want('Dis-Chem: a special in the JSON-LD is a hand check naming both prices, not a moved price', res.hand.some(l => /^CHECK BY HAND .*Fixture creatine DC.*special R391.49; the shelf price R434.99/.test(l)) && !res.moved.some(l => l.includes('Fixture creatine DC')));
+  want('Dis-Chem: a blocked page means check by hand', res.hand.some(l => /^CHECK BY HAND .*Fixture citrulline DC.*page not read \(HTTP 403\)/.test(l)));
+  want('Wellness Warehouse: a price inside @graph that moved is reported', res.moved.some(l => /^CHANGED .*Fixture omega WW.*R399.95 -> R429.95/.test(l)));
+  want('Wellness Warehouse: no JSON-LD price, the Shopify product record is read (cents to rand)', res.same.some(l => l.includes('Fixture D3 WW')));
+  want('Wellness Warehouse: the Shopify record says unavailable, out of stock reported', res.moved.some(l => /^NO STOCK .*Fixture magnesium WW/.test(l)));
+  want('Wellness Warehouse: a page in another currency means check by hand', res.hand.some(l => /^CHECK BY HAND .*Fixture collagen WW.*prices in USD, the record in ZAR/.test(l)));
+  want('Faithful to Nature: an escaped plus sign in the script type is read', res.same.some(l => l.includes('Fixture beta-alanine FtN')));
+  want('Faithful to Nature: AggregateOffer lowPrice is read after a block that is not JSON', res.same.some(l => l.includes('Fixture oats FtN')));
+  want('Faithful to Nature: out of stock from the offer availability', res.moved.some(l => /^NO STOCK .*Fixture almonds FtN/.test(l)));
+  want('Faithful to Nature: no JSON-LD price (not a Shopify store) means check by hand, with the URL', res.hand.some(l => /^CHECK BY HAND .*Fixture raisins FtN.*no JSON-LD price.*https:\/\/fixture\.example\/ftn-raisins/.test(l)));
+  want('a brand store read from its product list is always a hand check', res.hand.some(l => /^CHECK BY HAND .*Fixture whey USN.*product list/.test(l)));
   want('a script block that is not JSON is skipped, not guessed', pageOffer('<script type="application/ld+json">{price: 5}</script>') === null);
-  want('exactly six moved lines and four hand checks', res.moved.length === 6 && res.hand.length === 4);
+  want('exactly seven moved lines, six hand checks and seven unchanged', res.moved.length === 7 && res.hand.length === 6 && res.same.length === 7);
   const newest = path.basename(newestFile(path.join(__dirname, 'prices')));
   want('newest dated evidence file is found', /^\d{4}-\d{2}-\d{2}\.json$/.test(newest));
   const fails = ok.filter(x => !x[1]);

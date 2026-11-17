@@ -1720,82 +1720,122 @@ const GOODSLEEP=[{date:'2027-01-25',h:7.6},{date:'2027-01-26',h:7.4},{date:'2027
  const r=await ev(q,(a)=>{eval(a.H);const bad=[];for(const [d,id] of a.MAIN){showDay(d);const ex=exOf(id);ex.querySelectorAll('.cell').forEach(c=>{if(!/^Set \d+ (reps|weight in kg|RPE), (top set|back-off), \S/.test(c.getAttribute('aria-label')||''))bad.push(c.getAttribute('aria-label'));});ex.querySelectorAll('.chk').forEach(c=>{if(!/^Set \d+ done, (top set|back-off), \S/.test(c.getAttribute('aria-label')||''))bad.push(c.getAttribute('aria-label'));});}return bad.slice(0,3);},{H,MAIN});
  T('AF a11y: every top-set and back-off field and tick is named "Set N … , top set|back-off, <exercise>"',!r.err&&Array.isArray(r)&&r.length===0,JSON.stringify(r));await done(q);}
 }
-// ===== AG. The best pick for every item, sourced anywhere (15 Nov 2026, LEDGER 24-25; was Takealot and Woolworths only) =====
+// ===== AG. The best pick for every item from a trusted South African shop (17 Nov 2026, LEDGER 24-25; 15 Nov: sourced anywhere; before that Takealot and Woolworths only) =====
 {const tryEvalAG=async(q,fn,arg)=>{try{return await q.evaluate(fn,arg);}catch(e){return {err:String(e&&e.message||e).slice(0,160)};}};
  const J=JSON.stringify;
- const PRICE=/^R[\d,]+(\.\d\d)? at [A-Za-z][\w .'&-]+ \(verified 15 Nov 2026\)$/;
- // A converted price: the source price in its own currency is the verified figure; the rand figure says est., the rate and the rate's date.
- const PRICE_EST=/^(\$|£|C\$)\d[\d,]*\.\d\d at [A-Za-z][\w .'&-]+ \(verified 15 Nov 2026\); about R[\d,]+ est\., converted at R\d+\.\d{4} per (US dollar|pound|Canadian dollar) \(ECB reference rate, 13 Nov 2026\)$/;
+ // One price segment: "R… at <shop> (verified <d Mon yyyy>)"; a pick's price is one or more segments, each optionally followed by " for …", joined by "; ".
+ const SEG='R[\\d,]+(?:\\.\\d\\d)? at [A-Za-z][\\w .\'&-]*? \\(verified \\d{1,2} [A-Z][a-z]{2} \\d{4}\\)';
+ const PRICE=new RegExp('^'+SEG+'(?: for [^;]+)?(?:; '+SEG+'(?: for [^;]+)?)*$');
+ const SEGS=s=>[...String(s).matchAll(/R([\d,]+(?:\.\d\d)?) at ([A-Za-z][\w .'&-]*?) \(verified (\d{1,2} [A-Z][a-z]{2} \d{4})\)/g)].map(m=>({v:+m[1].replace(/,/g,''),shop:m[2],date:m[3],txt:m[0]}));
+ const MON={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+ const ISO=d=>{const m=String(d).match(/^(\d{1,2}) ([A-Z][a-z]{2}) (\d{4})$/);return m?m[3]+'-'+MON[m[2]]+'-'+m[1].padStart(2,'0'):null;};
+ // Words from the import era (15 Nov 2026) that must not come back on Fuel, the Guide or the Win Plan money card.
+ const BANNED=/iHerb|Momentous|Transparent Labs|Organic Choice|Virgin City Fields|The Dough|Aramex|\bduties\b|\bimport(?:s|ed|ing|er|ers)?\b|grass-fed|grass fed|pasture-raised|pasture raised/i;
  // The page carries an old backup's Standard/Premium setting (cb2_fuelq): it must change nothing.
  const q=await ctxPage('2026-11-18',{cb2_fuelq:'standard'});
  const f=await tryEvalAG(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('fuel');await W(300);
    document.querySelectorAll('#suppStack .supp-h').forEach(h=>{if(!h.classList.contains('open'))h.click();});await W(100);
    const items=SUPP_TIERS.flatMap(t=>t.items);
    const cards=[...document.querySelectorAll('#suppStack .supp')].map(c=>{const g=s=>c.querySelectorAll(s).length,tx=s=>(c.querySelector(s)||{}).textContent||'';
-     return {n:tx('.supp-n'),best:g('.tk-best'),none:g('.tk-none'),cert:g('.tk-cert'),nocert:g('.tk-nocert'),price:tx('.tk-best .tk-price').trim(),certTxt:tx('.tk-cert'),m:tx('.tk-best .tk-m')};});
-   const data=items.map(i=>({n:i.n,none:!!(i.best&&i.best.none),buy:!!(i.best&&!i.best.none),cv:!!(i.best&&i.best.cert&&i.best.cert.verified),cn:(i.best&&i.best.cert&&i.best.cert.name)||'',m:i.best&&i.best.m,dose:(i.best&&i.best.dose)||'',est:(i.best&&i.best.est)||null,price:i.best&&i.best.price,shop:i.best&&i.best.shop,pick:i.best&&i.best.pick,old:('std' in i)||('prem' in i)}));
+     return {n:tx('.supp-n'),best:g('.tk-best'),none:g('.tk-none'),cert:g('.tk-cert'),nocert:g('.tk-nocert'),also:g('.tk-also'),old:g('.tk-imp,.tk-loc'),price:tx('.tk-best .tk-price').trim(),certTxt:tx('.tk-cert'),m:tx('.tk-best .tk-m'),alsoTxt:tx('.tk-also'),note:tx('.tk-best .tk-note')};});
+   const data=items.map(i=>({n:i.n,none:!!(i.best&&i.best.none),buy:!!(i.best&&!i.best.none),cv:!!(i.best&&i.best.cert&&i.best.cert.verified),cn:(i.best&&i.best.cert&&i.best.cert.name)||'',cd:(i.best&&i.best.cert&&i.best.cert.date)||'',m:i.best&&i.best.m,dose:(i.best&&i.best.dose)||'',
+     est:!!(i.best&&('est' in i.best)),imp:!!(i.best&&('imp' in i.best||'loc' in i.best)),price:i.best&&i.best.price,shop:i.best&&i.best.shop,shops:(i.best&&i.best.shops)||null,stores:i.best&&i.best.stores,short:(i.best&&i.best.short)||'',also:(i.best&&i.best.also)||'',pick:i.best&&i.best.pick,old:('std' in i)||('prem' in i)}));
    const rows=[...document.querySelectorAll('#suppPriceTbl .sp-row')].map(r=>({n:r.querySelector('.pt-n').firstChild.textContent,small:(r.querySelector('.pt-n small')||{}).textContent||'',p:r.querySelector('.pt-p').textContent,g:r.querySelector('.pt-g').textContent}));
-   return {cards,data,rows,estNote:(document.getElementById('estNote')||{}).textContent||'',seg:document.querySelectorAll('#fuelQSeg,#view-fuel [data-q]').length,stackTotal:(document.getElementById('stackTotal')||{}).textContent||null,where:(document.getElementById('whereBuy')||{}).textContent||'',
+   const wb=[...document.querySelectorAll('#whereBuy .wb-pick')].map(e=>({n:e.dataset.pick,t:e.textContent}));
+   return {cards,data,rows,wb,estNote:!!document.getElementById('estNote'),seg:document.querySelectorAll('#fuelQSeg,#view-fuel [data-q]').length,stackTotal:(document.getElementById('stackTotal')||{}).textContent||null,stackNote:(document.getElementById('stackNote')||{}).textContent||'',where:(document.getElementById('whereBuy')||{}).textContent||'',
+     slow:{c:SLOW_PRO.casein,k:SLOW_PRO.cottage},slowRow:[...document.querySelectorAll('#view-fuel .tblk-item')].map(e=>e.textContent).find(t=>/Slow protein before bed/.test(t))||'',
+     shops:typeof FUEL_SHOPS!=='undefined'&&Array.isArray(FUEL_SHOPS)?FUEL_SHOPS.slice():null,brands:typeof FUEL_BRAND_STORES!=='undefined'&&Array.isArray(FUEL_BRAND_STORES)?FUEL_BRAND_STORES.slice():null,
      fuelTxt:document.getElementById('view-fuel').textContent,mode:typeof fuelQ,stored:localStorage.getItem('cb2_fuelq')};});
  const ok=f&&!f.err,buy=ok?f.data.filter(d=>d.buy):[],none=ok?f.data.filter(d=>d.none):[];
  const card=n=>(ok&&f.cards.find(c=>c.n===n))||{};
+ const shopsOf=d=>d.shops&&d.shops.length?d.shops:[d.shop];
+ const trusted=x=>ok&&!!f.shops&&!!f.brands&&(f.shops.includes(x)||f.brands.includes(x));
  T('AG picks: each of the 10 bought items shows exactly one best pick, carbohydrate and iron show "Nothing to buy"; no Standard/Premium switch or std/prem data is left, and an old backup\'s cb2_fuelq setting is ignored',
    ok&&buy.length===10&&buy.every(d=>card(d.n).best===1&&card(d.n).none===0)&&none.length===2&&none.every(d=>card(d.n).best===0&&card(d.n).none===1)&&f.cards.length===12&&f.seg===0&&f.data.every(d=>!d.old)&&f.mode==='undefined'&&f.stored==='"standard"'&&!/Premium pick|Standard picks|Takealot pick|budget open/.test(f.fuelTxt),
    J(ok?{buy:buy.length,none:none.length,seg:f.seg,mode:f.mode,bad:f.cards.filter(c=>c.best+c.none!==1).map(c=>c.n)}:f));
- T('AG prices: every best-pick price is "R… at <its shop> (verified 15 Nov 2026)", or a source price in its own currency with the rand figure marked "est." with the rate and its date (and only those carry an est record); the card shows the price the data holds',
-   buy.length===10&&buy.every(d=>(d.est?(PRICE_EST.test(d.price)&&d.price.startsWith(d.est.amt+' at ')&&d.price.includes('converted at '+d.est.rate+' ('+d.est.src+', '+d.est.date+')')):PRICE.test(d.price))&&d.price.includes(' at '+d.shop+' (verified')&&card(d.n).price===d.price),
-   J(buy.filter(d=>!(PRICE.test(d.price)||PRICE_EST.test(d.price))||card(d.n).price!==d.price).map(d=>[d.n,d.price,card(d.n).price])));
- T('AG certification: a certification line (the mark and the database check) only on the items whose data says verified; every other bought item says plainly it carries none',
-   buy.length===10&&buy.some(d=>d.cv)&&buy.every(d=>{const c=card(d.n);return d.cv?(c.cert===1&&c.nocert===0&&c.certTxt.includes(d.cn)&&/certifier’s own database, checked 15 Nov 2026/.test(c.certTxt)):(c.cert===0&&c.nocert===1);}),
-   J(buy.map(d=>[d.n,d.cv,card(d.n).cert,card(d.n).nocert])));
+ T('AG prices: every best-pick price is one or more "R… at <shop> (verified <date>)" (a second product follows "; "), the first names the pick\'s shop and every one names a shop on the pick; the card shows the price the data holds',
+   buy.length===10&&buy.every(d=>PRICE.test(d.price)&&SEGS(d.price).length>=1&&SEGS(d.price)[0].shop===d.shop&&SEGS(d.price).every(x=>shopsOf(d).includes(x.shop))&&shopsOf(d).every(s=>SEGS(d.price).some(x=>x.shop===s))&&card(d.n).price===d.price),
+   J(buy.filter(d=>!PRICE.test(d.price)||card(d.n).price!==d.price||!SEGS(d.price).every(x=>shopsOf(d).includes(x.shop))).map(d=>[d.n,d.price,card(d.n).price])));
+ const PG=ok?f.rows.map(r=>r.p).join(' | '):'';
+ T('AG no converted price: no pick carries an estimate or an import note, no price on Fuel is in another currency or says "est." or "converted", and the estimate note is gone',
+   ok&&buy.length===10&&buy.every(d=>!d.est&&!d.imp&&card(d.n).old===0)&&!f.estNote&&!/[$£€]\s?\d|\best\.|converted at|ECB reference/.test(f.fuelTxt)&&f.rows.every(r=>/^R[\d,]+(\.\d\d)?( \+ R[\d,]+(\.\d\d)?)*$/.test(r.p)),
+   J(ok&&{est:buy.filter(d=>d.est||d.imp).map(d=>d.n),old:f.cards.filter(c=>c.old).map(c=>c.n),note:f.estNote,cur:(f.fuelTxt.match(/[$£€]\s?\d[^ ]*|\best\.|converted at|ECB reference/)||[])[0],pg:PG.slice(0,120)}));
+ T('AG certification: a certification line (the mark and the day it was checked on the certifier\'s database) only on the items whose data says verified; every other bought item says plainly it carries none',
+   buy.length===10&&buy.some(d=>d.cv)&&buy.every(d=>{const c=card(d.n);return d.cv?(c.cert===1&&c.nocert===0&&c.certTxt.includes(d.cn)&&!!ISO(d.cd)&&c.certTxt.includes('certifier’s own database, checked '+d.cd)):(c.cert===0&&c.nocert===1);}),
+   J(buy.map(d=>[d.n,d.cv,d.cd,card(d.n).cert,card(d.n).nocert])));
+ const cv=buy.filter(d=>d.cv),nW=['no','one','two','three','four','five','six','seven','eight','nine','ten'];
+ T('AG stack note: it says how many bought items carry a mark verified on the certifier\'s database (two today: the creatine and the whey), names each mark, and says that for the others no trusted South African shop stocks a certified version',
+   ok&&cv.length===2&&cv.map(d=>d.short).join()==='creatine,whey'&&f.stackNote.includes(nW[cv.length]+' of the '+buy.length+' items you would buy carry a sport-testing mark verified on the certifier’s own database')&&cv.every(d=>f.stackNote.includes(d.cn+' on the '+d.short))&&f.stackNote.includes('For the other '+nW[buy.length-cv.length]+', no trusted South African shop stocks a certified version'),
+   J(ok&&{cv:cv.map(d=>d.n),note:f.stackNote.slice(0,330)}));
  const sum=buy.reduce((a,d)=>a+d.m,0),shown=ok&&f.stackTotal?+f.stackTotal.replace(/[^\d]/g,''):NaN;
  T('AG stack: #stackTotal equals the sum of the monthly costs',buy.length===10&&sum>0&&shown===sum&&buy.every(d=>Number.isInteger(d.m)),J({shown:ok&&f.stackTotal,sum}));
  const fmtI=n=>String(n).replace(/\B(?=(\d{3})+(?!\d))/g,',');
- T('AG dose line: every card states its monthly cost at its own named dose ("About R… a month at 5 g a day"), never "the dose above" (which sits under the highest dose)',
-   buy.length===10&&buy.every(d=>d.dose.length>3&&!/dose above/.test(d.dose)&&card(d.n).m==='About R'+fmtI(d.m)+' a month at '+d.dose),J(buy.filter(d=>card(d.n).m!=='About R'+fmtI(d.m)+' a month at '+d.dose).map(d=>[d.n,card(d.n).m])));
- T('AG price guide: one row per bought item with the pick, the item and its shop, the shelf price from its card and the same monthly cost',
-   ok&&f.rows.length===10&&f.rows.every((r,i)=>{const d=buy[i];return !!d&&r.n===d.pick&&r.small===d.n+' · '+d.shop&&(d.est?/^≈R[\d,]+ est\.$/.test(r.p)&&d.price.includes('about '+r.p.slice(1)+',')&&/\(verified/.test(d.price):d.price.startsWith(r.p+' at '))&&r.g.replace(/[^\d]/g,'')===String(d.m);}),J(ok&&f.rows.slice(0,2)));
- const ests=buy.filter(d=>d.est);
- T('AG estimates: under the price guide one note says a converted figure is an estimate, not a verified price, and gives each one\'s source price, the rate and the rate\'s date',
-   ok&&(ests.length===0?f.estNote==='':(/not a verified price/.test(f.estNote)&&ests.every(d=>f.estNote.includes(d.pick+' ('+d.est.amt+')')&&f.estNote.includes('converted at '+d.est.rate+' ('+d.est.src+', '+d.est.date+')')))),J(ok&&{n:ests.length,note:f.estNote.slice(0,240)}));
- T('AG where to buy: the note names every shop on the list, says that with Aramex DDP iHerb collects duties, VAT and import fees at checkout and nothing is due on delivery, and that an import takes longer',
-   ok&&[...new Set(buy.map(d=>d.shop))].every(s=>f.where.includes(s))&&(!buy.some(d=>d.shop==='iHerb')||(/Aramex DDP/.test(f.where)&&/collected at checkout and nothing is due on delivery/.test(f.where)&&/checkout total is the real price/.test(f.where)))&&/takes longer than a local delivery/.test(f.where),J(ok&&f.where.slice(0,260)));
- // Copy from the old rule is gone from Fuel and the Guide (the home-gym equipment tier is left out by element and is still there)
- const g=await tryEvalAG(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('guide');await W(250);const v=document.getElementById('view-guide');if(!v)return null;const c=v.cloneNode(true);const kit=c.querySelectorAll('[data-kit="equipment"]').length;
-   const fit=!!(v.querySelector('[data-kit="equipment"]')&&/FitArc/.test(v.querySelector('[data-kit="equipment"]').textContent));c.querySelectorAll('[data-kit="equipment"]').forEach(e=>e.remove());return {txt:c.textContent,kit,fit};});
- const STALE=/Takealot only|priced at Takealot|on Woolworths food|from Woolworths|food at Woolworths|Woolworths item|Premium pick|Standard picks|PREMIUM|budget open|verified 28 Oct 2026|Cheaper Choices|Takealot Price Guide/;
- T('AG copy: Fuel and the Guide carry no copy from the Takealot/Woolworths rule or the Standard/Premium switch, and the Guide money card quotes the 15 Nov picks',
-   ok&&g&&!g.err&&!STALE.test(f.fuelTxt)&&!STALE.test(g.txt)&&g.kit===1&&g.fit&&/Where Money Actually Buys Muscle/.test(g.txt)&&/verified 15 Nov 2026/.test(g.txt),J({f:ok&&(f.fuelTxt.match(STALE)||[])[0],g:g&&!g.err&&(g.txt.match(STALE)||[])[0],kit:g&&g.kit}));
+ T('AG dose line: every card states its monthly cost at its own named dose basis ("About R… a month at <amount and unit>"), never "the dose above"; caffeine counts 26 training days, collagen 13 heavy sessions, magnesium the label\'s maximum',
+   buy.length===10&&buy.every(d=>/\d/.test(d.dose)&&/\b(g|mg|IU|capsules?|softgels?|tablets?|scoop)\b/.test(d.dose)&&!/dose above/.test(d.dose)&&card(d.n).m==='About R'+fmtI(d.m)+' a month at '+d.dose)&&/26 training days/.test((buy.find(d=>d.n==='Caffeine')||{}).dose)&&/13 heavy sessions/.test((buy.find(d=>d.n==='Collagen Peptides + Vitamin C')||{}).dose)&&/label’s maximum/.test((buy.find(d=>d.n==='Electrolytes')||{}).dose),
+   J(buy.filter(d=>card(d.n).m!=='About R'+fmtI(d.m)+' a month at '+d.dose).map(d=>[d.n,card(d.n).m])));
+ T('AG price guide: one row per bought item with the pick, the item and its shops, every shelf price from its card and the same monthly cost',
+   ok&&f.rows.length===10&&f.rows.every((r,i)=>{const d=buy[i];return !!d&&r.n===d.pick&&r.small===d.n+' · '+shopsOf(d).join(' + ')&&r.p===SEGS(d.price).map(x=>x.txt.split(' at ')[0]).join(' + ')&&r.g.replace(/[^\d]/g,'')===String(d.m);}),J(ok&&f.rows.slice(0,2)));
+ const cardOf=n=>card(n).note||'';
+ T('AG honesty: caffeine says two capsules with the morning coffee reach roughly the app\'s dose, never a third, half delayed release; magnesium is costed at the label\'s 300 mg, below the 350 mg line; beta-alanine says the label\'s 3 g a day is below the app\'s dose; the casein says no certification is verified for its tub',
+   ok&&/Two capsules are the most the label allows, about 2\.3 mg\/kg/.test(cardOf('Caffeine'))&&/with your morning coffee and you reach roughly the 3 mg\/kg/.test(cardOf('Caffeine'))&&/Never take a third capsule/.test(cardOf('Caffeine'))&&/half of it plain and half delayed release/.test(cardOf('Caffeine'))
+   &&/label directs 100–300 mg a day/.test(cardOf('Electrolytes'))&&/three tablets \(300 mg\)/.test(cardOf('Electrolytes'))&&/below the 350 mg line shown above it/.test(cardOf('Electrolytes'))
+   &&/The label says 3 g a day; this card’s 3\.2 g a day/.test(cardOf('Beta-Alanine'))&&!f.slow.c.cert&&/^no certification verified for this tub/.test(f.slow.c.nocert||'')&&f.slowRow.includes(f.slow.c.price+'; '+f.slow.c.nocert),
+   J(ok&&{caf:cardOf('Caffeine').slice(0,140),mg:cardOf('Electrolytes').slice(0,140),cas:f.slow.c,row:f.slowRow.slice(-200)}));
+ T('AG trusted shops: FUEL_SHOPS lists the trusted retailers, and every shop on a supplement pick, its second choice, the slow-protein picks and every price on Fuel is on it or is a brand\'s own South African store',
+   ok&&!!f.shops&&['Woolworths','Dis-Chem','Clicks','Wellness Warehouse','Faithful to Nature','Takealot','Checkers','Pick n Pay'].every(x=>f.shops.includes(x))&&buy.every(d=>shopsOf(d).every(trusted)&&SEGS(d.also).every(x=>trusted(x.shop)))&&SEGS(f.slow.c.price+' '+f.slow.k.price).every(x=>trusted(x.shop))&&SEGS(f.fuelTxt).length>=20&&SEGS(f.fuelTxt).every(x=>trusted(x.shop)),
+   J(ok&&{shops:f.shops,bad:SEGS(f.fuelTxt).filter(x=>!trusted(x.shop)).map(x=>x.shop).slice(0,4)}));
+ T('AG second choice: every pick carries an "Also good" line instead of the old import and local lines; a priced second choice has the price form above',
+   ok&&buy.every(d=>d.also.length>10&&card(d.n).also===1&&card(d.n).alsoTxt.startsWith('Also good: ')&&card(d.n).alsoTxt.includes(d.also)&&SEGS(d.also).every(x=>new RegExp('^'+SEG+'$').test(x.txt))),J(ok&&buy.map(d=>[d.n,card(d.n).also])));
+ T('AG where to buy: it says nothing is shipped from abroad, names every pick with its shops and "stores and online" or "online only" from its data, explains online only, the Takealot seller inference and Woolworths\' regional prices, and lists the trusted shops',
+   ok&&/every pick comes from a trusted South African shop, in a store or online, and nothing is shipped from abroad/.test(f.where)&&f.wb.length===10&&buy.every(d=>{const w=f.wb.find(x=>x.n===d.n);return !!w&&w.t.includes(shopsOf(d).join(' and ')+', '+(d.stores?'stores and online':'online only'))&&w.t.toLowerCase().startsWith(d.short.toLowerCase());})
+   &&buy.some(d=>!d.stores)&&buy.filter(d=>!d.stores).every(d=>f.where.includes('Online only means no walk-in shop sells the')&&f.where.includes(d.short))
+   &&(!buy.some(d=>shopsOf(d).includes('Takealot'))||/Takealot itself appears to be the seller: that is read from its listing data/.test(f.where))&&/shelf price in your area can differ by a few rand/.test(f.where)&&f.shops.every(x=>f.where.includes(x))&&f.brands.every(x=>f.where.includes(x)),
+   J(ok&&{wb:f.wb.slice(0,3),where:f.where.slice(0,200)}));
+ // Copy from the old rules is gone from Fuel and the Guide (with the Win Plan money card); the home-gym equipment tier is still there
+ const g=await tryEvalAG(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('guide');await W(250);const v=document.getElementById('view-guide');if(!v)return null;
+   // The watch card's Import button and "import again" are the health-data import, not buying from abroad: that card is left out of the word scan, by element.
+   const kit=v.querySelector('[data-kit="equipment"]'),c=v.cloneNode(true);const watch=[...c.querySelectorAll('.card')].filter(e=>/^Connect Apple Watch/.test((e.querySelector('.card-t')||{}).textContent||''));watch.forEach(e=>e.remove());
+   return {txt:c.textContent,watch:watch.length,kit:v.querySelectorAll('[data-kit="equipment"]').length,fit:!!(kit&&/FitArc/.test(kit.textContent)),money:/Where Money Actually Buys Muscle/.test(v.textContent)};});
+ const STALE=/Takealot only|priced at Takealot|on Woolworths food|food at Woolworths|Woolworths item|Premium pick|Standard picks|PREMIUM|budget open|verified 28 Oct 2026|Cheaper Choices|Takealot Price Guide|regardless of price|sourced anywhere|wherever it is sold/;
+ T('AG copy: Fuel and the Guide (Win Plan money card included) carry none of the import-era words (iHerb, Momentous, Transparent Labs, Organic Choice, Virgin City Fields, The Dough, Aramex, duties, import, grass-fed, pasture-raised) and no copy from the older rules; the money card quotes the 17 Nov picks',
+   ok&&g&&!g.err&&!BANNED.test(f.fuelTxt)&&!BANNED.test(g.txt)&&!STALE.test(f.fuelTxt)&&!STALE.test(g.txt)&&g.watch===1&&g.kit===1&&g.fit&&g.money&&/verified 17 Nov 2026/.test(g.txt),
+   J({f:ok&&((f.fuelTxt.match(BANNED)||f.fuelTxt.match(STALE)||[])[0]),g:g&&!g.err&&((g.txt.match(BANNED)||g.txt.match(STALE)||[])[0]),kit:g&&g.kit}));
  // Grocery list and meal plan
  const gr=await tryEvalAG(q,()=>{switchView('fuel');const w=document.getElementById('mealPlanWrap');
    const rows=[...w.querySelectorAll('.gr-row')].map(r=>({n:r.querySelector('.pt-n').firstChild.textContent,shop:(r.querySelector('.gr-shop')||{}).textContent||'',c:(r.querySelector('.gr-c')||{}).textContent||''}));
    const k=MP_DAYS.map(d=>d.meals.reduce((a,x)=>a+x.kc,0)),p=MP_DAYS.map(d=>d.meals.reduce((a,x)=>a+x.p,0));
    return {rows,tot:(document.getElementById('groceryTotal')||{}).textContent||'',data:MP_GROCERY.map(x=>({it:x.it,c:x.c,shop:x.shop})),days:[...w.querySelectorAll('.mp-day .mp-tot')].map(e=>e.textContent),want:k.map((x,i)=>x+' kcal · '+p[i]+'g P'),
      intKP:MP_DAYS.every(d=>d.meals.every(x=>Number.isInteger(x.kc)&&Number.isInteger(x.p)&&!('pf' in x))),st:(w.querySelector('.card-st')||{}).textContent||'',
+     eggs:MP_DAYS.flatMap(d=>d.meals.map(x=>x.f)).concat(MEALS.map(x=>x.d)).filter(t=>/\beggs?\b/i.test(t)),
      avg:{k:Math.round(k.reduce((a,b)=>a+b,0)/k.length/10)*10,p:Math.round(p.reduce((a,b)=>a+b,0)/p.length)},why:w.querySelectorAll('#mpWhy .why-row').length,swaps:w.querySelectorAll('.swap-row').length,tag:/PREMIUM/.test(w.innerHTML)};});
  const cents=x=>Math.round(parseFloat(String(x).replace(/[^\d.]/g,''))*100);
- T('AG groceries: every line names its shop and has a cost, and the weekly total shown is the sum of the lines',
-   gr&&!gr.err&&gr.rows.length>=12&&gr.rows.length===gr.data.length&&gr.rows.every((r,i)=>!!r.shop&&r.shop===gr.data[i].shop&&r.n===gr.data[i].it&&/^R\d+\.\d\d$/.test(r.c)&&cents(r.c)===Math.round(gr.data[i].c*100))&&cents(gr.tot)===gr.rows.reduce((a,r)=>a+cents(r.c),0),
-   J(gr&&!gr.err?{n:gr.rows.length,tot:gr.tot,sum:gr.rows.reduce((a,r)=>a+cents(r.c),0),noShop:gr.rows.filter(r=>!r.shop).map(r=>r.n).slice(0,3)}:gr));
- T('AG meal plan: one text per meal (no pf, no PREMIUM tag), whole kcal and protein, and each day header and the plan average equal the sums from MP_DAYS; the swap card is now "Why These Picks"',
+ T('AG groceries: every line names a trusted shop and has a cost, and the weekly total shown is the sum of the lines',
+   gr&&!gr.err&&gr.rows.length>=12&&gr.rows.length===gr.data.length&&gr.rows.every((r,i)=>!!r.shop&&trusted(r.shop)&&r.shop===gr.data[i].shop&&r.n===gr.data[i].it&&/^R\d+\.\d\d$/.test(r.c)&&cents(r.c)===Math.round(gr.data[i].c*100))&&cents(gr.tot)===gr.rows.reduce((a,r)=>a+cents(r.c),0),
+   J(gr&&!gr.err?{n:gr.rows.length,tot:gr.tot,sum:gr.rows.reduce((a,r)=>a+cents(r.c),0),bad:gr.rows.filter(r=>!r.shop||!trusted(r.shop)).map(r=>r.n+' '+r.shop).slice(0,3)}:gr));
+ T('AG meal plan: one text per meal (no pf, no PREMIUM tag), whole kcal and protein, and each day header and the plan average equal the sums from MP_DAYS; "Why These Picks" is there',
    gr&&!gr.err&&gr.intKP&&!gr.tag&&gr.days.length===3&&gr.days.every((t,i)=>t===gr.want[i])&&gr.st.includes('~'+gr.avg.k+' kcal · ~'+gr.avg.p+'g protein per day')&&gr.why>=3&&gr.swaps===0,J(gr&&!gr.err?{days:gr.days,want:gr.want,avg:gr.avg,why:gr.why}:gr));
+ T('AG eggs: the organic pack is mixed sizes, so every meal gives its eggs by count with the weight in brackets and says to weigh them (no grams-first egg text)',
+   gr&&!gr.err&&gr.eggs.length>=4&&gr.eggs.filter(t=>/organic free-range eggs/.test(t)).length>=4&&gr.eggs.every(t=>!/organic free-range eggs/.test(t)||/\d(–\d)? Woolworths organic free-range eggs \((about )?\d+(–\d+)? g; (mixed-size pack, so )?weigh them\)/.test(t))&&!gr.eggs.some(t=>/\d\s?g Woolworths organic free-range eggs/.test(t)),
+   J(gr&&!gr.err?gr.eggs.map(t=>t.slice(0,90)):gr));
  // Science wording
  const sc=await tryEvalAG(q,()=>{const h=document.getElementById('suppStack').innerHTML,v=document.getElementById('view-fuel').textContent;return {liver:/yellow eyes or skin/.test(h)&&/dark urine/.test(h)&&/stop and see a doctor/i.test(v),cycle:/8 weeks on, 2 off/.test(v),legal:/most effective legal set/.test(v),notBuy:/what NOT to buy/.test(v)&&/HMB/.test(v),caf:/440–530/.test(h)&&!/tremor/.test(h),coll:/15 g is a floor/.test(h),d3:/Ceiling, not a target/.test(h),mg:/may help sleep onset; the evidence is thin and comes from older adults/.test(h),row:/your urine darkens/.test(v)&&/cap the day at about 400 mg/.test(v)};});
  T('AG science: liver caution on ashwagandha (card and 20:00 row), no "8 weeks on, 2 off", no "most effective legal set", honest caffeine, collagen, D3 and magnesium wording, skip list kept',sc&&sc.liver&&!sc.cycle&&!sc.legal&&sc.notBuy&&sc.caf&&sc.coll&&sc.d3&&sc.mg&&sc.row,J(sc));
- // Evidence file: every price the Fuel tab and the Guide quote, every monthly cost and every grocery line
+ // Evidence file: every price the Fuel tab and the Guide quote, at its own date, every monthly cost and every grocery line
  const pk=await tryEvalAG(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('fuel');await W(200);const fuel=document.getElementById('view-fuel').textContent;switchView('guide');await W(200);const guide=document.getElementById('view-guide').textContent;
-   return {txt:fuel+' '+guide,best:SUPP_TIERS.flatMap(t=>t.items).filter(i=>i.best&&!i.best.none).map(i=>({n:i.n,m:i.best.m})),gro:MP_GROCERY.map(x=>({t:x.it,c:x.c,shop:x.shop}))};});
- let ev=null;try{const dir=path.resolve('../tools/prices');const fl=fs.readdirSync(dir).filter(x=>/^\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort().pop();ev=JSON.parse(fs.readFileSync(path.join(dir,fl),'utf8'));}catch(e){ev={err:String(e)};}
+   return {txt:fuel+' '+guide,best:SUPP_TIERS.flatMap(t=>t.items).filter(i=>i.best&&!i.best.none).map(i=>({n:i.n,m:i.best.m,cv:!!(i.best.cert&&i.best.cert.verified),cn:i.best.cert&&i.best.cert.name,cd:i.best.cert&&i.best.cert.date})),gro:MP_GROCERY.map(x=>({t:x.it,c:x.c,shop:x.shop}))};});
+ let ev=null,evName='';try{const dir=path.resolve('../tools/prices');evName=fs.readdirSync(dir).filter(x=>/^\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort().pop();ev=JSON.parse(fs.readFileSync(path.join(dir,evName),'utf8'));}catch(e){ev={err:String(e)};}
  const miss=[];let quoted=0;
- if(pk&&!pk.err&&ev&&ev.records){const CUR={R:'ZAR','$':'USD','£':'GBP','C$':'CAD'};
-   for(const m of pk.txt.matchAll(/(C\$|R|\$|£)([\d,]+(?:\.\d\d)?) at ([A-Za-z][\w .'&-]*?) \(verified 15 Nov 2026\)(; about R([\d,]+) est\., converted at R([\d.]+) per)?/g)){quoted++;const v=+m[2].replace(/,/g,'');
-     const r=ev.records.find(r=>r.shop===m[3]&&(r.currency||'ZAR')===CUR[m[1]]&&Math.abs(r.price-v)<0.005);
-     if(!r)miss.push(m[0].slice(0,70));else if(m[5]&&(Math.round(r.price_zar_est)!==+m[5].replace(/,/g,'')||!r.fx||Math.abs(r.fx.rate-(+m[6]))>0.00005))miss.push('est '+m[0].slice(0,50));}
-   for(const b of pk.best){const r=ev.records.find(r=>r.monthly!=null&&r.item===b.n);if(!r||r.monthly!==b.m)miss.push('monthly '+b.n);}
-   for(const x of pk.gro){const r=ev.records.find(r=>/grocery/.test(r.role)&&r.item===x.t&&r.shop===x.shop);if(!r||Math.abs(r.lineTotal-x.c)>0.005||Math.abs(r.price*r.qty-x.c)>0.005)miss.push('gro '+x.t);}
+ if(pk&&!pk.err&&ev&&ev.records){
+   for(const x of SEGS(pk.txt)){quoted++;const r=ev.records.find(r=>r.shop===x.shop&&(r.currency||'ZAR')==='ZAR'&&Math.abs(r.price-x.v)<0.005&&r.fetched===ISO(x.date));if(!r)miss.push(x.txt.slice(0,70));}
+   if(ev.records.some(r=>(r.currency||'ZAR')!=='ZAR'||'price_zar_est' in r||'fx' in r))miss.push('a converted record');
+   for(const b of pk.best){const r=ev.records.find(r=>r.monthly!=null&&r.item===b.n);if(!r||r.monthly!==b.m||!/rounded half up to R\d+$/.test(r.arithmetic||''))miss.push('monthly '+b.n);
+     else if(b.cv&&!(r.cert&&r.cert.verified===true&&r.cert.name===b.cn&&r.cert.checked===ISO(b.cd)&&/^https:\/\//.test(r.cert.checked_url||'')))miss.push('cert '+b.n);
+     else if(!b.cv&&!(r.cert&&r.cert.verified===false))miss.push('nocert '+b.n);}
+   for(const x of pk.gro){const r=ev.records.find(r=>/grocery/.test(r.role)&&r.item===x.t&&r.shop===x.shop);if(!r||Math.abs(r.lineTotal-x.c)>0.005||Math.abs(r.price*r.qty-x.c)>0.005+1e-9)miss.push('gro '+x.t);}
    if(Math.abs(pk.gro.reduce((a,x)=>a+x.c,0)-ev.weeklyGroceryTotal)>0.005)miss.push('weekly total');
-   if(ev.date!=='2026-11-15')miss.push('evidence date '+ev.date);}
- T('AG evidence: tools/prices/2026-11-15.json holds every price the Fuel tab and the Guide quote (shop, currency and amount; estimates at the same rand), every monthly cost and every grocery line',
+   if(ev.stackMonthly!==pk.best.reduce((a,b)=>a+b.m,0))miss.push('stack total');
+   if(ev.date!=='2026-11-17'||evName!=='2026-11-17.json')miss.push('evidence date '+ev.date);}
+ T('AG evidence: tools/prices/2026-11-17.json holds every price the Fuel tab and the Guide quote (shop and amount, fetched on the date the price string gives; nothing converted), every monthly cost with its arithmetic and certification check, the stack total and every grocery line',
    pk&&!pk.err&&ev&&!ev.err&&miss.length===0&&quoted>=20,J({miss:miss.slice(0,4),quoted,err:(ev&&ev.err)||(pk&&pk.err)}));
  // Markup: each supplement sits inside its tier; tier gaps 16 px, item gaps 8 px, at 390 px
  const mk=await tryEvalAG(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('fuel');await W(450);document.querySelectorAll('#suppStack .supp-h.open').forEach(h=>h.click());await W(100);
@@ -1806,10 +1846,10 @@ const GOODSLEEP=[{date:'2027-01-25',h:7.6},{date:'2027-01-26',h:7.4},{date:'2027
  // Fit: long titles and the new lines wrap at 390 and 375 px with every card open
  const fit={};for(const w of [390,375]){await q.setViewport({width:w,height:844});fit[w]=await tryEvalAG(q,async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('fuel');await W(300);
    document.querySelectorAll('#suppStack .supp-h').forEach(h=>{if(!h.classList.contains('open'))h.click();});document.querySelectorAll('#view-fuel .tool').forEach(t=>t.classList.add('open'));await W(100);
-   const over=[...document.querySelectorAll('#suppStack .tk-best,#suppStack .tk-none,#suppStack .tk-n,#suppStack .tk-price,#suppStack .tk-cert,#suppStack .tk-nocert,#suppStack .tk-imp,#suppStack .tk-loc,#stackNote,#whereBuy,#view-fuel .price-tbl .pt-n,#mealPlanWrap .mp-f,#mpWhy .why-row')].filter(e=>e.scrollWidth>e.clientWidth+1||e.getBoundingClientRect().right>innerWidth+0.5).length;
-   return {over,page:document.documentElement.scrollWidth<=innerWidth,n:document.querySelectorAll('#suppStack .tk-best').length,open:document.querySelectorAll('#suppStack .supp-b.open').length};});}
+   const over=[...document.querySelectorAll('#suppStack .tk-best,#suppStack .tk-none,#suppStack .tk-n,#suppStack .tk-price,#suppStack .tk-cert,#suppStack .tk-nocert,#suppStack .tk-also,#stackNote,#whereBuy,#view-fuel .price-tbl .pt-n,#view-fuel .price-tbl .pt-p,#mealPlanWrap .mp-f,#mpWhy .why-row')].filter(e=>e.scrollWidth>e.clientWidth+1||e.getBoundingClientRect().right>innerWidth+0.5).length;
+   return {over,page:document.documentElement.scrollWidth<=innerWidth,n:document.querySelectorAll('#suppStack .tk-best').length,open:document.querySelectorAll('#suppStack .supp-b.open').length,also:document.querySelectorAll('#suppStack .tk-also').length};});}
  await q.setViewport({width:390,height:844});
- T('AG fit: pick titles, certification, import and local lines, the price guide, the grocery list and the meal plan wrap inside their cards at 390 and 375 px with every card open (no overflow, no sideways scroll)',[390,375].every(w=>fit[w]&&!fit[w].err&&fit[w].over===0&&fit[w].page&&fit[w].n===10&&fit[w].open===12),J(fit));
+ T('AG fit: pick titles, certification and second-choice lines, the price guide, the grocery list and the meal plan wrap inside their cards at 390 and 375 px with every card open (no overflow, no sideways scroll)',[390,375].every(w=>fit[w]&&!fit[w].err&&fit[w].over===0&&fit[w].page&&fit[w].n===10&&fit[w].open===12&&fit[w].also===10),J(fit));
  T('AG: no page errors',q.__errs.length===0,q.__errs.join('|').slice(0,300));
  await done(q);
  // An old backup that still carries cb2_fuelq:"standard" restores with no error, and Fuel shows the best picks

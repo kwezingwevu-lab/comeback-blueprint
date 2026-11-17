@@ -24,87 +24,123 @@
    "shop": "Woolworths",
    "productId": "9990001",
    "title": "Fixture oats",
-   "size": "Fixture oats",
    "price": 47.99
   },
   {
    "shop": "Woolworths",
    "productId": "9990002",
    "title": "Fixture eggs",
-   "size": "Fixture eggs",
-   "price": 31.99
+   "price": 74.99
   },
   {
    "shop": "Woolworths",
    "productId": "9990003",
    "title": "Fixture milk",
-   "size": "Fixture milk",
-   "price": 99.99
+   "price": 42.99
   },
   {
-   "shop": "iHerb",
-   "title": "Fixture casein",
-   "url": "https://fixture.example/ih-casein",
-   "price": 808.34,
-   "currency": "ZAR"
+   "shop": "Woolworths",
+   "productId": "9990005",
+   "title": "Fixture potatoes",
+   "url": "https://fixture.example/ww-potatoes",
+   "price": 32.99
   },
   {
-   "shop": "Organic Choice",
-   "title": "Fixture chicken",
-   "url": "https://fixture.example/oc-chicken",
-   "price": 299.9,
-   "currency": "ZAR"
-  },
-  {
-   "shop": "Momentous",
-   "title": "Fixture D3",
-   "url": "https://fixture.example/mo-d3",
-   "price": 19.99,
-   "currency": "USD"
-  },
-  {
-   "shop": "Virgin City Fields",
-   "title": "Fixture mince",
-   "url": "https://fixture.example/vcf-mince",
-   "price": 130,
-   "currency": "ZAR"
-  },
-  {
-   "shop": "iHerb",
-   "title": "Fixture omega",
-   "url": "https://fixture.example/ih-omega",
-   "price": 961.3,
-   "currency": "ZAR"
-  },
-  {
-   "shop": "Virgin City Fields",
-   "title": "Fixture steak",
-   "url": "https://fixture.example/vcf-steak",
-   "price": 155,
-   "currency": "ZAR"
-  },
-  {
-   "shop": "iHerb",
-   "title": "Fixture whey",
-   "url": "https://fixture.example/ih-whey",
-   "price": 3117.16,
-   "currency": "ZAR"
-  },
-  {
-   "shop": "Momentous",
-   "title": "Fixture collagen",
-   "url": "https://fixture.example/mo-collagen",
-   "price": 54.99,
-   "currency": "USD"
-  },
-  {
-   "shop": "Momentous",
-   "title": "Fixture shipping quote",
-   "url": "https://fixture.example/cart/shipping_rates.json",
-   "price": 87.2,
-   "currency": "USD",
+   "shop": "Woolworths",
+   "productId": "9990004",
+   "title": "Fixture chicken per kg",
+   "url": "https://fixture.example/ww-chicken-kg",
+   "price": 134.99,
+   "unit": "kg",
    "check": "hand",
-   "why": "a checkout shipping quote, not a product page"
+   "why": "a random-mass pack priced per kg"
+  },
+  {
+   "shop": "Dis-Chem",
+   "title": "Fixture creatine DC",
+   "url": "https://fixture.example/dc-creatine",
+   "price": 434.99,
+   "special": 391.49,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Dis-Chem",
+   "title": "Fixture caffeine DC",
+   "url": "https://fixture.example/dc-caffeine",
+   "price": 184.99,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Dis-Chem",
+   "title": "Fixture citrulline DC",
+   "url": "https://fixture.example/dc-citrulline",
+   "price": 344.99,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Wellness Warehouse",
+   "title": "Fixture omega WW",
+   "url": "https://fixture.example/ww-omega",
+   "price": 399.95,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Wellness Warehouse",
+   "title": "Fixture D3 WW",
+   "url": "https://wellnesswarehouse.com/products/fixture-d3",
+   "price": 259.95,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Wellness Warehouse",
+   "title": "Fixture magnesium WW",
+   "url": "https://wellnesswarehouse.com/products/fixture-mag",
+   "price": 369.95,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Wellness Warehouse",
+   "title": "Fixture collagen WW",
+   "url": "https://fixture.example/ww-collagen",
+   "price": 369.95,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Faithful to Nature",
+   "title": "Fixture beta-alanine FtN",
+   "url": "https://fixture.example/ftn-beta",
+   "price": 899,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Faithful to Nature",
+   "title": "Fixture oats FtN",
+   "url": "https://fixture.example/ftn-oats",
+   "price": 190,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Faithful to Nature",
+   "title": "Fixture almonds FtN",
+   "url": "https://fixture.example/ftn-almonds",
+   "price": 50,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "Faithful to Nature",
+   "title": "Fixture raisins FtN",
+   "url": "https://fixture.example/ftn-raisins",
+   "price": 110,
+   "currency": "ZAR"
+  },
+  {
+   "shop": "USN",
+   "title": "Fixture whey USN",
+   "url": "https://fixture.example/products.json (product list)",
+   "price": 689,
+   "currency": "ZAR",
+   "check": "hand",
+   "why": "read from the store's product list, not a product page"
   }
  ]
 }

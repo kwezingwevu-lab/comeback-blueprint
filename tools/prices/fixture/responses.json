@@ -19,20 +19,34 @@
    "inStock": true
   },
   "9990003": {
-   "price": 99.99,
+   "price": 42.99,
    "inStock": true
   }
  },
  "pages": {
-  "https://fixture.example/ih-casein": "<html><head><script type=\"application/ld&#x2B;json\">{\"@context\": \"https://schema.org\", \"@type\": \"Product\", \"name\": \"Fixture casein\", \"offers\": {\"@type\": \"Offer\", \"price\": \"808.34\", \"priceCurrency\": \"ZAR\", \"availability\": \"https://schema.org/InStock\"}}</script></head></html>",
-  "https://fixture.example/oc-chicken": "<html><script type=\"application/ld+json\">{\"@context\": \"https://schema.org\", \"@graph\": [{\"@type\": \"WebPage\", \"name\": \"x\"}, {\"@type\": \"Product\", \"name\": \"Fixture chicken\", \"offers\": [{\"@type\": \"Offer\", \"price\": \"319.90\", \"priceCurrency\": \"ZAR\", \"availability\": \"http://schema.org/InStock\"}]}]}</script></html>",
-  "https://fixture.example/mo-d3": "<html><script type=\"application/ld+json\">{\"@type\": \"Product\", \"offers\": {\"price\": 19.99, \"priceCurrency\": \"USD\", \"availability\": \"https://schema.org/InStock\"}}</script></html>",
-  "https://fixture.example/vcf-mince": "<html><script type=\"application/ld+json\">not json at all</script><script type=\"application/ld+json\">{\"@type\": [\"Product\"], \"offers\": {\"@type\": \"AggregateOffer\", \"lowPrice\": \"130.00\", \"highPrice\": \"260.00\", \"priceCurrency\": \"ZAR\"}}</script></html>",
-  "https://fixture.example/ih-omega": "<html><script type=\"application/ld&#x2B;json\">{\"@type\": \"Product\", \"offers\": {\"price\": \"961.30\", \"priceCurrency\": \"ZAR\", \"availability\": \"https://schema.org/OutOfStock\"}}</script></html>",
-  "https://fixture.example/vcf-steak": "<html><body><span class=\"price\">R 155.00</span></body></html>",
-  "https://fixture.example/mo-collagen": "<html><script type=\"application/ld+json\">{\"@type\": \"Product\", \"offers\": {\"price\": \"932.82\", \"priceCurrency\": \"ZAR\"}}</script></html>"
+  "https://fixture.example/dc-creatine": "<html><script type=\"application/ld+json\">{\"@type\": \"Product\", \"offers\": {\"@type\": \"Offer\", \"price\": \"391.49\", \"priceCurrency\": \"ZAR\", \"availability\": \"https://schema.org/InStock\", \"seller\": {\"@type\": \"Organization\", \"name\": \"Dis-Chem\"}}}</script></html>",
+  "https://fixture.example/dc-caffeine": "<html><script type=\"application/ld+json\">{\"@type\": \"Product\", \"offers\": {\"@type\": \"Offer\", \"price\": \"184.99\", \"priceCurrency\": \"ZAR\", \"availability\": \"https://schema.org/InStock\"}}</script></html>",
+  "https://fixture.example/ww-omega": "<html><script type=\"application/ld+json\">{\"@context\": \"https://schema.org\", \"@graph\": [{\"@type\": \"WebPage\", \"name\": \"x\"}, {\"@type\": \"Product\", \"name\": \"Fixture omega\", \"offers\": [{\"@type\": \"Offer\", \"price\": \"429.95\", \"priceCurrency\": \"ZAR\", \"availability\": \"http://schema.org/InStock\"}]}]}</script></html>",
+  "https://wellnesswarehouse.com/products/fixture-d3": "<html><body><span class=\"price\">R 259.95</span></body></html>",
+  "https://wellnesswarehouse.com/products/fixture-mag": "<html><body>no price here</body></html>",
+  "https://fixture.example/ww-collagen": "<html><script type=\"application/ld+json\">{\"@type\": \"Product\", \"offers\": {\"price\": \"21.99\", \"priceCurrency\": \"USD\"}}</script></html>",
+  "https://fixture.example/ftn-beta": "<html><head><script type=\"application/ld&#x2B;json\">{\"@context\": \"https://schema.org\", \"@type\": \"Product\", \"offers\": {\"@type\": \"Offer\", \"price\": \"899.00\", \"priceCurrency\": \"ZAR\", \"availability\": \"https://schema.org/InStock\"}}</script></head></html>",
+  "https://fixture.example/ftn-oats": "<html><script type=\"application/ld+json\">not json at all</script><script type=\"application/ld+json\">{\"@type\": [\"Product\"], \"offers\": {\"@type\": \"AggregateOffer\", \"lowPrice\": \"190.00\", \"highPrice\": \"380.00\", \"priceCurrency\": \"ZAR\"}}</script></html>",
+  "https://fixture.example/ftn-almonds": "<html><script type=\"application/ld+json\">{\"@type\": \"Product\", \"offers\": {\"price\": \"50.00\", \"priceCurrency\": \"ZAR\", \"availability\": \"https://schema.org/OutOfStock\"}}</script></html>",
+  "https://fixture.example/ww-potatoes": "<html><script type=\"application/ld+json\">{\"@type\": \"Product\", \"offers\": {\"price\": \"32.99\", \"priceCurrency\": \"ZAR\", \"availability\": \"https://schema.org/InStock\"}}</script></html>",
+  "https://fixture.example/ftn-raisins": "<html><body><span class=\"price\">R 110.00</span></body></html>"
+ },
+ "shopify": {
+  "https://wellnesswarehouse.com/products/fixture-d3": {
+   "price": 25995,
+   "available": true
+  },
+  "https://wellnesswarehouse.com/products/fixture-mag": {
+   "price": 36995,
+   "available": false
+  }
  },
  "blocked": [
-  "https://fixture.example/ih-whey"
+  "https://fixture.example/dc-citrulline"
  ]
 }
