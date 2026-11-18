@@ -84,7 +84,8 @@ var _bad={},_badHide=false,_storeFail=false,_saveBad=false,_failToastAt=0;
 function noteBad(k,raw,n){if(k in _bad)return;_bad[k]=n;try{let q={};try{q=JSON.parse(localStorage.getItem("cb2_quarantine")||"{}");}catch(e){}if(!isObj(q))q={};if(!(k in q)){q[k]=String(raw);localStorage.setItem("cb2_quarantine",JSON.stringify(q));}}catch(e){}}
 function load(k,d){let raw=null;try{if(!STORAGE_OK)return k in mem?mem[k]:d;raw=localStorage.getItem(k);if(!raw)return d;const c=checkKey(k,JSON.parse(raw),false);if(c.err){noteBad(k,raw,-1);return d;}if(c.drop)noteBad(k,raw,c.drop);return c.v;}catch(e){if(raw)noteBad(k,raw,-1);return d;}}
 // persist() reports whether the write landed: false when storage is blocked, full or refusing. The value is still parked in memory for this session.
-function persist(k,v){try{if(!STORAGE_OK){mem[k]=v;return false;}localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){mem[k]=v;_storeFail=true;return false;}}
+var _gmRev=0; /* bumped by every write; the game layer keeps its snapshot until it moves (17 Nov 2026) */
+function persist(k,v){_gmRev++;try{if(!STORAGE_OK){mem[k]=v;return false;}localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){mem[k]=v;_storeFail=true;return false;}}
 // keepData: used when the vault or the account copy fills the app. With storage blocked (a viewer that refuses localStorage) persist() parks the value in memory and says false, which is still a restore for this session.
 function keepData(k,v){return persist(k,v)||!STORAGE_OK;}
 // A setting counts as a change for freshness (cb2_ts) and goes to the vault and the account copy, like a log does.
@@ -178,9 +179,9 @@ function warmupSets(working,bar){working=parseFloat(working);bar=parseFloat(bar)
    peak-week D-1 pump, which replaces Pull B. planned = the week's lift days (a peak legs-off day is not one; a Fallback week plans four);
    due = lift days already behind us, dueNow adds today's; before = main sessions logged before today. A set counts by okSet (0 kg = bodyweight). */
 function uniqDay(a){const seen={};return a.filter(x=>{const k=x.dateISO+"|"+x.day;if(seen[k])return false;seen[k]=1;return true;});} // a day logged at both places is one workout
-function sessionsThisWeek(){const wk=planWeek(),s=weekStartISO(wk),e=dateAdd(s,7),t=todayISO(),tmpl=weekTemplate(),tiAt=iso=>tmpl.find(x=>x.day===DOW[new Date(iso+"T12:00:00").getDay()]);
+function sessionsThisWeek(list){const L=list||DB.sessions,wk=planWeek(),s=weekStartISO(wk),e=dateAdd(s,7),t=todayISO(),tmpl=weekTemplate(),tiAt=iso=>tmpl.find(x=>x.day===DOW[new Date(iso+"T12:00:00").getDay()]);
   const logged=x=>x.dateISO>=s&&x.dateISO<e&&Object.values(x.entries||{}).some(arr=>(arr||[]).some(okSet));
-  const main=uniqDay(DB.sessions.filter(x=>logged(x)&&(x.day!=="extras"))),pump=uniqDay(DB.sessions.filter(x=>logged(x)&&x.day==="extras")).length;
+  const main=uniqDay(L.filter(x=>logged(x)&&(x.day!=="extras"))),pump=uniqDay(L.filter(x=>logged(x)&&x.day==="extras")).length;
   const plan=[];for(let i=0;i<7;i++){const d=dateAdd(s,i),k=liftKeyFor(d);if(k)plan.push({d,k});}
   // a logged session fills the planned day of the same lift wherever in the week it was done (a moved session is n of n); one that fills none (before Day 1, an extra session, a lift done twice) is an extra: done and planned, never 5 of 4, and it never stands in for the lift that was skipped
   const left=plan.map(x=>x.k);let xtra=0,xDue=0,xNow=0;main.forEach(x=>{const j=left.indexOf(x.day);if(j>=0){left.splice(j,1);return;}xtra++;if(x.dateISO<t)xDue++;if(x.dateISO<=t)xNow++;});
@@ -926,10 +927,10 @@ function renderStrengthTest(){
     const w=numOK(wi,"Kg",1,500,"");if(w==null)return;
     const r=numOK(ri,"Reps",1,3,"");if(r==null)return;
     if(!Number.isInteger(r)){ri.classList.add("bad");toast("Reps are a whole number — nothing saved",false,true);return;}
-    DB.lifts.push({date:todayISO(),lift,w,r});DB.save();
+    const _gb=gmBefore(),_d=todayISO();DB.lifts.push({date:_d,lift,w,r});const _ok=DB.save();
     if(document.getElementById("liftSel"))renderStrength();
     renderStrengthTest();
-    logToast("Test logged · "+lift+" 1RM ~"+Math.round(e1rm(w,r))+" kg");}));
+    logToast("Test logged · "+lift+" 1RM ~"+Math.round(e1rm(w,r))+" kg");gmOnce(_gb,_d,_ok,"Test logged");}));
 }
 var _dupNames=null;function dupNames(){if(_dupNames)return _dupNames;const c={};Object.keys(EXMAP).forEach(id=>{const n=EXMAP[id].name;c[n]=(c[n]||0)+1;});Object.keys(HOME_SUB).forEach(id=>{const n="🏠 "+HOME_SUB[id].n;c[n]=(c[n]||0)+1;});_dupNames=c;return c;}
 function exLabel(key){const p=String(key).split("|"),id=p[0];const base=(p[1]==="home"&&HOME_SUB[id])?"🏠 "+HOME_SUB[id].n:((EXMAP[id]&&EXMAP[id].name)||id);return (dupNames()[base]>1&&EXMAP[id]&&GYM[EXMAP[id].day])?base+" · "+GYM[EXMAP[id].day].name:base;}
@@ -946,10 +947,22 @@ function renderLiftsPane(){const el=document.getElementById("tp-lifts");if(!el)r
   <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;text-align:right"><thead><tr style="color:var(--text-3);font-size:11px"><th style="text-align:left;padding:4px">exercise</th><th style="padding:4px">best e1RM kg</th><th style="padding:4px">change</th><th style="padding:4px"></th></tr></thead><tbody>${rows}</tbody></table></div>
   <div class="calc-note" style="margin-top:10px"><b>How it is computed:</b> each set’s estimated one-rep max is weight × (1 + reps ÷ 30), the Epley formula, and the best set of each day is plotted. It is most accurate between about 3 and 10 reps — read it as a trend line, not a max test. Home and gym sessions are kept apart because the loads are not comparable. Deload weeks are left out: they are planned at about 65%, so they would read as a loss every sixth week. PB means the latest session is the best on record.</div>${bwNote}`;
   const sel=document.getElementById("lhSel");if(sel)sel.addEventListener("change",ev=>{curLiftKey=ev.target.value;renderLiftsPane();});}
-function regionDone(fromISO,pump){const st=fromISO||weekStartISO(planWeek()),en=dateAdd(st,7);const out={};Object.keys(REGION).forEach(r=>out[r]=0);DB.sessions.filter(x=>x.dateISO>=st&&x.dateISO<en&&((x.day==="extras")===!!pump)).forEach(x=>{Object.entries(x.entries||{}).forEach(([id,arr])=>{const n=(arr||[]).filter(okSet).length;if(!n)return;Object.entries(REGION).forEach(([r,ids])=>{if(ids.includes(id))out[r]+=n;});});});return out;}
-function renderRegionsPane(){const el=document.getElementById("tp-regions");if(!el)return;const ws=weekStartISO(planWeek()),plan=regionSets(ws),done=regionDone(ws),prev=regionDone(dateAdd(ws,-7)),pump=regionDone(ws,true);const order=["calves","hamstrings","glutes","quads","lower back","mid back","upper back"];
-  el.innerHTML=`<div class="chart-card"><div class="chart-head"><h3>Hard sets per region — week ${planWeek()}</h3><span class="chs">overlapping · logged / planned</span></div>${order.map(r=>{const p=plan[r]||0,d=done[r]||0,pct=p?Math.min(100,Math.round(d/p*100)):0;return `<div class="rg" data-rg="${r}" style="margin:10px 0"><div style="display:flex;justify-content:space-between;gap:8px;font-size:13px"><b style="text-transform:capitalize">${r}</b><span style="font-family:var(--f-mono);color:var(--text-2)">${d} / ${p}${pump[r]?" + "+pump[r]+" pump":""}${prev[r]?" · last week "+prev[r]:""}</span></div><div style="height:8px;border-radius:4px;background:var(--panel-3);margin-top:5px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pct>=100?"var(--go)":pct>=60?"var(--gold)":"var(--bad)"}"></div></div></div>`;}).join("")}</div>
-  <div class="calc-note"><b>How it counts:</b> every set you logged with reps and weight in this plan week (Saturday to Friday). A compound counts for each region it trains — a Romanian deadlift is hamstrings, glutes and lower back, so these are overlapping counts: the regions add up to more than the sets you did, and they will not match the Guide’s per-muscle totals, which count each exercise once. Extras sets are light pump work (RIR 2), so they show as “+ pump” and do not count toward the hard-set plan. Green = the planned dose is done; gold = most of it; red = under-served so far.${blockPlan()?" This week sits in the "+blockPlan().name.replace(/ block$/,"")+" block, so the plan shown is the block’s dose.":focusLB?"":" Legs &amp; Back focus is off, so the plan shown is the even split."}</div>${walkTrackLine(ws)}`;}
+/* One counting rule for the bars and the game (17 Nov 2026): the logged sets (okSet) of main sessions, or of Extras when pump is set, from the date `from`
+   up to but not including `to`, one row per session and exercise. Two logs on one date are counted both (review A-S3): the place switch keeps a Commercial
+   Gym log and a Home Gym log apart, so they are normally two halves of one session, as regionDone always counted them. A double log cannot lift a level:
+   credit stops at the dated dose. */
+function hardSets(from,to,pump){const P=!!pump,out=[];DB.sessions.forEach(x=>{if(!x||typeof x.dateISO!=="string"||!(x.dateISO>=from&&x.dateISO<to)||((x.day==="extras")!==P)||!x.entries)return;const E=x.entries;
+    for(const id in E){const a=E[id];if(!Array.isArray(a))continue;let n=0;for(let i=0;i<a.length;i++)if(okSet(a[i]))n++;if(n)out.push({d:x.dateISO,id,n});}});return out;}
+function regionDone(fromISO,pump){const st=fromISO||weekStartISO(planWeek()),out={};Object.keys(REGION).forEach(r=>out[r]=0);hardSets(st,dateAdd(st,7),pump).forEach(o=>{Object.entries(REGION).forEach(([r,ids])=>{if(ids.includes(o.id))out[r]+=o.n;});});return out;}
+function renderRegionsPane(){const el=document.getElementById("tp-regions");if(!el)return;const ws=weekStartISO(planWeek()),plan=regionSets(ws),done=regionDone(ws),prev=regionDone(dateAdd(ws,-7)),pump=regionDone(ws,true);const order=["calves","hamstrings","glutes","quads","lower back","mid back","upper back"],_sel=_gm.ui&&_gm.ui.sel;
+  /* a throw anywhere in the game leaves the bars, the notes and the rest of Track as they were; the body’s place says so, without numbers (review A-M1) */
+  let _s=gmSafe(),_top="",_up="",_rules="";if(_s&&_s.started){try{_top=gmTrackTopHTML(_s);_up=gmUpperRowsHTML(_s);_rules=gmRulesHTML();order.forEach(r=>gmRowAria(r,_s));}catch(e){_s=null;_top=_up=_rules="";}}if(!_s&&planStarted())_top=gmFailHTML("track");const _on=!!(_s&&_s.started);
+  /* the bars call the game only through these: a throw there draws the bars by the base rule (review V4) */
+  const _pct=(d,p)=>{try{return gmPct(d,p);}catch(e){return p?Math.min(100,Math.round(d/p*100)):0;}},_col=p=>{try{return gmBarCol(p);}catch(e){return p>=100?"var(--go)":p>=60?"var(--gold)":"var(--steel)";}},
+    _aria=r=>{try{return gmRowAria(r,_s);}catch(e){return r;}},_note=()=>{try{return gmBlockNote(ws);}catch(e){return "";}};
+  el.innerHTML=`${_top}<div class="chart-card"><div class="chart-head"><h3>Hard sets per region — week ${planWeek()}</h3><span class="chs">overlapping · logged / planned</span></div>${order.map(r=>{const p=plan[r]||0,d=done[r]||0,pct=_pct(d,p);return `<div class="rg${_sel===r?" sel":""}" data-rg="${r}" ${_on?`role="button" tabindex="0" aria-pressed="${_sel===r?"true":"false"}" aria-label="${esc(_aria(r))}"`:""} style="margin:10px 0"><div style="display:flex;justify-content:space-between;gap:8px;font-size:13px"><b style="text-transform:capitalize">${r}</b><span style="font-family:var(--f-mono);color:var(--text-2)">${d} / ${p}${pump[r]?" + "+pump[r]+" pump":""}${prev[r]?" · last week "+prev[r]:""}</span></div><div style="height:8px;border-radius:4px;background:var(--panel-3);margin-top:5px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${_col(pct)}"></div></div></div>`;}).join("")}${_up}</div>
+  <div class="calc-note"><b>How it counts:</b> every set you logged with reps and weight in this plan week (Saturday to Friday). A compound counts for each region it trains — a Romanian deadlift is hamstrings, glutes and lower back, so these are overlapping counts: the regions add up to more than the sets you did, and they will not match the Guide’s per-muscle totals, which count each exercise once. Extras sets are light pump work (RIR 2), so they show as “+ pump” and do not count toward the hard-set plan. Green = the planned dose is done; gold = most of it (60% or more); steel = not there yet this week. No red: an empty bar is a week still to come, not a fault.${_note()}</div>${walkTrackLine(ws)}${_rules}`;
+  if(_on)try{gmWireTrack(el);}catch(e){}}
 function coachText(){const p=DB.profile,c=compute(),g=gainModel("hyper"),mc=macros("hyper"),wk=planWeek(),ws=weekStartISO(wk),we=dateAdd(ws,7),r=weeklyReview();
   const srt=(a,k)=>[...(a||[])].sort((x,y)=>String(x[k]).localeCompare(String(y[k])));
   const w=srt(DB.weight,"date").slice(-14).map(x=>x.date+" "+x.v+" kg").join(", ")||"none logged";
@@ -1209,7 +1222,7 @@ function renderHome(){_rollISO=todayISO();
     <div class="pillar end"><div class="pi">${ICON.target}<span>Focus</span></div><div class="pv">Week ${todayISO()>=START_ISO?wk:"0"}</div><div class="pl">${currentBlock().name}</div><div class="pmeta">${currentBlock().days?"day":"wk"} ${currentBlock().i}/${currentBlock().n} · ${currentBlock().span}</div></div>
   </div>
   ${started?`<div class="compbar"><div class="compcard lift"><div class="cc-top"><span class="cc-l">Lifts this week</span><span class="cc-v">${comp.lifts}/${comp.planned}</span></div><div class="dots">${liftDots}</div></div><div class="compcard run"><div class="cc-top"><span class="cc-l">Weigh-ins this week</span><span class="cc-v">${wiCount}/3</span></div><div class="dots">${runDots}</div></div></div>`:""}
-  
+  ${started?gmCardHTML():""}
   ${quickLogHTML()}
   ${milestoneCardHTML()}
   <div class="eyebrow">${showT?"Today — "+todayDow+(todayISO()===DAY1_ISO?" · Day 1":""):"First Session — "+fsDow+" "+fmtDM(FIRST_ISO)}</div>
@@ -1224,6 +1237,7 @@ function renderHome(){_rollISO=todayISO();
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">${(()=>{let lab,act="goToLift(1)";if(started&&dp.kind==="lift"){const _k=liftKeyToday()||dp.key,_s=sessionToday(_k),_n=((GYM[_k]&&GYM[_k].name)||"Lift").split(" ")[0];lab=_s&&_s.done?"Today’s log":_s?"Continue "+_n:"Start "+_n;}else if(dp.kind==="run"||dp.kind==="race"||dp.kind==="ramp"){lab="Run card";act="goToRun()";}else lab=started?"Lift tab":"Preview Day 1";return `<button class="btn btn-gold" style="flex:1;min-width:130px" onclick="${act}">${ICON.lift}${lab}</button>`;})()}<button class="btn btn-cyan" style="flex:1;min-width:130px" onclick="switchView('run')">${ICON.cal}Events</button></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px"><button class="btn btn-ghost" style="flex:1;min-width:130px" onclick="switchView('roadmap')">2-Year Roadmap</button><button class="btn btn-ghost" style="flex:1;min-width:130px" onclick="switchView('track')">Log Progress</button></div>
   </div>`;
+  if(started)try{gmMountLater("home");}catch(e){try{gmNoFig("home");}catch(e2){}}
   const lw=DB.weight.length?[...DB.weight].sort((a,b)=>b.date.localeCompare(a.date))[0].v:DB.profile.weight;
   document.getElementById("pillarStr").textContent=lw+" kg";
   document.getElementById("pillarStrMeta").innerHTML='<span style="white-space:nowrap">ceiling ~'+Math.round(compute().ceilBW)+' kg @ 18%</span><br><span style="white-space:nowrap">~'+Math.round(compute().ceilLean/0.76)+' kg @ 24%</span>';
@@ -1270,14 +1284,14 @@ function saveRunLog(){const g=id=>document.getElementById(id),de=g("rlDate"),ty=
   const type=RUN_TYPES.includes(ty.value)?ty.value:"Easy",sec=runTimeIn(ti.value),pace=sec?sec/dist:0;
   if(sec==null||sec<=0){ti.classList.add("bad");toast("Time needs minutes and seconds, like 48:30, or 1:05:00 for a run over an hour — nothing saved",false,true);return;}
   if(pace<150||pace>1500){ti.classList.add("bad");toast("That works out at "+fmtPace(pace)+" per km. Check the distance and the time — nothing saved",false,true);return;}
-  ti.classList.remove("bad");const row={date,type,dist:Math.round(dist*100)/100,time:sec};DB.runs.push(row);DB.save();
-  undoToast("Run logged · "+row.dist+" km · "+fmtPace(pace)+"/km",()=>{DB.runs=DB.runs.filter(x=>x!==row);DB.save();renderLift();});renderLift();}
+  ti.classList.remove("bad");const row={date,type,dist:Math.round(dist*100)/100,time:sec},_gb=gmBefore();DB.runs.push(row);const _ok=DB.save();
+  undoToast("Run logged · "+row.dist+" km · "+fmtPace(pace)+"/km",()=>{DB.runs=DB.runs.filter(x=>x!==row);DB.save();renderLift();});renderLift();gmOnce(_gb,date,_ok);}
 function timeIn(v){v=String(v==null?"":v).trim().replace(",",".").replace(":",".");const m=v.match(/^(\d{1,3})(?:\.(\d{1,2}))?$/);if(!m)return null;const ss=m[2]==null?0:+(m[2].length===1?m[2]+"0":m[2]);if(ss>=60)return null;return +m[1]*60+ss;}
 function savePaceCheck(){const ty=document.getElementById("pcType"),el=document.getElementById("pcTime"),de=document.getElementById("pcDate");if(!ty||!el)return;const dist=ty.value==="tt"?5:1,sec=timeIn(el.value),lo=dist===1?150:720,hi=dist===1?720:3600;
   if(sec==null||sec<lo||sec>hi){el.classList.add("bad");toast((dist===1?"1 km":"5 km")+" time needs minutes and seconds between "+fmtPace(lo)+" and "+fmtPace(hi)+", like "+(dist===1?"4:30":"24:30")+" — nothing saved",false,true);return;}
   const date=(de&&de.value)||todayISO();if(!dateOK(de,date))return;el.classList.remove("bad");
-  const row={date,type:dist===1?"Check":"Time trial",dist,time:sec};DB.runs.push(row);DB.save();
-  undoToast((dist===1?"1 km check":"5 km time trial")+" saved · "+fmtPace(sec),()=>{DB.runs=DB.runs.filter(x=>x!==row);DB.save();renderLift();});renderLift();}
+  const row={date,type:dist===1?"Check":"Time trial",dist,time:sec},_gb=gmBefore();DB.runs.push(row);const _ok=DB.save();
+  undoToast((dist===1?"1 km check":"5 km time trial")+" saved · "+fmtPace(sec),()=>{DB.runs=DB.runs.filter(x=>x!==row);DB.save();renderLift();});renderLift();gmOnce(_gb,date,_ok);}
 function runSecHTML(){const t=todayISO(),dp=dayPlan(t),r=dp.run,pc=runPaces(),wk=planStarted()?planWeek():1,w=runWeek(wk),cardDay=!!r;
   const paceTxt=pc?"Estimates from your "+(pc.src.type==="Check"?"1 km check":"5 km time trial")+" ("+fmtPace(pc.src.time)+", "+fmtDM(pc.src.date)+"): easy "+fmtPace(pc.easy)+" · long "+fmtPace(pc.long)+" · threshold "+fmtPace(pc.thr)+" · 10 km pace "+fmtPace(pc.p10)+" (5 km pace + 4.5%) · strides "+fmtPace(pc.strides)+", per km. Joburg altitude makes every one of them feel harder; trust effort on hot days.":"No paces yet. Until your 1 km check or a 5 km time trial is logged, run by effort: easy is the talk test (full sentences), threshold is a few words at a time.";
   const list=w.runs.map(x=>'<div style="padding:5px 0;border-bottom:1px solid var(--line)"><b>'+x.d+" "+fmtDM(dateForWeekDay(wk,x.d))+"</b> · "+esc(x.title)+"</div>").join("");
@@ -1802,6 +1816,7 @@ function renderLiftDay(){_gridISO=liftISO();_gridTs=Date.now();
     html+=`<div class="ex"><div class="ex-h"><div class="ex-n">${e.n}</div><div class="ex-ti"><div class="ex-nm" role="heading" aria-level="3">${hsx?"\ud83c\udfe0 "+hsx.n:e.name}</div><div class="ex-tag ${e.cmp?"cmp":"iso"}">${hsx?"replaces "+e.name+" \u00b7 "+rx.load:e.tag}</div></div></div>
       <div class="chips">${hsx?`<span class="chip"><b>${exSets(e,rx)}</b>×<b>${rx.reps}</b>${fxTagHTML(e)}</span><span class="chip">tempo <b>${rx.tempo}</b></span><span class="chip">rest <b>${accRest(e)}</b></span><span class="chip rir">${isDeloadWeek()?"RIR <b>3+</b> deload":"RIR <b>0</b> last set"}</span><span class="chip stretch">${rx.finisher}</span></div>`:`<span class="chip">${tm?`<b>${fxSets(e)}</b> sets: 1×<b>${e.top.reps}</b> top + ${fxSets(e)-1}×<b>${e.backoff.reps}</b> back-off`:`<b>${fxSets(e)}</b>×<b>${e.reps}</b>`}${fxTagHTML(e)}${aggrExtra(e,day)?' <span style="color:var(--gold);font-weight:700">+1</span>':""}</span><span class="chip">tempo <b>${e.tempo}</b></span><span class="chip">rest ${tm?`<b>${e.top.rest}</b> top · <b>${e.backoff.rest}</b> back-off`:`<b>${accRest(e)}</b>`}</span><span class="chip rir">RIR ${tm?(rampIn()?`<b>${topRIR(e)}</b> top · <b>${boRIR()}</b> back-off`:`<b>${e.top.rir}</b> · never 0`):`<b>${isDeloadWeek()?"3+":e.rir}</b>`}</span>${e.stretch?'<span class="chip stretch">stretch focus</span>':''}</div>`}`;
     if(!hsx&&e.top)html+=topNoteHTML(e);
+    if(e.id==="lb9"&&curDay==="upperB"&&gmSkipToday())html+=`<div class="gm-skip" id="lb9Skip" style="margin:8px 16px 2px;padding:8px 10px;border-left:3px solid var(--gold);background:rgba(255,197,61,.07);border-radius:0 8px 8px 0;font-size:13px;line-height:1.45">Race week: skip these today, as the plan says. They are not in this week’s dose.</div>`;
     if(LOC==="home"&&HOME_SUB[e.id]){const hs=HOME_SUB[e.id];html+=`<div style="margin:8px 16px 2px;padding:8px 10px;border-left:3px solid var(--gold);background:rgba(255,197,61,.07);border-radius:0 8px 8px 0;font-size:13px;line-height:1.45"><b>Cue:</b> ${hs.h}</div>`;}
     if(lt)html+=`<div class="lastt" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>${fp&&fp.deload?"Last full week":"Last time"}: <b>${fmtSets(lt)}</b> ${fp&&fp.deload?"— deload week: go lighter.":"— beat it."}</span><button class="btn" style="flex:none;width:auto;background:var(--panel-3);color:var(--gold);border:1px solid rgba(255,197,61,.4);padding:6px 10px;font-size:12px" onclick="fillFromLast('${e.id}')">\u21ba Fill</button></div>`;
     {const pt=progressTarget(e);if(pt)html+=`<div class="lastt nextt" data-kind="${pt.kind}" style="background:rgba(74,222,128,.07);border-color:rgba(74,222,128,.3)"><span style="color:var(--go);font-weight:700">Next target:</span> <b>${pt.bo?"top set ":""}${fmtLoad(pt.w)} × ${pt.reps}</b>${pt.bo?` <span style="color:var(--text-2)">· back-offs about <b>${fmtLoad(pt.bo.w)} × ${pt.bo.reps}</b></span>`:""} <span style="color:var(--text-2)">· ${String(pt.why).replace(/(\S+) (\S+)$/,'<span style="white-space:nowrap">$1 $2</span>')}</span></div>`;}
@@ -1827,13 +1842,15 @@ function renderLiftDay(){_gridISO=liftISO();_gridTs=Date.now();
      inp.addEventListener("mouseup",ev=>{if(fresh()){ev.preventDefault();selAll();}}); // the pointer-up that ends the tap would otherwise put the caret back
      inp.addEventListener("click",()=>{if(fresh())selAll();});}
     inp.addEventListener("keydown",ev=>{if(ev.key!=="Enter")return;ev.preventDefault();const all=[...document.querySelectorAll("#liftBody .cell")],nx=all[all.indexOf(inp)+1];if(nx)nx.focus();else inp.blur();});
-    inp.addEventListener("input",()=>{if(liftStale())return;const s=ensureLiftSession(curDay),ex=inp.dataset.ex,i=+inp.dataset.i,f=inp.dataset.f,row=inp.closest("tr");s.entries[ex]=s.entries[ex]||[];s.entries[ex][i]=s.entries[ex][i]||{};const _cv=cellVal(inp);if(_cv===undefined)return;if(_cv===null)cellBad(inp);else inp.classList.remove("bad");if(row.classList.contains("pending"))adoptRow(row,s,ex,i,inp);s.entries[ex][i][f]=_cv===null?"":_cv;DB.save();const st=s.entries[ex][i];inp.classList.toggle("filled",!!inp.value);rowSync(row,st);if(f==="w"&&i===0)boSync(ex);});
-    inp.addEventListener("change",()=>{if(liftStale())return;const ex=inp.dataset.ex,i=+inp.dataset.i,s=findLiftSession(curDay),st=s&&s.entries[ex]&&s.entries[ex][i];if(st&&st.r&&st.w){const v=e1rm(st.w,st.r),lk=locKey(ex,s.loc);let prev=0;DB.sessions.forEach(ss=>{if(locKey(ex,ss.loc)!==lk)return;((ss.entries&&ss.entries[ex])||[]).forEach((x,xi)=>{if(ss.id===s.id&&xi===i)return;const vv=e1rm(x&&x.w,x&&x.r);if(vv>prev)prev=vv;});});if(v>prev&&prev>0)toast("New PR on "+exLabel(ex+"|"+lk).replace(/\s*\(.*?\)/g,"")+" — ~"+Math.round(v)+" kg",true);}});
+    inp.addEventListener("input",()=>{if(liftStale()){gmDisarm();return;}gmArm();const s=ensureLiftSession(curDay),ex=inp.dataset.ex,i=+inp.dataset.i,f=inp.dataset.f,row=inp.closest("tr");s.entries[ex]=s.entries[ex]||[];s.entries[ex][i]=s.entries[ex][i]||{};const _cv=cellVal(inp);if(_cv===undefined)return;if(_cv===null)cellBad(inp);else inp.classList.remove("bad");if(row.classList.contains("pending"))adoptRow(row,s,ex,i,inp);s.entries[ex][i][f]=_cv===null?"":_cv;gmSaved(DB.save());const st=s.entries[ex][i];inp.classList.toggle("filled",!!inp.value);rowSync(row,st);if(f==="w"&&i===0)boSync(ex);});
+    /* 17 Nov 2026: the cell's change event looks for a level or a complete week; record facts wait for the set's tick (review A-S2). The old "New PR" estimate is gone.
+       A stale grid (the day has moved) drops the armed "before" too (review A-N2). */
+    inp.addEventListener("change",()=>{if(liftStale()){gmDisarm();return;}const s=findLiftSession(curDay);if(s)gmFire(s.dateISO);else gmDisarm();});
   });
-  document.querySelectorAll("#liftBody .chk").forEach(b=>b.addEventListener("click",()=>{if(liftStale())return;const ex=b.dataset.chk,i=+b.dataset.i,row=b.closest("tr"),wIn=row&&row.querySelector('input[data-f="w"]'),rIn=row&&row.querySelector('input[data-f="r"]');
+  document.querySelectorAll("#liftBody .chk").forEach(b=>b.addEventListener("click",()=>{if(liftStale()){gmDisarm();return;}gmArm();const ex=b.dataset.chk,i=+b.dataset.i,row=b.closest("tr"),wIn=row&&row.querySelector('input[data-f="w"]'),rIn=row&&row.querySelector('input[data-f="r"]');
     if(wIn&&rIn&&!wIn.value.trim()&&numIn(rIn.value)>0&&wIn.placeholder==="0"){wIn.value="0";wIn.dispatchEvent(new Event("input",{bubbles:true}));} // erg-15: last time was bodyweight, so a blank Kg is 0
-    if(row&&row.classList.contains("pending")){const s0=ensureLiftSession(curDay);s0.entries[ex]=s0.entries[ex]||[];s0.entries[ex][i]=s0.entries[ex][i]||{};adoptRow(row,s0,ex,i,null);DB.save();rowSync(row,s0.entries[ex][i]);} // erg-02: the tick is what makes a prefilled row a logged set
-    const s=findLiftSession(curDay),st=s&&s.entries[ex]&&s.entries[ex][i];if(st&&st.r&&st.w){const exObj=GYM[curDay].ex.find(x=>x.id===ex);const sec=parseRest(restStr(exObj,i));startRest(sec);toast("Set done · resting "+fmtPace(sec),true);}else toast("Enter reps and weight first (type 0 for bodyweight)",false,true);}));
+    if(row&&row.classList.contains("pending")){const s0=ensureLiftSession(curDay);s0.entries[ex]=s0.entries[ex]||[];s0.entries[ex][i]=s0.entries[ex][i]||{};adoptRow(row,s0,ex,i,null);gmSaved(DB.save());rowSync(row,s0.entries[ex][i]);} // erg-02: the tick is what makes a prefilled row a logged set
+    const s=findLiftSession(curDay),st=s&&s.entries[ex]&&s.entries[ex][i];if(st&&st.r&&st.w){const exObj=GYM[curDay].ex.find(x=>x.id===ex);const sec=parseRest(restStr(exObj,i));startRest(sec);toast("Set done · resting "+fmtPace(sec),true);gmFire(s.dateISO,"Set done · resting "+fmtPace(sec),{id:ex,i});}else{gmDisarm();toast("Enter reps and weight first (type 0 for bodyweight)",false,true);}}));gmWarmLater();
   document.querySelectorAll("#liftBody .tool-h").forEach(h=>h.addEventListener("click",()=>h.parentElement.classList.toggle("open")));
   const plW=document.getElementById("plW"),plBar=document.getElementById("plBar");
   if(plW){plW.addEventListener("input",drawPlates);plBar.addEventListener("input",drawPlates);}
@@ -1992,8 +2009,9 @@ let focusOn=false,focusIdx=0;
 let focusLB=load("cb2_focuslb",true);
 const REGION={quads:["ga1","ga3","ga4","ga5","gb2","gb5"],hamstrings:["ga2","ga6","gb1","gb4","gb8","ga8"],glutes:["ga1","ga3","ga4","gb1","gb2","gb3","ga8","ga2"],calves:["ga7","gb6","x5","gb9","la9","lb9"],"lower back":["ga8","gb1","ga2"],"mid back":["la1","la3","la4","lb1","lb2","lb4","ua2","ua4","lb3","la2"],"upper back":["la2","la5","la8","lb5","lb8","x1"]};
 const FX_TARGET=new Set([].concat(...Object.values(REGION)));const FX_TRIM=new Set(["pa5","pa6","pa7","pb5","pb6","la6","la7","lb6","lb7","ua5","ua6","ua7","x2","x3","x4"]);
-function fxDelta(e){if(!focusLB||blockPlan())return 0;if(FX_TARGET.has(e.id))return 1;if(FX_TRIM.has(e.id))return -1;return 0;}
-function fxSets(e){const b=blockDose(e);if(b)return b.sets;return Math.max(2,(e.sets||3)+fxDelta(e));}
+/* fxSets(e): today's dose. fxSets(e, iso, fo): the dose on the date iso (its own block), with the focus on, off or as set (17 Nov 2026). */
+function fxDelta(e,asOf,fo){if(!(fo==null?focusLB:fo)||blockPlan(asOf,fo))return 0;if(FX_TARGET.has(e.id))return 1;if(FX_TRIM.has(e.id))return -1;return 0;}
+function fxSets(e,asOf,fo){const b=blockDose(e,asOf,fo);if(b)return b.sets;return Math.max(2,(e.sets||3)+fxDelta(e,asOf,fo));}
 function exSets(e,rx){const b=blockDose(e);if(b)return b.sets;return rx?Math.max(2,rx.sets+fxDelta(e)):fxSets(e);}
 function fxTag(e){const b=blockDose(e);if(b)return b.tag;const d=fxDelta(e);return d>0?"focus":d<0?"trim":"";}
 function fxTagHTML(e){const t=fxTag(e);return (t==="focus"||t==="priority")?' <span style="color:var(--go);font-weight:700">'+t+'</span>':t?' <span style="color:var(--text-3)">'+t+'</span>':"";}
@@ -2003,26 +2021,35 @@ function fxTagHTML(e){const t=fxTag(e);return (t==="focus"||t==="priority")?' <s
    and core work are outside the block. */
 var MUSCLE={chest:["pa1","pa3","pa4","pa5","pb2","pb3","pb7","ua1"],delts:["pa2","pa6","pb1","pb4","pb5","ua3","ua5"],arms:["pa7","pb6","la6","la7","lb6","lb7","ua6","ua7"],quads:["ga1","ga3","ga4","ga5","gb2","gb5"],hamstrings:["ga2","ga6","gb4","gb8"],"glutes & lower back":["ga8","gb1","gb3"],calves:["ga7","la9","gb6","gb9","lb9"],"back width":["la2","la4","lb1","lb4","ua2"],"mid back":["la1","la3","lb2","lb3","ua4"],"upper back":["la5","la8","lb5","lb8"]};
 var BLOCK_MUSCLES={"Legs & back":["quads","hamstrings","glutes & lower back","calves","back width","mid back","upper back"],"Posterior chain":["hamstrings","glutes & lower back","back width","mid back","upper back"],"Legs":["quads","hamstrings","glutes & lower back","calves"],"Delts & arms":["delts","arms"],"Chest & back width":["chest","back width"]};
-var LEGBACK=["quads","hamstrings","glutes & lower back","calves","back width","mid back","upper back"],_blkMemo=null;
-function blockPlan(){const b=currentBlock(),lb=b.name==="Legs & back block";if(lb?!planStarted():(!planStarted()||!/ specialisation$/.test(b.name)))return null;const key=b.name+"|"+focusLB;if(_blkMemo&&_blkMemo.key===key)return _blkMemo;
+var LEGBACK=["quads","hamstrings","glutes & lower back","calves","back width","mid back","upper back"],_blkMemo={},_blkAt={};
+/* blockPlan(): today's block with the focus as set. blockPlan(asOf, fo): the block of the date asOf, with the focus on (true), off (false) or as set
+   (omitted): the as-of path every past week is dosed through (17 Nov 2026). Plans are kept per block and focus; a date is looked up once. */
+function blockPlan(asOf,fo){const F=fo==null?focusLB:!!fo,ak=asOf?asOf+"|"+F:null;if(ak&&(ak in _blkAt))return _blkAt[ak];
+  const b=currentBlock(asOf),lb=b.name==="Legs & back block",st=asOf?asOf>=FIRST_ISO:planStarted();if(lb?!st:(!st||!/ specialisation$/.test(b.name))){if(ak)_blkAt[ak]=null;return null;}const key=b.name+"|"+F;if(_blkMemo[key]){if(ak)_blkAt[ak]=_blkMemo[key];return _blkMemo[key];}
   const short=lb?"Legs & back":b.name.replace(/ specialisation$/,""),emph=BLOCK_MUSCLES[short]||[],sets={},tag={},tot={},order=[];GYM_ORDER.forEach(k=>GYM[k].ex.forEach(e=>order.push(e)));
   Object.keys(MUSCLE).forEach(g=>{const ids=MUSCLE[g],on=emph.includes(g);let ex=order.filter(e=>ids.includes(e.id)),held=[];
     // Legs & back block: the direct 45-degree extension (ga8) keeps its dose (the erector rule); the extra glute sets go to the hip thrust first, then the deadlift
     if(lb&&g==="glutes & lower back"){held=ex.filter(e=>e.id==="ga8");ex=ex.filter(e=>e.id!=="ga8").sort((a,c)=>(a.id==="gb3"?0:1)-(c.id==="gb3"?0:1));}
     // 4 Nov 2026: the block only ever RAISES a group. Every exercise starts from its normal dose (focus included) and a group already above 20 keeps it (quads 24, calves 22).
-    const nb=e=>Math.max(2,(e.sets||3)+(focusLB?(FX_TARGET.has(e.id)?1:FX_TRIM.has(e.id)?-1:0):0)),hb=held.map(e=>Math.max(2,(e.sets||3)+(focusLB?1:0))),raw=ex.map(e=>e.sets||3),base=ex.map(nb),B=base.reduce((a,x)=>a+x,0)+hb.reduce((a,x)=>a+x,0),R=raw.reduce((a,x)=>a+x,0)+held.reduce((a,e)=>a+(e.sets||3),0);
+    const nb=e=>Math.max(2,(e.sets||3)+(F?(FX_TARGET.has(e.id)?1:FX_TRIM.has(e.id)?-1:0):0)),hb=held.map(e=>Math.max(2,(e.sets||3)+(F?1:0))),raw=ex.map(e=>e.sets||3),base=ex.map(nb),B=base.reduce((a,x)=>a+x,0)+hb.reduce((a,x)=>a+x,0),R=raw.reduce((a,x)=>a+x,0)+held.reduce((a,e)=>a+(e.sets||3),0);
     const T=on?Math.max(B,Math.min(20,Math.max(16,Math.ceil(R*1.3)))):0;
     const n=base.slice();let t=n.reduce((a,x)=>a+x,0)+hb.reduce((a,x)=>a+x,0);
     held.forEach((e,j)=>{sets[e.id]=hb[j];tag[e.id]=on?"priority":"";});for(let pass=0;pass<4&&t<T;pass++)for(let j=0;j<ex.length&&t<T;j++){if(n[j]<Math.max(base[j],raw[j]+2)){n[j]++;t++;}}
     ex.forEach((e,j)=>{sets[e.id]=n[j];tag[e.id]=on?"priority":"";});tot[g]=t;
     ids.forEach(id=>{if(id in sets)return;const u=GYM.upperA&&GYM.upperA.ex.find(x=>x.id===id);if(u){sets[id]=Math.max(nb(u),(u.sets||3)+(on?1:0));tag[id]=on?"priority":"";}});});
-  _blkMemo={key,name:b.name,short,emph,sets,tag,tot};return _blkMemo;}
-function blockDose(e){const p=e&&blockPlan();return p&&(e.id in p.sets)?{sets:p.sets[e.id],tag:p.tag[e.id]}:null;}
+  _blkMemo[key]={key,name:b.name,short,emph,sets,tag,tot};if(ak)_blkAt[ak]=_blkMemo[key];return _blkMemo[key];}
+function blockDose(e,asOf,fo){const p=e&&blockPlan(asOf,fo);return p&&(e.id in p.sets)?{sets:p.sets[e.id],tag:p.tag[e.id]}:null;}
 function aggrExtra(e,d){const b=blockDose(e);return aggrLive()&&!isDeloadWeek()&&!!d&&e===d.ex[0]&&!!e.cmp&&!shortNight()&&!(b&&b.tag==="maintenance");}
 function muscleSets(){const o={};Object.keys(MUSCLE).forEach(g=>{o[g]=0;GYM_ORDER.forEach(k=>GYM[k].ex.forEach(e=>{if(MUSCLE[g].includes(e.id))o[g]+=fxSets(e);}));});return o;} // weekly hard sets per MUSCLE group over the five lift days
-/* regionSets(): the standard week (the Guide card). regionSets(ws): the week that starts on ws as dated, only its own lift days (14 Nov 2026:
-   week 1 of the late start has four, race week has no Legs B), for "this week, logged / planned". The Fallback week keeps the standard count. */
-function regionSets(ws){const out={};Object.keys(REGION).forEach(r=>out[r]=0);const keys=ws&&!(DB.profile&&DB.profile.phase==="build")?Array.from({length:7},(_,i)=>liftKeyFor(dateAdd(ws,i))).filter(k=>k&&GYM[k]):GYM_ORDER;keys.forEach(k=>{const d=GYM[k];if(!d)return;d.ex.forEach(e=>{Object.entries(REGION).forEach(([r,ids])=>{if(ids.includes(e.id))out[r]+=fxSets(e);});});});return out;}
+/* regionSets(): the standard week (the Guide card), at today's dose. regionSets(ws): the week that starts on ws as dated, only its own lift days (14 Nov 2026:
+   week 1 of the late start has four, race week has no Legs B), for "this week, logged / planned". 17 Nov 2026: each day is dosed at ITS OWN date (the 22-day
+   block ends on a Sunday, so week 4's Saturday is at the block dose and the rest of that week is not), and race week's Thursday Upper B skips its calf
+   raises (lb9), as the plan says. The Fallback week counts its own four sessions, each at its own date (gmLiftDays(ws, true)). */
+function regionSets(ws,fo){const out={};Object.keys(REGION).forEach(r=>out[r]=0);const add=(e,n)=>{Object.entries(REGION).forEach(([r,ids])=>{if(ids.includes(e.id))out[r]+=n;});};
+  if(!ws){GYM_ORDER.forEach(k=>{const d=GYM[k];if(d)d.ex.forEach(e=>add(e,fxSets(e)));});return out;}
+  const std=!!(DB.profile&&DB.profile.phase==="build");let days;try{days=gmLiftDays(ws,std);}catch(x){days=[];for(let i=0;i<7;i++){const iso=dateAdd(ws,i),k=liftKeyFor(iso);if(k&&GYM[k])days.push({k,iso});}}
+  /* the game helpers are wrapped: a throw there falls back to the plain week (review V4) */
+  days.forEach(d=>GYM[d.k].ex.forEach(e=>{let sk=false;try{sk=!std&&gmSkip(d.k,d.iso,e.id);}catch(x){}if(sk)return;add(e,fxSets(e,d.iso,fo));}));return out;}
 function homeRx(e,hs){const n=hs.n;const isCalf=/Calf/i.test(n),isNordic=/Nordic/i.test(n),isIso=/Curl|Raise|Fly|Extension|Y-T-W|Y-Raise|Pullover|Kickback|21s|Shrug|Rollout|Dead-Bug|Crunch/i.test(n);
   let load="your kit";const hasBag=/bag/i.test(n),has15=/15 kg|2\u00d715/.test(n),has5=/5 kg|2\u00d75/.test(n)&&!/15 kg|2\u00d715/.test(n);
   const one15=/\(15 kg( DB)?\)|15 kg goblet/.test(n)&&!/2×15/.test(n);if(hasBag&&has15)load="20 kg bag + "+(one15?"1×15 kg DB":"15 kg DBs");else if(hasBag)load="20 kg bag";else if(one15)load="1×15 kg DB";else if(has15)load="2\u00d715 kg DBs";else if(has5)load="2\u00d75 kg DBs";else if(/Push-Up|Nordic|Rollout|Dead-Bug|Split Squat|Sissy|Bridge/i.test(n))load="bodyweight";
@@ -2724,8 +2751,9 @@ function weeklyReviewHTML(){
   </div>
   <div class="verdict ${r.cls}" style="margin-top:10px"><b>Verdict:</b> ${r.verdict}</div>${reviewInfoHTML(r)}${aiSlot("review")}<button class="btn btn-ghost" id="coachBtn" style="margin-top:10px" onclick="shareCoachText()">Copy this week for Claude</button><textarea id="coachBox" hidden readonly aria-label="Weekly check-in text" style="width:100%;min-height:180px;margin-top:8px;padding:10px;border-radius:10px;background:var(--panel-3);color:var(--text);border:1px solid var(--line);font-family:var(--f-mono);font-size:16px"></textarea><div class="calc-note" style="margin-top:6px">Builds a plain-text check-in from your log — weigh-ins, tapes, sleep, every set, sets per region — with four questions and an instruction not to guess. Paste it into Claude on your phone. <span id="coachSendNote">${aiSendNote()}</span></div></div>`;
 }
-function currentBlock(){const w=planWeek();
-  if(p22Live())return {name:"Legs & back block",span:p22Span(" – ",1),i:p22Day(),n:22,days:true,focus:"16–20 hard sets a week for every leg and back group; the upper body keeps its hybrid dose. Top sets stay at 3 in reserve through week 3."};
+/* currentBlock(): the block running today. currentBlock(asOf): the block that runs on the date asOf (the 22-day block by its dates, a specialisation block by the plan week of asOf). */
+function currentBlock(asOf){const w=asOf?Math.max(1,Math.floor(dayDiff(START_ISO,asOf)/7)+1):planWeek();
+  if(asOf?(asOf>=DAY1_ISO&&asOf<=p22End()):p22Live())return {name:"Legs & back block",span:p22Span(" – ",1),i:asOf?dayDiff(DAY1_ISO,asOf)+1:p22Day(),n:22,days:true,focus:"16–20 hard sets a week for every leg and back group; the upper body keeps its hybrid dose. Top sets stay at 3 in reserve through week 3."};
   if(w<=16)return {name:"Base block",span:"weeks 1\u201316",i:w,n:16,focus:"Every muscle twice a week. The muscle-memory window \u2014 the fastest gains of the whole arc happen here."};
   const names=["Posterior chain","Legs","Delts & arms","Chest & back width"];const k=Math.floor((w-17)/6),idx=k%4,start=17+k*6;
   return {name:names[idx]+" specialisation",span:"weeks "+start+"\u2013"+(start+5),i:w-start+1,n:6,focus:"+30\u201350% sets for "+names[idx].toLowerCase()+" (16\u201320 hard sets), everything else at maintenance (6\u20138). Same total volume, focused recovery budget."};}
@@ -3423,7 +3451,7 @@ function aiLogSave(){const L=_ai.log;if(L.st!=="preview")return;const de=documen
   if(!dateOK(de,date))return;
   if(dayDiff(date,t)>AI_LOG_BACK){if(de)de.classList.add("bad");toast("That date is more than "+AI_LOG_BACK+" days back — nothing saved",false,true);return;}
   const items=L.items.filter(x=>x.on&&!aiLogWhy(x,date));if(!items.length)return;
-  const snap=JSON.stringify({weight:DB.weight,measure:DB.measure,sleep:DB.sleep||[],steps:DB.steps||[],rhr:DB.rhr||[],sessions:DB.sessions,runs:DB.runs,pw:DB.profile.weight}),tape={},touched={};
+  const _gb=gmBefore(),snap=JSON.stringify({weight:DB.weight,measure:DB.measure,sleep:DB.sleep||[],steps:DB.steps||[],rhr:DB.rhr||[],sessions:DB.sessions,runs:DB.runs,pw:DB.profile.weight}),tape={},touched={};
   items.forEach(x=>{const v=x.v;
     if(x.k==="weight"){touched.weight=1;DB.weight=DB.weight.filter(r=>r.date!==date);DB.weight.push({date,v});}
     else if(x.k==="sleep"){touched.sleep=1;DB.sleep=(DB.sleep||[]).filter(r=>r.date!==date);DB.sleep.push({date,h:v});}
@@ -3435,10 +3463,10 @@ function aiLogSave(){const L=_ai.log;if(L.st!=="preview")return;const de=documen
       if(v.rpe!=null)row.rpe=String(v.rpe);a.push(row);s.entries[v.ex]=a;}
     else if(x.k==="run"){touched.runs=1;DB.runs.push({date,type:v.type,dist:v.km,time:v.sec});}});
   if(Object.keys(tape).length){touched.measure=1;const old=DB.measure.find(r=>r.date===date)||{};DB.measure=DB.measure.filter(r=>r.date!==date);DB.measure.push(Object.assign({},old,{date},tape));}
-  if(touched.weight)syncWeight();DB.save();const n=items.length;
+  if(touched.weight)syncWeight();const _ok=DB.save(),n=items.length;
   const rest=L.items.filter(x=>x.ok&&x.on&&x.k==="set"&&items.indexOf(x)<0);   // sets held back only by the day he saved under: kept, under today, so nothing has to be typed twice
   _ai.log=rest.length?{q:L.q,st:"preview",items:rest,date:todayISO(),dnote:"",note:""}:{q:"",st:"idle",items:[],date:"",dnote:"",note:""};rerenderAll();
-  undoToast("Saved "+n+" item"+(n===1?"":"s")+" under "+fmtShort(date),()=>{const o=JSON.parse(snap);Object.keys(touched).forEach(k=>{DB[k]=o[k];});if(touched.weight)DB.profile.weight=o.pw;DB.save();rerenderAll();});}   // Undo puts back only the lists this save wrote to
+  undoToast("Saved "+n+" item"+(n===1?"":"s")+" under "+fmtShort(date),()=>{const o=JSON.parse(snap);Object.keys(touched).forEach(k=>{DB[k]=o[k];});if(touched.weight)DB.profile.weight=o.pw;DB.save();rerenderAll();});gmOnce(_gb,date,_ok);}   // Undo puts back only the lists this save wrote to
 
 /* ----- F5: meal check. A plate is an estimate with its range; a printed nutrition table is read, and the servings are his to enter. ----- */
 function aiMealPrompt(note,img){const src=img?"picture":"description";
@@ -3545,6 +3573,323 @@ document.addEventListener("input",function(e){const t=e.target;if(!t||!t.id)retu
 document.addEventListener("change",function(e){const t=e.target;if(!t||!t.id)return;
   if((t.id==="aiLogFile"||t.id==="aiMealFile")&&!t.onchange){const f=t.files&&t.files[0];if(!f)return;if(t.id==="aiLogFile")aiLogRead(f);else aiMealRead(f);}
   else if(t.id==="aiLogDate"){_ai.log.date=t.value;if(t.value)_ai.log.dnote="";aiPaint();}});
+/* ===== The body is the game (17 Nov 2026; design v2, after the independent review) =====
+   Ten muscle groups fill as the week's hard sets are logged; each has a level from the sets logged so far; the week's quests are the plan's own
+   sessions; a moment is a plain fact the plan or the log already holds (a top set earned, a week complete). Rules: every number is a function of
+   the logs and the plan; nothing is stored (no new key) and nothing is random; credit stops at each week's planned dose; Extras earn nothing;
+   nothing decays. No estimated one-rep max is used anywhere in this layer.
+   Groups: the seven REGION groups (overlapping counts, as Track shows them) and chest, delts, arms from MUSCLE (each exercise once).
+   mesh = the 3D figure's keys for the group (vis/threed CONTRACT.md); abs, obliques, forearms and body are not tracked and stay neutral. */
+var GM_GROUPS=[
+  {key:"quads",name:"Quadriceps",short:"Quads",mesh:["quads"]},
+  {key:"hamstrings",name:"Hamstrings",short:"Hamstrings",mesh:["hamstrings"]},
+  {key:"glutes",name:"Glutes",short:"Glutes",mesh:["glutes"]},
+  {key:"calves",name:"Calves",short:"Calves",mesh:["calves"]},
+  {key:"lower back",name:"Lower back",short:"Lower back",mesh:["lowerback"]},
+  {key:"mid back",name:"Mid back and lats",short:"Mid back",mesh:["midback","lats"]},
+  {key:"upper back",name:"Upper back",short:"Upper back",mesh:["upperback"]},
+  {key:"chest",name:"Chest",short:"Chest",mesh:["chest"],m:1},
+  {key:"delts",name:"Delts",short:"Delts",mesh:["delts"],m:1},
+  {key:"arms",name:"Arms",short:"Arms",mesh:["biceps","triceps"],m:1}];
+var GM_TOP=["ga1","gb1","pa1","pb1","la1"]; /* top-set rows compared by load; lb1 is one id for two exercises (weighted pull-up, pulldown), so its loads are not */
+var GM_EARN=["ga1","gb1","pa1","pb1","la1","lb1"]; /* the lifts whose top set the engine steps up (topTarget) */
+var GM_LIFT={ga1:"Squat",gb1:"Deadlift",pa1:"Bench press",pb1:"Overhead press",la1:"Barbell row",lb1:"Pull-up or pulldown"};
+var GM_FALLBACK=["pushA","pullA","legsA","upperA"]; /* the Fallback week's four sessions */
+var _gm={memo:null,cap:{},ix:null,base:null,armed:false,aiso:null,rev:-1,pend:null,qt:0,seen:{},greet:null};
+function gmIdMap(){if(_gm.ix)return _gm.ix;const ix={};GM_GROUPS.forEach((g,i)=>{(g.m?MUSCLE:REGION)[g.key].forEach(id=>{(ix[id]=ix[id]||[]).push(i);});});return _gm.ix=ix;}
+function gmObj(a){const o={};GM_GROUPS.forEach((g,i)=>{o[g.key]=a[i];});return o;}
+function gmWs(ws){return ws||weekStartISO(planWeek());}
+function gmFallback(){return !!(DB.profile&&DB.profile.phase==="build");}
+/* Plan week of a date by arithmetic on the ISO digits (no Date object: the snapshot reads thousands of dates). */
+function gmDay(iso){return Date.UTC(+iso.slice(0,4),+iso.slice(5,7)-1,+iso.slice(8,10))/864e5;}
+var GM_D0=null;
+function gmWkOf(iso){if(GM_D0===null)GM_D0=gmDay(START_ISO);return Math.floor((gmDay(iso)-GM_D0)/7)+1;}
+/* A date the game may read: ISO_RE and a day the month has, i.e. the y-m-d survives a UTC round trip ("2027-04-31" does not: it would read as 1 May
+   and land in the next week). Arithmetic, no Date object. Every game reader skips a date that fails (review A-M1). */
+var GM_MD=[31,28,31,30,31,30,31,31,30,31,30,31];
+function gmDateOK(iso){if(typeof iso!=="string"||!ISO_RE.test(iso))return false;const y=+iso.slice(0,4),m=+iso.slice(5,7),d=+iso.slice(8,10);return d<=(m===2&&((y%4===0&&y%100!==0)||y%400===0)?29:GM_MD[m-1]);}
+/* The lift days of the week that starts on ws, each with its own date. std = the Fallback week: its four sessions as the Lift tab runs them (Push A,
+   Pull A, Legs A, Upper), laid on Mon, Wed, Sat and Fri of that week (Legs A opens the week on its Saturday, as in the hybrid week). A day before Day 1 (nothing is due then)
+   moves to the first free day from Day 1 (week 1: Legs A on Sun 15 Nov), and Upper goes on the Thursday of race week (Friday is race day). Review A-S4. */
+var GM_FB_DAY={legsA:0,pushA:2,pullA:4,upperA:6};
+function gmLiftDays(ws,std){const mk=ws+"|"+(std?1:0),M=_gm.days||(_gm.days={});if(M[mk])return M[mk];const out=[];
+  if(std){const late=[];GM_FALLBACK.forEach(k=>{if(!GYM[k])return;let iso=dateAdd(ws,GM_FB_DAY[k]);if(iso===RACE_ISO)iso=dateAdd(iso,-1);if(iso<START_ISO||preDay1(iso))late.push(k);else out.push({k,iso});});
+    /* a day before Day 1 (week 1's Saturday): that session is still due this week on the Lift tab, so it takes the first free day from Day 1 (review V1) */
+    late.forEach(k=>{for(let i=0;i<7;i++){const iso=dateAdd(ws,i);if(iso<START_ISO||preDay1(iso)||iso===RACE_ISO||out.some(o=>o.iso===iso))continue;out.push({k,iso});break;}});out.sort((a,b)=>a.iso<b.iso?-1:a.iso>b.iso?1:0);}
+  else for(let i=0;i<7;i++){const iso=dateAdd(ws,i),k=liftKeyFor(iso);if(k&&GYM[k])out.push({k,iso});}return M[mk]=out;}
+/* Race week: Thursday's Upper B skips its calf raises (the plan's own text), so lb9 is out of that week's dose. */
+function gmSkip(k,iso,id){return id==="lb9"&&k==="upperB"&&raceWeekISO(iso);}
+/* The dose of a dated week per group: each lift day at the dose of ITS OWN date (fxSets(e, iso)), with the focus on, off or as set (fo omitted).
+   For the seven REGION groups this is regionSets(ws) by construction: same days, same doses. */
+function gmDose(ws,std,fo){const out=GM_GROUPS.map(()=>0),ix=gmIdMap();gmLiftDays(ws,std).forEach(d=>GYM[d.k].ex.forEach(e=>{const gs=ix[e.id];if(!gs||(!std&&gmSkip(d.k,d.iso,e.id)))return;const n=fxSets(e,d.iso,fo);for(let i=0;i<gs.length;i++)out[gs[i]]+=n;}));return out;}
+/* The credit cap of a week: per group, the highest dose the dated plan sets for it over the hybrid and the Fallback week, with the Legs & Back focus on
+   and off (review A-S4), plus Aggressive's gold +1 set wherever that day's own date could have shown it (review A-S6). It reads no setting and no clock,
+   so a setting can never lower credit; it only ever limits logged sets. Deload weeks keep their sets. Week 1 needs no exception: the Fallback week's
+   Legs A, whose Saturday is before Day 1, is laid on Day 1 (gmLiftDays), so its dose is planned and capped like any other week's. */
+function gmPlus1(e,iso,fo){if(!e||!e.cmp||!(iso<=aggrEndISO())||isDeloadISO(iso))return false;const b=blockDose(e,iso,fo);return !(b&&b.tag==="maintenance");}
+function gmCap(ws){let c=_gm.cap[ws];if(c)return c;c=GM_GROUPS.map(()=>0);const ix=gmIdMap();[false,true].forEach(std=>[true,false].forEach(fo=>{const n=gmDose(ws,std,fo);
+    gmLiftDays(ws,std).forEach(d=>{const e=GYM[d.k].ex[0];if(gmPlus1(e,d.iso,fo))(ix[e.id]||[]).forEach(i=>{n[i]++;});});n.forEach((v,i)=>{if(v>c[i])c[i]=v;});}));return _gm.cap[ws]=c;}
+function gmPlanned(ws){return gmObj(gmDose(gmWs(ws),gmFallback()));}
+function gmDone(ws){const st=gmWs(ws),out=GM_GROUPS.map(()=>0),ix=gmIdMap();hardSets(st,dateAdd(st,7),false).forEach(o=>{if(!gmDateOK(o.d))return;(ix[o.id]||[]).forEach(i=>{out[i]+=o.n;});});return gmObj(out);}
+/* The ladder: Level L needs 5 x L x (L+1) credited sets (10, 30, 60, 100, 150, 210 ...). */
+function gmT(L){return 5*L*(L+1);}
+function gmLevel(c){let L=0;while(gmT(L+1)<=c)L++;return L;}
+/* Lifts of a week, matched by SESSION KEY: a planned key counts once however often it is logged and on whatever day; a session that matches no
+   remaining planned key is extra (never required). Race week: Wednesday's Pull A is optional, as the plan's text says ("if you feel good"). */
+function gmLogged(x){const E=x&&x.entries;if(!E)return false;for(const id in E){const a=E[id];if(Array.isArray(a))for(let i=0;i<a.length;i++)if(okSet(a[i]))return true;}return false;}
+function gmMainSessions(from,to){return DB.sessions.filter(x=>x&&x.day!=="extras"&&gmDateOK(x.dateISO)&&x.dateISO>=from&&x.dateISO<to&&gmLogged(x));}
+function gmMatch(keys,list){const left=keys.map(o=>Object.assign({done:false},o)),seen={};let extra=0;
+  list.slice().sort((a,b)=>String(a.dateISO).localeCompare(String(b.dateISO))).forEach(x=>{const u=x.dateISO+"|"+x.day;if(seen[u])return;seen[u]=1;const o=left.find(q=>q.k===x.day&&!q.done);if(o)o.done=true;else extra++;});
+  const req=left.filter(o=>!o.opt);return {keys:left,planned:req.length,done:req.filter(o=>o.done).length,extra,optional:left.filter(o=>o.opt).map(o=>o.k),complete:req.length>0&&req.every(o=>o.done)};}
+function gmWeekLifts(ws,list){ws=gmWs(ws);const S=list||gmMainSessions(ws,dateAdd(ws,7));
+  return {hybrid:gmMatch(gmLiftDays(ws,false).map(d=>({k:d.k,iso:d.iso,opt:d.k==="pullA"&&raceWeekISO(d.iso)})),S),fallback:gmMatch(GM_FALLBACK.map(k=>({k,iso:null,opt:k==="pullA"&&raceWeekISO(dateAdd(ws,GM_FB_DAY.pullA))})),S)};}
+/* Runs a plan week asks for: not optional, not walks, not before Day 1; null once the run plan has ended (no goal race, no run quest). */
+function gmRunPlan(wk){if(!(wk>=1&&wk<=PLAN_WEEKS))return null;const M=_gm.rp||(_gm.rp={});if(wk in M)return M[wk];let n=0;runWeek(wk).runs.forEach(r=>{if(r.t==="opt"||r.t==="walk"||preDay1(dateForWeekDay(wk,r.d)))return;n++;});return M[wk]=n;}
+/* ----- moments' facts: no estimate anywhere ----- */
+function gmEx(id){const m=EXMAP[id];return m&&GYM[m.day]?GYM[m.day].ex.find(e=>e.id===id):null;}
+/* Heaviest top set: row one of the lift, at the gym, reps inside the top-set range, RPE logged and 9 or lower, plan week 4 or later, never in a
+   deload week, heavier than every earlier row one of that lift; the first one is the baseline. The value is the latest such set. */
+function gmTop1(id){const e=gmEx(id),rr=e&&e.top?repRange({reps:e.top.reps}):null;if(!rr)return null;const by={};let best=null;
+  DB.sessions.forEach(x=>{if(!x||x.day==="extras"||!gmDateOK(x.dateISO)||locKey(id,x.loc)!=="gym")return;const st=x.entries&&x.entries[id]&&x.entries[id][0];if(!okSet(st)||!(+st.w>0))return;const o=by[x.dateISO];if(!o||+st.w>o.w)by[x.dateISO]={w:+st.w,r:+st.r,rpe:st.rpe?rpeNum(st.rpe):null};});
+  let max=-1,n=0;Object.keys(by).sort().forEach(d=>{const o=by[d];if(n>0&&o.w>max&&o.r>=rr.lo&&o.r<=rr.hi&&o.rpe!=null&&o.rpe<=9&&gmWkOf(d)>=4&&!isDeloadISO(d))best={w:o.w,r:o.r,date:d};if(o.w>max)max=o.w;n++;});return best;}
+function gmTopBests(){const out={};GM_TOP.forEach(id=>{out[id]=gmTop1(id);});return out;}
+/* Tested best (Track, Tests): a test of 1 to 3 reps heavier than every earlier one of that lift with at least as many reps, with an earlier test
+   on an earlier day. Loads are compared with loads; nothing is converted to a one-rep max. */
+function gmTestedBests(){const out={},by={};(DB.lifts||[]).forEach((x,i)=>{if(!x||!isStr(x.lift)||!gmDateOK(x.date)||!(+x.w>0)||!(+x.r>=1&&+x.r<=3))return;(by[x.lift]=by[x.lift]||[]).push({w:+x.w,r:+x.r,date:x.date,i});});
+  Object.keys(by).forEach(l=>{const a=by[l].sort((p,q)=>p.date.localeCompare(q.date)||p.i-q.i);a.forEach((x,j)=>{let mx=-1,old=false;for(let k=0;k<j;k++){const y=a[k];if(y.r>=x.r){if(y.w>mx)mx=y.w;if(y.date<x.date)old=true;}}if(old&&x.w>mx)out[l]={w:x.w,r:x.r,date:x.date};});});return out;}
+/* Fastest 1 km check and 5 km trial: faster than every earlier one of its type; the first of a type is the baseline. */
+function gmFastest(){const out={check:null,tt:null},T={check:["Check",1],tt:["Time trial",5]};Object.keys(T).forEach(k=>{
+    const a=(DB.runs||[]).map((x,i)=>({x,i})).filter(o=>o.x&&o.x.type===T[k][0]&&+o.x.dist===T[k][1]&&+o.x.time>0&&gmDateOK(o.x.date)).sort((p,q)=>p.x.date.localeCompare(q.x.date)||p.i-q.i);
+    let mn=Infinity,first=null;a.forEach(o=>{const d=o.x.date,t=+o.x.time;if(first!==null&&d>first&&t<mn)out[k]={time:t,date:d};if(t<mn)mn=t;if(first===null)first=d;});});return out;}
+/* The engine's own next top-set target, as the log will stand after the day iso: only for a lift logged at the gym on that day, never in a deload week. */
+function gmEarned(iso,ids){const out={};if(!gmDateOK(iso)||isDeloadISO(iso))return out;const td=DB.sessions.filter(x=>x&&x.dateISO===iso&&x.day!=="extras");if(!td.length)return out;const tom=dateAdd(iso,1);
+  (ids||GM_EARN).forEach(id=>{const e=gmEx(id);if(!e||!e.top||!td.some(x=>locKey(id,x.loc)==="gym"&&x.entries&&(x.entries[id]||[]).some(okSet)))return;const tt=topTarget(e,tom);if(tt)out[id]={kind:tt.kind,w:tt.w};});return out;}
+/* ----- the snapshot: everything the card, the pane and the moments read, built in one pass and kept until the logs, the day or a setting change ----- */
+function gmStamp(){return [_gmRev,DB.sessions.length,(DB.runs||[]).length,(DB.lifts||[]).length,DB.weight.length,(DB.steps||[]).length,DB.measure.length,todayISO(),liftISO(),focusLB?1:0,DB.profile&&DB.profile.phase,bulkMode].join("|");}
+function gmSnapshot(){const st=gmStamp(),m=_gm.memo;if(m&&m.st===st&&m.S===DB.sessions&&m.R===DB.runs&&m.L===DB.lifts)return m.snap;const snap=gmBuild();_gm.memo={st,S:DB.sessions,R:DB.runs,L:DB.lifts,snap};return snap;}
+function gmBuild(){const G=GM_GROUPS,NG=G.length,ix=gmIdMap(),liso=liftISO(),started=planStarted(),wk=planWeek(),ws=weekStartISO(wk),we=dateAdd(ws,7),fb=gmFallback(),nW=started?wk:0,zero=()=>G.map(()=>0);
+  const done=[],sW=[],rW=[],last=G.map(()=>null),glow=zero();for(let i=0;i<nW;i++){done.push(zero());sW.push([]);rW.push({});}
+  if(nW){hardSets(START_ISO,we,false).forEach(o=>{const gs=ix[o.id];if(!gs||!gmDateOK(o.d))return;const w=gmWkOf(o.d)-1;if(w<0||w>=nW)return;for(let j=0;j<gs.length;j++){const g=gs[j];done[w][g]+=o.n;if(!last[g]||o.d>last[g])last[g]=o.d;if(o.d===liso)glow[g]=1;}});
+    DB.sessions.forEach(x=>{if(!x||x.day==="extras"||!gmDateOK(x.dateISO)||!(x.dateISO>=START_ISO&&x.dateISO<we)||!gmLogged(x))return;const w=gmWkOf(x.dateISO)-1;if(!(w>=0&&w<nW))return;sW[w].push(x);});
+    (DB.runs||[]).forEach(r=>{if(!r||r.type==="Walk"||!gmDateOK(r.date)||!(r.date>=START_ISO&&r.date<we))return;const w=gmWkOf(r.date)-1;if(!(w>=0&&w<nW))return;rW[w][r.date]=1;});}
+  /* credit: every week, the current one too, stops at that week's cap; the fill (the colour) uses the plan as it stands */
+  const planCur=nW?gmDose(ws,fb):zero(),doneCur=nW?done[nW-1]:zero(),credited=zero();
+  for(let w=0;w<nW;w++){const cap=gmCap(weekStartISO(w+1));for(let g=0;g<NG;g++)credited[g]+=Math.min(done[w][g],cap[g]);}
+  const prevPlan=nW>1?gmDose(weekStartISO(wk-1),fb):null,prevDone=nW>1?done[nW-2]:null,anyCur=doneCur.some(x=>x>0),lastWeek=!anyCur&&!!prevDone&&prevDone.some(x=>x>0);
+  const groups=G.map((g,i)=>{const L=gmLevel(credited[i]);return {key:g.key,name:g.name,short:g.short,mesh:g.mesh,once:!!g.m,planned:planCur[i],done:doneCur[i],t:planCur[i]>0?doneCur[i]/planCur[i]:null,
+    prevT:prevPlan&&prevPlan[i]>0?prevDone[i]/prevPlan[i]:null,prevDone:prevDone?prevDone[i]:0,credited:credited[i],level:L,floor:gmT(L),next:gmT(L+1),toNext:gmT(L+1)-credited[i],last:last[i],glow:glow[i]};});
+  /* weeks: complete = every required lift key logged and, while the run plan lasts, runs on as many days as the plan asks. A finished week counts
+     under either plan (hybrid or Fallback), so a setting never rewrites a past week; the current week uses the plan he is on. */
+  const flags=[];let curL=null,curRuns=null;
+  for(let w=0;w<nW;w++){const cur=w===nW-1,L=gmWeekLifts(weekStartISO(w+1),sW[w]),rp=gmRunPlan(w+1),rd=Object.keys(rW[w]).length,lc=cur?(fb?L.fallback:L.hybrid).complete:(L.hybrid.complete||L.fallback.complete);
+    flags.push(lc&&(rp==null||rd>=rp));if(cur){curL=fb?L.fallback:L.hybrid;curRuns=rp==null?null:{done:Math.min(rd,rp),planned:rp};}}
+  /* n = weeks complete (never resets); row = complete weeks in a row ending with the last finished week, the current one joining once complete; best = the longest row */
+  let n=0,run=0,best=0;flags.forEach((ok,w)=>{if(ok){n++;run++;if(run>best)best=run;}else if(w<nW-1)run=0;});
+  let quests=null;if(nW){/* the Lifts quest counts as the base app does, but only sessions whose date the calendar has (review R2A-1) */const c=sessionsThisWeek(DB.sessions.filter(x=>x&&gmDateOK(x.dateISO))),sw=stepsWeek(ws);quests={lifts:{done:c.lifts,planned:c.planned},runs:curRuns,weigh:{done:DB.weight.filter(x=>x&&gmDateOK(x.date)&&x.date>=ws&&x.date<we).length,of:3},steps:{done:sw.hit,of:7},waist:DB.measure.some(x=>x&&x.waist!=null&&gmDateOK(x.date)&&x.date>=ws&&x.date<we)};}
+  return {started,wk,ws,liso,fallback:fb,raceWeek:nW>0&&raceWeekISO(dateAdd(ws,6)),groups,lastWeek,quests,lifts:curL,weeks:{flags,n,row:run,best,fresh:nW>1&&!flags[nW-2]&&!flags[nW-1]},complete:nW?flags[nW-1]:false,records:null};}
+/* The facts the record moments compare, read once per snapshot and only when a moment is being looked for. */
+function gmRecs(s){if(s&&!s.records)s.records={top:gmTopBests(),tested:gmTestedBests(),fast:gmFastest(),earned:gmEarned(s.liso)};return s?s.records:null;}
+function gmCredited(){const o={};gmSnapshot().groups.forEach(g=>{o[g.key]=g.credited;});return o;}
+function gmLevels(){const o={};gmSnapshot().groups.forEach(g=>{o[g.key]={level:g.level,credited:g.credited,floor:g.floor,next:g.next,toNext:g.toNext};});return o;}
+function gmGlow(){const o={};gmSnapshot().groups.forEach(g=>{o[g.key]=g.glow;});return o;}
+function gmQuests(){const s=gmSnapshot();return s.quests?Object.assign({complete:s.complete,required:s.lifts?{done:s.lifts.done,planned:s.lifts.planned,extra:s.lifts.extra,optional:s.lifts.optional}:null},s.quests):null;}
+function gmStreak(){const w=gmSnapshot().weeks;return {weeks:w.n,row:w.row,best:w.best};}
+/* The 3D figure's values: {t, glow} per mesh key; untracked keys are absent (neutral). Last week's fill shows until the first set of a new week. */
+function gmMeshValues(s){s=s||gmSnapshot();const o={};s.groups.forEach(g=>{const t=s.lastWeek?g.prevT:g.t,band=gmBand(t==null?0:Math.min(100,Math.round(t*100)));g.mesh.forEach(k=>{o[k]={t:t==null?null:t,band,glow:s.lastWeek?0:g.glow};});});return o;}
+/* The moments one save made: b and a are snapshots before and after it, iso the date it was saved under. Most important first. */
+function gmMoments(b,a,iso,o){const out=[];o=o||{};if(!a||!a.started||!gmDateOK(iso))return out;const w=gmWkOf(iso)-1,bf=(b&&b.weeks&&b.weeks.flags)||null;
+  if(bf&&w>=0&&a.weeks.flags[w]&&!bf[w])out.push({kind:"week",key:"week|"+(w+1)+"|1|"+iso,text:"Week complete: every planned lift "+(gmRunPlan(w+1)!=null?"and run ":"")+"is in"});
+  /* a one-shot save (o.recs): every record fact, before against after */
+  if(o.recs){const A=gmRecs(a),B=(b&&b.records)||{top:{},tested:{},fast:{},earned:{}};
+    Object.keys(A.tested).forEach(l=>{const x=A.tested[l],y=B.tested[l];if(x&&x.date===iso&&!(y&&y.date===iso&&y.w>=x.w))out.push({kind:"tested",key:"tested|"+l+"|"+x.w+"|"+iso,text:"New tested best · "+esc(l)+" "+x.w+" kg"});});
+    [["check","Fastest 1 km check yet"],["tt","Fastest 5 km trial yet"]].forEach(p=>{const x=A.fast[p[0]],y=B.fast[p[0]];if(x&&x.date===iso&&!(y&&y.date===iso&&y.time<=x.time))out.push({kind:"fast",key:"fast|"+p[0]+"|"+x.time+"|"+iso,text:p[1]+" · "+fmtPace(x.time)});});
+    GM_TOP.forEach(id=>{const x=A.top[id],y=B.top[id];if(x&&x.date===iso&&!(y&&y.date===iso&&y.w>=x.w))out.push({kind:"top",key:"top|"+id+"|"+x.w+"|"+iso,text:"Heaviest top set yet · "+GM_LIFT[id]+" "+x.w+" kg × "+x.r});});
+    if(a.liso===iso)GM_EARN.forEach(id=>{const x=A.earned[id],y=B.earned&&B.earned[id],e=gmEx(id);if(x&&x.kind==="up"&&!(y&&y.kind==="up"&&y.w>=x.w))out.push({kind:"earned",key:"earned|"+id+"|"+x.w+"|"+iso,text:"Top set earned · "+GM_LIFT[id]+": +"+((e&&e.top&&e.top.inc)||2.5)+" kg next time"});});}
+  /* the grid's tick on a lift's top-set row (o.tick = the lift): that lift's facts, judged against the days before today only, never against today's
+     own rows, so a corrected typo is judged against history (review A-S2) */
+  if(o.tick&&a.liso===iso){const id=o.tick,e=gmEx(id);if(GM_TOP.includes(id)){const x=gmTop1(id);if(x&&x.date===iso)out.push({kind:"top",key:"top|"+id+"|"+x.w+"|"+iso,text:"Heaviest top set yet · "+GM_LIFT[id]+" "+x.w+" kg × "+x.r});}
+    if(GM_EARN.includes(id)){const x=gmEarned(iso,[id])[id];if(x&&x.kind==="up")out.push({kind:"earned",key:"earned|"+id+"|"+x.w+"|"+iso,text:"Top set earned · "+GM_LIFT[id]+": +"+((e&&e.top&&e.top.inc)||2.5)+" kg next time"});}}
+  if(b&&b.groups)a.groups.forEach((g,i)=>{const p=b.groups[i];if(p&&g.level>p.level)out.push({kind:"level",key:"level|"+g.key+"|"+g.level+"|"+iso,text:g.short+" reached Level "+g.level});});
+  return out;}
+/* ----- the screens: the "Your body" card on Home and the body's home on Track > Regions. The numbers and bars are the game; the 3D figure
+   (window.MuscleMap, vis/threed CONTRACT.md v1.1) is how it looks, mounted lazily when the module exists and WebGL2 works, and never needed. ----- */
+var GM_RULES=["Levels count the hard sets you have logged for a muscle, up to each week’s planned dose. They measure work done, not muscle size.",
+  "If you delete a log, its sets leave the count.",
+  "Legs and back count every region a lift trains, so a deadlift counts for hamstrings, glutes and lower back. Chest, delts and arms count each exercise once. Do not compare levels between muscles.",
+  "A week’s credit stops at the highest dose the plan sets for it (the hybrid or the Fallback week, Legs &amp; Back focus on or off), so changing a setting never lowers a level. A gold +1 set counts. An extra session fills the bars but earns nothing above the dose; Extras pump sets earn nothing.",
+  "A week is complete when every planned lift is logged (each session once, whatever day you did it) and the week’s planned runs are in. In race week Pull A is optional.",
+  "Moments are plain facts: the top set the engine steps up, your heaviest top set (set 1 at the gym, 3–5 reps, RPE 9 or lower, from week 4, never in a deload week), a tested best, your fastest 1 km check or 5 km trial, a level, a complete week. No estimated max. Squat and deadlift bests assume the same variant each time.",
+  "Colour, on the bars and on the body alike: steel under 60% of this week’s plan, gold from 60%, green at 100% (the week’s dose done). On the body a brighter shade of the colour means further along. The body shows last week, dimmed, until your first set of a new week."];
+function gmGroup(k){return GM_GROUPS.find(g=>g.key===k)||null;}
+function gmOfMesh(mk){return GM_GROUPS.find(g=>g.mesh.includes(mk))||null;}
+function gmSetsTxt(n){return n+" hard set"+(n===1?"":"s");}
+/* One muscle's line: "Quadriceps · 12 / 24 hard sets this week · Level 3, 72 / 100 to Level 4 · last trained Thu 19 Nov" */
+function gmDetailTxt(k,s){s=s||gmSnapshot();const g=s.groups.find(x=>x.key===k);if(!g)return "";
+  return g.name+" · "+g.done+" / "+g.planned+" hard sets this week · Level "+g.level+", "+g.credited+" / "+g.next+" to Level "+(g.level+1)+" · "+(g.last?"last trained "+fmtDow(g.last):"not trained yet");}
+function fmtDow(iso){const d=new Date(iso+"T12:00:00");return DOW[d.getDay()]+" "+d.getDate()+" "+["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];}
+function gmAriaTxt(s){s=s||gmSnapshot();return "Muscle map"+(s.lastWeek?", showing last week":"")+". "+s.groups.map(g=>g.short+" "+(s.lastWeek?g.prevDone:g.done)+" of "+g.planned+" sets, Level "+g.level).join("; ")+".";}
+/* a quest never reads past its target ("Weigh-ins 3/3", not 4/3: review B-N8); the counters above the card still show every one logged */
+function gmFrac(d,n){return Math.min(d,n)+"/"+n;}
+function gmQuestHTML(s){const q=s.quests;if(!q)return "";const it=(l,v,ok)=>`<div class="gm-qi${ok?" ok":""}"><span>${l}</span><b>${v}</b></div>`;
+  return `<div class="gm-q" id="gmQuests">${it("Lifts",gmFrac(q.lifts.done,q.lifts.planned),q.lifts.done>=q.lifts.planned)}${q.runs?it("Runs",gmFrac(q.runs.done,q.runs.planned),q.runs.done>=q.runs.planned):""}${it("Weigh-ins",gmFrac(q.weigh.done,3),q.weigh.done>=3)}${it("Step days",gmFrac(q.steps.done,7),q.steps.done>=7)}${it("Waist tape",q.waist?"done":"not yet",q.waist)}</div>`;}
+function gmWeeksHTML(s){const w=s.weeks;return `<div class="gm-wk" id="gmWeeks"><b>Weeks complete: ${w.n}</b><small>In a row: ${w.row} · best ${w.best}</small>${w.fresh&&w.best>0?`<small>A new count starts this week.</small>`:""}${s.complete?`<small class="gm-done">This week is complete.</small>`:""}</div>`;}
+function gmNextHTML(s){const n=s.groups.filter(g=>g.planned>0||g.credited>0).slice().sort((a,b)=>a.toNext-b.toNext||GM_GROUPS.findIndex(x=>x.key===a.key)-GM_GROUPS.findIndex(x=>x.key===b.key)).slice(0,2);
+  return n.length?`<div class="gm-next" id="gmNext">${n.map(g=>`<div>${g.short}: ${gmSetsTxt(g.toNext)} to Level ${g.level+1}</div>`).join("")}</div>`:"";}
+function gmNotesHTML(s){const o=[];if(s.raceWeek)o.push(s.fallback?"Race week: Pull A is optional, as the plan says.":"Race week: Pull A is optional and Thursday’s calf raises are left out, as the plan says.");
+  /* a deload week by its own date: the bars plan the full sets (fxSets does not read the deload), but the Lift tab says "cut loads … (or halve the sets)" (review R1-4) */
+  if(s.started&&s.ws&&isDeloadISO(s.ws))o.push("Deload week: lighter loads. The bars still plan the full sets, so halving them, as the Lift tab allows, leaves the bars short this week.");if(s.lifts&&s.lifts.extra)o.push(s.lifts.extra+" extra session"+(s.lifts.extra===1?"":"s")+" this week: "+(s.lifts.extra===1?"it fills":"they fill")+" the bars and earn"+(s.lifts.extra===1?"s":"")+" nothing above the dose.");
+  if(!s.quests&&s.lifts&&s.lifts.done<s.lifts.planned&&!o.length&&s.lifts.done===0)o.push("0 of "+s.lifts.planned+" lifts so far this week.");return o.map(x=>`<div class="gm-note">${x}</div>`).join("");}
+function gmFigHTML(slot,big){const lw=gmSnapshot().lastWeek;return `<div class="gm-figwrap${big?" big":""}${lw?" lw":""}" id="gmWrap-${slot}"><div class="gm-fig" id="gmFig-${slot}" data-gm-fig="${slot}"></div>${lw?`<span class="gm-lw">Last week</span>`:""}</div>`;}
+/* Home: the "Your body" card, after the two this-week counters */
+function gmCardHTML(){try{const s=gmSnapshot();if(!s.started)return "";
+  return `<div class="card gm-card" id="gmCard"><div role="heading" aria-level="3" class="card-t"><span class="ic">${ICON.target}</span>Your body</div>
+  <div class="gm-row">${gmFigHTML("home")}<div class="gm-side">${gmWeeksHTML(s)}${gmQuestHTML(s)}${gmNextHTML(s)}</div></div>
+  ${gmNotesHTML(s)}<div class="gm-line" id="gmLine-home" aria-live="polite">${_gm.ui&&_gm.ui.sel?esc(gmDetailTxt(_gm.ui.sel,s)):"Tap a muscle for its numbers, or open Track › Regions."}</div>${gmCrHomeHTML()}</div>`;}catch(e){return planStarted()?gmFailHTML("home"):"";}}
+/* The card when the game cannot be worked out (review A-M1): its title and one line, no numbers; the rest of the view is untouched. */
+function gmFailHTML(slot){return slot==="track"?`<div class="chart-card gm-top gm-fail" id="gmTop"><div class="chart-head"><h3>Your body</h3></div><div class="gm-note" id="gmFail-track">The body card could not be worked out from this log.</div></div>`
+  :`<div class="card gm-card gm-fail" id="gmCard"><div role="heading" aria-level="3" class="card-t"><span class="ic">${ICON.target}</span>Your body</div><div class="gm-note" id="gmFail-home">The body card could not be worked out from this log.</div></div>`;}
+function gmSafe(){try{return gmSnapshot();}catch(e){return null;}}
+/* The Regions note, from the week’s own lift days (review A-S5): one sentence when every day has the same block state, else the week says it is mixed. */
+function gmBlockNote(ws){try{const st=gmLiftDays(ws,gmFallback()).map(d=>{const b=blockPlan(d.iso);return b?b.name:"";});
+    if(st.length>1&&st.some(x=>x!==st[0])){const n=(st[0]||st[st.length-1]).replace(/ block$/,"").toLowerCase().replace(/ & /g," and ");
+      return st[0]?" This week starts inside the "+n+" block and ends after it, so each day is shown at its own dose."+(focusLB?"":" Legs &amp; Back focus is off, so the days after the block are at the even split.")
+        :" This week starts before the "+n+" block and ends inside it, so each day is shown at its own dose.";}}catch(e){}
+  return blockPlan()?" This week sits in the "+blockPlan().name.replace(/ block$/,"")+" block, so the plan shown is the block’s dose.":focusLB?"":" Legs &amp; Back focus is off, so the plan shown is the even split.";}
+/* Race week’s Thursday Upper B, by the grid’s own date: its calf raises are out of the week’s dose (review A-S1). */
+function gmSkipToday(){try{const t=liftISO();return liftKeyFor(t)==="upperB"&&gmSkip("upperB",t,"lb9");}catch(e){return false;}}
+/* Track > Regions: the figure on top with Front / Back, the line for the chosen muscle, the bars, the rules */
+function gmTrackTopHTML(s){return `<div class="chart-card gm-top" id="gmTop"><div class="chart-head"><h3>Your body — week ${planWeek()}</h3><span class="chs">${s.lastWeek?"last week until your first set":"this week"}</span></div>${gmFigHTML("track",1)}
+  <div class="seg gm-view" role="group" aria-label="Turn the figure" id="gmView">${(()=>{const y=_gm.ui&&_gm.ui.yaw_track,bk=isFinite(y)&&Math.abs(Math.atan2(Math.sin(y),Math.cos(y)))>Math.PI/2;return `<button type="button" data-gmv="front" aria-pressed="${bk?"false":"true"}"${bk?"":` class="on"`}>Front</button><button type="button" data-gmv="back" aria-pressed="${bk?"true":"false"}"${bk?` class="on"`:""}>Back</button>`;})()}</div>
+  <div class="gm-line" id="gmLine-track" aria-live="polite">${_gm.ui&&_gm.ui.sel?esc(gmDetailTxt(_gm.ui.sel,s)):"Tap a muscle or a bar below for its numbers."}</div>${gmWeeksHTML(s)}${gmQuestHTML(s)}${gmNotesHTML(s)}</div>`;}
+/* One colour rule for the bars and the body (review B-S1): the percentage of this week's plan, rounded as the bar draws it, picks the band;
+   0 steel (under 60%), 1 gold (60% to 99%), 2 green (100%). The figure gets the band (contract v1.2), so its hue is the bar's exactly. */
+function gmPct(d,p){return p?Math.min(100,Math.round(d/p*100)):0;}
+function gmBand(pct){return pct>=100?2:pct>=60?1:0;}
+function gmBarCol(pct){return ["var(--steel)","var(--gold)","var(--go)"][gmBand(pct)];}
+function gmRowAria(k,s){const g=s.groups.find(x=>x.key===k);return g?g.name+": "+g.done+" of "+g.planned+" hard sets this week, Level "+g.level+", "+g.credited+" of "+g.next+" credited sets to Level "+(g.level+1)+". Shows it on the figure.":k;}
+function gmUpperRowsHTML(s){return `<div class="gm-uh" id="gmUpperH">Upper body: each exercise counted once</div>`+["chest","delts","arms"].map(k=>{const g=s.groups.find(x=>x.key===k),p=g.planned,d=g.done,pct=gmPct(d,p);
+  return `<div class="rg rg-up${_gm.ui&&_gm.ui.sel===k?" sel":""}" data-rg="${k}" role="button" tabindex="0" aria-pressed="${_gm.ui&&_gm.ui.sel===k?"true":"false"}" aria-label="${esc(gmRowAria(k,s))}" style="margin:10px 0"><div style="display:flex;justify-content:space-between;gap:8px;font-size:13px"><b style="text-transform:capitalize">${k}</b><span style="font-family:var(--f-mono);color:var(--text-2)">${d} / ${p}</span></div><div style="height:8px;border-radius:4px;background:var(--panel-3);margin-top:5px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${gmBarCol(pct)}"></div></div></div>`;}).join("");}
+function gmRulesHTML(){return `<div class="calc-note gm-rules" id="gmRules"><b>How the body counts:</b><ul>${GM_RULES.map(r=>`<li>${r}</li>`).join("")}</ul><div class="gm-credit" id="gmCredit">${gmCreditHTML()}</div></div>`;}
+/* The mesh's credit and licence notice (review B-S6): build.py writes them into an inert application/json block (#mm-credit) from the mesh data's
+   credit field and MESH_LICENCE.md, so the words are never retyped here. Plain text: no link, no scheme. Read once; no block (a build without the mesh) = nothing. */
+function gmCreditData(){if(_gm.cr!==undefined)return _gm.cr;let d=null;try{const el=document.getElementById("mm-credit");if(el){const x=JSON.parse(el.textContent);if(x&&typeof x.credit==="string")d={credit:x.credit,notice:Array.isArray(x.notice)?x.notice.filter(t=>typeof t==="string"):[]};}}catch(e){d=null;}return _gm.cr=d;}
+function gmCreditHTML(){const d=gmCreditData();return d?[d.credit].concat(d.notice).map(t=>`<div>${esc(t)}</div>`).join(""):"";}
+/* Home's pointer to it, wherever a figure slot is on the card */
+function gmCrHomeHTML(){return gmCreditData()&&gmFigOK()?`<div class="gm-crp" id="gmCrHome">Anatomy: BodyParts3D. Credit and licence on Track, Regions.</div>`:"";}
+/* ----- the figure: one instance per slot (home, track); a re-render destroys the old one and keeps the chosen muscle and the turn ----- */
+function gmRM(){try{return !!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);}catch(e){return false;}}
+function gmMMok(){let r=false;try{r=!!(window.MuscleMap&&typeof MuscleMap.supported==="function"&&typeof MuscleMap.mount==="function"&&MuscleMap.supported());}catch(e){r=false;}_gm.glok=r;return r;}
+/* Cheap, no context made: a figure box is worth drawing (the module is here, the browser has WebGL2, and no check in this page's life said no). */
+function gmFigOK(){if(_gm.glok===false)return false;try{return !!(window.MuscleMap&&typeof MuscleMap.mount==="function"&&window.WebGL2RenderingContext);}catch(e){return false;}}
+function gmShown(el){return !!(el&&el.isConnected&&el.getClientRects().length);}
+/* The check said no after the box was drawn (review R1-3, R2): a box below the screen or in a hidden view folds away unseen; a box on screen (or above
+   it) keeps its size and says so, so nothing he is reading moves; the next render draws the card without it. Track folds at once: its figure is first
+   checked right after the tap that opened the Regions tab. */
+function gmNoGL(slot){const w=document.getElementById("gmWrap-"+slot),f=document.getElementById("gmFig-"+slot);let below=true;try{const r=w&&w.getBoundingClientRect();below=slot!=="home"||!gmShown(w)||r.top>=(window.innerHeight||document.documentElement.clientHeight);}catch(e){}
+  if(below||!f){gmNoFig(slot);return;}w.classList.add("msg");w.setAttribute("data-gm","none");f.textContent="The figure cannot be drawn on this device. Every number is here.";const ln=document.getElementById("gmLine-"+slot);if(ln&&!(_gm.ui&&_gm.ui.sel)){ln.style.minHeight=ln.offsetHeight+"px";ln.textContent=slot==="home"?"Each muscle’s numbers are on Track › Regions.":"Tap a bar below for its numbers.";}const cp=document.getElementById("gmCrHome");if(slot==="home"&&cp)cp.style.visibility="hidden";}
+/* The mesh: window.MM_DATA when a script defines it; else the inert JSON block the build carries (#mm-data), parsed once at the first mount; else the placeholder figure. */
+function gmMeshData(){if(_gm.data!==undefined)return _gm.data;let d=null;try{if(window.MM_DATA&&typeof MM_DATA==="object")d=MM_DATA;else{const el=document.getElementById("mm-data");if(el&&el.textContent.trim())d=JSON.parse(el.textContent);else if(typeof MM_PLACEHOLDER==="function")d=MM_PLACEHOLDER(1);}}catch(e){d=null;try{if(typeof MM_PLACEHOLDER==="function")d=MM_PLACEHOLDER(1);}catch(e2){d=null;}}return _gm.data=d;}
+function gmColors(){const cs=getComputedStyle(document.documentElement),v=(n,f)=>(cs.getPropertyValue(n)||"").trim()||f;const st=v("--steel","#6E7B95"),go=v("--gold","#FFC53D"),gr=v("--go","#42D77D");return {low:st,mid:go,high:gr,steel:st,gold:go,green:gr,none:v("--line-2","#374257"),body:"#4A5670",select:v("--text","#F3F6FC")};}
+function gmUnmount(slot){const H=_gm.h||(_gm.h={}),h=H[slot];if(_gm.lt)clearTimeout(_gm.lt[slot]);if(!h)return;try{const dbg=h.debug&&h.debug();if(dbg&&isFinite(dbg.yaw))(_gm.ui||(_gm.ui={}))["yaw_"+slot]=dbg.yaw;}catch(e){}try{h.destroy();}catch(e){}H[slot]=null;}
+function gmNoFig(slot){const w=document.getElementById("gmWrap-"+slot);if(w){w.classList.add("none");w.setAttribute("data-gm","none");}const ln=document.getElementById("gmLine-"+slot);if(ln&&!(_gm.ui&&_gm.ui.sel))ln.textContent=slot==="home"?"Each muscle’s numbers are on Track › Regions.":"Tap a bar below for its numbers.";const c=document.getElementById("gmCard");if(slot==="home"&&c)c.classList.add("gm-nofig");const cp=document.getElementById("gmCrHome");if(slot==="home"&&cp)cp.hidden=true;const t=document.getElementById("gmTop");if(slot==="track"&&t)t.classList.add("gm-nofig");}
+var GM_FIRST_MS=1500,GM_LOST_MS=2000;
+/* The first Home mount of a page's life (review B-S3): after GM_FIRST_MS from boot and then the next idle period (a timer where requestIdleCallback
+   is missing, as in Safari); a touch or click on the card opens the gate at once. Until then the card shows its numbers and the figure's box, at its
+   final size, empty. Every later mount is immediate. */
+function gmGate(go){if(_gm.ready)return go();(_gm.gq||(_gm.gq=[])).push(go);if(_gm.gt)return;
+  _gm.gt=setTimeout(()=>{const f=()=>gmGateOpen();try{if(window.requestIdleCallback)requestIdleCallback(f,{timeout:1000});else setTimeout(f,60);}catch(e){f();}},Math.max(0,GM_FIRST_MS-performance.now()));}
+function gmGateOpen(){if(_gm.ready)return;_gm.ready=true;clearTimeout(_gm.gt);const q=_gm.gq||[];_gm.gq=[];q.forEach(f=>{try{f();}catch(e){}});}
+function gmMountLater(slot){const el=document.getElementById("gmFig-"+slot),H=_gm.h||(_gm.h={}),old=H[slot];if(_gm.io&&_gm.io[slot]){_gm.io[slot].disconnect();_gm.io[slot]=null;}
+  if(!el){gmUnmount(slot);return;}
+  if(!gmFigOK()){gmUnmount(slot);gmNoFig(slot);return;}  /* drawn in the same task as the render: the card never shows the box (review R1-3) */
+  /* a slot that already had a figure, re-rendered (on screen or in a hidden pane): mount over the old one now, so the module reuses its canvas and
+     WebGL context instead of losing it and making a new one (contract v1.2 item 10; WebKit counts lost contexts until garbage collection) */
+  if(old){try{const d=old.debug&&old.debug();if(d&&isFinite(d.yaw))(_gm.ui||(_gm.ui={}))["yaw_"+slot]=d.yaw;}catch(e){}if(_gm.lt)clearTimeout(_gm.lt[slot]);H[slot]=null;
+    if(!gmMMok()){gmNoFig(slot);return;}gmMount(slot,el);return;}
+  gmUnmount(slot);
+  /* go() mounts only into a slot on screen: a view left before the gate opened waits until it is shown again (review R1-2) */
+  let watch=null;const go=()=>{if(!el.isConnected||(_gm.h&&_gm.h[slot]))return;if(!gmShown(el)){watch();return;}if(!gmMMok()){gmNoGL(slot);return;}gmMount(slot,el);},go2=slot==="home"?()=>gmGate(go):go;
+  /* the support check runs when the gate opens while Home is shown, whether or not the card has been scrolled to, so a device that cannot draw folds the
+     box away unseen (review R2); Home left before then makes no check and no mount on the view he moved to (review R1-2) */
+  if(slot==="home"&&!_gm.ready&&_gm.glok==null)gmGate(()=>{if(_gm.glok==null&&gmShown(el)&&!(_gm.h&&_gm.h.home)&&!gmMMok())gmNoGL("home");});
+  /* a touch or click on the card opens the gate and mounts at once, whether or not the observer has reported yet */
+  if(slot==="home"&&!_gm.ready){const c=document.getElementById("gmCard");if(c){const t=()=>{gmGateOpen();go();};c.addEventListener("pointerdown",t,{once:true});c.addEventListener("click",t,{once:true});}}
+  if(!(window.MuscleMap&&typeof MuscleMap.mount==="function")){gmNoFig(slot);return;}
+  watch=()=>{if(window.IntersectionObserver){const io=new IntersectionObserver(es=>{if(es.some(e=>e.isIntersecting)){io.disconnect();go2();}});io.observe(el);(_gm.io||(_gm.io={}));if(_gm.io[slot])_gm.io[slot].disconnect();_gm.io[slot]=io;}
+    else setTimeout(go2,250);};watch();}
+function gmMount(slot,el){try{const data=gmMeshData();if(!data){gmNoFig(slot);return null;}const s=gmSnapshot(),rm=gmRM();let h=null;
+  const lt=_gm.lt||(_gm.lt={});
+  try{h=MuscleMap.mount(el,{data,values:gmMeshValues(s),colors:gmColors(),onPick:k=>gmPick(k,slot),label:gmAriaTxt(s),height:"100%",autoRotate:false,reducedMotion:rm,
+    /* a lost context (iOS under memory pressure, or after the app was in the background): the module hides its canvas at once; with no restore within
+       GM_LOST_MS the card falls back to its numbers (review B-M1) */
+    onLost:()=>{clearTimeout(lt[slot]);lt[slot]=setTimeout(()=>{if(_gm.h&&_gm.h[slot]===h){gmUnmount(slot);gmNoFig(slot);}},GM_LOST_MS);},
+    onRestored:()=>{clearTimeout(lt[slot]);},
+    /* Front / Back follow the figure when a turn ends (review B-S2) */
+    onSettle:e=>{if(!e||!isFinite(e.yaw))return;(_gm.ui||(_gm.ui={}))["yaw_"+slot]=e.yaw;if(slot==="track"&&_gm.h&&_gm.h.track===h)gmViewBtns(!e.front);}});}catch(e){h=null;}
+  if(!h){gmNoFig(slot);return null;}(_gm.h||(_gm.h={}))[slot]=h;el.setAttribute("data-gm","on");
+  if(slot==="home")_gm.ready=true;
+  const ui=_gm.ui||{};try{if(isFinite(ui["yaw_"+slot]))h.view(ui["yaw_"+slot]);if(ui.sel){const g=gmGroup(ui.sel);if(g)h.select(g.mesh);}}catch(e){}
+  gmGreet(h,s,rm);return h;}catch(e){gmNoFig(slot);return null;}}
+/* The next time a body is on screen it pulses the groups trained since it was last seen, and turns once for a newly completed week. Nothing is stored. */
+function gmGreet(h,s,rm){const cur={d:{},n:s.weeks.n,ws:s.ws};s.groups.forEach(g=>{cur.d[g.key]=g.done;});const was=_gm.greet;_gm.greet=cur;if(!was||rm)return;
+  const keys=[];if(was.ws===cur.ws)s.groups.forEach(g=>{if(cur.d[g.key]>(was.d[g.key]||0))keys.push.apply(keys,g.mesh);});
+  try{if(keys.length&&h.flash)h.flash(keys,{ms:1200,strength:1});if(cur.n>was.n&&h.spin)h.spin();}catch(e){}}
+/* Front / Back follow the figure when a selection turns it (select() turns to a muscle on the far side) */
+function gmViewBtns(bk){document.querySelectorAll("#gmView button").forEach(b=>{const on=(b.dataset.gmv==="back")===bk;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on?"true":"false");});}
+function gmPick(k,slot){const g=k?gmOfMesh(k):null;gmSelect(g?g.key:null,slot,k);}
+/* One selection for the figure, the line and the bars: a pick on the figure selects the bar row, a bar row selects the muscle on the figure. */
+function gmSelect(key,from,mk){const ui=_gm.ui||(_gm.ui={});ui.sel=key;const s=gmSafe();
+  ["home","track"].forEach(sl=>{const l=document.getElementById("gmLine-"+sl);if(l)l.textContent=key?(s?gmDetailTxt(key,s):""):(mk?(mk==="body"?"Not a muscle the game tracks.":(({abs:"Abs",obliques:"Obliques",forearms:"Forearms"})[mk]||mk)+": not tracked by the game."):(sl==="home"?"Tap a muscle for its numbers, or open Track › Regions.":"Tap a muscle or a bar below for its numbers."));
+    const h=_gm.h&&_gm.h[sl],g=key?gmGroup(key):null;let sel=g?g.mesh:null;
+    /* on the figure that reported the pick, the picked part goes last: the module's Enter continues from the last selected part, so the keyboard
+       cycle moves on instead of looping inside a group; an untracked part is outlined alone so the cycle carries on from it (review R1-1) */
+    if(sl===from&&mk&&mk!=="body")sel=g?g.mesh.filter(x=>x!==mk).concat(g.mesh.includes(mk)?[mk]:[]):[mk];
+    if(h)try{h.select(sel);}catch(e){}});
+  document.querySelectorAll("#tp-regions .rg[data-rg]").forEach(r=>{const on=r.dataset.rg===key;r.classList.toggle("sel",on);r.setAttribute("aria-pressed",on?"true":"false");});}
+function gmWireTrack(el){el.querySelectorAll(".rg[data-rg]").forEach(r=>{const k=r.dataset.rg,act=()=>{const now=_gm.ui&&_gm.ui.sel===k?null:k;gmSelect(now,"bar");};
+    r.addEventListener("click",act);});   /* Enter and Space reach it as a click: the app's keyboard handler clicks every role=button */
+  el.querySelectorAll("#gmView button").forEach(b=>b.addEventListener("click",()=>{gmViewBtns(b.dataset.gmv==="back");const h=_gm.h&&_gm.h.track;if(h)try{h.view(b.dataset.gmv);}catch(e){}}));
+  gmMountLater("track");}
+/* ----- when a moment may fire: the set tick and the cell's change event in the Lift grid, the run log, the pace check, a test and the AI log after
+   Confirm; only after a save that succeeded, only for today's session or run by its own date. Boot, restore, import, the vault, the account copy,
+   Undo and the Strava merge never call these, and any write that is not the grid's own between the first keystroke and the tick voids the moment.
+   A moment waiting behind an Undo is dropped if anything is written before it shows. */
+/* The snapshot on hand, when it is current; never a rebuild. */
+function gmWarm(){const m=_gm.memo;return m&&m.st===gmStamp()&&m.S===DB.sessions&&m.R===DB.runs&&m.L===DB.lifts?m.snap:null;}
+/* Warm the snapshot when the grid is drawn, in idle time, so the first keystroke finds it on hand. */
+function gmWarmLater(){const f=()=>{try{gmSnapshot();}catch(e){}};try{if(window.requestIdleCallback)requestIdleCallback(f,{timeout:300});else setTimeout(f,120);}catch(e){}}
+/* Nothing heavy on a keystroke (review A-S7): the "before" is the snapshot already on hand when it is current, with no records; when it is not, this edit
+   has no "before" and makes no level or week moment (missed, never false). Re-armed when the grid's date has moved since it was armed (review A-N2). */
+function gmArm(){try{const iso=liftISO();if(_gm.armed&&_gm.aiso===iso)return;_gm.base=gmWarm();_gm.armed=true;_gm.aiso=iso;_gm.rev=_gmRev;_gm.bad=false;}catch(e){gmDisarm();}}
+function gmSaved(ok){if(!_gm.armed)return;if(ok===false)_gm.bad=true;_gm.rev=_gmRev;}
+function gmDisarm(){_gm.armed=false;_gm.base=null;_gm.bad=false;_gm.aiso=null;}
+/* The cell's change event (tk omitted) looks for a level or a complete week. The set's tick (tk = {id, i}) looks for those and, on the top-set row (i = 0),
+   for that lift's record facts (review A-S2): a typo corrected before the tick is never announced; a value corrected after a tick is announced for what it is. */
+function gmFire(iso,lead,tk){if(!_gm.armed)return [];const b=_gm.base,ok=_gm.rev===_gmRev&&!_gm.bad&&!_storeFail&&_gm.aiso===liftISO();gmDisarm();if(!ok||!iso||iso!==liftISO())return [];
+  try{const m=gmMoments(b,gmSnapshot(),iso,tk&&tk.i===0?{tick:tk.id}:null);
+    /* the tick right after a cell's change: the change's moment rides in the tick's own toast instead of being covered by it */
+    const cr=lead&&_gm.last&&performance.now()-_gm.last.t<1500?_gm.last:null;if(lead)_gm.last=null;
+    const f=gmShow(m,lead,cr);if(!f.length&&cr)toast(gmLines(lead,[],[],cr),true);return f;}catch(e){return [];}}
+/* A one-shot save (a run, a pace check, a test, the AI log): b is the snapshot taken just before it wrote, ok what DB.save() returned. */
+function gmBefore(){gmDisarm();try{const b=gmSnapshot();gmRecs(b);return b;}catch(e){return null;}}
+function gmOnce(b,iso,ok,lead){gmDisarm();if(!b||ok===false||_storeFail||!iso||(iso!==todayISO()&&iso!==liftISO()))return [];try{return gmShow(gmMoments(b,gmSnapshot(),iso,{recs:true}),lead);}catch(e){return [];}}
+/* Several moments from one save are one toast; it waits while an Undo or an error toast is up, and never replaces one. A fact is announced once in a
+   page's life (_gm.seen, in memory only, keyed by kind, lift or group, value and date): an edit that repeats it says nothing (review A-S2, A-N4). */
+/* The toast: the lead, then at most three moments, each a block of its own with a dot and a hanging indent (review R1-5), most important first
+   (a week, then records, then levels, as gmMoments orders them). Moments carried from the cell's change event a moment ago (cr: {msg, k}) take their
+   place by the same order, this save's own first on a tie; a carried one that does not fit is dropped and never counted as hidden (it was shown), so
+   a carried level can never push a record off. "on your body card" only when every hidden moment is a level or a week, which the card shows (review V3). */
+var GM_PRI={week:0,tested:1,fast:2,top:3,earned:4,level:5};
+function gmLines(lead,tx,kd,cr){const it=[],seen={};(tx||[]).forEach((t,i)=>{if(!t||seen[t])return;seen[t]=1;it.push({t,k:(kd||[])[i],own:1,i:it.length});});
+  const cm=cr?(Array.isArray(cr)?cr:(cr.msg||[])):[],ck=cr&&!Array.isArray(cr)?(cr.k||[]):[];cm.forEach((t,j)=>{if(!t||seen[t])return;seen[t]=1;it.push({t,k:ck[j]||"level",own:0,i:it.length});});
+  const p=x=>x.k in GM_PRI?GM_PRI[x.k]:6;it.sort((a,b)=>p(a)-p(b)||b.own-a.own||a.i-b.i);
+  const L=it.slice(0,3),hid=it.slice(3).filter(x=>x.own),out=L.map(x=>`<span class="tm">${x.t}</span>`);
+  if(hid.length)out.push(`<span class="tm tm-more">and ${hid.length} more${hid.every(x=>x.k==="level"||x.k==="week")?" on your body card":""}</span>`);
+  return (lead||"")+out.join("");}
+function gmShow(m,lead,cr){const S=_gm.seen||(_gm.seen={}),f=(m||[]).filter(x=>!(x&&x.key&&S[x.key]));if(!f.length)return f;_gm.pk=f.map(x=>x.key);_gm.pm=f.map(x=>x.text);_gm.pkd=f.map(x=>x.kind);_gm.pend=gmLines(lead,_gm.pm,_gm.pkd,cr);_gm.pl=!!lead;_gm.pr=_gmRev;_gm.tries=0;gmToastWait();return f;}
+function gmToastWait(){clearTimeout(_gm.qt);const t=document.getElementById("toast");if(!t||!_gm.pend)return;const busy=t.classList.contains("show")&&(t.classList.contains("act")||t.classList.contains("err"));
+  if(busy){if(++_gm.tries>60){_gm.pend=null;return;}_gm.qt=setTimeout(gmToastWait,250);return;}const msg=_gm.pend;_gm.pend=null;if(_gmRev!==_gm.pr)return; /* written to since (an Undo, another save): the moment may no longer be true */
+  toast(msg,true);(_gm.pk||[]).forEach(k=>{if(k)_gm.seen[k]=1;});_gm.last=_gm.pl?null:{msg:_gm.pm,k:_gm.pkd,t:performance.now()};}
 safeStep("wireRest",wireRest);safeStep("renderHome",renderHome);safeStep("axSync",function(){axSync(document.getElementById("main"));});safeStep("updateHeader",updateHeader);safeStep("warnSync",warnSync);setTimeout(function(){var _bootP=[];safeStep("idbBoot",function(){_bootP.push(idbBoot());});safeStep("cloudBoot",function(){_bootP.push(cloudBoot());});safeStep("claudeStoreBoot",function(){_bootP.push(claudeStoreBoot());});safeStep("liveBoot",function(){liveBoot(_bootP);});safeStep("aiBoot",function(){aiBoot();});},600);try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});}catch(e){}document.addEventListener("click",e=>{const r=e.target.closest("#radiusSeg button");if(r&&+r.dataset.r!==radiusKm){const _s=document.getElementById("radiusSeg"),_t=_s?_s.getBoundingClientRect().top:0;radiusKm=+r.dataset.r;setPref("cb2_radius",radiusKm);switchView("run");const _n=document.getElementById("radiusSeg");if(_n)window.scrollBy(0,_n.getBoundingClientRect().top-_t);}});document.addEventListener("click",e=>{const f=e.target.closest("#focusSeg button");if(f){const v=f.dataset.fx==="on";if(v!==focusLB){focusLB=v;setPref("cb2_focuslb",focusLB);holdSeg("focusSeg",()=>switchView("lift"));}}});document.addEventListener("click",e=>{const b=e.target.closest("#locSeg button");if(b&&b.dataset.loc!==LOC){const _o=LOC,_nm=x=>x==="home"?"Home Gym":"Commercial Gym",_iso=liftISO(),_has=l=>{const s=findSess(_iso,curDay,l);return !!s&&Object.values(s.entries||{}).some(a=>(a||[]).some(q=>q&&(q.r||q.w)));},_had=_has(_o),_has2=_has(b.dataset.loc);LOC=b.dataset.loc;setPref("cb2_loc",LOC);holdSeg("locSeg",()=>switchView("lift"));if(_had)toast("Sets already logged stay in the "+_nm(_o)+" log — "+_nm(LOC)+(_has2?" keeps its own":" starts its own"),true);}});
 /* ===== Tech layer boot: rest-timer resync, wake-lock toggle, installable offline app (only when served over http/https) ===== */
 document.addEventListener("visibilitychange",()=>{try{restResync();wakeLockSync();}catch(e){}});
