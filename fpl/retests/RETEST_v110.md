@@ -968,3 +968,33 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
 - **Classic GW11.** 4-4-2, captain Haaland, vice Gomez. Flags: Guéhi d 75%, Brobbey i, Saka i ("expected back 20 Dec" in the FPL feed).
 - **Draft.** waivers_processed false at the pull (GW11 waivers 11:00Z); the sheet is claims. Xhaka i on the roster.
 - **E-196.** smoke_wk went red on the Konsa rule (the C2 protocol sold Guéhi on a doubt); fixed in sellCandidates, no test loosened.
+
+## 20 Nov 2026, about 17:40Z: GW11, the day's second run, at the manager's request (deadline Sat 21 Nov 11:00Z)
+
+- **Why a second run.** The rule is one run per gameweek. At 16:35Z the manager sent fresh screenshots of both teams. The morning run's Draft half was wrong: its pull at 11:05Z was taken five minutes into the waiver run (waivers_processed false, processing_status "w"), so version 32 told him to claim eight players after claims had closed (E-198). CI was red on the morning commit (E-197), and the page had been republished before CI was read (E-199). It is not an E-184 case: no flag moved on the captain or the vice. He approved the second run before it started.
+- **Decision first (E-188).** The reply went out before any app work, from the season model on feeds read in memory between 16:41Z and 17:10Z, and five independent read-only checks re-derived it (live signability, a search to beat the Draft signings, the Classic eleven, the CI failure, the refresh plan).
+- **Pulls.** 17:20:01Z, then 17:39:12Z. The second was mine to cause: one desk-research source line was written with a time range the Lab cannot turn into SAST, components D6 went red on it, and a bake never runs without a pull (E-163). Between the two pulls one flag moved (Heaven, MUN, a to d; in neither squad), so the input hash moved from 338fb4390cf9047d to b3ce126c40e2caa9 and the plan was solved again. Stage times from the logs: pull 17:39Z, solve chain 17:39:30Z to 17:44:50Z, holds re-pinned, plan, weekly block and build by 17:45:16Z.
+- **state.cjs.** GW10 picks, the fifteen unchanged, bank 2.7, 3 free transfers, confirmed through GW10.
+- **Hold re-pinned (E-195).** GW11 and GW12 no transfer; 5 free transfers into GW13.
+- **Plan.** Hash b3ce126c40e2caa9, 560.91 to GW19 (562.01 at 11:05Z; the difference is Guéhi's lower start chance). The solver's own plan plays the wildcard in GW13 for 583.36. Bench Boost GW14, Wildcard 1 GW19.
+- **Desk research (pipeline/intel.js, the GW11 block).** One override: Guéhi 0.35 against the feed's 75% (Sports Mole, 18 Nov: "major doubt", hip, chances "understood to be slim"). Le Bris confirmed Xhaka and Brobbey miss Aston Villa (Premier League News Now, 20 Nov); the feed already has both out. Two pages were opened and dated; every other search result was older than 16 Nov or undated and was discarded.
+- **Classic GW11, no transfer.** 4-4-2: Verbruggen; De Cuyper, Tarkowski, Guéhi, van Ewijk; Gomez, Rogers, Mbeumo, Janelt; Haaland (captain), Calvert-Lewin. Bench: Kinsky; Diop, Saka, Brobbey. Simulation at the feed's 75%, 90,000 draws: 52.5; the line-up saved on the site (Brobbey starting) 52.4; Rogers as captain 49.8. With Guéhi at 0.25, starting him or Diop is level (51.56 against 51.54), so he starts and Diop is first substitute. Flags: Guéhi d 75%, Brobbey i, Saka i (the feed says back 20 Dec).
+- **Draft GW11.** waivers_processed true; the manager lodged no claim. As-is best eleven 39.30 (4-4-2). Best fifteen to GW20 found on the season model, and not beaten by an independent search: Tonali, Janelt and McAtee for Xhaka, Bobb and King, and Mukiele for Robinson: 42.55 this week, +19.4 to GW20. The exact best for GW11 alone is 43.62 (Tonali, Anderson, Janelt, Richards and Pinnock for Xhaka, King, Bobb, Robinson and Affengruber), 7.5 worse to GW20. The two engines disagree on McAtee and on the order of the three defenders; both rate Tonali the best add. The app's sheet names the same four signings but pairs Mukiele with Affengruber and counts a backup as a signing (E-200, open); it also lists Gibbs-White and Schade, locked until the next waiver run.
+- **Fixes.**
+  - E-197: qa/ios.cjs waits for `data-store` to leave "pending" before it reads the first-launch note. The assertion is unchanged, and the detail names failing contexts first.
+  - E-198: pipeline/pull.sh exits 4 on a pull taken in the middle of the waiver run. qa/pull_guard.cjs 29/29, with the mutation.
+  - E-199: the republish waits for the CI run on the pushed commit.
+- **Gate, local.** 36 of 39 steps green. webkit, ios and browser.py cannot run in this container (E-170); the iPhone fix is CI's to prove. Notable suites:
+
+  | Suite | Result |
+  |---|---|
+  | components | 331/331 |
+  | smoke | 73/73 |
+  | smoke_wk | 40/40 |
+  | plan_legality | 61/61 |
+  | reference | 67/67 |
+  | unit_engine | 278/278 |
+  | verify | 34/34 |
+  | pull_guard | 29/29 |
+  | mc_separation | 43/43 |
+

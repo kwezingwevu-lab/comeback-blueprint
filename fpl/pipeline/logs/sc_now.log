@@ -1,1 +1,1 @@
-now Optimization terminated successfully. (HiGHS Status 7: Optimal) 73.5 s · gap 0.003843593310664548 · total 583.5 · obj 485.55 · stored objective was 486.83 · not better on the same params, the file is unchanged
+now Optimization terminated successfully. (HiGHS Status 7: Optimal) 44.5 s · gap 0.002575535831562271 · total 583.36 · obj 487.23 · stored objective was 487.23 · not better on the same params, the file is unchanged

@@ -911,7 +911,12 @@ async function runMatrix(env, spec) {
     // the first paint: simple mode, landing card
     m.mode0 = await page.getAttribute(".mc-root", "data-mode");
     m.landing = await page.evaluate(function () { return window.__QA.words(".landing"); });
-    m.importNote = await page.evaluate(function () { return window.__QA.noteOn("New here\\?|Import the export from Safari"); });
+    /* E-197: useBoot paints .mc-root at once and reads the saved copy afterwards, so `fresh` (what shows the first-launch note)
+       lands a moment after the mount. Wait on the state itself, never on a sleep (E-153, as qa/webkit.js does): the first save's
+       read-back moves data-store off "pending", and that save is made only once boot is ready. A store that never settles is
+       read as it stands, and the IOS27-10 check below then fails naming the context and its data-store. */
+    try { await page.waitForFunction(function () { const r = document.querySelector(".mc-root"); return !!r && !!r.getAttribute("data-store") && r.getAttribute("data-store") !== "pending"; }, null, { timeout: 15000 }); } catch (e) { /* read it as it stands */ }
+    m.importNote = await page.evaluate(function () { const n = window.__QA.noteOn("New here\\?|Import the export from Safari"); const r = document.querySelector(".mc-root"); n.store = r ? r.getAttribute("data-store") : null; return n; });
     // full mode and every tab the strip offers, by tap
     m.tabs = await goFull(page);
     m.tabRuns = [];
@@ -2409,10 +2414,13 @@ function judge(env, R, M) {
       !d.fatal && posts === 0, d.fatal ? "error: " + d.fatal : posts + " POST(s) seen (route " + (d.posts || 0) + ", request events " + (d.reqPosts || 0) + ", fetch log \"" + String(d.fetchLog || "").trim() + "\")");
     check("IOS27-10 dist: ↻ is labelled 'Check for new data'", !d.fatal && d.label === "Check for new data", d.fatal ? "error: " + d.fatal : "aria-label " + JSON.stringify(d.label));
     check("IOS27-10 dist: tapping ↻ asks the server for sw.js (an update check)", !d.fatal && d.swAfterTap > 0, d.fatal ? "error: " + d.fatal : d.swAfterTap + " sw.js request(s) after the tap");
-    const fl = sims.map(function (m) { const n = m.importNote || {}; return { k: m.spec.key, note: n.found === true, w: n.total }; });
-    const flOk = fl.filter(function (x) { return x.note && x.w > 0 && x.w < 110; }).length;
+    const fl = sims.map(function (m) { const n = m.importNote || {}; return { k: m.spec.key, note: n.found === true, w: n.total, store: n.store === undefined ? "?" : n.store, fatal: m.fatal || "" }; });
+    const flPass = function (x) { return x.note && x.w > 0 && x.w < 110; };
+    const flRow = function (x) { return x.k + " " + (x.note ? "note" : "no note") + "/" + x.w + "w" + (x.store && x.store !== "pending" && x.store !== "?" ? "" : " (data-store " + x.store + ")") + (x.fatal ? " ERROR " + String(x.fatal).slice(0, 80) : ""); };
+    const flBad = fl.filter(function (x) { return !flPass(x); });
+    const flOk = fl.length - flBad.length;
     check("IOS27-10 SIM: a first launch as an app with no saved state shows 'New here? Import the export from Safari.' and the landing (with the note) stays < 110 words",
-      fl.length === 12 && flOk === 12, flOk + "/" + fl.length + " SIM contexts show it under 110 words; " + fl.map(function (x) { return x.k + " " + (x.note ? "note" : "no note") + "/" + x.w + "w"; }).slice(0, 3).join(", ") + (fl.length > 3 ? " …" : ""));
+      fl.length === 12 && flOk === 12, flOk + "/" + fl.length + " SIM contexts show it under 110 words" + (flBad.length ? "; FAILING " + flBad.map(flRow).join(", ") : "") + "; " + fl.filter(flPass).map(flRow).slice(0, 3).join(", ") + (flOk > 3 ? " …" : ""));
     const tabNote = desc.map(function (m) { return m.importNote ? m.importNote.found === true : null; });
     check("IOS27-10 a Safari-tab first launch does not show the app-only import note", tabNote.length === 12 && tabNote.every(function (x) { return x === false; }), tabNote.filter(function (x) { return x === false; }).length + "/" + tabNote.length + " descriptor contexts without it");
   }

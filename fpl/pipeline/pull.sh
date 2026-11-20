@@ -24,6 +24,10 @@
 # 3. It exits non-zero when a feed the bake cannot do without is missing, and says which. A pull
 #    that half-succeeds and reports success is how a stale snapshot gets committed as fresh.
 #
+# 4. (20 Nov 2026, ERRORS.md E-198) It exits 4 when the next gameweek's Draft waivers are due and the
+#    game still says they are not processed: a snapshot taken mid-run is never baked. Exit codes:
+#    1 an essential feed is missing, 2 the gameweek cannot be told, 3 degraded, 4 waivers in progress.
+#
 # THE FEEDS ARE NOT COMMITTED. They carry `player_first_name`, `player_last_name`, `player_name`
 # and league-entry `short_name` straight from the API, and those are never committed (v110 §1.5,
 # ERRORS.md E-085). pipeline/feeds/ is ignored by git; the bake writes the scrubbed block.
@@ -156,6 +160,37 @@ if [ -n "$LACK" ]; then
   echo "pull: FAILED — the bake cannot run without:$LACK" >&2
   exit 1
 fi
+# >>> E-198 waiver guard
+# A pull taken while the Draft waiver run is due but not settled is never baked. Claims have closed, ownership is about to
+# change, and a sheet built from these feeds tells the manager to claim players a rival is about to be given (20 Nov 2026:
+# the pull five minutes after waivers_time read waivers_processed false with processing_status "w", and the sheet shipped).
+# It asks what phase the game is in at the pull, the one thing a content hash cannot say. Unknown is not "due": a /game that
+# answers nothing readable passes. A d_game.json kept from an earlier pull is refused by its next_event, because a stale
+# "processed" is as wrong as a fresh "not processed".
+WV="$(node -e '
+  const fs = require("fs");
+  const rd = (f) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch (e) { return null; } };
+  const g = rd(process.argv[1]), b = rd(process.argv[2]);
+  if (!g || typeof g !== "object") process.exit(0);
+  const ev = b && b.events && Array.isArray(b.events.data) ? b.events.data : [];
+  const nx = Number(g.next_event), bn = b && b.events ? Number(b.events.next) : NaN;
+  if (isFinite(nx) && isFinite(bn) && nx > 0 && bn > 0 && nx !== bn) {
+    process.stdout.write("the Draft game feed speaks of GW" + nx + " and the Draft bootstrap of GW" + bn + ": one of them was kept from an earlier pull, so the waiver phase is unknown");
+    process.exit(0);
+  }
+  if (g.waivers_processed !== false) process.exit(0);
+  const row = ev.filter((e) => Number(e.id) === nx)[0];
+  const t = row && row.waivers_time ? Date.parse(row.waivers_time) : NaN;
+  if (!isFinite(t)) process.exit(0);
+  const late = Math.floor((Date.now() - t) / 60000);
+  if (late < 0) process.exit(0);
+  process.stdout.write("GW" + nx + " Draft waivers were due at " + row.waivers_time + " (" + late + " min ago) and /api/game still says waivers_processed false" + (g.processing_status ? " (processing_status " + g.processing_status + ")" : "") + ": the run is in progress and ownership is about to change");
+' "$FEEDS/d_game.json" "$FEEDS/dbootstrap.json" 2>/dev/null || true)"
+if [ -n "$WV" ]; then
+  echo "pull: REFUSED — $WV. Bake nothing from these feeds; pull again once waivers_processed is true (ERRORS.md E-198)." >&2
+  exit 4
+fi
+# <<< E-198 waiver guard
 if [ "$MISSED" -gt 0 ]; then
   echo "pull: degraded — no previous file for:$MISSING_NAMES" >&2
   exit 3

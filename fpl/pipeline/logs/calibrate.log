@@ -1,4 +1,4 @@
-backtest GW3,4,5,6,7,8,9,10 in 0.6s · points given a start: ρ 0.181 v naive 0.076 (n 1760) · minutes Brier 0.138 v naive 0.162 (n 3368) · team goals log-lik -236.2 v naive -238.5 (n 80)
+backtest GW3,4,5,6,7,8,9,10 in 0.4s · points given a start: ρ 0.181 v naive 0.076 (n 1760) · minutes Brier 0.138 v naive 0.162 (n 3368) · team goals log-lik -236.2 v naive -238.5 (n 80)
   pos 1: n 160 pred 3.29 act 3.69 ratio 1.121 [1.013, 1.238] ρ 0.172 v 0.064 MAE 2.22 v 2.48 → factor 1.06
   pos 2: n 671 pred 3.37 act 3.66 ratio 1.086 [1.032, 1.145] ρ 0.212 v 0.098 MAE 2.46 v 2.82 → factor 1.043
   pos 3: n 769 pred 3.21 act 3.54 ratio 1.100 [1.045, 1.157] ρ 0.168 v -0.004 MAE 1.99 v 2.68 → factor 1.05

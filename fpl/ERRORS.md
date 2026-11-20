@@ -2248,3 +2248,36 @@ CAUSE: sellCandidates (src/engine.js) marked any status other than "a" as a forc
 CAUGHT: smoke_wk `sells-respect-the-konsa-rule`, 20 Nov 2026 11:30Z.
 RULE: a doubt (status d) does not outrank C1 rule 1. A player who started his club's last match after a spell out stays protected unless the feed rules him out (i, s, u, n).
 TEST: smoke_wk `sells-respect-the-konsa-rule` on the 20 Nov data (red before, green after).
+
+### E-197 · v110 · one iPhone-suite check read a first-launch note before the app had loaded its saved state
+CAUSE: qa/ios.cjs read `importNote` straight after `.mc-root` mounted (mount() waits for the selector only). src/ui.jsx useBoot paints `.mc-root` at once and sets `fresh` only after two awaited `store.get` calls, so a read made before they resolve finds no note. With three jobs sharing the CI runner, one SIM context of twelve lost that race on the run for e5e7091 (20 Nov 2026: "11/12 SIM contexts"); the same two files had passed the two runs before. The check printed only the first three contexts, so the failing one was never named. Class: E-153.
+CAUGHT: the CI run, read at 16:45Z on 20 Nov, five hours after the push and after the page had been republished (E-199).
+RULE:
+- A suite reads boot-dependent state (the saved tab and mode, the first-launch note, the not-saving note) only after the app's own state says boot has settled: `data-store` off "pending", the E-153 wait, never a sleep and never the bare mount.
+- A check that samples many contexts names the failing ones first.
+
+TEST: qa/ios.cjs IOS27-10 SIM. The assertion is unchanged (twelve contexts, the note present, under 110 words); the read now follows the wait, and the detail lists failing contexts with their data-store. Provable only on CI (E-170).
+OPEN: a code review on 20 Nov found the same read-before-boot pattern elsewhere, none of it red: qa/ios.cjs Shell A, B and C and goFull straight after mount; qa/webkit.js's file:// boot and three fixed 700 ms waits; qa/smoke.cjs reload reads; qa/harness.cjs open(). Each is to move to the same wait. The sister check "a Safari-tab first launch does not show the app-only import note" read the same pre-boot value and could pass without testing anything; it now reads after the wait.
+
+### E-198 · v110 · the refresh baked a snapshot taken in the middle of the Draft waiver run
+CAUSE: the routine was armed for the deadline minus 24 hours, which in this league is the moment the waiver run starts (the Draft event's waivers_time). On 20 Nov 2026 the pull at about 11:05Z read /api/game five minutes into the run: waivers_processed false, processing_status "w". Nothing in the pipeline looked at the phase, so the bake, the solve and weekly.cjs built a claims sheet after claims had closed. Version 32 told the manager to claim eight players; three of them (two first choices and a backup) went to rivals when the run settled, and twelve ownership rows had changed by 16:41Z. No claim had been lodged, so the stale sheet cost no claim, but it was wrong for five and a half hours and the gate could not see it: no suite reads the league's ownership or /api/game at test time.
+CAUGHT: the manager's screenshots at 16:35Z, then a live read of /api/game and element-status.
+RULE:
+- A snapshot taken while waivers are due and unprocessed is never baked. pipeline/pull.sh exits 4 and names it; a d_game.json kept from an earlier pull is refused by its next_event. The caller bakes nothing, leaves the tree at HEAD and tries again later with a one-shot re-arm, never a sleeping session (E-176).
+- The routine is armed after the waiver run: the deadline minus 23 hours.
+- After waivers settle, the reply and the sheet say "sign now", from the engine's own free-agent functions on the fresh ownership (E-192).
+
+TEST: qa/pull_guard.cjs: due and unprocessed exits 4 and names the gameweek; processed exits 0; not yet due exits 0; a game feed kept from the gameweek before is refused; mutation: with the guard cut out the same feeds exit 0. 29/29.
+
+### E-199 · v110 · the page was republished before CI on the pushed commit had been read
+CAUSE: the routine's step 7 reads "push, read CI, and republish". On 20 Nov the session pushed e5e7091 at 11:43Z and republished the page (version 32) straight away; the run was then interrupted and CI was never read. CI finished red at 11:56Z on one iPhone-suite check (E-197). The three browser suites that cannot run in the container (E-170) are the ones a local gate cannot vouch for, so the publish went out on a gate nobody had seen whole.
+CAUGHT: the next session, 16:45Z, reading the run before anything else.
+RULE: the republish is the last act and waits for the CI run on the pushed commit to conclude green. A red or unread run means no republish: the decision goes in the reply and the page keeps its last green build (law 3; the E-180 and E-187 precedents).
+TEST: none in code; the publish is a session act. The routine's prompt says it in step 7, and every RETEST section names the CI run that was read (E-175).
+
+### E-200 · v110 · open · a held-back pair leaves the Draft sheet dropping the wrong player
+CAUSE: the Draft solve returns the best fifteen, and solve.py's draft() zips adds to drops within a position in list order. On the 20 Nov 17:39Z data its fifteen brings two defenders in (Mukiele, N.Williams) for two out (Affengruber, Robinson) and pairs Mukiele with Affengruber. buildClaimSheet's fitOnly then holds back N.Williams (flagged d 75%, and locked until the next waiver run), which leaves the sheet dropping Affengruber and keeping Robinson. On the same engine Mukiele for Robinson is worth +7.9 Draft expected points to GW20 against +2.3 for the pair as written. The written Draft eleven also takes a backup as a signing (Palacios for Bobb) and so leaves out Tonali, the best single add for the gameweek on both engines.
+CAUGHT: the GW11 reply, 20 Nov 2026, setting the sheet against a search over like-for-like swaps on the same engine (retests/RETEST_v110.md, 20 Nov 17:39Z section).
+RULE (to build): within a position the best add is paired with the worst drop, so a held-back or failed pair costs the least valuable swap, and the pairs are re-ranked once one is held back. The pairing belongs in the sheet builder that weekly.cjs and precompute.cjs both call, not in solve.py: draft() is byte for byte the reference's.
+TEST: none yet. Until it lands the reply states the better pairing beside the sheet.
+

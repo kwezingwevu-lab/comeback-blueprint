@@ -106,7 +106,7 @@ function serve(mode, routes) {
   };
 }
 
-function runPull(feeds, base, args) {
+function runPull(feeds, base, args, script) {
   const env = Object.assign({}, process.env, {
     FEEDS: feeds,
     FPL_BASE: base,
@@ -114,7 +114,7 @@ function runPull(feeds, base, args) {
     PULL_TIMEOUT: "4"
   });
   try {
-    const out = execFileSync("bash", [PULL].concat(args || []), { env: env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    const out = execFileSync("bash", [script || PULL].concat(args || []), { env: env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
     return { code: 0, out: out };
   } catch (e) {
     return { code: e.status === undefined || e.status === null ? -1 : e.status, out: String(e.stdout || "") + String(e.stderr || "") };
@@ -210,6 +210,65 @@ ok("pipeline/pull.sh exists and is executable", fs.existsSync(PULL), PULL);
   ok("good: the gameweek in play is detected from the feed, not from a default",
     /gameweek in play 7/.test(r.out), r.out.split("\n").slice(0, 3).join(" · "));
   ok("good: it exits zero", r.code === 0, "exit " + r.code + " · " + r.out.split("\n").slice(-3).join(" · "));
+}
+
+/* ---------------------------------------------------------------- E-198: a pull taken mid waiver run is refused */
+{
+  /* The instants are fixture inputs, far in the past and far in the future, so no case depends on the day it runs (E-157).
+     Both hosts point at one stand-in: the Classic bootstrap URL ends "bootstrap-static/" and the Draft one "bootstrap-static". */
+  const PAST = new Date(Date.UTC(2000, 0, 1)).toISOString(), FUTURE = new Date(Date.UTC(2999, 0, 1)).toISOString();
+  const dboot = (when, next) => JSON.stringify({ events: { current: next - 1, next: next, data: [{ id: next, waivers_time: when }] }, elements: [], teams: [] });
+  const game = (processed, next) => JSON.stringify({ current_event: next - 1, next_event: next, waivers_processed: processed, processing_status: processed ? "n" : "w" });
+  const rules = (gameBody, when) => ({ rules: [
+    { re: "bootstrap-static/$", body: bootstrap({ current: 5, finished: 5, next: 6 }) },
+    { re: "bootstrap-static$", body: dboot(when, 6) },
+    { re: "/game$", body: gameBody },
+    { re: "/fixtures/", body: "[]" },
+    { re: "details", body: JSON.stringify({ league_entries: [], standings: [], matches: [] }) },
+    { re: "entry/3546875/$", body: JSON.stringify({ leagues: { classic: [] } }) },
+    { re: "history", body: JSON.stringify({ current: [], chips: [] }) }
+  ], default: "{}" });
+  const run = (name, gameBody, when, script, pre) => {
+    const dir = seed(name); if (pre) pre(dir);
+    const srv = serve("good", rules(gameBody, when));
+    const r = runPull(dir, srv.base, [], script);
+    srv.close();
+    return r;
+  };
+  const tail = (r) => "exit " + r.code + " · " + r.out.trim().split("\n").slice(-2).join(" · ");
+
+  const due = run("wv-due", game(false, 6), PAST);
+  ok("waivers: due and not processed, the pull is refused with exit 4",
+    due.code === 4, tail(due));
+  ok("waivers: the refusal names the gameweek and what the game said",
+    /REFUSED/.test(due.out) && /GW6\b/.test(due.out) && /waivers_processed false/.test(due.out) && /E-198/.test(due.out), tail(due));
+  ok("waivers: the refused pull still wrote the feeds it fetched (the bake is what must not run)",
+    fs.existsSync(path.join(TMP, "wv-due", "d_game.json")), fs.readdirSync(path.join(TMP, "wv-due")).filter((f) => /^d_/.test(f)).join(","));
+
+  const done = run("wv-done", game(true, 6), PAST);
+  ok("waivers: due and processed, the pull exits zero", done.code === 0, tail(done));
+
+  const early = run("wv-early", game(false, 6), FUTURE);
+  ok("waivers: not yet due, the pull exits zero (a midweek pull rightly ships a claims sheet)", early.code === 0, tail(early));
+
+  /* A /game that does not answer JSON keeps the previous file. One kept from the gameweek before says "processed" about a
+     run that is over; the guard refuses it by its next_event rather than read it as this week's. */
+  const stale = run("wv-stale", "<html>The game is being updated.</html>", PAST, null, (dir) => {
+    fs.writeFileSync(path.join(dir, "d_game.json"), game(true, 5));
+  });
+  ok("waivers: a game feed kept from the gameweek before is refused, never read as this week's",
+    stale.code === 4 && /GW5\b/.test(stale.out) && /GW6\b/.test(stale.out) && /unknown/.test(stale.out), tail(stale));
+
+  /* Mutation (E-183): the same due-and-unprocessed feeds through a copy of pull.sh with the guard cut out must exit zero.
+     If it does not, the first check above is green for some other reason. */
+  const src = fs.readFileSync(PULL, "utf8");
+  const a = src.indexOf("# >>> E-198 waiver guard"), b = src.indexOf("# <<< E-198 waiver guard");
+  const cut = a >= 0 && b > a ? src.slice(0, a) + src.slice(b) : null;
+  const MUT = path.join(TMP, "pull_no_guard.sh");
+  if (cut) fs.writeFileSync(MUT, cut);
+  const mut = cut ? run("wv-mut", game(false, 6), PAST, MUT) : { code: -1, out: "the guard's markers are not in pipeline/pull.sh" };
+  ok("mutation: with the guard cut out, the same feeds exit zero (so the exit 4 above is the guard's)",
+    !!cut && mut.code === 0, tail(mut));
 }
 
 /* ---------------------------------------------------------------- gameweek detection fallbacks */

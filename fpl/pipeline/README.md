@@ -19,8 +19,10 @@ Fetches every public feed the bake reads into `pipeline/feeds/`, which git ignor
 is detected from bootstrap (`is_current`, then the highest finished event, then `is_next` minus one), or
 given as an argument to replay a past week. A feed that answers with something other than JSON — the API
 serves an HTML "being updated" page with a 200 during deadline processing — leaves the previous file
-alone, and the script exits non-zero naming any feed the bake cannot do without. Writes: the feed files
-only. Proved by `qa/pull_guard.cjs`.
+alone, and the script exits non-zero naming any feed the bake cannot do without. It exits 4 when the next
+gameweek's Draft waivers are due and the game still says they are not processed (ERRORS.md E-198): a snapshot
+taken in the middle of the waiver run is never baked, and a game feed kept from an earlier pull is refused the
+same way. Pull again once `waivers_processed` is true. Writes: the feed files only. Proved by `qa/pull_guard.cjs`.
 
 ## 2. Bake — `node pipeline/bake.js` (`npm run bake`)
 

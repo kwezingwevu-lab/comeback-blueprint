@@ -10,7 +10,7 @@
 "use strict";
 
 const INTEL = {
-  asOf: "2026-10-23T05:40:00Z",
+  asOf: "2026-11-20T17:20:00Z",
   /* Gameweek 5 market numbers (allaboutfpl / Fantasy Football Scout clean-sheet odds and RotoWire prices, 17 Sep). Kept as calibration anchors now the week is played. */
   market5: { MCI: { xg: 2.36, cs: 0.48 }, NEW: { xg: 2.01, cs: 0.35 }, NFO: { xg: 1.88, cs: 0.38 }, LIV: { xg: 1.84 }, ARS: { xg: 1.80, cs: 0.34 }, EVE: { xg: 1.80, cs: 0.34 }, MUN: { xg: 1.80 }, CHE: { xg: 1.77 }, LEE: { xg: 1.77, cs: 0.33 }, TOT: { cs: 0.31 } },
   /* Average bookmaker match prices (home, draw, away), OddsPortal, read 26 September. Every fixture
@@ -70,8 +70,15 @@ const INTEL = {
       "Mateta|CRY": { p: 0.15, why: "BELOW the flag. Glasner gives him only 'some chance this weekend' (cpfc.co.uk, 15 Oct 19:39Z)." },
       "Kesler-Hayden|COV": { p: 0.6, why: "Available again after the knock (Coventry Live, 16 Oct 04:00Z); minutes on return uncertain." },
     },
+    11: {
+      /* Read 20 Nov 2026 about 17:15Z, the day's second read, after Thursday's and Friday's pressers. Two pages were opened and
+         dated; everything else a search returned was older than 16 Nov or undated and was discarded. One override: the only
+         player in either fifteen where dated reporting and the official flag disagree. */
+      "Guéhi|MCI": { p: 0.35, why: "BELOW the feed's 75%, which has not moved since 7 Nov. 'Major doubt' with a hip injury; his 'chances of featuring against the Cottagers are understood to be slim' (Sports Mole, 18 Nov). He went off in the Forest defeat on 7 Nov and withdrew from the England squad. Not lower than 0.35: the feed moved Khusanov and Matheus N. to 50% on 20 Nov and left him where he was, so the club has not ruled him out." },
+    },
   },
   notes: [
+    "Read 20 Nov 2026 about 17:15Z for gameweek 11 (deadline Sat 21 Nov 11:00Z, 13:00 SAST), the second read of the day. Guéhi (MCI): 'major doubt', hip, chances 'understood to be slim' (Sports Mole, 18 Nov) against the feed's 75%, unchanged since 7 Nov; his start chance is set to 0.35. Khusanov (MCI) 'major doubt', to be assessed (Sports Mole, 18 Nov); the feed moved him and Matheus N. to 50% at 15:30Z on 20 Nov. Le Bris confirmed that Xhaka (calf, 'we will see') and Brobbey (front of the thigh, a new injury, 'we'll have to assess weekly') both miss Aston Villa (Premier League News Now, 20 Nov, quoting Thursday's press conference); the feed already has both out, so no override. From search summaries only, pages not opened: Tonali, Mukiele, Richards (CRY) and Pinnock are in predicted elevens (The Hard Tackle, 20 Nov). The feed flagged Fulham's Lecomte and Smith Rowe out at 11:30Z on 20 Nov. Searches for every other player in either fifteen returned nothing dated 16 to 20 Nov.",
     "Read 23 Oct 2026 about 05:40Z for gameweek 8 (deadline Fri 23 Oct 17:30Z, 19:30 SAST). Saka (ARS) came off inside ten minutes at Bayern on 21 Oct with a thigh problem (RotoWire, 21 Oct); the official feed now has him d 50% 'Thigh injury', so the feed's flag stands and no override is added. Semenyo (MCI) out about eight weeks with the knee, to mid-December (Maresca via Fantasy Football Scout, 22 Oct 13:00Z); the feed has him i 0%. Haaland 'the only one 100% available' (Maresca, same page). Murillo, Sels and Gibbs-White fit (Glasner via Fantasy Football Scout, 21 Oct 14:15Z). Brobbey stays at the feed's 75%. Arteta had not spoken when read; re-check Saka after his presser.",
     "Re-read 16 Oct 2026 about 07:50Z before Friday's pressers: Isidor a major doubt, Meunier out, Brobbey ready but unproven (Sunderland Echo, 16 Oct 05:00Z); Mateta 'some chance' (cpfc.co.uk, 15 Oct 19:39Z); Kesler-Hayden available (Coventry Live, 16 Oct 04:00Z); Szoboszlai and Gakpo still doubts (Liverpool.com, 16 Oct 06:03Z, the feed's flags kept); Reece James a doubt (the feed's 75% kept). Manchester City, Chelsea, United, Arsenal and Everton speak later on Friday; the routine re-reads after them.",
     "Read 15 Oct 2026 about 18:50Z for gameweek 7 (deadline Sat 17 Oct 10:00Z, 12:00 SAST), through the Parallel Search and Exa connectors. No injury reported against Raya, Gabriel, Saka, Konsa or Havertz (Arsenal; Saka was ill and benched against Lille, then scored and assisted: Arteta via Hayters, 13 Oct; the Evening Standard expects him to start, 15 Oct), Haaland (two goals against PSG; 'Man City are not believed to have any injury concerns', Evening Standard, 14 Oct), Palmer and João Pedro (played against Bournemouth, Evening Standard, 12 Oct), Tarkowski, Barry, Diop, Janelt, Groß, Hall, Tavernier, Silva, Thomas, van Ewijk, Leno, Affengruber, Gonzalo, Calvert-Lewin, Stach, Trafford, Tzolakis or Kinsky. Out or doubtful elsewhere: Isak, Gakpo and Szoboszlai doubts and Gravenberch suspended (Iraola, liverpoolfc.com, 15 Oct); Saliba, Hincapié and Tzolis out (Evening Standard, 15 Oct); Sesko doubtful and Dorgu out (Yorkshire Evening Post, 15 Oct); Mateta not yet available (Sage via Fantasy Football Scout, 14 Oct); Ruggeri out more than a month (Emery, Birmingham Live, 13 Oct); Milenković and Igor Jesus out (Nottingham Post, 13 Oct); Kulusevski and Porro doubtful (Evening Standard, 15 Oct).",
@@ -91,6 +98,7 @@ const INTEL = {
     "There are two players called Hughes. He owns id 212, the Crystal Palace midfielder, who is fit and unflagged. The one carrying 'Groin injury - Unknown return date' is id 278, a Hull defender. Match on id, never on the name. Read from the feed pulled 26 Sep and unchanged on 2 Oct.",
   ],
   sources: [
+    "Sports Mole, 18 Nov (Manchester City's injury list for Fulham: Guéhi, Khusanov, Semenyo); Premier League News Now, 20 Nov (Le Bris on Xhaka and Brobbey); The Hard Tackle, 20 Nov (predicted elevens, search summaries only); official Fantasy Premier League and FPL Draft feeds, pulled 20 Nov",
     "Fantasy Football Scout, 21 Oct 14:15Z and 22 Oct 13:00Z (gameweek 8 team news: Glasner, Maresca); RotoWire (Adam Zdroik), 21 Oct (Saka); official Fantasy Premier League feed read 23 Oct 05:35Z",
     "Sunderland Echo, 16 Oct 05:00Z (Le Bris on Isidor, Meunier, Brobbey); cpfc.co.uk, 15 Oct 19:39Z (Mateta); Coventry Live, 16 Oct 04:00Z (Kesler-Hayden); Liverpool.com, 16 Oct 06:03Z",
     "Official Fantasy Premier League and FPL Draft feeds, pulled 16 Oct 09:20Z",
