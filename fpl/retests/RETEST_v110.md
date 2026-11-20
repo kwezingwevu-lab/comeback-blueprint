@@ -997,4 +997,6 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
   | verify | 34/34 |
   | pull_guard | 29/29 |
   | mc_separation | 43/43 |
+- **CI run 71 (commit 3d2bf8d), read before any republish.** The iPhone suite passed with the E-197 wait (the check that was 11/12 in the morning is green). The run was red on a different suite, browser.py: the Review tab's full-page histogram 4.60 points from its baseline against a 4.5 tolerance, both colour schemes (E-201). The morning's run had stopped before browser.py, so this was its first run on GW10's data.
+- **E-201.** browser.py now runs in this container (Python Playwright installed against the preinstalled Chromium) and reproduced it at 4.66. A section probe named the growth: Review's two sections carry a row per played gameweek. The baseline, recorded on 9 Oct with five gameweeks played, was re-recorded with `--write-baseline`; the suite is 185/185; `--mutate invert` fires all 36 picture checks and `--mutate reflow` none. The tolerance is unchanged. The page is republished only after the CI run on the commit that carries this line is read green.
 

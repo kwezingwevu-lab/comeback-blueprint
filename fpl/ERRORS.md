@@ -2281,3 +2281,15 @@ CAUGHT: the GW11 reply, 20 Nov 2026, setting the sheet against a search over lik
 RULE (to build): within a position the best add is paired with the worst drop, so a held-back or failed pair costs the least valuable swap, and the pairs are re-ranked once one is held back. The pairing belongs in the sheet builder that weekly.cjs and precompute.cjs both call, not in solve.py: draft() is byte for byte the reference's.
 TEST: none yet. Until it lands the reply states the better pairing beside the sheet.
 
+### E-201 · v110 · CI run 71 red: the Review tab's full-page histogram had drifted past tolerance against a baseline recorded six weeks earlier
+CAUSE: qa/browser.py compares each tab's full-page luminance histogram with a baseline recorded on 9 Oct 2026, with five gameweeks played. Since then the app gained panels on purpose (the as-is elevens on Squad and Draft, the survivor panel on Rivals) and the season's record grew: Review carries a row per played gameweek, thirteen now across its two sections. The baseline was never re-recorded, because the suite could not run in this container (E-170) and `--write-baseline` with it. Every tab had crept toward the 4.5-point tolerance (measured here against the old baseline: Command 3.9, Chips 3.1, Rivals 2.5, Lab 4.6); with GW10's row Review reached 4.60 on CI and 4.66 here, in both colour schemes. The morning's CI run never showed it: it stopped at the iPhone suite, so browser.py was skipped (E-197).
+CAUGHT: CI run 71 on 3d2bf8d, read at 18:15Z on 20 Nov before any republish (E-199 held).
+RULE:
+- The suite runs in this container again: `python3 -m pip install playwright==<the version of the Node playwright package>` drives the preinstalled Chromium (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers python3 qa/browser.py`). It is part of every local gate, which corrects E-170 for this one suite; webkit.js and ios.cjs remain CI's.
+- The baseline is re-recorded with `--write-baseline` in the same commit as any deliberate change to what a tab paints, and the mutation proofs are run against the new one.
+- It is never re-recorded to absorb content that should not be on screen (E-175): a probe of section heights names what grew first. Here it was Review's two sections, one row per played gameweek, nothing stale.
+- The tolerance stays at 4.5.
+
+TEST: qa/browser.py 185/185 on the re-recorded baseline. `--mutate invert` fires all 36 signature and histogram checks (Review 77.44 points against 4.5). `--mutate reflow` fires none of them while the overflow walk fires, as designed.
+OPEN: Review and Lab grow with the season, so a fixed full-page histogram becomes a clock for them again within weeks (E-084's class). The check needs a growth-proof form for those two tabs, for example the histogram of a fixed-height region or of the page with the per-gameweek rows collapsed. Until then the drift is read on every run and a re-record comes with a section probe beside it.
+
