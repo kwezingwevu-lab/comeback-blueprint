@@ -2242,3 +2242,9 @@ RULE:
 TEST: plan_legality `the plan's first week is the week the manager fixed (E-186), and each later fixed week is a hold (E-195)`, with its mutation `a transfer in a held week goes red (E-195)`. The no-rebuy mutation now uses the first week that sells, not week 0, so a hold opening no longer leaves it unbuildable. plan_legality 62/62, reference 67/67.
 - components: the Plan tab's transfer and price-watch panels (plan-changes, pl-changes, plan-price) do not render on a hold week, so components 331/331 went red on `A-TabPlan-renders-every-testid-it-owns` (5 Nov 20:15Z).
 - The fixture now adds `MCP_MOVES`, a variant rendered from the solver's own plan for the same data (timing.now, which opens with transfers), so those panels stay tested while the shipped plan holds. Green again on the 6 Nov data.
+
+### E-196 · v110 · the C2 protocol sold a returning starter because he carried a doubt
+CAUSE: sellCandidates (src/engine.js) marked any status other than "a" as a forced sale, and transferProtocol protects a Konsa-rule player only when he is not forced. On the 20 Nov 2026 feeds Guéhi started GW10 after missing GW9 (konsa true) and carries d 75%, so the GW11 protocol proposed selling him for Gabriel.
+CAUGHT: smoke_wk `sells-respect-the-konsa-rule`, 20 Nov 2026 11:30Z.
+RULE: a doubt (status d) does not outrank C1 rule 1. A player who started his club's last match after a spell out stays protected unless the feed rules him out (i, s, u, n).
+TEST: smoke_wk `sells-respect-the-konsa-rule` on the 20 Nov data (red before, green after).

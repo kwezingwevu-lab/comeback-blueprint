@@ -959,3 +959,12 @@ tree, alone: bake 42/42, privacy 27/27, components 300/300, smoke 69/69, verify 
   | unit_engine | 278/278 |
   | mc_separation | 43/43 |
   | mc_all | 0 failures |
+
+## 20 Nov 2026, about 11:05Z: GW11, the routine's 24-hour refresh (deadline Sat 21 Nov 11:00Z)
+
+- **Pull.** 11:05:03Z, then the full chain to 11:11:51Z. state.cjs: squad unchanged, bank 2.7, **3 free transfers** into GW11, confirmed through GW10.
+- **Hold re-pinned (E-195).** `fixed_week.cjs --weeks 2`: GW11 and GW12 no transfer; 5 free transfers into GW13.
+- **Plan.** Hash 2f20653cc20d2d10, 562.01 to GW19 (wildcard GW19, the manager's choice); the solver's own plan plays the wildcard in GW13 for 582.35. Bench Boost GW14.
+- **Classic GW11.** 4-4-2, captain Haaland, vice Gomez. Flags: Guéhi d 75%, Brobbey i, Saka i ("expected back 20 Dec" in the FPL feed).
+- **Draft.** waivers_processed false at the pull (GW11 waivers 11:00Z); the sheet is claims. Xhaka i on the roster.
+- **E-196.** smoke_wk went red on the Konsa rule (the C2 protocol sold Guéhi on a doubt); fixed in sellCandidates, no test loosened.

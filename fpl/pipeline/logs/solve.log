@@ -1,6 +1,6 @@
-plan Optimization terminated successfully. (HiGHS Status 7: Optimal) 71.6 s · gap 0.004970557267169231 · total 630.34
-no-wildcard 44.0 s · gap 0.0027597237266423283 · total 624.05
-free hit [(13, 2.21), (14, 7.46), (15, 4.02), (16, 1.7), (17, 1.56), (18, 0.55), (19, 2.0)]
-draft 0.0 s · value 490.59 base 464.12 [('Mbeumo', 'King'), ('McAtee', 'Bobb'), ('Tonali', 'Gomez')]
-draft if taken 490.59 [('Mbeumo', 'King'), ('McAtee', 'Bobb'), ('Tonali', 'Gomez')]
-done in 115.9 s · /home/user/comeback-blueprint/fpl/data/solver_out.json
+plan Optimization terminated successfully. (HiGHS Status 7: Optimal) 58.3 s · gap 0.0038213221404496066 · total 582.35
+no-wildcard 17.2 s · gap 0.004550750145385198 · total 573.82
+free hit [(13, 3.95), (14, 4.05), (15, 4.37), (16, 0.64), (17, 1.37), (18, 1.71), (19, 1.01)]
+draft 0.0 s · value 453.98 base 419.01 [('Mukiele', 'Robinson'), ('Mbeumo', 'Xhaka'), ('McAtee', 'King'), ('McGinn', 'Bobb')]
+draft if taken 453.98 [('Mukiele', 'Robinson'), ('Mbeumo', 'Xhaka'), ('McAtee', 'King'), ('McGinn', 'Bobb')]
+done in 75.8 s · /home/user/comeback-blueprint/fpl/data/solver_out.json

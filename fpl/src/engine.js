@@ -1172,6 +1172,9 @@ function sellCandidates(squad, ctx) {
       var reasons = [];
       if (num(gs.starts_last3, 0) === 0) reasons.push("no starts in the last 3");
       if (fl.status !== "a") reasons.push("status " + fl.status + (fl.chance !== null ? " (" + fl.chance + "%)" : ""));
+      /* E-196: a doubt (status d) does not outrank the Konsa rule (C1 rule 1). A player who started his club's last match after
+         a spell out is protected unless the feed rules him out (i, s, u, n); a "d" is a doubt, not a ruling. */
+      if (gs.konsa && num(gs.starts_last3, 0) > 0 && fl.status === "d") { out.push({ id: id, web_name: el.web_name, reason: "started the last match after a spell out — protected (Konsa rule) despite status d" + (fl.chance !== null ? " (" + fl.chance + "%)" : ""), forced: false, konsa: true }); return; }
       if (reasons.length) out.push({ id: id, web_name: el.web_name, reason: reasons.join("; "), forced: true, konsa: !!gs.konsa });
       else if (gs.konsa) out.push({ id: id, web_name: el.web_name, reason: "started the last match after a spell out — protected (Konsa rule)", forced: false, konsa: true });
     });
