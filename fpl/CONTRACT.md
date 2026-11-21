@@ -152,6 +152,12 @@ const WEEKLY = {
                                                         // are the engine's best replacements over the
                                                         // whole list and say so in both fields.
     claims: [ {out:<code>, in:<code>, why:"…"}, … in claim order … ],
+                                                        // 21 Nov 2026 (E-203): after the week's waiver run
+                                                        // claims holds only the free agents to sign now, in
+                                                        // order, each why saying "sign now", and the block adds
+    next_run: { gw, waivers: "<ISO>", place, of,        // the next waiver run (null after the re-draft): its
+      claims: [ {out:<code>, in:<code>, why:"…"}, … ] },// time, the manager's place and the locked players
+                                                        // worth a claim. Absent before the run.
     xi: { formation: "3-5-2", gk: <code>, def: [...], mid: [...], fwd: [...] },
     watchlist: [ …codes with three starts… ]
   },

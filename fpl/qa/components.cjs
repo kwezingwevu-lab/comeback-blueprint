@@ -168,6 +168,20 @@ let BUILT_SETTLED = false;
 try { if (MCB.MC && MCB.MC.draft && MCB.MC.draft.waiversProcessed) { BUILT_SETTLED = true; MCB.MC.draft.waiversProcessed = false; } } catch (e) { /* the block check below reports it */ }
 if (BUILT_SETTLED) console.log("# the shipped block is baked after this week's waivers; rendering the pre-settle phase from it, the settled phase by moving the data");
 try { MCP = { MC: MCB.MC, PLAN: MCB.PLAN, PRE: MCB.PRE, E: MCB.MCEngine.create(MCB.MC) }; } catch (e) { MCP = null; }
+/* E-203 (21 Nov 2026): after the week's waiver run the build writes a two-part Draft sheet (PRE.claims.phase "free": now
+   and next). MCP_SETTLED is the same block with waivers processed and that sheet: the shipped PRE when it is already
+   two-part, else one built here with the same builder on the flipped copy, so the settled panels are reached whichever
+   phase the shipped build is in. */
+let MCP_SETTLED = null;
+try {
+  const MCs = JSON.parse(JSON.stringify(MCB.MC)); MCs.draft.waiversProcessed = true;
+  let PREs = MCB.PRE;
+  if (!(PREs && PREs.claims && PREs.claims.phase === "free")) {
+    const ANs = require(path.join(ROOT, "src", "mc_analysis.js")), Ms = MCB.MCEngine.create(MCs);
+    PREs = Object.assign({}, MCB.PRE, { claims: ANs.buildDraftSheet(Ms, MCs, MCB.PLAN.draft.pairs, { fitOnly: true }) });
+  }
+  MCP_SETTLED = { MC: MCs, PLAN: MCB.PLAN, PRE: PREs, E: MCB.MCEngine.create(MCs) };
+} catch (e) { MCP_SETTLED = null; }
 assert("components-the-mc-engine-data-plan-and-precomputed-blocks-are-in-scope",
   !!(MCP && MCP.MC && Array.isArray(MCP.MC.players) && MCP.PLAN && MCP.PRE && MCP.E && typeof MCP.E.ep === "function" &&
     typeof MCP.PLAN.hash === "string" && MCP.PLAN.hash === MCP.PRE.hash),
@@ -484,6 +498,8 @@ const FIX = {
       .concat(CTX_NO_LEAGUE ? [{ ctx: CTX_NO_LEAGUE, ui: uiFor("draft", true), on: ON, state: STATE_NO_LEAGUE, onLeague: noop, mc: MCP }] : [])
       // v110 D3: a match price typed on the Odds tab, which hides every build-time Draft answer behind its own note
       .concat([{ ctx: CTX_MKT, ui: uiFor("draft", true), on: ON, state: STATE_MKT, onLeague: noop, mc: MCP }])
+      // E-203: the settled phase, where df-claims draws the two-part sheet (df-signnow, df-nextrun)
+      .concat(MCP_SETTLED ? [{ ctx: CTX, ui: uiFor("draft", true), on: ON, state: baseState, onLeague: noop, mc: MCP_SETTLED }] : [])
   },
   TabChips: { props: { ctx: CTX, ui: uiFor("chips", true), on: ON, plan: PLAN, onConfirm: noop, mc: MCP }, text: [],
     fuzz: { ctx: CTX, ui: uiFor("chips", false), on: ON, plan: PLAN, onConfirm: noop, mc: MCP } },
@@ -1224,7 +1240,7 @@ console.log("--- v110 D3 · the Draft tab ---");
       .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#x27;|&#39;/g, "'")
       .replace(/\s+/g, " ").trim();
   };
-  const MARKS = ["sec-df-claims", "df-claims", "df-horizon", "df-phase", "df-claims-note", "df-sheet", "df-strip", "df-stress", "rev-df-orderings", "df-orderings-list",
+  const MARKS = ["sec-df-claims", "df-claims", "df-horizon", "df-phase", "df-claims-note", "df-sheet", "df-strip", "df-stress", "rev-df-orderings", "df-orderings-list", "df-signnow", "df-nextrun",
     "rev-df-rivals", "df-rivals-list", "sec-df-solved", "df-solved", "df-solved-note", "sec-df-waivers", "sec-df-pool", "df-pool-horizon", "rev-df-pool-app", "df-pool-app",
     "sec-df-trades", "df-trades", "df-trades-note", "sec-df-h2h"];
   const raw = function (html, id) {
@@ -1458,10 +1474,87 @@ console.log("--- v110 D3 · the Draft tab ---");
     const mv = moved(function (M2) { M2.draft.waiversProcessed = true; M2.players.forEach(function (p) { if (p.id === topId) p.ds = "l"; }); });
     const r2 = tryRender("TabDraft", props({ mc: mv, ui: uiOpen({ "df-pool": true }) }));
     const p2 = r2.ok ? part(r2.html, "df-pool-horizon") : "", ph2 = r2.ok ? part(r2.html, "df-phase") : "", n2 = r2.ok ? part(r2.html, "df-claims-note") : "";
+    /* 21 Nov 2026 (E-203): after the run the build may carry a two-part sheet (PRE.claims.phase "free"). It is drawn only
+       while every sign-now player can still be signed, so the expected branch follows the data: with the top free agent
+       locked, the two-part sheet is drawn unless he is one of its sign-now players or drops, and hidden behind a note
+       otherwise; a pre-settle PRE always steps aside with the settled note. Never the claims sheet (df-sheet). */
+    const C2 = PR && PR.claims ? PR.claims : {}, two = C2.phase === "free" && Array.isArray(C2.now);
+    const touches = two && C2.now.some(function (q) { return q.add === topId || q.drop === topId; });
+    const sheetOk = function (r, wantTwo) {
+      const n = r.ok ? part(r.html, "df-claims-note") : "";
+      return r.ok && !has(r.html, "df-sheet") && (wantTwo ? has(r.html, "df-signnow") && has(r.html, "df-nextrun") && !n : !has(r.html, "df-signnow") && /settled|ownership/.test(n));
+    };
     assert("D3-moved-once-waivers-settle-the-labels-read-sign-now-or-locked-and-the-sheet-steps-aside",
       r2.ok && p2.indexOf(top[0].p.n) >= 0 && /locked until next waivers/.test(p2) && /sign now/.test(p2) && !/waiver claim/.test(p2) &&
-        /have settled/.test(ph2) && /settled/.test(n2) && !has(r2.html, "df-sheet"),
-      "pool «" + p2.slice(0, 160) + "» · phase «" + ph2.slice(0, 100) + "» · note «" + n2 + "»");
+        /have settled/.test(ph2) && sheetOk(r2, two && !touches),
+      "pool «" + p2.slice(0, 160) + "» · phase «" + ph2.slice(0, 100) + "» · " + (two ? (touches ? "the locked player is on the two-part sheet, so it is hidden" : "two-part sheet expected") : "pre-settle sheet, steps aside") + " · note «" + n2 + "»");
+    if (two && C2.now.length) {
+      // mutation: lock a player the sign-now lines bring in; the two-part sheet must step aside behind the ownership note
+      const lockId = C2.now[0].add;
+      const mv3 = moved(function (M2) { M2.draft.waiversProcessed = true; M2.players.forEach(function (p) { if (p.id === lockId) p.ds = "l"; }); });
+      const r3 = tryRender("TabDraft", props({ mc: mv3 }));
+      assert("D3-mutation-a-locked-player-among-the-sign-now-lines-hides-the-two-part-sheet", sheetOk(r3, false) && !sheetOk(r3, true),
+        "locked " + nm(lockId) + ": «" + (r3.ok ? part(r3.html, "df-claims-note") : "threw") + "»");
+    }
+  }
+
+  // E-203 (21 Nov 2026): once the week's waivers have run, df-claims draws two parts — the free agents to sign now, in order,
+  // then what cannot be signed this week (locked until the next waiver run, with its time and the manager's place) — and
+  // never the claims sheet, a backup or a first choice. Every expectation is read from the settled block and its sheet.
+  if (MCP_SETTLED) {
+    const CS = MCP_SETTLED.PRE.claims, ES = MCP_SETTLED.E, MS = MCP_SETTLED.MC, nS = MS.gw.next;
+    const nmS = function (id) { return ES.P[id] ? ES.P[id].n : "?"; };
+    const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], MONS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const sday = function (iso) { const d = new Date(Date.parse(iso) + 2 * 3600000); return DAYS[d.getUTCDay()] + " " + d.getUTCDate() + " " + MONS[d.getUTCMonth()] + " " + String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0"); };
+    const ordS = function (n) { const m = n % 100; return n + (m >= 11 && m <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" })[n % 10] || "th"); };
+    const lineOf = function (q) { return nmS(q.add) + " for " + nmS(q.drop); };
+    const rS = tryRender("TabDraft", props({ mc: MCP_SETTLED }));
+    const sn = rS.ok ? part(rS.html, "df-signnow") : "", nr = rS.ok ? part(rS.html, "df-nextrun") : "", all = rS.ok ? plain(rS.html) : "";
+    const twoPartRules = function (snT, nrT, html, C) {
+      const bad = [];
+      if (!has(html, "df-signnow") || !has(html, "df-nextrun")) bad.push("the two parts are not both drawn");
+      if (C.now.length ? !inOrder(snT, C.now.map(lineOf)) : snT.indexOf("Nothing to sign now") < 0) bad.push("sign-now rows are not the sheet's, in order");
+      C.now.forEach(function (q) { if (nrT.indexOf(nmS(q.add) + " for ") >= 0) bad.push(nmS(q.add) + " is signed now and also claimed"); });
+      if (C.next) {
+        const head = "Locked until the next waiver run, " + sday(C.next.wv) + " SAST, where you claim " + ordS(C.next.place) + " of " + C.next.of;
+        if (nrT.indexOf(head) < 0) bad.push("the part-two head does not carry «" + head + "»");
+        if (C.next.claims.length ? !inOrder(nrT, C.next.claims.map(lineOf)) : nrT.indexOf("Nobody locked is worth a claim") < 0) bad.push("next-run rows are not the sheet's, in order");
+        C.next.claims.forEach(function (q) { if (snT.indexOf(nmS(q.add) + " for ") >= 0) bad.push(nmS(q.add) + " is locked but listed to sign now"); });
+      }
+      (C.heldBack || []).forEach(function (h) { if (nrT.indexOf(nmS(h.add) + " for ") < 0 || nrT.indexOf("status " + h.status) < 0) bad.push("held-back " + nmS(h.add) + " is not named with his status"); });
+      if (/backup|first choice/i.test(snT + " " + nrT)) bad.push("a line says backup or first choice");
+      if (/Classic/.test(snT + " " + nrT)) bad.push("a Classic word in the Draft sheet");
+      if (has(html, "df-sheet") || has(html, "df-stress") || has(html, "rev-df-orderings")) bad.push("the claims sheet's own panels are drawn as well");
+      return bad;
+    };
+    const bad = rS.ok ? twoPartRules(sn, nr, rS.html, CS) : ["threw " + (rS.err && rS.err.message)];
+    if (rS.ok && all.indexOf("Sign now, then claims for the next run") < 0) bad.push("the section title does not say sign now");
+    assert("D3-settled-the-sheet-has-two-parts-sign-now-first-then-what-cannot-be-signed-this-week", bad.length === 0,
+      (bad.length ? bad.slice(0, 4).join("; ") + " · " : "") + CS.now.length + " to sign now, " + (CS.next ? CS.next.claims.length + " for the run " + sday(CS.next.wv) : "no next run") + " · «" + sn.slice(0, 200) + "»");
+    // mutation: the same rules on a copy that lists a locked player among the sign-now lines must fail
+    if (CS.next && CS.next.claims.length) {
+      const CM = JSON.parse(JSON.stringify(CS)); CM.now = CM.now.concat([CM.next.claims[0]]);
+      const fake = sn + " " + lineOf(CM.next.claims[0]);
+      assert("D3-mutation-a-locked-player-written-as-sign-now-fails-the-two-part-rules", twoPartRules(fake, nr, rS.html, CM).length > 0, "rules on the mutated copy: " + twoPartRules(fake, nr, rS.html, CM).slice(0, 2).join("; "));
+    }
+    // the clock: an hour after this gameweek's deadline the two-part sheet steps aside; an hour before, it is drawn
+    const dlS = (MS.draft.events[String(nS)] || {}).dl;
+    if (typeof dlS === "string") {
+      const at = function (ms) { return tryRender("TabDraft", props({ mc: MCP_SETTLED, ctx: F("buildCtx")(LIVE, baseState, new Date(Date.parse(dlS) + ms).toISOString()) })); };
+      const rAfter = at(3600000), rBefore = at(-3600000);
+      const nA = rAfter.ok ? part(rAfter.html, "df-claims-note") : "threw";
+      assert("D3-settled-after-the-deadline-the-two-part-sheet-steps-aside",
+        rAfter.ok && /deadline has passed/.test(nA) && !has(rAfter.html, "df-signnow") && rBefore.ok && has(rBefore.html, "df-signnow"),
+        "after «" + nA + "» · before " + (rBefore.ok && has(rBefore.html, "df-signnow") ? "drawn" : "not drawn (the mutation side fails)"));
+    }
+    // the landing and the checklist count the signings (draftClaimsView), never a claim
+    const cv = F("draftClaimsView")(MCP_SETTLED, Date.parse(NOW), 0);
+    const want = CS.now.length ? CS.now.length + " to sign now, first " + lineOf(CS.now[0]) : "Nothing to sign now";
+    const CE = JSON.parse(JSON.stringify(CS)); CE.now = [];
+    const cvE = F("draftClaimsView")(Object.assign({}, MCP_SETTLED, { PRE: Object.assign({}, MCP_SETTLED.PRE, { claims: CE }) }), Date.parse(NOW), 0);
+    assert("D1-settled-the-landing-Draft-line-counts-the-signings-and-says-so-when-there-are-none",
+      cv.state === "signnow" && cv.line.indexOf(want) === 0 && !/claim,|claims,|first choice/.test(cv.line) && cvE.state === "signnow" && cvE.line.indexOf("Nothing to sign now") === 0,
+      "«" + cv.line + "» · with no sign-now line «" + cvE.line + "»");
   }
 
   // a typed match price hides every build-time answer behind a note naming the Odds tab; nothing else is lost

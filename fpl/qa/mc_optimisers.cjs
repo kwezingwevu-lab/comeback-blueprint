@@ -79,6 +79,7 @@ const finish = () => { console.log("SUITE mc_optimisers " + pass + "/" + (pass +
 const readJson = (rel) => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, rel), "utf8")); } catch (e) { return null; } };
 const r1 = (x) => Math.round(x * 10) / 10;
 const f1 = (x) => (Math.round(x * 10) / 10).toFixed(1);
+const f2 = (x) => (Math.round(x * 100) / 100).toFixed(2);
 const who = (p) => (p ? p.n + "|" + p.t : "?");
 
 const SHAPE = { 1: 2, 2: 5, 3: 5, 4: 3 };      // frozen-ok: Part N1/N2, 2/5/5/3
@@ -181,8 +182,123 @@ const roster = M.draftRoster(), mine = new Set(roster.map((p) => p.id)), poolIds
   ok("the expected roster (" + f1(C.meanValue) + ", " + f1(C.p10) + " to " + f1(C.p90) + ") sits between today and the ceiling", C.meanValue >= C.valueNow - 1e-6 && C.meanValue <= C.valueAll + 1e-6 && C.p10 <= C.p90, "");
   const after = roster.map((p) => p.id); C.sim.filter((x) => x.ok).forEach((x) => { const k = after.indexOf(x.drop); if (k >= 0) after[k] = x.add; });
   ok("the stress-test roster stays 2/5/5/3 (" + C.landed.length + " claims land)", shapeOk(after.map((i) => P[i])), "");
-  const rebuilt = AN.buildClaimSheet(M, MC, PLAN.draft.pairs, { mc: true, fitOnly: true });
-  ok("data/pre.json's claims sheet is buildClaimSheet's answer on the shipped data and the solved pairs, field for field", JSON.stringify(rebuilt) === JSON.stringify(C), "");
+  // 21 Nov 2026 (E-203): both writers call buildDraftSheet, which is buildClaimSheet's object before the waiver run and that
+  // object plus the two parts after it; the shipped claims are compared with it, field for field.
+  const rebuilt = AN.buildDraftSheet(M, MC, PLAN.draft.pairs, { mc: true, fitOnly: true });
+  ok("data/pre.json's claims are buildDraftSheet's answer on the shipped data and the solved pairs, field for field", JSON.stringify(rebuilt) === JSON.stringify(C), "");
+  const sw = JSON.parse(JSON.stringify(C)); const L0 = sw.phase === "free" ? sw.now : sw.sheet;
+  if (L0.length >= 2) { const t = L0[0]; L0[0] = L0[1]; L0[1] = t; }
+  ok("mutation: the same claims with two lines swapped are not the builder's", L0.length < 2 || JSON.stringify(rebuilt) !== JSON.stringify(sw), L0.length < 2 ? "fewer than two lines" : "");
+}
+
+/* ---------------------------------------------------------------- the two-part Draft sheet (E-203, E-200; 21 Nov 2026)
+   After the week's waiver run the sheet is two parts: free agents to sign now, each the best like-for-like swap left on the
+   roster the lines above leave, and the locked players worth a claim at the next run. These checks run on clones in both
+   phases, so they run whichever phase the shipped data is in. */
+{
+  const clone = (processed) => { const X = JSON.parse(JSON.stringify(MC)); X.draft.waiversProcessed = processed; return X; };
+  const MCs = clone(true), MCp = clone(false), Ms = ENG.create(MCs), Mp = ENG.create(MCp), Hs = AN.mcHorizon(Ms, MCs), nx = Hs.next, hz = Hs.dEnd, Ps = Ms.P;
+  const S = AN.buildDraftSheet(Ms, MCs, PLAN.draft.pairs, { fitOnly: true });
+  const Sp = AN.buildDraftSheet(Mp, MCp, PLAN.draft.pairs, { fitOnly: true }), Cp = AN.buildClaimSheet(Mp, MCp, PLAN.draft.pairs, { fitOnly: true });
+  const NEW = ["phase", "now", "next", "heldBack", "valueAfter"];
+  ok("before the waiver run buildDraftSheet is buildClaimSheet, byte for byte, with none of the two-part keys (constraint d)",
+    JSON.stringify(Sp) === JSON.stringify(Cp) && NEW.every((k) => !(k in Sp)), "");
+  ok("mutation: after the run the same comparison fails, and all five two-part keys are there", JSON.stringify(S) !== JSON.stringify(AN.buildClaimSheet(Ms, MCs, PLAN.draft.pairs, { fitOnly: true })) && NEW.every((k) => k in S), "");
+  const lines = (X) => JSON.stringify(AN.sheetLines(X));
+  ok("the written lines do not depend on the Monte Carlo option, in either phase",
+    lines(AN.buildDraftSheet(Ms, MCs, PLAN.draft.pairs, { mc: true, fitOnly: true })) === lines(S) && lines(AN.buildDraftSheet(Mp, MCp, PLAN.draft.pairs, { mc: true, fitOnly: true })) === lines(Sp), "");
+
+  const fit = (p) => !!p && p.st === "a", MIN = AN.MC_SIGN_MIN_GAIN, PER = AN.MC_SIGN_PER_POS;
+  // a replay of the greedy rule: each line must be the largest like-for-like gain left, from players still on the roster
+  // the pass started from, at least MIN; and after the last line nothing reaches MIN
+  const replay = (ls, roster, pool, g0) => {
+    const bad = [], start = new Set(roster.map((p) => p.id)), dropped = new Set(), added = new Set(); let cur = roster.slice();
+    ls.forEach((l, i) => {
+      const avail = pool.filter((p) => !added.has(p.id) && !start.has(p.id));
+      const best = Ms.draftMoves(cur, g0, hz, { pool: avail, perPos: PER }).filter((m) => start.has(m.drop.id) && !dropped.has(m.drop.id))[0];
+      const a = Ps[l.add], d = cur.find((x) => x.id === l.drop);
+      if (!a || !d || a.p !== d.p) { bad.push("line " + (i + 1) + " is not like for like on the roster"); return; }
+      if (!best || Math.abs(best.gain - l.gain) > 1e-9 || l.gain < MIN || best.add.id !== l.add || best.drop.id !== l.drop) bad.push("line " + (i + 1) + " " + who(a) + " for " + who(d) + " " + f1(l.gain) + " is not the best swap left" + (best ? " (" + who(best.add) + " for " + who(best.drop) + " " + f1(best.gain) + ")" : ""));
+      if (l.kind !== undefined || l.of !== undefined) bad.push("line " + (i + 1) + " carries a claims-sheet kind");
+      added.add(l.add); dropped.add(l.drop); cur = cur.map((x) => x === d ? a : x);
+    });
+    const avail = pool.filter((p) => !added.has(p.id) && !start.has(p.id));
+    const more = avail.length ? Ms.draftMoves(cur, g0, hz, { pool: avail, perPos: PER }).filter((m) => start.has(m.drop.id) && !dropped.has(m.drop.id))[0] : null;
+    if (more && more.gain >= MIN) bad.push("after the last line " + who(more.add) + " for " + who(more.drop) + " still adds " + f1(more.gain));
+    return { bad, after: cur };
+  };
+  const roster = Ms.draftRoster(), fa = Ms.freeAgents().filter(fit), locked = Ms.lockedFreeAgents().filter(fit);
+  const r1 = replay(S.now, roster, fa, nx);
+  ok("sign now (" + S.now.length + " lines): each is a fit free agent for one of my players, like for like, the best swap left on the roster the lines above leave, at least +" + MIN,
+    r1.bad.length === 0 && S.now.every((l) => fit(Ps[l.add]) && Ps[l.add].ds === "a"), r1.bad.slice(0, 3).join("; "));
+  ok("the roster after the signings (" + f1(S.valueAfter) + ") is today's (" + f1(S.valueNow) + ") plus the lines' gains",
+    Math.abs(S.valueAfter - S.valueNow - S.now.reduce((t, l) => t + l.gain, 0)) < 1e-6 && Math.abs(S.valueAfter - Ms.squadValue(r1.after, nx, hz, false)) < 1e-6, "");
+  if (S.now.length) {
+    const other = roster.find((x) => x.p === Ps[S.now[0].add].p && x.id !== S.now[0].drop);
+    const mut = [Object.assign({}, S.now[0], { drop: other.id })].concat(S.now.slice(1));
+    ok("mutation: the first line paired with another of my players (E-200's pairing) is caught by the replay", replay(mut, roster, fa, nx).bad.length > 0, replay(mut, roster, fa, nx).bad.slice(0, 1).join(""));
+  }
+
+  // greedy against an exhaustive search over every like-for-like fifteen from my roster and the top PER fit free agents a
+  // position (by points to the horizon). A group of a position is dropped only when another beats or equals it in every
+  // week at every count the elevens can use; the survivors' cross product is scored as bestXI scores an eleven.
+  const weeks = []; for (let g = nx; g <= hz; g++) weeks.push(g);
+  const need = { 1: 2, 2: 5, 3: 5, 4: 3 }, FORM = ENG.FORMATIONS;
+  const groupsOf = (k) => {
+    const cands = roster.filter((p) => p.p === k).concat(fa.filter((p) => p.p === k).map((p) => ({ p, v: Ms.epRange(p, nx, hz) })).sort((a, b) => b.v - a.v).slice(0, PER).map((x) => x.p));
+    const ev = cands.map((p) => weeks.map((g) => Ms.ep(p, g))), n = cands.length, r = need[k], out = [];
+    const pick = (from, chosen) => {
+      if (chosen.length === r) {
+        const pre = weeks.map((_, w) => { const v = chosen.map((i) => ev[i][w]).sort((a, b) => b - a); const c = [0]; v.forEach((x) => c.push(c[c.length - 1] + x)); return c; });
+        out.push({ ids: chosen.map((i) => cands[i].id), pre, tot: pre.reduce((t, c) => t + c[r], 0) }); return;
+      }
+      for (let i = from; i <= n - (r - chosen.length); i++) pick(i + 1, chosen.concat([i]));
+    };
+    pick(0, []);
+    out.sort((a, b) => b.tot - a.tot);
+    const keep = [];
+    out.forEach((g) => { if (!keep.some((h) => h.pre.every((c, w) => c.every((x, j) => x >= g.pre[w][j] - 1e-12)))) keep.push(g); });
+    return keep;
+  };
+  const GK = groupsOf(1), DF = groupsOf(2), MD = groupsOf(3), FW = groupsOf(4);
+  let bestV = -Infinity, bestSet = null;
+  GK.forEach((g) => DF.forEach((d) => MD.forEach((m) => FW.forEach((f) => {
+    let v = 0;
+    for (let w = 0; w < weeks.length; w++) { let b = -Infinity; FORM.forEach(([a, b2, c]) => { const t = d.pre[w][a] + m.pre[w][b2] + f.pre[w][c]; if (t > b) b = t; }); v += g.pre[w][1] + b; }
+    if (v > bestV) { bestV = v; bestSet = [].concat(g.ids, d.ids, m.ids, f.ids); }
+  }))));
+  const exact = bestSet ? Ms.squadValue(bestSet.map((i) => Ps[i]), nx, hz, false) : NaN;
+  const gap = (val) => exact - val;
+  const extra = bestSet ? bestSet.filter((i) => !r1.after.some((p) => p.id === i)).map((i) => who(Ps[i])) : [];
+  ok("the greedy signings are within +" + MIN + " of an exhaustive search over " + GK.length + "×" + DF.length + "×" + MD.length + "×" + FW.length + " like-for-like fifteens (exhaustive " + f2(exact) + ", greedy " + f2(S.valueAfter) + ")",
+    isFinite(exact) && gap(S.valueAfter) < MIN, extra.length ? "the search also signs " + extra.join(", ") : "");
+  if (S.now.length) {
+    const undone = r1.after.map((p) => p.id === S.now[0].add ? Ps[S.now[0].drop] : p);
+    ok("mutation: with the first signing undone the same comparison fires", gap(Ms.squadValue(undone, nx, hz, false)) >= MIN, "");
+  }
+
+  // the next run: locked, fit players, from the gameweek after this one, on the roster the signings leave; its time and
+  // the manager's place are the league's own
+  const run = nx + 1, ev = (MCs.draft.events || {})[String(run)] || {}, order = Ms.waiverOrder();
+  if (run <= hz && typeof ev.wv === "string") {
+    const r2 = replay(S.next.claims, r1.after, locked, run);
+    ok("next waiver run (" + S.next.claims.length + " claims): each is a fit locked player, the best claim left from GW" + run + " on the roster the signings leave",
+      r2.bad.length === 0 && S.next.claims.every((l) => fit(Ps[l.add]) && Ps[l.add].ds === "l"), r2.bad.slice(0, 3).join("; "));
+    ok("the next run is GW" + run + " at the league's waiver time, and the place is waiver_pick (" + S.next.place + " of " + S.next.of + ")",
+      S.next.gw === run && S.next.wv === ev.wv && S.next.place === order.indexOf(MCs.draft.me) + 1 && S.next.of === order.length, "");
+    if (S.now.length && S.next.claims.length) {
+      const mut = [Object.assign({}, S.next.claims[0], { drop: S.now[0].drop })].concat(S.next.claims.slice(1));
+      ok("mutation: a next-run claim that drops a player a signing has already dropped is caught", replay(mut, r1.after, locked, run).bad.length > 0, "");
+    }
+  } else ok("after the re-draft there is no next run on the sheet", S.next === null, "");
+  const inParts = new Set(S.now.map((l) => l.add).concat(S.next ? S.next.claims.map((l) => l.add) : []));
+  ok("every held-back player is flagged and in neither part (" + S.heldBack.map((h) => who(Ps[h.add]) + " " + h.status).join(", ") + ")",
+    S.heldBack.every((h) => Ps[h.add] && Ps[h.add].st !== "a" && !inParts.has(h.add)), "");
+  if (S.now.length) {
+    const firstId = S.now[0].add, MCf = clone(true); MCf.players.forEach((p) => { if (p.id === firstId) { p.st = "d"; p.cop = 75; } });
+    const Mf = ENG.create(MCf), Sf = AN.buildDraftSheet(Mf, MCf, PLAN.draft.pairs, { fitOnly: true });
+    ok("mutation: flag the first signing and he leaves the sign-now lines", !Sf.now.some((l) => l.add === firstId), "");
+  }
 }
 
 /* ---------------------------------------------------------------- trades */

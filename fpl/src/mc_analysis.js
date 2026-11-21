@@ -23,6 +23,11 @@
  *   headToHead(M, DATA, opts)              the Draft head-to-head for the gameweek in focus (B8)
  *   greedyTransfers(M, DATA, opts)         the greedy transfer search, moves named out -> in (B4)
  *   claimability(M, DATA)                  the waiver pool with the phase-aware "how to get him" (B5)
+ *   buildDraftSheet(M, DATA, pairs, opts)  the sheet the app writes (E-203, E-200): before waivers process, exactly
+ *                                           buildClaimSheet's object; after, the same object plus the two parts —
+ *                                           now (free agents to sign before the deadline, each with the drop that
+ *                                           costs least) and next (locked players worth a claim at the next run)
+ *   sheetLines(S)                          the lines a sheet writes: { phase, now, next }
  *
  * RULES ENCODED (fpl/CLAUDE.md Part N)
  *   · Like for like: every claim and every trade swaps a player for one in the same position. A pair
@@ -246,6 +251,66 @@ function claimablePairs(M, pairs) {
   return { game: "draft", pairs: keep, held: held };
 }
 
+/* ─────────────── the two-part Draft sheet (E-203, E-200, 21 Nov 2026) ───────────────
+   After the week's waiver run a claims sheet is the wrong instrument: a player dropped in that run is locked until the next
+   one, every other unowned player can be signed at once, and a "first choice" that is locked or a "backup" that can be
+   signed sends the manager to buttons that do not work (E-203: on 20 Nov the sheet led with Gibbs-White and Schade, both
+   locked). So once waivers have processed the sheet has two parts, built here and nowhere else:
+     now   fit free agents (league status a, FPL status a), chosen one at a time: the like-for-like swap that adds most to
+           the roster's Draft value to the horizon, then the next on the changed roster, until none adds MC_SIGN_MIN_GAIN.
+           Each line's drop is the one that costs least for that add (E-200: never the solver's list-order pairing).
+     next  fit locked players worth a claim at the next waiver run, the same way, from the gameweek after this one, on the
+           roster the signings leave (so a drop can be a player signed above), with the run's time and the manager's place.
+   Flagged players are still held back (heldBack), each priced on the same roster from the week he could first arrive.
+   Before waivers process the function returns buildClaimSheet's object untouched, so that phase is byte for byte today's
+   and parity B7 is untouched. The greedy choice is checked against an exhaustive search in qa/mc_optimisers.cjs. */
+const MC_SIGN_MIN_GAIN = 0.25, MC_SIGN_PER_POS = 14;
+function greedySwaps(M, roster, pool, g0, g1) {
+  let cur = roster.slice();
+  const start = new Set(roster.map(function (p) { return p.id; })), dropped = new Set(), added = new Set(), lines = [];
+  for (let k = 0; k < roster.length; k++) {
+    const avail = pool.filter(function (p) { return !added.has(p.id) && !start.has(p.id); });
+    if (!avail.length) break;
+    const mv = M.draftMoves(cur, g0, g1, { pool: avail, perPos: MC_SIGN_PER_POS })
+      .filter(function (m) { return start.has(m.drop.id) && !dropped.has(m.drop.id); })[0];
+    if (!mv || !(mv.gain >= MC_SIGN_MIN_GAIN)) break;
+    lines.push({ add: mv.add.id, drop: mv.drop.id, gain: mv.gain });
+    added.add(mv.add.id); dropped.add(mv.drop.id);
+    cur = cur.map(function (x) { return x === mv.drop ? mv.add : x; });
+  }
+  return { lines: lines, after: cur };
+}
+function buildDraftSheet(M, DATA, pairs, opts) {
+  opts = opts || {};
+  const out = buildClaimSheet(M, DATA, pairs, opts);
+  if (!DATA || !DATA.draft || DATA.draft.waiversProcessed !== true) return out;
+  const H = mcHorizon(M, DATA, opts), next = H.next, dEnd = H.dEnd, P = M.P;
+  const fit = function (p) { return !!p && p.st === "a"; };
+  const one = greedySwaps(M, M.draftRoster(), M.freeAgents().filter(fit), next, dEnd);
+  const run = next + 1, evs = DATA.draft.events || {}, ev = evs[String(run)] || {};
+  let nx = null;
+  if (run <= dEnd && typeof ev.wv === "string") {
+    const order = M.waiverOrder();
+    const two = greedySwaps(M, one.after, M.lockedFreeAgents().filter(fit), run, dEnd);
+    nx = { gw: run, wv: ev.wv, place: order.indexOf(DATA.draft.me) + 1, of: order.length, claims: two.lines };
+  }
+  const used = new Set(one.lines.map(function (l) { return l.add; }).concat(nx ? nx.claims.map(function (l) { return l.add; }) : []));
+  out.phase = "free";
+  out.now = one.lines;
+  out.next = nx;
+  out.heldBack = (out.held || []).filter(function (h) { return !used.has(h.add) && P[h.add]; }).map(function (h) {
+    const a = P[h.add], how = M.howToGet(a), from = how === "free" ? next : run;
+    const best = from <= dEnd ? M.draftMoves(one.after, from, dEnd, { pool: [a] })[0] : null;
+    return { add: h.add, drop: best ? best.drop.id : h.drop, status: h.status, chance: h.chance, gain: best ? best.gain : null, from: from, how: how };
+  });
+  out.valueAfter = M.squadValue(one.after, next, dEnd, false);
+  return out;
+}
+function sheetLines(S) {
+  if (S && S.phase === "free") return { phase: "free", now: Array.isArray(S.now) ? S.now : [], next: S.next && Array.isArray(S.next.claims) ? S.next.claims : [] };
+  return { phase: "claims", now: S && Array.isArray(S.sheet) ? S.sheet : [], next: [] };
+}
+
 /* ─────────────── B5 · claimability ─────────────── */
 function claimability(M, DATA) {
   const processed = !!DATA.draft.waiversProcessed, pool = M.waiverPool();
@@ -259,6 +324,7 @@ if (typeof module !== "undefined" && module.exports) {
     mcHorizon: mcHorizon, buildClaimSheet: buildClaimSheet, findTrades: findTrades, tradeGroups: tradeGroups,
     classicReviewSummary: classicReviewSummary, draftReviewSummary: draftReviewSummary, reviewSummary: reviewSummary,
     classicGameweekSim: classicGameweekSim, headToHead: headToHead, greedyTransfers: greedyTransfers, claimability: claimability, claimablePairs: claimablePairs,
+    buildDraftSheet: buildDraftSheet, sheetLines: sheetLines, greedySwaps: greedySwaps, MC_SIGN_MIN_GAIN: MC_SIGN_MIN_GAIN, MC_SIGN_PER_POS: MC_SIGN_PER_POS,
     MC_SIM_DRAWS: MC_SIM_DRAWS, MC_SIM_SEED: MC_SIM_SEED, MC_H2H_DRAWS: MC_H2H_DRAWS, MC_H2H_SEED: MC_H2H_SEED,
     MC_CLAIM_RUNS: MC_CLAIM_RUNS, MC_CLAIM_SEED: MC_CLAIM_SEED, MC_PILOT_RUNS: MC_PILOT_RUNS, MC_PILOT_SEED: MC_PILOT_SEED,
     MC_RIVAL_TOP: MC_RIVAL_TOP, MC_BACKUP_MIN_GAIN: MC_BACKUP_MIN_GAIN, MC_TRADE: MC_TRADE, MC_REVIEW_WEEKS: MC_REVIEW_WEEKS, MC_REVIEW_FLAGS: MC_REVIEW_FLAGS

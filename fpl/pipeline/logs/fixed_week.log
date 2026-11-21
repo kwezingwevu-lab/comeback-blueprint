@@ -1,5 +1,5 @@
-never (from GW13) Optimization terminated successfully. (HiGHS Status 7: Optimal) 22.1 s · gap 0.0011104696525687514 · total 457.13
-latest wildcard GW19: total 461.44 (never 457.13, +4.31) · the never plan to GW18, then the wildcard in GW19 (the set-1 limit), the new fifteen held after: 8 changes for +4.32 points that week · written to /tmp/fixed_week_18392/solver_timing.json
-  GW11: no transfer · FT before 3 · eleven 4-4-2, captain Haaland, vice Gomez · 51.29
-  GW12: no transfer · FT before 4 · eleven 4-4-2, captain Mbeumo, vice Calvert-Lewin · 48.18
-fixed_week.cjs · GW11–GW12: no transfer · 0 hit(s) · bank 2.7 · FT into GW13 5 · fixed weeks 99.47 · never 556.6 · GW19 wildcard 560.91 · wrote data/solver_timing.json
+never (from GW13) Optimization terminated successfully. (HiGHS Status 7: Optimal) 20.2 s · gap 0.003960753169987096 · total 457.91
+latest wildcard GW19: total 460.75 (never 457.91, +2.84) · the never plan to GW18, then the wildcard in GW19 (the set-1 limit), the new fifteen held after: 8 changes for +2.84 points that week · written to /tmp/fixed_week_12666/solver_timing.json
+  GW11: no transfer · FT before 3 · eleven 4-4-2, captain Haaland, vice Gomez · 51.27
+  GW12: no transfer · FT before 4 · eleven 4-4-2, captain Mbeumo, vice Calvert-Lewin · 48.12
+fixed_week.cjs · GW11–GW12: no transfer · 0 hit(s) · bank 2.7 · FT into GW13 5 · fixed weeks 99.39 · never 557.3 · GW19 wildcard 560.14 · wrote data/solver_timing.json

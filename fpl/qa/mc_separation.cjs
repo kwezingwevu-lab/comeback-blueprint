@@ -259,7 +259,18 @@ const pack = (mv) => mv.map((m) => m.add.id + ">" + m.drop.id + ":" + m.gain + "
   const same = pack(M.draftMoves(M.draftRoster(), next, dEnd, { perPos: 4 })) === pack(Mc.draftMoves(Mc.draftRoster(), next, dEnd, { perPos: 4 }))
     && JSON.stringify(M.rivalClaimLists(next, dEnd, 4)) === JSON.stringify(Mc.rivalClaimLists(next, dEnd, 4))
     && JSON.stringify(AN.buildClaimSheet(M, MC, PLAN.draft.pairs, { fitOnly: true })) === JSON.stringify(AN.buildClaimSheet(Mc, c, PLAN.draft.pairs, { fitOnly: true }));
+  // 21 Nov 2026 (E-203): the two-part sheet, built after the waiver run, reads nothing of the Classic game either
+  const settledCopy = (X) => { const Y = clone(X); Y.draft.waiversProcessed = true; return Y; };
+  const S0 = settledCopy(MC), S1 = settledCopy(c);
+  const sameTwo = JSON.stringify(AN.buildDraftSheet(ENG.create(S0), S0, PLAN.draft.pairs, { fitOnly: true })) === JSON.stringify(AN.buildDraftSheet(ENG.create(S1), S1, PLAN.draft.pairs, { fitOnly: true }));
   const moved = Mc.classicSquad().bank !== M.classicSquad().bank;
+  ok("the two-part Draft sheet is identical with the Classic bank, selling prices, free transfers and squad changed", sameTwo && moved, "two-part identical " + sameTwo);
+  {
+    // mutation: change one fit free agent's Draft status instead, and the two-part sheet changes
+    const S2 = settledCopy(MC), first = AN.buildDraftSheet(ENG.create(S0), S0, PLAN.draft.pairs, { fitOnly: true }).now[0];
+    if (first) S2.players.forEach((p) => { if (p.id === first.add) p.ds = "l"; });
+    ok("mutation: with one signing's Draft status changed the two-part sheet differs", !!first && JSON.stringify(AN.buildDraftSheet(ENG.create(S2), S2, PLAN.draft.pairs, { fitOnly: true })) !== JSON.stringify(AN.buildDraftSheet(ENG.create(S0), S0, PLAN.draft.pairs, { fitOnly: true })), "");
+  }
   ok("the Draft search reads nothing of the Classic game: with the Classic bank, selling prices, free transfers and squad changed, the Draft moves, the rivals' claims and the claims sheet are identical",
     same && moved, "draft identical " + same + ", classic changed " + moved);
 }

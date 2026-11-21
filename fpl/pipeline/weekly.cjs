@@ -10,9 +10,11 @@
  *
  *   Classic   data/plan.json — the first planned week's squad, captain and vice, chip, and the no-wildcard
  *             scenario's first week as the fallback; the chip weeks of the whole plan; the timing scenarios.
- *   Draft     buildClaimSheet (src/mc_analysis.js) on the solved roster's pairs (PLAN.draft.pairs), with the
- *             Monte Carlo orderings — the same call data/pre.json makes, so the two can never disagree; the
- *             eleven is the best eleven of the roster the stress test leaves (src/mc_engine.js bestXI).
+ *   Draft     buildDraftSheet (src/mc_analysis.js) on the solved roster's pairs (PLAN.draft.pairs), with the
+ *             Monte Carlo orderings — the same call data/pre.json makes, so the two can never disagree. Before the
+ *             week's waiver run it is the claims sheet and the eleven is the best of the roster the stress test
+ *             leaves; after it (E-203) `claims` holds only the free agents to sign now, `next_run` the locked players
+ *             worth a claim at the next run, and the eleven is the best of the roster the sign-now lines leave.
  *   Checks    the app's own engine (src/engine.js) on data/live.json: legal15, bestXI, flags, convergence.
  *             The rule C1.6 exemption is declared, never assumed: every player in the written fifteen at or
  *             over the rival-ownership gate goes into `locks`, because the plan maximises expected points
@@ -156,27 +158,40 @@ const choice = PLAN.plan.managerChoice || null;
 const RULE_NOTE = "No chip before GW13 (the manager's rule of 22 Oct 2026: chips are kept for his last-man-standing league too) and Wildcard 1 in GW19 (his choice of 20 Oct 2026).";
 
 /* ─────────────── Draft ─────────────── */
-const sheet = AN.buildClaimSheet(M, MC, PLAN.draft.pairs, { mc: true, fitOnly: true });   // no flagged player lodged (CLAUDE.md D2)
+const sheet = AN.buildDraftSheet(M, MC, PLAN.draft.pairs, { mc: true, fitOnly: true });   // no flagged player lodged (CLAUDE.md D2)
+const LN = AN.sheetLines(sheet);   // E-203: after the waiver run, the sign-now lines and the next run's claims; before it, the claims sheet
 const CP = { held: sheet.held };
 const tag = (c) => sheet.landed.indexOf(c.add) >= 0 ? "lands" : sheet.lost.indexOf(c.add) >= 0 ? "taken first" : "not reached";
 // Once this gameweek's waivers have settled the sheet is no longer a claims run (CLAUDE.md N2): an unclaimed player is
 // signed instantly until the deadline, and one dropped in that run is locked until the next. The waiver-run odds and the
 // stress-test label describe a run that has already happened, so they are not written then.
 const settled = !!MC.draft.waiversProcessed;
-const howNow = (id) => M.howToGet(P[id]) === "free" ? "sign now (a free agent until the GW" + next + " deadline)" : "locked until the next waiver run, so lodge it as a claim then";
-const claims = sheet.sheet.map((c) => ({
+if (settled !== (LN.phase === "free")) refuse("the Draft sheet's phase (" + LN.phase + ") is not the block's (waivers processed " + settled + ")");
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], MONS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const sastDay = (iso) => { const d = new Date(Date.parse(iso) + 2 * 3600000); return DAYS[d.getUTCDay()] + " " + d.getUTCDate() + " " + MONS[d.getUTCMonth()] + " " + String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0"); };
+const NR = settled ? sheet.next : null;   // the next waiver run (null after the re-draft)
+// E-203: after the run every written line can be carried out as written. "sign now" lines first; locked players only
+// under next_run, each with a drop taken from the roster those signings leave.
+const claims = settled ? LN.now.map((c) => ({
+  out: code(c.drop), in: code(c.add),
+  why: nm(c.add) + " for " + nm(c.drop) + " (" + POS[P[c.add].p] + "), +" + f1(c.gain) + " Draft expected points to GW" + dEnd + " on your roster, sign now (a free agent until the GW" + next + " deadline)"
+})) : sheet.sheet.map((c) => ({
   out: code(c.drop), in: code(c.add),
   why: nm(c.add) + " for " + nm(c.drop) + " (" + POS[P[c.add].p] + "), " + (c.kind === "backup" ? "backup for " + nm(c.of) : "first choice") +
     ": +" + f1(c.gain) + " Draft expected points to GW" + dEnd +
-    (settled ? ", " + howNow(c.add)
-      : (sheet.land && sheet.land[c.add] !== undefined ? ", lands in " + Math.round(100 * sheet.land[c.add]) + "% of " + sheet.runs + " simulated waiver runs" : "") + ", stress test: " + tag(c))
+    (sheet.land && sheet.land[c.add] !== undefined ? ", lands in " + Math.round(100 * sheet.land[c.add]) + "% of " + sheet.runs + " simulated waiver runs" : "") + ", stress test: " + tag(c)
 }));
+const nextClaims = NR ? NR.claims.map((c) => ({
+  out: code(c.drop), in: code(c.add),
+  why: nm(c.add) + " for " + nm(c.drop) + " (" + POS[P[c.add].p] + "), +" + f1(c.gain) + " Draft expected points from GW" + NR.gw + " to GW" + dEnd + ", locked until the next waiver run, " + sastDay(NR.wv) + " SAST, so lodge it as a claim then"
+})) : [];
 const rosterNow = M.draftRoster().map((p) => p.id);
 const after = rosterNow.slice();
 if (settled) {
   // Waivers have run (CLAUDE.md N2): only a free agent can be signed before this deadline. A locked player waits for the next
   // run, so he can never be in this gameweek's eleven (5 Nov 2026: the eleven listed Mbeumo, McAtee and Tonali, all locked).
-  sheet.sheet.forEach((c) => { if (M.howToGet(P[c.add]) !== "free") return; const k = after.indexOf(c.drop); if (k >= 0 && after.indexOf(c.add) < 0) after[k] = c.add; });
+  // E-200: the eleven holds the owned players and the sign-now lines, nothing else (a backup is not a signing).
+  LN.now.forEach((c) => { const k = after.indexOf(c.drop); if (k < 0 || after.indexOf(c.add) >= 0) refuse("sign-now line " + nm(c.add) + " for " + nm(c.drop) + " does not apply to the roster"); after[k] = c.add; });
 } else {
   sheet.sim.filter((x) => x.ok).forEach((x) => { const k = after.indexOf(x.drop); if (k >= 0) after[k] = x.add; });
 }
@@ -186,15 +201,17 @@ const byP = (k) => dxi.xi.filter((p) => p.p === k).map((p) => code(p.id));
 // engine that ranks the sheet (qa/smoke_wk.cjs check 28, E-126), and its incoming player is status a. The app's older
 // five-gameweek draftEV is asked too, and a disagreement is printed as a note, not a conflict.
 const notes5 = [];
-sheet.sheet.forEach((q) => {
+LN.now.forEach((q) => {
   const o = E.draftEl(code(q.drop), CTX), i = E.draftEl(code(q.add), CTX);
   if (!o || !i) { conflicts.push("claim " + nm(q.add) + " for " + nm(q.drop) + ": a code does not resolve in data/live.json"); return; }
   const eo = E.draftEV(o, CTX), ei = E.draftEV(i, CTX), forced = String(o.status) !== "a" || eo.starts_last3 === 0;
-  const g = M.epRange(P[q.add], next, dEnd) - M.epRange(P[q.drop], next, dEnd);
+  // after the run each line's gain is the roster's (squadValue on the roster the lines above leave); before it, player for player
+  const g = settled ? q.gain : M.epRange(P[q.add], next, dEnd) - M.epRange(P[q.drop], next, dEnd);
   if (!forced && !(g > 0)) conflicts.push("claim " + i.web_name + " for " + o.web_name + " is neither forced nor a gain to GW" + dEnd + " (" + f2(g) + ")");
   if (!forced && ei.ev - eo.ev <= 0) notes5.push(i.web_name + " for " + o.web_name + " " + f2(ei.ev - eo.ev));
   if (String(i.status) !== "a") conflicts.push("claim " + i.web_name + " is status " + i.status + " in the Draft feed");
 });
+(NR ? NR.claims : []).forEach((q) => { const a = P[q.add]; if (!a || a.ds !== "l" || a.st !== "a") conflicts.push("next-run claim " + nm(q.add) + " is not a fit locked player (league " + (a ? a.ds : "?") + ", status " + (a ? a.st : "?") + ")"); });
 // CLAUDE.md B3: wildcard picks have three starts of the last three, P(start) at least 0.75 and status a. The
 // optimiser prices minutes through P(start) instead of a hard floor, so a buy under the floor is reported by name.
 const b3 = kind !== "wildcard" ? [] : buys.filter((id) => { const gs = CTX.gwStats[id] || {}; const e = CTX.els[id]; return !(gs.starts_last3 >= 3) || !(e && e.status === "a") || !((CTX.xp[id] || {}).pstart >= 0.75); })
@@ -280,15 +297,38 @@ L("    why: " + JSON.stringify([
 L("  },");
 L("");
 L("  draft: {");
-L("    // buildClaimSheet (src/mc_analysis.js) on the solved roster's pairs, with the Monte Carlo orderings — the same call");
-L("    // data/pre.json makes. " + (settled ? "This gameweek's waivers have settled: each line says whether its player can be signed now or is locked until the next run, in order of gain." : "Lodge in exactly this order: " + (sheet.strategy === "firsts" ? "every first choice, then the backups" : "each backup directly under its first choice") + " — the ordering that lands more value under the league's own processing (strategy " + J(sheet.strategy) + ")."));
-if (sheet.orderings) L("    // Monte Carlo over " + sheet.runs + " runs, mean Draft value by ordering: " + sheet.orderings.map((o) => o.name + " " + f1(o.mean)).join("; ") + ".");
+if (settled) {
+  L("    // buildDraftSheet (src/mc_analysis.js), the same call data/pre.json makes. This gameweek's waivers have settled (E-203): claims");
+  L("    // holds only free agents to sign before the deadline, each with the drop that costs least, in this order; next_run holds the");
+  L("    // locked players worth a claim at the next waiver run, each drop taken from the roster those signings leave.");
+} else {
+  L("    // buildDraftSheet (src/mc_analysis.js) on the solved roster's pairs, with the Monte Carlo orderings — the same call");
+  L("    // data/pre.json makes. Lodge in exactly this order: " + (sheet.strategy === "firsts" ? "every first choice, then the backups" : "each backup directly under its first choice") + " — the ordering that lands more value under the league's own processing (strategy " + J(sheet.strategy) + ").");
+  if (sheet.orderings) L("    // Monte Carlo over " + sheet.runs + " runs, mean Draft value by ordering: " + sheet.orderings.map((o) => o.name + " " + f1(o.mean)).join("; ") + ".");
+}
+const heldText = (settled ? sheet.heldBack : CP.held).map((h) => nm(h.add) + " for " + nm(h.drop) + " (status " + h.status + (h.chance !== null ? ", " + h.chance + "%" : "") + ")").join(", ");
 L("    pool: \"api\",");
-L("    pool_note: " + J("League " + MC.draft.league.id + ": the ins are free agents in the league's own feed, and the waiver model reproduces the league's claim log (qa/waiver_log.cjs). " + sheet.sheet.length + " claims, " + sheet.sheet.filter((c) => c.kind === "backup").length + " of them backups." + (settled ? " Waivers for GW" + next + " have settled, so a free agent is signed instantly until the deadline and a player dropped in that run is locked until the next." : "") + (CP.held.length ? " Held back because the player is flagged (re-check after the pressers): " + CP.held.map((h) => nm(h.add) + " for " + nm(h.drop) + " (status " + h.status + (h.chance !== null ? ", " + h.chance + "%" : "") + ")").join(", ") + "." : "")) + ",");
+L("    pool_note: " + J("League " + MC.draft.league.id + ": the ins are " + (settled ? "players" : "free agents") + " in the league's own feed, and the waiver model reproduces the league's claim log (qa/waiver_log.cjs). " +
+  (settled
+    ? "Waivers for GW" + next + " have settled, so a free agent is signed instantly until the deadline and a player dropped in that run is locked until the next. " +
+      claims.length + (claims.length === 1 ? " player to sign now" : " players to sign now") +
+      (NR ? "; " + nextClaims.length + (nextClaims.length === 1 ? " claim" : " claims") + " for the next waiver run, " + sastDay(NR.wv) + " SAST, where you claim " + NR.place + " of " + NR.of + "." : "; the next waiver run falls after the re-draft.")
+    : sheet.sheet.length + " claims, " + sheet.sheet.filter((c) => c.kind === "backup").length + " of them backups.") +
+  (heldText ? " Held back because the player is flagged (re-check after the pressers): " + heldText + "." : "")) + ",");
 L("    claims: [");
 claims.forEach((c, i) => L("      { out: " + c.out + ", in: " + c.in + ", why: " + J(c.why) + " }" + (i < claims.length - 1 ? "," : "")));
 L("    ],");
-L("    // The best eleven of the roster the stress test leaves (src/mc_engine.js bestXI for GW" + next + "): " + dxi.form + ", " + dxi.xi.map((p) => p.n).join(", ") + ".");
+if (settled) {
+  if (NR) {
+    L("    next_run: {");
+    L("      gw: " + NR.gw + ", waivers: " + J(NR.wv) + ", place: " + NR.place + ", of: " + NR.of + ",");
+    L("      claims: [");
+    nextClaims.forEach((c, i) => L("        { out: " + c.out + ", in: " + c.in + ", why: " + J(c.why) + " }" + (i < nextClaims.length - 1 ? "," : "")));
+    L("      ]");
+    L("    },");
+  } else L("    next_run: null,");
+}
+L("    // The best eleven of the roster " + (settled ? "the sign-now lines leave" : "the stress test leaves") + " (src/mc_engine.js bestXI for GW" + next + "): " + dxi.form + ", " + dxi.xi.map((p) => p.n).join(", ") + ".");
 L("    xi: {");
 L("      formation: " + J(dxi.form) + ",");
 L("      gk: " + byP(1)[0] + ",");
@@ -318,13 +358,16 @@ const text = lines.join("\n") + "\n";
 // the written file must evaluate to the object it describes
 const back = (new Function(text + "\n;return WEEKLY;"))();
 if (back.hash !== PLAN.hash || back.classic.wildcard15.length !== 15 || back.draft.claims.length !== claims.length) refuse("the written block does not read back", 5);
+if (settled && (NR ? !(back.draft.next_run && back.draft.next_run.claims.length === nextClaims.length) : back.draft.next_run !== null)) refuse("the written next_run does not read back", 5);
 
 console.log("weekly.cjs · v" + OPT.version + " GW" + next + " · plan " + PLAN.hash + " · " + kind + (choice ? " (" + choice + ")" : "") + (R0 ? " · " + buys.length + " transfer(s), " + R0.hitCount + " hit(s), FT " + R0.ftBefore + "→" + R0.ftAfter + ", bank " + R0.bank : "") + " · captain " + nm(w0.cap) + ", vice " + nm(w0.vice) +
   " · chips " + chipWeeks.map((c) => c.chip + " GW" + c.gw).join(", ") + " · locks " + (locks.map(nm).join(", ") || "none") + " · cost " + money(cost) + " of " + money(CTX.budget) +
   " · fallback " + fbMoves.map((m) => nm(m.out) + "→" + nm(m.in)).join(", ") + " (captain " + nm(fbCap) + ", from " + (fbSource.indexOf("transferProtocol") >= 0 ? "the app's protocol" : "the optimiser") + ")" +
   " · Draft " + claims.length + " claims (" + sheet.strategy + "), mean " + (sheet.meanValue !== undefined ? f1(sheet.meanValue) : "-") + " p10 " + (sheet.p10 !== undefined ? f1(sheet.p10) : "-") + " p90 " + (sheet.p90 !== undefined ? f1(sheet.p90) : "-") + ", stress " + f1(sheet.valueStress) + ", all first " + f1(sheet.valueAll) + ", now " + f1(sheet.valueNow));
 claims.forEach((c, i) => console.log("  " + (i + 1) + ". " + c.why));
-if (CP.held.length) console.log("held back (flagged): " + CP.held.map((h) => nm(h.add) + " for " + nm(h.drop) + " " + h.status + (h.chance !== null ? " " + h.chance + "%" : "")).join(", "));
+if (settled) console.log(NR ? "next waiver run GW" + NR.gw + " " + sastDay(NR.wv) + " SAST, place " + NR.place + " of " + NR.of + ", " + nextClaims.length + " claim(s), roster " + f1(sheet.valueNow) + " → " + f1(sheet.valueAfter) + " to GW" + dEnd : "next waiver run: after the re-draft");
+nextClaims.forEach((c, i) => console.log("  next " + (i + 1) + ". " + c.why));
+if (CP.held.length) console.log("held back (flagged): " + (settled ? sheet.heldBack : CP.held).map((h) => nm(h.add) + " for " + nm(h.drop) + " " + h.status + (h.chance !== null ? " " + h.chance + "%" : "")).join(", "));
 if (notes5.length) console.log("note: src/engine.js draftEV (five gameweeks) scores " + notes5.length + " of the claims as no gain: " + notes5.join(", "));
 // CLAUDE.md C1 rule 1 (the Konsa rule): never sell a player who started his club's last match after a spell out.
 // On the wildcard every place is re-picked, so a protected player the optimiser lets go is reported, not refused.

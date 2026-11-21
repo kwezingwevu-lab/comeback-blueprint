@@ -1018,3 +1018,67 @@ The manager sent four more screenshots (taken at about 16:46Z, read at about 18:
 - **The report.** N.Williams, Gibbs-White and Schade are unavailable on the Draft site. The live feed at 19:38Z agrees: all three at status l (dropped since this week's waiver run, unowned), and the six locked players are the same six as in the 17:39Z block. His roster in the feed was unchanged, and Tonali, Mukiele, Janelt, McAtee and Kamara were still at status a.
 - **What the sheet said.** It opened with Gibbs-White and Schade as first choices, each marked locked until the next waiver run, and listed the signable players as their backups (E-203). Version 33 of the page still carries that sheet; nothing was rebuilt tonight.
 - **What the reply said.** This week: Tonali for Xhaka, Mukiele for Robinson, then the optional pair. Next run (Thu 26 Nov 18:30Z, first pick): Gibbs-White for King +14.0, N.Williams for Affengruber +4.4 if his flag has cleared, Schade for Bobb about +3, all Draft expected points for GW12 to GW20 on the 17:39Z block with the first two signings made.
+
+## 21 Nov 2026, from about 06:40Z: GW11, a third run at the manager's request, and the two-part Draft sheet (E-203, E-200)
+
+- **Why a third run.** The manager asked for the two-part Draft sheet to be live before the 11:00Z deadline ("Complete"). The first gate on the 17:39Z block went red on verify.sh: overnight price moves meant the committed block no longer matched the live feed. Offered a fresh pull or no pull, he chose the fresh pull, which overrides the one-run rule for this gameweek. It is not an E-184 case: no flag moved on the captain or the vice.
+- **Pull 06:41:54Z** (74 feeds). Changes since 17:39Z: 11 prices, no flags. Raya 6.2 to 6.3, Wirtz 7.2 to 7.3; Dowman, Barkley, Simms, King, Hjertø-Dahl, Guéhi (6.0 to 5.9), Mbeumo (7.9 to 7.8), Fletcher and Dubravka each down 0.1. Draft: waivers still processed. One rival signed Alysson and Guéhi and dropped Branthwaite and Belloumi, who are locked until the next run. The manager's roster is unchanged, and all four sign-now players were still at status a.
+- **Plan.** Hash 64cda385a664778d, 560.14 to GW19 (560.91 at 17:39Z). Bench Boost moves from GW14 to GW16; Wildcard 1 stays in GW19. The hold (E-195) was re-pinned. Part M was regenerated with `--replaced`, because the plan hash moved.
+- **Classic GW11: no transfer.** Unchanged from 17:39Z. 4-4-2: Verbruggen; De Cuyper, Tarkowski, Guéhi, van Ewijk; Gomez, Rogers, Mbeumo, Janelt; Haaland (captain), Calvert-Lewin. Bench: Kinsky; Diop, Saka, Brobbey. Vice-captain Gomez.
+- **Draft GW11: the sheet now has two parts.** The builder is `buildDraftSheet` in src/mc_analysis.js. weekly.cjs and precompute.cjs both call it, and precompute refuses on any difference.
+  - **Sign now, as free agents:**
+    1. Mukiele for Robinson +7.9
+    2. McAtee for King +6.1
+    3. Janelt for Xhaka +3.1
+    4. Tonali for Bobb +2.4
+
+    Gains are Draft expected points to GW20 on the roster. The roster goes from 418.9 to 438.4, and this week's best eleven from 39.29 (4-4-2) to 42.55 (4-5-1).
+  - **Locked until the next waiver run** (Thu 26 Nov 18:30Z; he claims 1st of 8). Each claim assumes the signings above are done:
+    - Gibbs-White for Tonali +11.4
+    - Branthwaite for Affengruber +2.2
+    - Schade for Janelt +0.6
+
+    Branthwaite joined the list this morning, when he was dropped.
+  - **Held back because flagged:** N.Williams (d 75%).
+  - **What the old sheet got wrong.** No line says "first choice" or "backup" (E-203). Mukiele is now paired with Robinson, the worst drop in his position, where the old sheet paired him with Affengruber (E-200, closed for this phase).
+  - **The second engine disagrees on two lines.** src/engine.js draftEV, over five gameweeks, scores Mukiele for Robinson at -0.48 and McAtee for King at -1.43. The weekly block prints both figures.
+- **Word counts at 390 px, first paint.** Draft tab 334 words (gate 500). Landing 71 (gate 110).
+- **Default state.** The seeded Draft roster is now the four sign-now drops plus the seven starters the signings leave: 11 of the 15. Sels, McBurnie, Isidor and Affengruber are not seeded, as before, because the block names only the claims and the eleven.
+- **E-204.** After the pull, unit_engine's LIVE-the-transfer-plan-reaches-the-week's-limit-not-the-search's went red. It required four or more swaps at FT4 on the live data. With Wirtz up 0.1 the bank after three swaps is £0.6m, and no fourth swap is affordable. With £10m more in the bank, the same search makes five swaps. The check was re-stated as its rule: past three swaps at FT4, or past three with the budget lifted. A new mutation, a copy of the engine with the E-090 cap put back, must turn it red, and does. unit_engine 279/279.
+- **Gate, local.** webkit and ios are CI-only here (E-170).
+
+| Suite | Result |
+  |---|---|
+  | components | 337/337 |
+  | smoke | 73/73 |
+  | smoke_wk | 47/47 |
+  | unit_engine | 279/279 |
+  | mc_optimisers | 51/51 |
+  | mc_rules | 46/46 |
+  | mc_separation | 45/45 |
+  | plan_legality | 61/61 and 67/67 (reference) |
+  | verify | 34/34 |
+  | waiver_log | 13/13 |
+  | parity | 51/51 |
+  | privacy | 27/27 |
+  | browser | 185/185 on the old baseline, before the re-record |
+
+  37 of 39 steps green. The two red steps are webkit and ios: WebKit is not installed in this container, and CI runs both.
+
+- **browser.py (E-201).** A section probe compared the committed page with the new one, all sections open at 390 px:
+  - Draft grew from 6118 to 6634 px. df-claims went from 357 to 949, now that it holds both parts; df-solved from 430 to 479; df-waivers fell from 920 to 794.
+  - Now went from 4489 to 4621 and Squad from 2253 to 2379 (the landing's Draft line and today's data). Plan went from 6722 to 6648.
+  - Rivals, Chips, Odds, Review and Lab were unchanged.
+
+  The baseline was re-recorded with `--write-baseline`, and the tolerance is unchanged. Results on the new baseline:
+  - plain run: 185/185;
+  - `--mutate invert`: all 36 picture checks fire (Draft dark: signature mean 208.31 against a tolerance of 40, histogram 85.41 pp against 4.5);
+  - `--mutate reflow`: no picture check fires, while the overflow walk fires four times on the Squad tab, as designed.
+
+  A 390×844 screenshot of the Draft tab shows the order Sign now, Cannot be signed this week, then the held-back note.
+
+- **Still open.**
+  - weekly.js and Part M say "until the GW11 deadline" but are not marked stale once it passes; the app's tab is.
+  - Part two has no rival model: with pick 1 the first claim is safe, and lower places are not modelled.
+  - E-200 stays open for the sheet before a waiver run.
+  - E-202 (start rates for new starters) is open.

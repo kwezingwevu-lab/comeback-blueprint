@@ -2933,14 +2933,42 @@ if (!LIVE) {
       const tp = E.transferProtocol(Object.assign({}, LSTATE, { ft: ft }), LCTX);
       return { ft: ft, k: tp.k, week: tp.weekLimit, search: tp.searchLimit, hits: tp.hits, value: tp.value };
     });
+    /* 21 Nov 2026 (ERRORS.md E-204, the E-193/E-194 class): this check used to require four or more swaps at FT4 on the
+       live data, which pins a fact of the day: that an affordable fourth swap passing C1 rule 1 exists. After the overnight
+       price drops of 21 Nov the bank after three swaps is £0.6m and none does. Re-stated as its rule: at four free
+       transfers the search goes past three swaps, or the same search with the budget lifted (£10m more in the bank, a
+       probe, not an expectation) goes past three, which proves the week stopped on money and not on the search limit.
+       If the E-090 cap ever came back, both sides would stop at three and this goes red. */
+    const rich = E.transferProtocol(Object.assign({}, LSTATE, { ft: 4, bank: Number(LSTATE.bank) + 100 }), LCTX);
+    const past3 = rows[4].k > E.MAX_SWAPS || rich.k > E.MAX_SWAPS;
     const ok = rows.every(function (r) {
       return r.week === Math.min(r.ft + 1, E.MAX_GREEDY_SWAPS) &&
         r.search === Math.min(r.week, E.MAX_SWAPS) &&
         r.k <= r.week &&
         r.hits === Math.max(0, r.k - r.ft) * 4;
-    }) && rows[4].k > E.MAX_SWAPS;               // at four free transfers it must get past three
+    }) && past3;                                  // at four free transfers it gets past three, or money is what stopped it
     return { ok: ok, detail: rows.map(function (r) { return "FT" + r.ft + "→" + r.k + "/" + r.week + " (hit " + r.hits + ")"; }).join(" · ") +
-      " · search limit " + E.MAX_SWAPS + ", week limit at FT4 " + rows[4].week };
+      " · search limit " + E.MAX_SWAPS + ", week limit at FT4 " + rows[4].week +
+      (rows[4].k > E.MAX_SWAPS ? "" : " · at FT4 the bank binds: with £10m more the same search makes " + rich.k + " swaps") };
+  });
+  // E-204's mutation: the same rule run on a copy of the engine with the E-090 cap put back (the greedy limit set to
+  // the search limit) must go red, on the live state and on the budget-lifted probe alike. Without this, the re-stated
+  // rule could pass because the probe always reaches past three whatever the engine does.
+  check("LIVE-E204-mutation-the-E090-cap-put-back-fails-the-week's-limit-rule", function () {
+    const src = fs.readFileSync(path.join(ROOT, "src", "engine.js"), "utf8");
+    const anchorTxt = "var MAX_GREEDY_SWAPS = 5;";
+    if (src.split(anchorTxt).length !== 2) return { ok: false, detail: "the anchor \"" + anchorTxt + "\" is not in engine.js exactly once" };
+    const m = { exports: {} };
+    (new Function("module", "exports", src.replace(anchorTxt, "var MAX_GREEDY_SWAPS = MAX_SWAPS;")))(m, m.exports);
+    const EM = m.exports;
+    const ctxM = EM.buildCtx(LIVE, LSTATE, LIVE.fetched_at);
+    const k4 = EM.transferProtocol(Object.assign({}, LSTATE, { ft: 4 }), ctxM).k;
+    const kRich = EM.transferProtocol(Object.assign({}, LSTATE, { ft: 4, bank: Number(LSTATE.bank) + 100 }), ctxM).k;
+    const realRich = E.transferProtocol(Object.assign({}, LSTATE, { ft: 4, bank: Number(LSTATE.bank) + 100 }), LCTX).k;
+    const mutantPasses = k4 > EM.MAX_SWAPS || kRich > EM.MAX_SWAPS;
+    return { ok: !mutantPasses && realRich > E.MAX_SWAPS,
+      detail: "with the cap put back: FT4 " + k4 + " swaps, budget-lifted " + kRich + " (rule " + (mutantPasses ? "still passes: the mutation is not caught" : "goes red, as it must") +
+        "); the real engine budget-lifted makes " + realRich };
   });
   // Greedy has to pay for itself: a plan grown past three swaps never scores worse than the plan
   // it grew from, or the extension is costing points to look busy.

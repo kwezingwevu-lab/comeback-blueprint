@@ -5,5 +5,6 @@
   "The weekly plan block is written from the solved plan by the pipeline rather than typed by hand, and it carries the same content hash as the plan and the data the plan was solved on, so a stale block cannot pass as current.",
   "The heavy searches (the claims stress test, the Draft trades and moves, the Classic transfer search, the Classic gameweek simulation, the Draft head-to-head and the review) run once when the app is built, so the phone opens without waiting for them.",
   "Odds and Review are new tabs: Odds for the match prices behind every projection and any price you type in yourself, Review for the transfers made and the bench points that were avoidable, each game on its own.",
-  "Rival managers' personal names are removed at the source; the app keeps team names and entry numbers only."
+  "Rival managers' personal names are removed at the source; the app keeps team names and entry numbers only.",
+  "Once the week's Draft waivers have run, the Draft sheet has two parts: the free agents you can sign now, best first, each with the player to drop, and under them the locked players worth a claim at the next waiver run, with its day, time and your place in the order."
 ]

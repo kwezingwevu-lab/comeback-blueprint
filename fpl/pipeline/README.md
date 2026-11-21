@@ -122,6 +122,12 @@ the app's rules, printing each one by name. Proved by `qa/smoke_wk.cjs` (check 2
 claims with the sheet line for line and requires one content hash across the block, the plan and the data),
 `qa/unit_engine.cjs` and `qa/verify.sh`.
 
+After the week's Draft waiver run (21 Nov 2026, ERRORS.md E-203) the same call, `buildDraftSheet`, returns two
+parts: `claims` is written with only the free agents to sign before the deadline, each with the drop that costs
+least on the roster, and `next_run` with the locked players worth a claim at the next waiver run (its time, the
+manager's place, each drop taken from the roster the signings leave). `pipeline/precompute.cjs` refuses to write
+`data/pre.json` when either part differs from `data/weekly.js` on the same hash.
+
 ## 8. Build — `node build.cjs` (`npm run build`)
 
 Assembles `src/engine.js` and `src/ui.jsx` with the bracketed data blocks into the single file

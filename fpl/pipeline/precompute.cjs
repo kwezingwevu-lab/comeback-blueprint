@@ -12,10 +12,12 @@
  *
  * WHAT IT WRITES — { at, hash, claims, trades, transfers, classicSim, h2h, review, draftMoves, changes }
  *   hash        the export hash of data/mc_data.json (pipeline/export.js buildInput): the data this was computed on.
- *   claims      buildClaimSheet(M, MC, PLAN.draft.pairs, { mc: true, fitOnly: true }) — the Draft claims sheet in
+ *   claims      buildDraftSheet(M, MC, PLAN.draft.pairs, { mc: true, fitOnly: true }) — the Draft claims sheet in
  *               lodging order with the Monte Carlo orderings; no flagged player lodged, the held pairs in .held.
- *               pipeline/weekly.cjs makes exactly this call, so data/weekly.js lodges this sheet line for line, and
- *               this script refuses to write when the two disagree on the same hash.
+ *               After the week's waiver run it also carries phase "free", now (the free agents to sign, in order),
+ *               next (the next run's time, the manager's place and the locked players worth a claim), heldBack and
+ *               valueAfter (E-203). pipeline/weekly.cjs makes exactly this call, so data/weekly.js writes these lines
+ *               line for line, and this script refuses to write when the two disagree on the same hash.
  *   trades      tradeGroups(findTrades(M, MC)) — like-for-like swaps with every rival, "both gain" apart from "ask".
  *   transfers   greedyTransfers(M, MC) — the kit's greedy Classic transfer search, moves named out -> in.
  *   classicSim  classicGameweekSim(M, MC) — the Classic gameweek in focus, simulated (fixed draws and seed).
@@ -70,7 +72,7 @@ function compute() {
   if (!PLAN.draft || !PLAN.draft.ok || !Array.isArray(PLAN.draft.pairs)) throw new Refusal("data/plan.json carries no solved Draft roster", 3);
 
   const H = AN.mcHorizon(M, MC);
-  const claims = AN.buildClaimSheet(M, MC, PLAN.draft.pairs, { mc: true, fitOnly: true });
+  const claims = AN.buildDraftSheet(M, MC, PLAN.draft.pairs, { mc: true, fitOnly: true });
   const trades = AN.tradeGroups(AN.findTrades(M, MC));
   const transfers = AN.greedyTransfers(M, MC);
   const classicSim = AN.classicGameweekSim(M, MC);
@@ -96,10 +98,15 @@ function compute() {
     if (W.hash === hash) {
       const LIVE = readJson("data/live.json"), codeOf = {};
       (LIVE.elements || []).forEach((e) => { codeOf[e.id] = Number(e.code); });
-      const mine = claims.sheet.map((q) => codeOf[q.drop] + ">" + codeOf[q.add]).join(",");
-      const theirs = ((W.draft && W.draft.claims) || []).map((c) => Number(c.out) + ">" + Number(c.in)).join(",");
-      if (mine !== theirs) throw new Refusal("the claims sheet (" + claims.sheet.length + " lines) is not the one data/weekly.js lodges on the same hash " + hash + " — re-run pipeline/weekly.cjs", 4);
-      weeklyNote = "claims equal data/weekly.js line for line (" + claims.sheet.length + ")";
+      const LN = AN.sheetLines(claims), seq = (a) => a.map((q) => codeOf[q.drop] + ">" + codeOf[q.add]).join(",");
+      const written = (a) => (a || []).map((c) => Number(c.out) + ">" + Number(c.in)).join(",");
+      const mine = seq(LN.now), theirs = written(W.draft && W.draft.claims);
+      if (mine !== theirs) throw new Refusal("the Draft sheet (" + LN.now.length + " lines) is not the one data/weekly.js writes on the same hash " + hash + " — re-run pipeline/weekly.cjs", 4);
+      if (LN.phase === "free") {
+        const nr = W.draft ? W.draft.next_run : undefined;
+        if (nr === undefined || seq(LN.next) !== written(nr && nr.claims) || (claims.next === null) !== (nr === null)) throw new Refusal("the next waiver run's claims are not the ones data/weekly.js writes on the same hash " + hash + " — re-run pipeline/weekly.cjs", 4);
+      }
+      weeklyNote = (LN.phase === "free" ? "sign-now lines and next-run claims equal data/weekly.js line for line (" + LN.now.length + " + " + LN.next.length + ")" : "claims equal data/weekly.js line for line (" + LN.now.length + ")");
     } else {
       weeklyNote = "data/weekly.js carries hash " + W.hash + ", not " + hash + " — re-run pipeline/weekly.cjs (qa/verify.sh I23 is red until then)";
     }
@@ -128,7 +135,7 @@ function precompute(opts) {
 function summary(res) {
   const p = res.out, c = p.claims;
   return "data/pre.json · hash " + p.hash + " · " + (res.wrote ? "written" : res.same ? "unchanged, at " + p.at + " kept" : "dry run, not written") +
-    " · " + res.ms + " ms · Draft claims " + c.sheet.length + " (" + c.strategy + ", held " + c.held.length + ") · Draft trades " +
+    " · " + res.ms + " ms · Draft " + (c.phase === "free" ? "sign now " + c.now.length + ", next run " + (c.next ? c.next.claims.length : "none") + ", held " + c.heldBack.length : "claims " + c.sheet.length + " (" + c.strategy + ", held " + c.held.length + ")") + " · Draft trades " +
     p.trades.both.length + " both-gain / " + p.trades.ask.length + " ask · Classic transfers " + (p.transfers ? p.transfers.moves.length : 0) +
     " · Classic sim GW" + (p.classicSim ? p.classicSim.gw : "-") + " · Draft h2h GW" + (p.h2h ? p.h2h.gw : "-") +
     " · Draft moves " + p.draftMoves.top.length + " · changes " + p.changes.length + " · " + res.weeklyNote;

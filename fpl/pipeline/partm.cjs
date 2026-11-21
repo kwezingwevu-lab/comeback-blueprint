@@ -105,12 +105,16 @@ const cs = PRE && PRE.claims ? PRE.claims : null;
 let draft = "**Draft GW" + gw + ": " + (cl.length ? cl.length + (MC.draft.waiversProcessed ? (cl.length === 1 ? " move" : " moves") : (cl.length === 1 ? " claim" : " claims")) : (MC.draft.waiversProcessed ? "no move" : "no claim")) + "** (" +
   (dev.wv ? (MC.draft.waiversProcessed ? "waivers settled " : "waivers settle ") + sast(dev.wv) : "waiver time not in the feed") + (dev.tr ? "; trades close " + sast(dev.tr) : "") + "). " +
   (MC.draft.waiversProcessed
-    ? (cl.length ? (function () {
-        // after the run (CLAUDE.md N2): weekly.cjs writes each line as "sign now" or "locked until the next waiver run"
-        const now = [], later = [];
-        (WEEKLY.draft.claims || []).forEach((c, i) => (/sign now/.test(c.why || "") ? now : later).push(cl[i]));
-        return (now.length ? "Sign now, as free agents: " + now.join("; ") + ". " : "") + (later.length ? "Locked until the next waiver run, so claim then: " + later.join("; ") + ". " : "");
-      })() : "")
+    ? (function () {
+        // after the run (E-203): weekly.cjs writes the free agents to sign now in claims, and the locked players worth a
+        // claim at the next run in next_run, each drop taken from the roster the signings leave
+        const nr = WEEKLY.draft.next_run, nx = nr && Array.isArray(nr.claims) ? nr.claims.map((c) => c.why ? c.why.split(",")[0] : "") : [];
+        const worth = cs && isFinite(cs.valueAfter) && isFinite(cs.valueNow) ? " Roster " + f1(cs.valueNow) + " today, " + f1(cs.valueAfter) + " after the signings (Draft expected points to GW" + M.CFG.draftEnd + ")." : "";
+        return (cl.length ? "Sign now, as free agents, in this order: " + cl.join("; ") + "." + worth + " " : "Nothing to sign now: no fit free agent improves the roster to GW" + M.CFG.draftEnd + ". ") +
+          (nr ? (nx.length ? "Cannot be signed this week, so claim at the next waiver run (" + sast(nr.waivers) + ", you claim " + nr.place + ({ 1: "st", 2: "nd", 3: "rd" }[nr.place % 10 === 0 || (nr.place % 100 >= 11 && nr.place % 100 <= 13) ? 0 : nr.place % 10] || "th") + " of " + nr.of + "; each drop assumes the signings above): " + nx.join("; ") + ". "
+                           : "Nobody locked is worth a claim at the next waiver run (" + sast(nr.waivers) + "). ")
+              : "The next waiver run falls after the re-draft. ");
+      })()
     : (cl.length ? "Lodge in this order: " + cl.join("; ") + ". " : "") +
   (cs && isFinite(cs.valueStress) ? "Worth " + f1(cs.valueStress) + " Draft expected points to GW" + M.CFG.draftEnd + " under the stress test, a mean of " + f1(cs.meanValue) + " over " + cs.runs + " simulated waiver runs, against " + f1(cs.valueNow) + " today." : ""));
 

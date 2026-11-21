@@ -307,9 +307,19 @@ const roster = M.draftRoster(), mine = new Set(roster.map((p) => p.id));
     ["the contested solve's pairs", (PLAN.draftIfTaken && PLAN.draftIfTaken.pairs) || [], (q) => q.add, (q) => q.drop],
     ["the claims sheet (PRE.claims)", PRE.claims.sheet, (q) => q.add, (q) => q.drop],
     ["the held-back pairs", PRE.claims.held || [], (q) => q.add, (q) => q.drop],
+    // 21 Nov 2026 (E-203): after the waiver run, the two parts and the held-back players priced on the roster they leave
+    ["the sign-now lines (PRE.claims.now)", PRE.claims.now || [], (q) => q.add, (q) => q.drop],
+    ["the next waiver run's claims (PRE.claims.next)", (PRE.claims.next && PRE.claims.next.claims) || [], (q) => q.add, (q) => q.drop],
+    ["the held-back players' best drops (PRE.claims.heldBack)", PRE.claims.heldBack || [], (q) => q.add, (q) => q.drop],
     ["the top Draft moves (PRE.draftMoves)", (PRE.draftMoves.top || []).concat(PRE.draftMoves.backups || []), (q) => q.add, (q) => q.drop]
   ];
   sets.forEach((s) => { const bad = cross(s[1], s[2], s[3]); ok("every claim swaps like for like: " + s[0] + " (" + s[1].length + ")", s[1].length >= 0 && bad.length === 0, bad.slice(0, 3).map((q) => JSON.stringify(q)).join("; ")); });
+  {
+    // mutation: a sign-now line whose drop is swapped for one of my players in another position is found
+    const src = (PRE.claims.now && PRE.claims.now.length ? PRE.claims.now : PRE.claims.sheet)[0];
+    const other = src ? roster.find((p) => P[src.add] && p.p !== P[src.add].p) : null;
+    ok("mutation: a line whose drop is in another position is found by the like-for-like test", !!other && cross([{ add: src.add, drop: other.id }], (q) => q.add, (q) => q.drop).length === 1, "");
+  }
   const live = AN.findTrades(M, MC), shipped = (PRE.trades.both || []).concat(PRE.trades.ask || []);
   [["the trades found now", live], ["the precomputed trades", shipped]].forEach((s) => {
     const bad = s[1].filter((t) => { const g = P[t.get], v = P[t.give]; return !g || !v || g.p !== v.p || mine.has(t.get) || !mine.has(t.give) || (MC.draft.rosters[t.rival] || []).indexOf(t.get) < 0; });

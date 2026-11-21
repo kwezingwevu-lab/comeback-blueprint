@@ -700,8 +700,10 @@ async function main() {
     const ex = shifted[0];
     const wrong = ex ? ctx.els[ex.id] : null;
     const exOk = !!ex && E.draftEl(ex.code, ctx).classic.id !== ex.id;
+    // 21 Nov 2026 (E-203): after the waiver run the block writes only free agents to sign now, and a week with none is legitimate
+    const settled25 = !!(LIVE.draft && LIVE.draft.game && LIVE.draft.game.waivers_processed);
     assert("draft-claims-join-on-code-not-id",
-      claims.length >= 1 && !bad.length && exOk,   // the written block's own length, never a typed count (E-084, E-094)
+      (settled25 || claims.length >= 1) && !bad.length && exOk,   // the written block's own length, never a typed count (E-084, E-094)
       claims.length + " claims, all " + (2 * claims.length) + " codes resolve in both tables; worked example " + (ex ? ex.web_name + " draft id " + ex.id + " vs classic id " + ctx.byCode[ex.code].id + " (keying on the draft id would give " + (wrong ? wrong.web_name : "nobody") + ")" : "none") + (bad.length ? " — " + bad.join("; ") : ""));
   }
 
@@ -709,21 +711,44 @@ async function main() {
   // the run every line is a claim with its waiver-run odds and stress-test label; once `game.waivers_processed` is true
   // the run has happened, so each line says "sign now" for a player the league feed has as status a and "locked until the
   // next waiver run" for one it has as status l, and none still quotes a run that is over.
+  // 21 Nov 2026 (E-203): after the run `claims` holds only free agents to sign now (status a, never a backup, a first
+  // choice or a locked player) and `next_run` holds the locked players worth a claim at the next run (status l, each
+  // written as locked, none of them also signed now). Before the run the lines are claims, as before.
   {
     const claims = (WEEKLY.draft && WEEKLY.draft.claims) || [];
+    const nextRun = WEEKLY.draft ? WEEKLY.draft.next_run : undefined;
     const settled = !!(LIVE.draft && LIVE.draft.game && LIVE.draft.game.waivers_processed);
     const st = {}; ((LIVE.draft && LIVE.draft.ownership) || []).forEach((o) => { st[o.code] = o.status; });
-    const bad = [];
-    claims.forEach((c) => {
-      const w = String(c.why || ""), s = st[c.in];
+    const rules = (cl, nr, stat) => {
+      const bad = [];
+      cl.forEach((c) => {
+        const w = String(c.why || ""), s = stat[c.in];
+        if (settled) {
+          if (/simulated waiver runs|stress test:/.test(w)) bad.push(c.in + " still quotes the settled run");
+          if (!/sign now/.test(w) || /backup|first choice|locked/.test(w) || s !== "a") bad.push(c.in + " (status " + s + ") reads: " + w.slice(0, 90));
+        } else if (!/stress test:/.test(w) || /sign now/.test(w)) bad.push(c.in + " is not written as a claim: " + w.slice(0, 90));
+      });
       if (settled) {
-        if (/simulated waiver runs|stress test:/.test(w)) bad.push(c.in + " still quotes the settled run");
-        if (/sign now/.test(w) ? s !== "a" : /locked until the next waiver run/.test(w) ? s !== "l" : true) bad.push(c.in + " (status " + s + ") reads: " + w.slice(0, 90));
-      } else if (!/stress test:/.test(w) || /sign now/.test(w)) bad.push(c.in + " is not written as a claim: " + w.slice(0, 90));
-    });
+        if (nr === undefined) bad.push("no next_run after the waiver run");
+        const ins = {}; cl.forEach((c) => { ins[c.in] = true; });
+        ((nr && nr.claims) || []).forEach((c) => {
+          const w = String(c.why || ""), s = stat[c.in];
+          if (!/locked until the next waiver run/.test(w) || s !== "l" || ins[c.in]) bad.push("next run " + c.in + " (status " + s + ") reads: " + w.slice(0, 90));
+        });
+      }
+      return bad;
+    };
+    const bad = rules(claims, nextRun, st);
     assert("draft-lines-match-the-waiver-phase",
-      claims.length >= 1 && !bad.length,
-      claims.length + " lines, waivers " + (settled ? "settled" : "not yet run") + ": " + claims.map((c) => c.in + " " + (st[c.in] || "?")).join(", ") + (bad.length ? " — " + bad.join("; ") : ""));
+      (settled || claims.length >= 1) && !bad.length,
+      claims.length + " lines" + (settled ? " to sign now and " + (nextRun && nextRun.claims ? nextRun.claims.length : 0) + " for the next run" : "") + ", waivers " + (settled ? "settled" : "not yet run") + ": " + claims.map((c) => c.in + " " + (st[c.in] || "?")).join(", ") + (bad.length ? " — " + bad.join("; ") : ""));
+    if (settled && claims.length) {
+      // mutations: a sign-now player the league has locked, and a sign-now line written as a backup, must each fail the rules
+      const stM = Object.assign({}, st); stM[claims[0].in] = "l";
+      const clM = claims.map((c, i) => i ? c : Object.assign({}, c, { why: c.why.replace("sign now", "backup for someone, sign now") }));
+      assert("E203-mutation-a-player-who-cannot-be-signed-among-the-sign-now-lines-goes-red", rules(claims, nextRun, stM).length > 0, rules(claims, nextRun, stM).slice(0, 1).join(""));
+      assert("E203-mutation-a-sign-now-line-called-a-backup-goes-red", rules(clM, nextRun, st).length > 0, rules(clM, nextRun, st).slice(0, 1).join(""));
+    }
   }
 
   // ---- 25c · once waivers have settled, the written Draft eleven holds only players the manager owns or can sign before
@@ -736,11 +761,21 @@ async function main() {
     // data/draft_league.cjs translates element-status owners to the league-entry id at the boundary (E-063), so that is the id compared
     const me = LIVE.draft && LIVE.draft.me ? LIVE.draft.me.leagueEntryId : null;
     const own = {}; ((LIVE.draft && LIVE.draft.ownership) || []).forEach((o) => { own[o.code] = o; });
-    const bad = codes.filter((c) => { const o = own[c]; return !o || !((o.owner === me && o.status === "o") || o.status === "a"); });
+    // 21 Nov 2026 (E-200, E-203): after the run the eleven holds only players the manager owns and has not dropped in a
+    // sign-now line, or that line's own signing. Any other free agent (a backup, 20 Nov: Palacios) is not a signing.
+    const cl = D.claims || [], ins = {}, outs = {}; cl.forEach((c) => { ins[c.in] = true; outs[c.out] = true; });
+    const badOf = (cs) => cs.filter((c) => { const o = own[c]; return !o || !((o.owner === me && o.status === "o" && !outs[c]) || (ins[c] && o.status === "a")); });
+    const bad = badOf(codes);
     assert("draft-eleven-holds-only-owned-or-signable-players-after-waivers",
       codes.length === 11 && (!settled || !bad.length),
       codes.length + " in the eleven, waivers " + (settled ? "settled" : "not yet run (claims may still land)") +
         (bad.length ? "; not playable this gameweek: " + bad.map((c) => c + " (" + ((own[c] || {}).status || "?") + ")").join(", ") : ""));
+    if (settled) {
+      // mutation: a free agent who is not one of the sign-now lines, put in the eleven, must be found
+      const stray = ((LIVE.draft && LIVE.draft.ownership) || []).find((o) => o.status === "a" && !ins[o.code]);
+      const mutated = stray ? codes.slice(0, 10).concat([stray.code]) : null;
+      assert("E200-mutation-a-free-agent-who-is-not-a-signing-in-the-eleven-goes-red", !!mutated && badOf(mutated).length > 0, stray ? "planted " + stray.code : "no stray free agent in the feed");
+    }
   }
 
   // ---- 26 · and the size of that mismatch reconciles against the live API, not a frozen number
@@ -821,6 +856,10 @@ async function main() {
     const bad = [];
     const notes = [];
     const disagree = [];
+    // 21 Nov 2026 (E-203): after the waiver run each sign-now line's gain is the roster's (src/mc_engine.js squadValue to
+    // the Draft horizon on the roster the lines above leave), replayed here; before it, player for player, as before.
+    const settled28 = !!MCD.draft.waiversProcessed;
+    let rosterNow = MM.draftRoster();
     claims.forEach((c) => {
       const out = E.draftEl(c.out, ctx), inn = E.draftEl(c.in, ctx);
       const outLive = draftFresh && draftFresh.get(Number(c.out)) ? draftFresh.get(Number(c.out)) : out.draft;
@@ -828,7 +867,12 @@ async function main() {
       const outEv = E.draftEV(out, ctx), inEv = E.draftEV(inn, ctx);
       const forced = String(outLive.status) !== "a" || outEv.starts_last3 === 0;
       const po = pOf(c.out), pi = pOf(c.in);
-      const gain = po && pi ? MM.epRange(pi, dNext, dHorizon) - MM.epRange(po, dNext, dHorizon) : NaN;
+      let gain = NaN;
+      if (po && pi && settled28) {
+        const trial = rosterNow.map((x) => x === po ? pi : x);
+        gain = rosterNow.indexOf(po) >= 0 ? MM.squadValue(trial, dNext, dHorizon, false) - MM.squadValue(rosterNow, dNext, dHorizon, false) : NaN;
+        rosterNow = trial;
+      } else if (po && pi) gain = MM.epRange(pi, dNext, dHorizon) - MM.epRange(po, dNext, dHorizon);
       if (!po || !pi) bad.push("code " + (po ? c.in : c.out) + " is not in the baked block");
       else if (!forced && !(gain > 0)) bad.push(out.web_name + "→" + inn.web_name + " is neither forced nor a gain to GW" + dHorizon + " (" + gain.toFixed(2) + ")");
       if (!forced && inEv.ev - outEv.ev <= 0) disagree.push(out.web_name + "→" + inn.web_name + " " + (inEv.ev - outEv.ev).toFixed(2));
@@ -841,15 +885,65 @@ async function main() {
     if (!oneHash) bad.push("the weekly block (" + WEEKLY.hash + "), the plan (" + PLANF.hash + ") and the baked data (" + exportHash + ") do not share one content hash");
     else {
       const codeOf = (id) => Number((ctx.els[id] || {}).code);
-      const sheet = AN.buildClaimSheet(MM, MCD, PLANF.draft.pairs, { fitOnly: true }).sheet.map((q) => codeOf(q.drop) + ">" + codeOf(q.add));
-      const written = claims.map((c) => Number(c.out) + ">" + Number(c.in));
-      if (JSON.stringify(sheet) !== JSON.stringify(written)) bad.push("the written claims are not the claims sheet line for line (" + written.length + " written, " + sheet.length + " on the sheet)");
+      const LN = AN.sheetLines(AN.buildDraftSheet(MM, MCD, PLANF.draft.pairs, { fitOnly: true }));
+      const seq = (a) => a.map((q) => codeOf(q.drop) + ">" + codeOf(q.add)), wr = (a) => (a || []).map((c) => Number(c.out) + ">" + Number(c.in));
+      const same = (cl, nr) => JSON.stringify(seq(LN.now)) === JSON.stringify(wr(cl)) && (LN.phase !== "free" || JSON.stringify(seq(LN.next)) === JSON.stringify(wr(nr && nr.claims)));
+      const nr = WEEKLY.draft ? WEEKLY.draft.next_run : null;
+      if (!same(claims, nr)) bad.push("the written lines are not the builder's line for line (" + claims.length + " written, " + LN.now.length + " from the builder" + (LN.phase === "free" ? ", next run " + wr(nr && nr.claims).length + " written, " + LN.next.length + " from the builder" : "") + ")");
+      if (settled28 !== (LN.phase === "free")) bad.push("the builder's phase " + LN.phase + " is not the block's");
+      if (settled28 && claims.length !== LN.now.length) bad.push(claims.length + " written against " + LN.now.length + " from the builder");
+      if (claims.length >= 2) {
+        // mutation: the same lines with the first two swapped are not the builder's
+        const sw = claims.slice(); const t0 = sw[0]; sw[0] = sw[1]; sw[1] = t0;
+        assert("E203-mutation-two-written-lines-swapped-are-not-the-builder's", !same(sw, nr), "swapped " + sw[0].in + " and " + sw[1].in);
+      }
     }
     // A shortfall that is real must be on screen, not hidden (Isidor: no free-agent forward has three starts).
     const shownIssues = ui.ok ? notes.filter((n) => { const who = n.split(" has ")[0]; return new RegExp(who.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\s\\S]{0,160}of 3 starts").test(ui.draftText); }) : [];
     assert("draft-claims-are-valid-against-the-draft-api",
-      claims.length >= 1 && !bad.length && shownIssues.length === notes.length,   // the block's own length (E-084, E-094)
+      (settled28 || claims.length >= 1) && !bad.length && shownIssues.length === notes.length,   // the block's own length (E-084, E-094); after the run the builder's count, checked above
       claims.length + " written claims checked against the " + (draftFresh ? "live draft API" : "snapshot (offline)") + ", gains to GW" + dHorizon + " by src/mc_engine.js, the sheet line for line and one content hash" + "; src/engine.js draftEV (five gameweeks) disagrees on " + disagree.length + (disagree.length ? " (" + disagree.join(", ") + ")" : "") + "; shortfalls named on screen: " + (notes.join("; ") || "none") + (bad.length ? " — invalid: " + bad.join("; ") : "") + (shownIssues.length !== notes.length ? " — a shortfall is not shown in the waivers panel" : ""));
+  }
+
+  // ---- 28b · E-203 (21 Nov 2026): the next waiver run's claims carry the league's own waiver time and the manager's place
+  // (waiver_pick), and every drop is on the roster the sign-now lines leave, position for position. All values are read
+  // from data/live.json; none is typed.
+  {
+    const D = WEEKLY.draft || {}, settled = !!(LIVE.draft && LIVE.draft.game && LIVE.draft.game.waivers_processed);
+    if (settled) {
+      const nr = D.next_run, g = LIVE.draft.game, evs = LIVE.draft.events || [], ents = LIVE.draft.entries || [];
+      const meId = LIVE.draft.me ? LIVE.draft.me.leagueEntryId : null, mine = ents.find((e) => e.leagueEntryId === meId);
+      const run = Number(g.next_event) + 1, ev = evs.find((e) => e.id === run);
+      const own = {}; ((LIVE.draft && LIVE.draft.ownership) || []).forEach((o) => { own[o.code] = o; });
+      const cl = D.claims || [], ins = {}, outs = {}; cl.forEach((c) => { ins[c.in] = true; outs[c.out] = true; });
+      const etype = (code) => { const r = E.draftEl(code, ctx); return r ? r.element_type : null; };
+      const rules = (x) => {
+        const bad = [];
+        if (!ev) { if (x !== null) bad.push("a next_run is written but the feed has no gameweek " + run); return bad; }
+        if (!x) { bad.push("no next_run although the feed has gameweek " + run); return bad; }
+        if (x.gw !== run) bad.push("gw " + x.gw + " is not " + run);
+        if (x.waivers !== ev.waivers_time) bad.push("waivers " + x.waivers + " is not the feed's " + ev.waivers_time);
+        if (!mine || x.place !== mine.waiverPick) bad.push("place " + x.place + " is not waiver_pick " + (mine ? mine.waiverPick : "?"));
+        if (x.of !== ents.length) bad.push("of " + x.of + " is not " + ents.length + " entries");
+        const usedDrop = {};
+        (x.claims || []).forEach((c) => {
+          const o = own[c.out], okDrop = ins[c.out] || (o && o.owner === meId && o.status === "o" && !outs[c.out]);
+          if (!okDrop || usedDrop[c.out]) bad.push("drop " + c.out + " is not on the roster the signings leave"); usedDrop[c.out] = true;
+          if (etype(c.in) === null || etype(c.in) !== etype(c.out)) bad.push(c.in + " for " + c.out + " is not position for position");
+        });
+        return bad;
+      };
+      const bad = rules(nr === undefined ? null : nr);
+      assert("draft-next-run-claims-carry-the-league's-own-waiver-time-and-place", !bad.length,
+        (nr ? "GW" + nr.gw + " " + nr.waivers + ", place " + nr.place + " of " + nr.of + ", " + nr.claims.length + " claims" : "no next run") + (bad.length ? " — " + bad.join("; ") : ""));
+      if (nr && ev) {
+        const thisWeek = (evs.find((e) => e.id === Number(g.next_event)) || {}).waivers_time;
+        const m1 = Object.assign({}, nr, { waivers: thisWeek });
+        const m2 = cl.length && nr.claims.length ? Object.assign({}, nr, { claims: [Object.assign({}, nr.claims[0], { out: cl[0].out })].concat(nr.claims.slice(1)) }) : null;
+        assert("E203-mutation-this-week's-waiver-time-on-the-next-run-goes-red", rules(m1).length > 0, rules(m1).slice(0, 1).join(""));
+        if (m2) assert("E203-mutation-a-next-run-drop-already-dropped-by-a-signing-goes-red", rules(m2).length > 0, rules(m2).slice(0, 1).join(""));
+      }
+    }
   }
 
   // ---- 29 · C5 watchlist rule: KEEP only with three starts of three
