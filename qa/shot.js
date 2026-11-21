@@ -1,6 +1,6 @@
 // Screenshot + text dump of one view at 390×844 on a mocked date (Chromium, offline-deterministic like qa_full.js).
 // Usage: node qa/shot.js <view> <YYYY-MM-DD> <outPrefix> [setupJS]   e.g. node qa/shot.js lift 2026-09-12 /tmp/lift "localStorage.setItem('cb2_pure','true')"
-const puppeteer=require('puppeteer');const {fontReply}=require('./fontroute');const path=require('path');const fs=require('fs');
+const puppeteer=require('puppeteer');const {fontReply,fontsOff}=require('./fontroute');const path=require('path');const fs=require('fs');
 const [view,iso,out,setup]=process.argv.slice(2);
 if(!view||!iso||!out){console.error('usage: node qa/shot.js <view> <iso> <outPrefix> [setupJS]');process.exit(2);}
 const MOCK=(iso)=>{const R=Date;const fixed=new R(iso+'T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;};
@@ -9,7 +9,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{const b=await puppeteer.launch({headless:'new',args:['--no-sandbox','--disable-setuid-sandbox']});const p=await b.newPage();
 await p.setRequestInterception(true);p.on('request',r=>{const u=r.url();if(u.startsWith('file:')||u.startsWith('data:')||u.startsWith('blob:'))r.continue();else r.respond(fontReply(u)||{status:200,contentType:'text/css',body:''});});
 const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(m.type()==='error')errs.push(m.text());});
-await p.evaluateOnNewDocument(MOCK,iso);await p.evaluateOnNewDocument(STORAGE);await p.evaluateOnNewDocument(()=>{try{localStorage.clear();}catch(e){}});
+await p.evaluateOnNewDocument(MOCK,iso);await p.evaluateOnNewDocument(fontsOff());await p.evaluateOnNewDocument(STORAGE);await p.evaluateOnNewDocument(()=>{try{localStorage.clear();}catch(e){}});
 if(setup)await p.evaluateOnNewDocument(new Function(setup));
 const file=process.env.APP||(fs.existsSync(path.resolve(__dirname,'ComebackBlueprint.html'))?path.resolve(__dirname,'ComebackBlueprint.html'):path.resolve(__dirname,'../dist/ComebackBlueprint.html'));
 await p.goto('file://'+file,{waitUntil:'networkidle0'});await p.setViewport({width:390,height:844,deviceScaleFactor:+(process.env.DSF||2)});await wait(900);

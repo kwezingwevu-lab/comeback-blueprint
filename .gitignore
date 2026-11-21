@@ -6,3 +6,4 @@ qa/qa_report.json
 !dist/*.png
 qa/shots/
 tools/out/
+__pycache__/

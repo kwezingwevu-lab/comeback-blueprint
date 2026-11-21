@@ -7,7 +7,7 @@
 // the Log button writes; planpath = weekly weigh-ins along the plan's own +0.4 kg path).
 process.env.TZ = 'Africa/Johannesburg';
 const puppeteer = require('puppeteer');
-const { fontReply } = require('./fontroute');
+const { fontReply, fontsOff } = require('./fontroute');
 const fs = require('fs');
 const path = require('path');
 const GUARD_SRC = require('./a11yguard').toString(); // accessible-name / focusable / boolean-state guard, evaluated inside the page
@@ -56,7 +56,7 @@ const MILESTONE = /soft milestone|check weekend|the check day|march check|5[–-
     const errs = [];
     p.on('pageerror', (e) => errs.push(e.message));
     p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-    await p.evaluateOnNewDocument(MOCK, c.d);
+    await p.evaluateOnNewDocument(MOCK, c.d); await p.evaluateOnNewDocument(fontsOff());
     await p.evaluateOnNewDocument('try{localStorage.clear();}catch(e){}' + c.seed);
     await p.setViewport({ width: VW, height: 844, deviceScaleFactor: 1 });
     await p.goto('file://' + APP, { waitUntil: 'load' });

@@ -42,12 +42,13 @@ T('webkit visual: roadmap, ETA and gauge labels render at 10.5 px or more at 390
 const rd=await p.evaluate(async()=>{switchView('roadmap');await new Promise(r=>setTimeout(r,200));const s=document.querySelector('#rmChart svg[data-tip]');s.scrollIntoView({block:'center'});const b=s.getBoundingClientRect();return {x:b.left+b.width*0.3,y:b.top+b.height/2,id:s.dataset.tip};});
 await p.mouse.click(rd.x,rd.y);await wait(150);const rt=await p.evaluate(id=>(document.getElementById(id+'r')||{innerText:''}).innerText.trim(),rd.id);
 T('webkit readout: a tap on the roadmap chart prints date, weight and phase',/^\d{1,2} [A-Z][a-z]{2} ’\d\d · \d+\.\d kg · \S/.test(rt),rt);
-// Progress photos (27 Sep): a photo picked through the file chooser is stored as a JPEG Blob in IndexedDB and decodes on screen.
+// Progress photos (27 Sep; P7 18 Nov): a photo picked through the file chooser is stored in IndexedDB as bytes plus the type the encoder really wrote, and decodes on screen.
 {const img=path.resolve(__dirname,'shots/webkit-photo-src.jpg');fs.mkdirSync(path.dirname(img),{recursive:true});await p.screenshot({path:img,type:'jpeg'});
  await p.evaluate(()=>{switchView('track');document.querySelector('.track-tabs button[data-tp="measure"]').click();});await wait(300);
  const [fc]=await Promise.all([p.waitForEvent('filechooser',{timeout:5000}),p.click('[data-ph="front"]')]);await fc.setFiles(img);for(let i=0;i<80;i++){await wait(100);if(await p.evaluate(()=>/^Saved · /.test(document.getElementById('toast').innerText)))break;}await wait(300);
- const ph=await p.evaluate(async()=>{const a=await phAll();const im=document.querySelector('#phBody .ph-cmp img');return {n:a.length,type:a[0]&&a[0].blob.type,ok:!!(im&&im.complete&&im.naturalWidth>0)};});
- T('webkit photos: picked photo stored as a JPEG in IndexedDB and shown',ph.n===1&&ph.type==='image/jpeg'&&ph.ok,JSON.stringify(ph));}
+ const ph=await p.evaluate(async()=>{const a=await phAll();const im=document.querySelector('#phBody .ph-cmp img');const u=a[0]?new Uint8Array(a[0].buf.slice(0,12)):[];const s=String.fromCharCode.apply(null,u);
+   return {n:a.length,type:a[0]&&a[0].blob.type,rec:a[0]&&a[0].type,magic:/^RIFF....WEBP/.test(s)?'image/webp':(u[0]===0xFF&&u[1]===0xD8)?'image/jpeg':'?',ok:!!(im&&im.complete&&im.naturalWidth>0)};});
+ T('webkit photos: picked photo stored in IndexedDB (bytes, typed by what the encoder wrote) and shown',ph.n===1&&/^image\/(webp|jpeg)$/.test(ph.type)&&ph.rec===ph.type&&ph.magic===ph.type&&ph.ok,JSON.stringify(ph));}
 await p.evaluate(()=>switchView('home'));await wait(300);
 fs.mkdirSync(path.resolve(__dirname,'shots'),{recursive:true});await p.screenshot({path:path.resolve(__dirname,'shots/webkit-home-390.png'),fullPage:false});
 await p.evaluate(()=>switchView('lift'));await wait(300);await p.screenshot({path:path.resolve(__dirname,'shots/webkit-lift-390.png'),fullPage:false});
@@ -97,9 +98,9 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  const open=async(c)=>{const pg=await c.newPage();pg.__errs=[];pg.on('pageerror',e=>pg.__errs.push(e.message));pg.on('console',m=>{if(m.type()==='error')pg.__errs.push(m.text());});await pg.goto('file://'+file,{waitUntil:'load'});await wait(1200);return pg;};
  // fonts and the policy
  {const c=await mkctx(MOCKS('2026-11-30')+CSPW,true);const pg=await open(c);let r=null;
-  for(let i=0;i<50&&!(r&&r.mano&&r.media==='all');i++){await wait(150);r=await safe(pg,()=>{const L=[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/['"]/g,''));const lk=document.querySelector('link[rel=stylesheet][href*="fonts.googleapis"]');return {mano:L.includes('Manrope'),media:lk?lk.media:'none',csp:window.__csp.length};});}
+  for(let i=0;i<50&&!(r&&r.mano&&r.media==='none');i++){await wait(150);r=await safe(pg,()=>{const L=[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/['"]/g,''));const lk=document.querySelector('link[rel=stylesheet][href*="fonts.googleapis"]');return {mano:L.includes('Manrope'),media:lk?lk.media:'none',csp:window.__csp.length};});}
   const bootErrs=pg.__errs.length;const n=await safe(pg,async()=>{const m=document.querySelector('meta[http-equiv="Content-Security-Policy"]');let f='allowed';try{await fetch('data:text/plain,hi');}catch(e){f='blocked';}await new Promise(r=>setTimeout(r,200));return {pol:m?m.content:'',fetch:f,viol:window.__csp.filter(v=>/^connect-src/.test(v)).length};});
-  T('webkit CSP: the page policy allows the Google Fonts stylesheet and font files (Manrope loads, inline onload swap runs), boot raises no violation, and fetch is refused',!!r&&r.mano&&r.media==='all'&&r.csp===0&&!!n&&/connect-src 'none'/.test(n.pol||'')&&n.fetch==='blocked'&&n.viol>=1&&bootErrs===0,JSON.stringify({r,n,bootErrs,e:pg.__errs.join('|').slice(0,160)}));await c.close();}
+  T('webkit CSP: the page policy (font-src data:) lets the inlined fonts load (Manrope loads, no Google Fonts stylesheet), boot raises no violation, and fetch is refused',!!r&&r.mano&&r.media==='none'&&r.csp===0&&!!n&&/connect-src 'none'/.test(n.pol||'')&&n.fetch==='blocked'&&n.viol>=1&&bootErrs===0,JSON.stringify({r,n,bootErrs,e:pg.__errs.join('|').slice(0,160)}));await c.close();}
  // a corrupt store already on the device
  {const BAD={cb2_weight:'[null,{},{"date":5,"v":"x"}]',cb2_sessions:'"abc"',cb2_measure:'{"a":1}',cb2_profile:'[]',cb2_bulk:'"zzz"',cb2_steps:'{oops',cb2_ceilbf:'1e999'};
   const c=await mkctx(MOCKS('2026-11-30')+RAWS(BAD));const pg=await open(c);
@@ -337,6 +338,84 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  delete o.bk;
  T('webkit rewards: the card renders on Track › Regions with chips on the quest lines and the record line; settings from the card land in cb2_rewards in localStorage; backup -> wipe -> restore brings them back across the reload and the card shows them; nothing overflows',
   o.card&&o.chips>=3&&o.rec&&o.ls&&o.ls.vit.garminDirect===true&&o.ls.vit.goal===600&&o.ls.san.option==='core'&&o.ls.on.adiclub===true&&o.fit&&o.after&&o.after.card&&o.after.s.vit.goal===600&&o.after.s.san.option==='core'&&o.after.goal==='600'&&/adiClub/.test(o.after.runs||'')&&e.length===0,JSON.stringify({card:o.card,chips:o.chips,rec:o.rec,ls:!!o.ls&&[o.ls.vit.garminDirect,o.ls.vit.goal,o.ls.san.option,o.ls.on.adiclub],fit:o.fit,after:o.after&&[o.after.card,o.after.s&&o.after.s.vit.goal,o.after.s&&o.after.s.san.option,o.after.goal,o.after.runs],crash:o.crash,e}));await c.close();}
+// P1 (17 Nov 2026) on Safari's engine: the inlined fonts load with every outside request refused, and with them stripped the metric-matched
+// fallbacks keep Home within 1% of its real-font height.
+{const {FONTS_OFF}=require('./fontroute');const DEMO=fs.readFileSync(path.join(__dirname,'fixtures','demo.setup.js'),'utf8').trim().split('\n').pop();
+ const run=async(off)=>{const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,timezoneId:'Africa/Johannesburg'});await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.abort('internetdisconnected'));
+   await c.addInitScript(i=>{const R=Date;const fixed=new R(i+'T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;},'2026-11-28');
+   await c.addInitScript('try{localStorage.clear();}catch(e){}'+DEMO);if(off)await c.addInitScript(FONTS_OFF);
+   const pg=await c.newPage();let r=null;try{await pg.goto('file://'+file,{waitUntil:'load'});await wait(1500);r=await pg.evaluate(async()=>{await document.fonts.ready;switchView('home');await new Promise(z=>setTimeout(z,300));
+     const h=document.documentElement.scrollHeight;const hb=document.querySelector('header.app');const hdr=hb?Math.round(hb.getBoundingClientRect().height*100)/100:-1;switchView('lift');await new Promise(z=>setTimeout(z,300));const rs=document.getElementById('runSec');const runSec=rs?Math.round(rs.getBoundingClientRect().height):0;switchView('run');await new Promise(z=>setTimeout(z,300));const run=document.documentElement.scrollHeight;switchView('home');
+     return {L:[...new Set([...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/['"]/g,'')))],bad:[...document.fonts].filter(f=>f.status==='error').map(f=>f.family+' '+f.weight),h,hdr,runSec,run};});}catch(e){r={err:String(e&&e.message||e).slice(0,160)};}await c.close();return r||{};};
+ const real=await run(false),off=await run(true);const d=real.h>0&&off.h>0?+(Math.abs(real.h-off.h)/real.h*100).toFixed(2):99;
+ T('webkit P1 fonts: with every outside request refused the three inlined families load, and with them stripped every fallback face (regular and bold) loads and keeps Home within 1% of its height',Array.isArray(real.L)&&['IBM Plex Mono','Manrope','Space Grotesk'].every(f=>real.L.includes(f))&&Array.isArray(off.L)&&!off.L.includes('Manrope')&&['Manrope Fallback','Space Grotesk Fallback','IBM Plex Mono Fallback'].every(f=>off.L.includes(f))&&Array.isArray(off.bad)&&off.bad.length===0&&Array.isArray(real.bad)&&real.bad.length===0&&d<1,JSON.stringify({real,off:{h:off.h,L:off.L,bad:off.bad,err:off.err},d}));
+ {const pc=k=>real[k]>0&&off[k]>0?+(Math.abs(real[k]-off[k])/real[k]*100).toFixed(2):99;const dr=pc('run'),ds=pc('runSec');
+  T('webkit P1 fallback heights: with the inlined faces stripped, the Run tab and the Lift run section (#runSec) stay within 1% of their real-font height and the header is exactly as tall (390 px, demo log)',dr<1&&ds<1&&real.hdr>40&&real.hdr===off.hdr,JSON.stringify({dr,ds,run:[real.run,off.run],runSec:[real.runSec,off.runSec],hdr:[real.hdr,off.hdr]}));}}
+// P1-R2-1 on Safari's engine: the inlined faces are in before the first frame, so the fallback faces are switched off without one being looked up
+{const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,timezoneId:'Africa/Johannesburg'});await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.abort('internetdisconnected'));
+ await c.addInitScript(()=>{window.__p1first=null;requestAnimationFrame(()=>{try{window.__p1first={ready:document.documentElement.hasAttribute('data-fonts-ready'),L:[...new Set([...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/['"]/g,'')))]};}catch(e){window.__p1first={err:String(e)};}});});
+ const pg=await c.newPage();let r=null;try{await pg.goto('file://'+file,{waitUntil:'load'});await wait(1500);r=await pg.evaluate(()=>{const fb=document.querySelector('style[data-fallback]');return {first:window.__p1first,fbOff:!!(fb&&fb.disabled),touched:[...document.fonts].filter(f=>/Fallback/.test(f.family)&&f.status!=='unloaded').map(f=>f.family+' '+f.weight+' '+f.status)};});}catch(e){r={err:String(e&&e.message||e).slice(0,160)};}await c.close();
+ T('webkit P1 fonts before the first frame: the three inlined families are loaded at the first animation frame, the fallback block is disabled and no fallback face was looked up',!!r&&!r.err&&!!r.first&&r.first.ready===true&&Array.isArray(r.first.L)&&['IBM Plex Mono','Manrope','Space Grotesk'].every(f=>r.first.L.includes(f))&&r.fbOff&&Array.isArray(r.touched)&&r.touched.length===0,JSON.stringify(r).slice(0,400));}
+// P7 (PX6) on Safari's engine: a 12 MP JPEG with EXIF orientation 6 through the file chooser is stored 960x1280 and upright, typed by the bytes,
+// no less sharp than the pre-P7 code on the same file; and with an iPhone-like encoder (PNG when asked for WebP) it is stored as JPEG.
+{const {LIB}=require('./p7photo');const tmp=path.resolve(__dirname,'shots/webkit-p7-12mp.jpg');
+ for(const mode of ['native','iphone']){const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,timezoneId:'Africa/Johannesburg'});
+  await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
+  let r=null;try{const pg=await c.newPage();await pg.goto('file://'+file,{waitUntil:'load'});await pg.waitForFunction(()=>typeof phShrink==='function'&&typeof DB==='object',null,{timeout:15000});await pg.evaluate(LIB);
+   const b64=await pg.evaluate(async()=>{window.__p7b64=await __p7.make();return window.__p7b64;});fs.mkdirSync(path.dirname(tmp),{recursive:true});fs.writeFileSync(tmp,Buffer.from(b64,'base64'));
+   if(mode==='iphone')await pg.evaluate(()=>__p7.noWebP(false));
+   await pg.evaluate(()=>{switchView('track');const t=document.querySelector('.track-tabs button[data-tp="measure"]');if(t)t.click();});await wait(300);
+   const [fc]=await Promise.all([pg.waitForEvent('filechooser',{timeout:5000}),pg.click('[data-ph="front"]')]);await fc.setFiles(tmp);
+   for(let i=0;i<150;i++){await wait(100);if(await pg.evaluate(()=>/^Saved · /.test((document.getElementById('toast')||{}).innerText||'')))break;}
+   r=await pg.evaluate(async()=>{const a=await phAll();const x=a[0];if(!x)return {n:0};const f=__p7.file(window.__p7b64);const m=await __p7.measure(x.blob,f);const o=await __p7.oldShrink(f);const om=await __p7.measure(o.blob,f);
+     const im=document.querySelector('#phBody .ph-cmp img');return {n:a.length,rec:[x.w,x.h],type:x.type,magic:__p7.magic(x.buf),m,old:om.psnr,oldBytes:o.blob.size,bytes:x.bytes,shown:!!(im&&im.complete&&im.naturalWidth===960&&im.naturalHeight===1280)};});}catch(e){r={err:String(e&&e.message||e).slice(0,200)};}
+  await c.close();const want=mode==='iphone'?'jpeg':null;
+  T('webkit P7 photo ('+mode+' encoder): a 12 MP JPEG with EXIF orientation 6 is stored 960x1280 and upright, the record type is the real encoding'+(want?' (JPEG: PNG came back for WebP)':'')+', and PSNR against a box-filtered reference is not lower than the old code',
+    !!r&&r.n===1&&r.rec&&r.rec[0]===960&&r.rec[1]===1280&&r.m&&r.m.w===960&&r.m.h===1280&&r.m.upright&&r.type==='image/'+r.magic&&(!want||r.magic===want)&&r.shown&&r.m.psnr>=r.old,JSON.stringify(r).slice(0,400));}
+ try{fs.unlinkSync(tmp);}catch(e){}
+ // the smoothing quality phCanvas sets must resample best here too: "high" scored 28.2 dB against "low"/"medium" 32.1 dB in this engine
+ {const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,timezoneId:'Africa/Johannesburg'});
+  await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
+  let r=null;try{const pg=await c.newPage();await pg.goto('file://'+file,{waitUntil:'load'});await pg.waitForFunction(()=>typeof phShrink==='function'&&typeof DB==='object',null,{timeout:15000});await pg.evaluate(LIB);
+   r=await pg.evaluate(async()=>{try{const b64=await __p7.make();return await __p7.quality(__p7.file(b64));}catch(e){return {err:String(e)};}});}catch(e){r={err:String(e&&e.message||e).slice(0,200)};}
+  await c.close();const best=r&&r.s?Math.max(r.s.low||0,r.s.medium||0,r.s.high||0):0;
+  T('webkit P7 smoothing: the quality phCanvas sets ("'+(r&&r.own)+'") scores within 0.05 dB of the best of low, medium and high on the 12 MP test photo',
+    !!r&&!r.err&&typeof r.app==='number'&&best>0&&r.app>=best-0.05&&r.s[r.own]>=best-0.05,JSON.stringify(r).slice(0,300));}}
+// P6 (PX5 + LAY-4) on Safari's engine: charts draw at their own width; a rotation redraws each visible chart once and keeps the reading;
+// a height-only change (the iOS toolbar) redraws nothing; labels 10.5-12.6 px at 390 and 844.
+{const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
+ await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
+ await c.addInitScript(()=>{const R=Date;const fixed=new R('2026-11-28T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;
+  try{localStorage.clear();localStorage.setItem('cb2_pure','true');localStorage.setItem('cb2_weight',JSON.stringify([{date:'2026-11-14',v:88},{date:'2026-11-21',v:88.4},{date:'2026-11-27',v:88.8}]));}catch(e){}});
+ let r=null;const e6=[];try{const pg=await c.newPage();pg.on('pageerror',e=>e6.push(e.message));pg.on('console',m=>{if(m.type()==='error')e6.push(m.text());});
+  await pg.goto('file://'+file,{waitUntil:'load'});await pg.waitForFunction(()=>typeof switchView==='function'&&typeof chartDraw==='function'&&typeof DB==='object',null,{timeout:15000});await wait(800);
+  const m=()=>pg.evaluate(()=>{const s=document.querySelector('#wChart svg[data-tip]');if(!s)return null;const bb=s.getBoundingClientRect(),vb=s.viewBox.baseVal.width,fs=[...s.querySelectorAll('text')].filter(t=>t.textContent.trim()).map(t=>parseFloat(getComputedStyle(t).fontSize)*bb.width/vb);
+   const rd=document.getElementById(s.dataset.tip+'r');return {vb,w:Math.round(bb.width),mn:Math.min(...fs),mx:Math.max(...fs),r:rd?rd.innerText.trim():'',id:s.dataset.tip};});
+  await pg.evaluate(()=>{switchView('track');window.__cd=[];const o=chartDraw;window.chartDraw=function(el){window.__cd.push(el.id);return o.apply(this,arguments);};});await wait(400);
+  await pg.evaluate(()=>{const s=document.querySelector('#wChart svg[data-tip]');if(s)tipAt(s,1);});const a=await m();
+  await pg.evaluate(()=>{window.__p6s=document.querySelector('#wChart svg[data-tip]');});
+  await pg.setViewportSize({width:390,height:700});await wait(300);await pg.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));await wait(200);await pg.evaluate(()=>window.scrollTo(0,0));await pg.setViewportSize({width:390,height:844});await wait(300);
+  const h=await pg.evaluate(()=>{const s=document.querySelector('#wChart svg[data-tip]');return (s&&s===window.__p6s&&s.isConnected)?window.__cd.length:'node replaced';});
+  await pg.setViewportSize({width:844,height:390});await wait(600);const b2=await m();const cd=await pg.evaluate(()=>window.__cd.slice());
+  r={a,h,b2,cd};}catch(e){r={err:String(e&&e.message||e).slice(0,200)};}
+ await c.close();
+ T('webkit P6 charts: labels 10.5-12.6 px at 390 and 844, a height-only change and a scroll redraw nothing (same drawing node), a rotation redraws the chart once at 560 and keeps the reading',
+   !!r&&!r.err&&r.a&&r.b2&&r.a.mn>=10.5&&r.a.mx<=12.6&&r.a.vb===r.a.w&&r.h===0&&r.cd.length===1&&r.b2.vb===560&&r.b2.w===560&&r.b2.mn>=10.5&&r.b2.mx<=12.6&&r.a.r==='21 Nov · 88.4 kg'&&r.b2.r===r.a.r&&r.b2.id!==r.a.id&&e6.length===0,JSON.stringify({r,e6}).slice(0,400));}
+// P6 (repair P6-V2-1) the Runs tab on Safari's engine: the weekly-volume bar chart and the longest-run and easy-pace line charts draw at their own width, at 390 and 820
+{const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
+ await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
+ await c.addInitScript(()=>{const R=Date;const fixed=new R('2026-11-28T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;
+  try{localStorage.clear();localStorage.setItem('cb2_pure','true');localStorage.setItem('cb2_runs',JSON.stringify([{date:'2026-11-15',type:'Long',dist:6,time:2340},{date:'2026-11-17',type:'Check',dist:1,time:390},{date:'2026-11-19',type:'Easy',dist:4,time:1560},{date:'2026-11-22',type:'Long',dist:7,time:2730},{date:'2026-11-24',type:'Easy',dist:5,time:1950},{date:'2026-11-26',type:'Easy',dist:4.5,time:1755}]));}catch(e){}});
+ let r=null;const e7=[];try{const pg=await c.newPage();pg.on('pageerror',e=>e7.push(e.message));
+  await pg.goto('file://'+file,{waitUntil:'load'});await pg.waitForFunction(()=>typeof switchView==='function'&&typeof DB==='object',null,{timeout:15000});await wait(800);
+  const m=()=>pg.evaluate(()=>['mChart','lrChart','paceChart'].map(id=>{const s=document.querySelector('#'+id+' svg.chart-svg');if(!s)return {id,none:true};const bb=s.getBoundingClientRect(),vb=s.viewBox.baseVal.width,fs=[...s.querySelectorAll('text')].filter(t=>t.textContent.trim()).map(t=>parseFloat(getComputedStyle(t).fontSize)*bb.width/vb);
+   return {id,vb,w:Math.round(bb.width),mn:Math.round(Math.min(...fs)*100)/100,mx:Math.round(Math.max(...fs)*100)/100,host:!!s.closest('.chart-host')};}));
+  await pg.evaluate(()=>{switchView('track');const bt=document.querySelector('.track-tabs button[data-tp="mileage"]');if(bt)bt.click();});await wait(500);const a=await m();
+  await pg.setViewportSize({width:820,height:844});await wait(600);const z=await m();r={a,z};}catch(e){r={err:String(e&&e.message||e).slice(0,200)};}
+ await c.close();
+ const ok=(L,max)=>Array.isArray(L)&&L.length===3&&L.every(x=>!x.none&&x.host&&Math.abs(x.vb-x.w)<=1&&x.vb>=280&&x.vb<=max&&x.mn>=10.5&&x.mx<=12.6);
+ T('webkit P6 Runs tab: the bar chart and both line charts draw at their rendered width (560 at 820), labels 10.5-12.6 px at 390 and 820',
+   !!r&&!r.err&&ok(r.a,560)&&ok(r.z,560)&&r.z.every(x=>x.vb===560)&&e7.length===0,JSON.stringify({r,e7}).slice(0,500));}
 // AI layer (LEDGER 36) on Safari's engine: the viewer-like frame with a mock "sample" capability (qa/ai_webkit.js)
 try{await require('./ai_webkit')((n,ok,d)=>T('webkit AI: '+n,ok,d));}catch(e){T('webkit AI: the checks ran to the end',false,String(e&&e.stack||e).slice(0,300));}
 T('webkit: no page/console errors',errs.length===0,errs.join('|').slice(0,300));

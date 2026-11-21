@@ -1,5 +1,11 @@
 # CHANGELOG.md — what has shipped (newest first)
 
+## 2026-11-21 - Polish A: inlined fonts, sharper photos, launch screens, charts at their real width
+- Fonts: the five latin faces (Space Grotesk, Manrope, IBM Plex Mono) are inlined in both files with metric-matched fallbacks; no Google Fonts request remains (CSP font-src data:), so the first screen no longer waits on the network (artifact frame, outside requests held 1.5 s: first paint 1728 ms to 212 ms). The OFL credit is on the Guide. Rules that asked for weights never loaded now use loaded ones.
+- Photos: step-down downscale with high-quality smoothing before the 1280 px draw; the record's type comes from the encoder. Offline file: a PNG Home Screen icon and 13 launch screens (the artifact file is unchanged by this).
+- Charts draw at the width of their own card (280-560), so labels stay 11-12 px on every screen, and redraw only on a width change.
+- Merged onto the body game and Rewards; the Home body card and Track › Regions keep their height within 1% whichever font draws them (P1-4c). Gate on the merged tree: ALL PASS 800/800, AI 118/118, PWA 14/14, both self-tests, WebKit 79/79, sweeps clean at 390 and 375.
+
 ## 2026-11-21 - Rewards: what Vitality and Sanlam Reality pay for his week (LEDGER 39)
 - A Rewards card on Track › Regions under the weekly quests, and one chip per switched-on programme on each quest line (lifts, runs, step days) on Home and Track. Vitality and Sanlam Reality are on by default; Strava challenges, adiClub, Sweatcoin and the Clicks and Dis-Chem cards are listed but off; wagers, crypto and paid-medal schemes are listed with a warning; the rest are left out with reasons.
 - The weekly tally counts only what his own log proves and always says "at least": runs of 30 min or more at 5.5 km/h or faster, steps bands, races by distance, one activity a day, the 900 cap (1,200 with Endurance). Heart-rate points are never counted. Sanlam points count only on Plus or Core, the race only when he marks a Sanlam product and claims within three months, the Wellness Check only for the principal member.

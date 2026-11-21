@@ -2,7 +2,7 @@
 // build it) with a mock window.claude.use: db + user (account copy) and "sample" as sample.d.ts describes it (a function + .json + .limits, onText in
 // chunks, any error code on demand, signal honoured, a call log on window.top.__aicalls). AI_SHOTS=<folder> also writes the screenshots.
 const puppeteer=require('puppeteer');const path=require('path');const fs=require('fs');const http=require('http');
-const {fontReply}=require('./fontroute');
+const {fontReply,fontsOff}=require('./fontroute');
 const MOCK=(iso)=>{const R=Date;const fixed=new R(iso+'T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(fixed);else super(...a);}static now(){return fixed;}}window.Date=M;};
 const MOCKS=`(function(){var T=window.top;T.__mdb=T.__mdb||{};T.__aicalls=T.__aicalls||[];T.__limcalls=T.__limcalls||0;T.__usecalls=T.__usecalls||[];
   function ref(p){return {get:function(){var e=Object.prototype.hasOwnProperty.call(T.__mdb,p);return Promise.resolve({id:p.split('/').pop(),exists:e,data:function(){return e?T.__mdb[p]:undefined;},metadata:{fromCache:false,hasPendingWrites:false}});},
@@ -39,7 +39,7 @@ async function start(){const b=await puppeteer.launch({headless:'new',args:['--n
   const open=async(o)=>{o=o||{};cur={iso:o.iso||'2026-11-28',seed:o.seed||'',w:o.w||390};const c=await b.createBrowserContext();const q=await c.newPage();await q.setRequestInterception(true);
     q.on('request',r=>{const u=r.url();if(u.startsWith(base)||u.startsWith('data:')||u.startsWith('blob:')||u.startsWith('about:'))r.continue();else r.respond(fontReply(u)||{status:200,contentType:'text/css',body:''});});
     q.__errs=[];q.on('pageerror',e=>q.__errs.push(e.message));q.on('console',m=>{if(m.type()==='error')q.__errs.push('console: '+m.text());});
-    await q.evaluateOnNewDocument((ai,nc)=>{if(window===window.top){window.__ai=ai;window.__noclaude=nc;}},o.ai||{},!!o.noclaude);
+    await q.evaluateOnNewDocument(fontsOff());await q.evaluateOnNewDocument((ai,nc)=>{if(window===window.top){window.__ai=ai;window.__noclaude=nc;}},o.ai||{},!!o.noclaude);
     await q.setViewport({width:cur.w,height:844,deviceScaleFactor:o.dsf||1});await q.goto(base+'/',{waitUntil:'load'});
     let f=null;for(let i=0;i<80;i++){f=q.frames().find(x=>x.url().includes('/frame'));if(f){const ok=await f.evaluate(()=>typeof DB!=='undefined'&&!!document.getElementById('view-home')&&!document.querySelector('#view-home .boot-ph')).catch(()=>false);if(ok)break;}await W(100);}
     await W(o.settle==null?1200:o.settle);     // the boot chain starts at 600 ms; use() answers after 40 ms

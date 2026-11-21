@@ -392,8 +392,8 @@ const LEG_A_PREV={ga1:sets([[3,110],[8,100],[8,100],[8,100],[8,100]]),ga2:sets([
  T('calendar: no typed distances left, unverified Pretoria date removed, club heading honest',c.stale===0&&!c.pta&&/Weekly, free, near home/.test(c.t)&&!/inside 10 km|within about 15 km/.test(c.t));
  T('calendar (26 Sep): anchors start with HYROX (Deadly Dozen and Warrior #2 have run)',/not for runners:\s*Virgin Active HYROX Johannesburg/.test(c.box),c.box.slice(0,160));
  T('calendar: verified additions render with computed distances',/Fat Cats 10K[\s\S]{0,200}~16 km from home/.test(c.t)&&/Sandton Half Marathon/.test(c.t),'');
- const sh=await q.evaluate(()=>({d:document.querySelector('meta[name=description]').content,f:document.querySelector('link[href*="fonts.googleapis.com/css2"]').media,mf:!!document.querySelector('link[rel=manifest]')}));
- T('shell: description retired the 15K race, fonts are non-blocking, no manifest link on file://',!/15K|race plan/.test(sh.d)&&sh.f==='all'&&!sh.mf,JSON.stringify(sh));
+ const sh=await q.evaluate(()=>({d:document.querySelector('meta[name=description]').content,f:document.querySelectorAll('link[href*="fonts.g"]').length===0&&!!document.querySelector('style[data-fonts]'),mf:!!document.querySelector('link[rel=manifest]')}));
+ T('shell: description retired the 15K race, fonts are inlined (no Google Fonts link at all, P1), no manifest link on file://',!/15K|race plan/.test(sh.d)&&sh.f===true&&!sh.mf,JSON.stringify(sh));
  for(const v of ['home','lift','run','roadmap','fuel','numbers','track','guide']){await q.evaluate(n=>switchView(n),v);await wait(120);}
  T('X16: all eight views, no errors',q.__errs.length===0,q.__errs.join('|'));await done(q);}
 
@@ -517,7 +517,7 @@ const nextT=async q=>q.evaluate(()=>[...document.querySelectorAll('#liftBody .ne
   for(let i=0;i<80;i++){await wait(100);if(await q.evaluate(t0=>{const t=document.getElementById('toast').innerText;return /^(Saved|Replaced) · /.test(t)&&t!==t0;},t0))break;}await wait(300);};
  await pick('front');await pick('side');await pick('front','2026-12-26');
  const r=await q.evaluate(async()=>{const a=await phAll();return {n:a.length,ids:a.map(p=>p.id).join(),type:a[0].blob.type,long:Math.max(a[0].w,a[0].h),figs:document.querySelectorAll('#phBody .ph-cmp figure').length,caps:[...document.querySelectorAll('#phBody figcaption')].map(f=>f.innerText.replace(/\s+/g,' ')),rows:document.querySelectorAll('#phBody .log-row').length,foot:(document.querySelector('#phBody .ph-foot')||{innerText:''}).innerText,imgOk:[...document.querySelectorAll('#phBody .ph-cmp img')].every(i=>i.complete&&i.naturalWidth>0)};});
- T('Z photos: picked through the file chooser, stored on the phone as 1280 px JPEGs; front compares first vs latest; list and storage line',/No photos yet/.test(empty)&&r.n===3&&r.ids==='2026-11-29-front,2026-11-29-side,2026-12-26-front'&&r.type==='image/jpeg'&&r.long===1280&&r.figs===2&&/^First 29 Nov/.test(r.caps[0])&&/^Latest 26 Dec/.test(r.caps[1])&&r.rows===3&&/3 photos · \d+ KB on this phone/.test(r.foot)&&/not in the JSON backup/.test(r.foot)&&r.imgOk,JSON.stringify(r));
+ T('Z photos: picked through the file chooser, stored on the phone at 1280 px (WebP where the browser writes it, else JPEG); front compares first vs latest; list and storage line',/No photos yet/.test(empty)&&r.n===3&&r.ids==='2026-11-29-front,2026-11-29-side,2026-12-26-front'&&/^image\/(webp|jpeg)$/.test(r.type)&&r.long===1280&&r.figs===2&&/^First 29 Nov/.test(r.caps[0])&&/^Latest 26 Dec/.test(r.caps[1])&&r.rows===3&&/3 photos · \d+ KB on this phone/.test(r.foot)&&/not in the JSON backup/.test(r.foot)&&r.imgOk,JSON.stringify(r));
  await q.evaluate(()=>(document.querySelector('[data-phdel="2026-11-29-side"]')||{click(){}}).click());await wait(400);const d1=await q.evaluate(async()=>(await phAll()).length);
  await q.evaluate(()=>(document.querySelector('#toast .undo')||{click(){}}).click());await wait(500);const d2=await q.evaluate(async()=>({n:(await phAll()).length,rows:document.querySelectorAll('#phBody .log-row').length}));
  await q.reload({waitUntil:'networkidle0'});await wait(900);await open();await wait(700);const d3=await q.evaluate(async()=>({n:(await phAll()).length,rows:document.querySelectorAll('#phBody .log-row').length}));
@@ -1029,8 +1029,8 @@ const cpage=async(seed,cloud,mode)=>{const c=await b.createBrowserContext();cons
  await q.setRequestInterception(true);q.on('request',r=>{const u=r.url();if(u.startsWith('file:')||u.startsWith('data:')||u.startsWith('blob:'))return r.continue();const f=fontReply(u);if(f)return r.respond(f);r.respond({status:200,contentType:'text/css',body:''});});
  await q.evaluateOnNewDocument(MOCK,'2026-11-30');await q.evaluateOnNewDocument(STORAGE);await q.evaluateOnNewDocument(CSPWATCH);
  await q.goto('file://'+path.resolve('ComebackBlueprint.html'),{waitUntil:'networkidle0'});await q.setViewport({width:390,height:844,deviceScaleFactor:1});
- let r=null;for(let i=0;i<40&&!(r&&r.mano&&r.media==='all');i++){await wait(150);r=await tryEval(q,()=>{const L=[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/['"]/g,''));const lk=document.querySelector('link[rel=stylesheet][href*="fonts.googleapis"]');return {L:[...new Set(L)],mano:L.includes('Manrope'),csp:window.__csp.length,media:lk?lk.media:'none'};});}
- T('AD-S1 CSP: with the policy on, the Google Fonts stylesheet (swapped in by its inline onload) and the font files still load in the shell, with no violation and no console error',!!r&&r.mano&&r.media==='all'&&r.csp===0&&errs.length===0,JSON.stringify(r)+errs.join('|').slice(0,160));
+ let r=null;for(let i=0;i<40&&!(r&&r.mano&&r.media==='none');i++){await wait(150);r=await tryEval(q,()=>{const L=[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/['"]/g,''));const lk=document.querySelector('link[rel=stylesheet][href*="fonts.googleapis"]');return {L:[...new Set(L)],mano:L.includes('Manrope'),csp:window.__csp.length,media:lk?lk.media:'none'};});}
+ T('AD-S1 CSP: with the policy on (font-src data:), the inlined fonts load in the shell with no Google Fonts stylesheet, no violation and no console error',!!r&&r.mano&&r.media==='none'&&r.csp===0&&errs.length===0,JSON.stringify(r)+errs.join('|').slice(0,160));
  await c.close();}
 
 // ---- (c) A save that did not land is never reported as saved
@@ -2049,7 +2049,7 @@ const GOODSLEEP=[{date:'2027-01-25',h:7.6},{date:'2027-01-26',h:7.4},{date:'2027
  const poll=async(f,fn,ms)=>{const t=Date.now();let v;while(Date.now()-t<(ms||6000)){v=await ev(f,fn);if(v&&!v.err&&v!==false)return v;await W(150);}return v;};
  // shape
  const shape={doctype:/<!doctype/i.test(ART),html:/<html[\s>]/i.test(ART),head:/<head[\s>]/i.test(ART),body:/<body[\s>]/i.test(ART),title:(ART.match(/<title>([^<]*)<\/title>/)||[])[1],sheets:(ART.match(/<link[^>]*rel="stylesheet"[^>]*>/g)||[]).length,first:ART.slice(0,7)};
- T('AI shape: dist/artifact.html has no doctype/html/head/body, starts with its <title>, the title is the name only, one font stylesheet',!shape.doctype&&!shape.html&&!shape.head&&!shape.body&&shape.title==='The Comeback Blueprint'&&shape.sheets===1&&shape.first==='<title>',JSON.stringify(shape));
+ T('AI shape: dist/artifact.html has no doctype/html/head/body, starts with its <title>, the title is the name only, no stylesheet link (fonts inlined, P1)',!shape.doctype&&!shape.html&&!shape.head&&!shape.body&&shape.title==='The Comeback Blueprint'&&shape.sheets===0&&shape.first==='<title>',JSON.stringify(shape));
  // 1. account copy: a weigh-in typed into Quick log reaches the private db subtree; wipe + reload restores it
  {const q=await host();let f=await q.frameNow();
   const pre=await ev(f,()=>({confirmBlocked:confirm('x')===false,manifest:!!document.querySelector('link[rel="manifest"]')}));
@@ -3077,7 +3077,7 @@ const GOODSLEEP=[{date:'2027-01-25',h:7.6},{date:'2027-01-26',h:7.4},{date:'2027
   T('GMV4 keyboard cycle (R1-1): a pick of the biceps leaves the Track figure at triceps+biceps (picked last) and Home at the group\'s own order; a pick of the forearms outlines the forearms alone on Track, nothing on Home, says "Forearms: not tracked by the game." and selects no row; Mid back and lats keeps the picked part last either way; a bar row selects the group in its own order on both',
    r.bi&&r.bi.join()==='triceps+biceps,biceps+triceps'&&r.fa[0]==='forearms'&&r.fa[1]===''&&r.fa[2]==='Forearms: not tracked by the game.'&&r.fa[3]===''&&r.mb.join()==='lats+midback,midback+lats'&&r.la.join()==='midback+lats,midback+lats'&&r.bar.join()==='biceps+triceps,biceps+triceps'&&r.errs===0,J(r));}
  // GMV5 boot without a figure (R1-2, R1-3, R2): Home left before the gate opens mounts nothing; a device that cannot draw never drops a box it shows; a browser without WebGL2 never draws one
- {const vq=async(iso,init)=>{const c=await b.createBrowserContext(),p=await c.newPage();await p.setViewport({width:390,height:844,deviceScaleFactor:1});await OFFLINE(p);p.__errs=[];p.on('pageerror',e=>p.__errs.push(e.message));p.on('console',m=>{if(m.type()==='error')p.__errs.push(m.text());});
+ {const vq=async(iso,init,vh)=>{const c=await b.createBrowserContext(),p=await c.newPage();await p.setViewport({width:390,height:vh||844,deviceScaleFactor:1});await OFFLINE(p);p.__errs=[];p.on('pageerror',e=>p.__errs.push(e.message));p.on('console',m=>{if(m.type()==='error')p.__errs.push(m.text());});
     await p.evaluateOnNewDocument(MOCK,iso);await p.evaluateOnNewDocument(STORAGE);await p.evaluateOnNewDocument(SEED({})+GMH+init);await p.goto('file://'+path.resolve('ComebackBlueprint.html'),{waitUntil:'domcontentloaded'});p.__ctx=c;return p;};
   const LS="window.__ls=[];try{new PerformanceObserver(function(l){l.getEntries().forEach(function(e){if(!e.hadRecentInput)window.__ls.push([e.startTime,e.value]);});}).observe({type:'layout-shift',buffered:true});}catch(e){}";
   const S0="document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){var w=document.getElementById('gmWrap-home'),c=document.getElementById('gmCard'),p=document.getElementById('gmCrHome');window.__s0={t:performance.now(),wrap:w?w.className:null,card:c?c.getBoundingClientRect().height:0,top:c?c.getBoundingClientRect().top:0,ptr:!!p&&!p.hidden&&getComputedStyle(p).visibility!=='hidden'};},250);});";
@@ -3088,14 +3088,15 @@ const GOODSLEEP=[{date:'2027-01-25',h:7.6},{date:'2027-01-26',h:7.4},{date:'2027
   /* (b) cannot draw, card on screen at boot (empty log): the box keeps its size and says so; no shift; the next render draws the card without it */
   const qb=await vq('2026-11-17','window.__mmSupported=false;'+MMS+LS+S0);await wait(3400);const b1=await qb.evaluate(st);const b2=await qb.evaluate(async()=>{switchView('home');await new Promise(r=>setTimeout(r,100));const w=document.getElementById('gmWrap-home'),p=document.getElementById('gmCrHome');return {wrap:w?w.className:null,ptr:!!p&&!p.hidden&&getComputedStyle(p).visibility!=='hidden',nofig:document.getElementById('gmCard').classList.contains('gm-nofig')};});
   const b0=await qb.evaluate(()=>window.__s0);b0.errs=qb.__errs.length;await done(qb);
-  /* (c) cannot draw, card below the screen (the demo log): the box folds away when the gate opens, before he scrolls to it */
-  const qc=await vq('2026-11-17',DEMO+';window.__mmSupported=false;'+MMS+LS+S0);await wait(3400);const c1=await qc.evaluate(st);const c0=await qc.evaluate(()=>window.__s0);c0.errs=qc.__errs.length;await done(qc);
+  /* (c) cannot draw, card below the screen (the demo log): the box folds away when the gate opens, before he scrolls to it. The screen is 780 tall:
+     with the inlined fonts (polish A) the card's top sits at about 824 on the demo log, inside an 844 screen, so 844 no longer puts it below */
+  const qc=await vq('2026-11-17',DEMO+';window.__mmSupported=false;'+MMS+LS+S0,780);await wait(3400);const c1=await qc.evaluate(st);const c0=await qc.evaluate(()=>window.__s0);c0.errs=qc.__errs.length;await done(qc);
   /* (d) no WebGL2 in the browser at all: the card is drawn without a box and without the pointer from the first paint */
   const qd=await vq('2026-11-17','try{Object.defineProperty(window,"WebGL2RenderingContext",{value:undefined,configurable:true,writable:true});}catch(e){}'+MMS+LS+S0);await wait(2600);const d1=await qd.evaluate(st);const d0=await qd.evaluate(()=>({s0:window.__s0,sup:__mm.calls.filter(c=>c.n==='supported'||c.n==='mount').length}));d0.errs=qd.__errs.length;await done(qd);
   T('GMV5 boot without a figure: (R1-2) Home left for Lift 250 ms after boot makes no support check and no mount while away, and mounts when Home is shown again; (R1-3) a device that cannot draw, with the card on screen, keeps the box at its size with "The figure cannot be drawn on this device. Every number is here." (no layout shift, the pointer hidden, the line pointing to Track › Regions) and the next render draws the card without the box; (R2) with the card below the screen the box folds away when the gate opens, before he scrolls; a browser without WebGL2 draws no box and no pointer from the first paint',
    a.view==='view-lift'&&a.mounts===0&&a.sup===0&&!a.h&&a.canvas===0&&a.back==='on'&&a.m2===1&&a.errs===0
    &&!!b0&&b0.wrap==='gm-figwrap'&&b0.top<844&&/\bmsg\b/.test(b1.wrap||'')&&b1.gm==='none'&&Math.abs(b1.card-b0.card)<0.5&&!b1.ptr&&b1.fig==='The figure cannot be drawn on this device. Every number is here.'&&b1.line==='Each muscle’s numbers are on Track › Regions.'&&b1.cls===0&&/\bnone\b/.test(b2.wrap||'')&&!b2.ptr&&b2.nofig&&b0.errs===0
-   &&c0.wrap==='gm-figwrap'&&c0.top>=844&&/\bnone\b/.test(c1.wrap||'')&&!c1.ptr&&c1.card<c0.card&&c0.errs===0
+   &&c0.wrap==='gm-figwrap'&&c0.top>=780&&/\bnone\b/.test(c1.wrap||'')&&!c1.ptr&&c1.card<c0.card&&c0.errs===0
    &&/\bnone\b/.test(d0.s0&&d0.s0.wrap||'')&&d0.s0.ptr===false&&/\bnone\b/.test(d1.wrap||'')&&d0.sup===0&&d1.cls===0&&d0.errs===0,J({a,b0,b1,b2,c0,c1,d0,d1}));}
  // ---- the real 3D module (vis/threed, inlined by build.py from src/mm): it mounts, front and back muscles can be tapped, a bar row selects and turns it, no WebGL gives the numbers card ----
  {const BIG="(function(){var P=JSON.parse;window.__P=P;window.__bigParse=0;JSON.parse=function(t){if(typeof t==='string'&&t.length>100000)window.__bigParse++;return P.apply(this,arguments);};})();";
@@ -3312,5 +3313,306 @@ const GOODSLEEP=[{date:'2027-01-25',h:7.6},{date:'2027-01-26',h:7.4},{date:'2027
  T('RW25 the Rewards pages raised no page or console errors',rwErrs===0,String(rwErrs));
 }
 // ===== end RW =====
+// ===== P1. Boot, fonts and first paint (polish package P1, 17 Nov 2026): fonts inlined from src/fonts, metric-matched fallbacks, loaded weights only, tabular counters =====
+// P1_RUN=1 node p1run.js runs this block alone (mutation runs). Every step is null-safe: a missing element is a FAIL line, never a crash.
+{const {fontReply,FONTS_OFF}=require('./fontroute');
+ const P1W=ms=>new Promise(r=>setTimeout(r,ms));
+ const P1READ=f=>{try{return fs.readFileSync(path.resolve(f),'utf8');}catch(e){return '';}};
+ const P1APP=P1READ('../dist/ComebackBlueprint.html'),P1ART=P1READ('../dist/artifact.html');
+ const P1DEMO=P1READ('fixtures/demo.setup.js').trim().split('\n').pop();
+ const P1FAM=['IBM Plex Mono','Manrope','Space Grotesk'];
+ const P1J=o=>JSON.stringify(o===undefined?null:o).slice(0,700);
+ // a page in its own context: route = 'fonts' (Google answered from qa/fonts, as every helper does), 'empty', 'abort', or a delay in ms
+ const p1page=async(iso,{seed,route,init,w}={})=>{const c=await b.createBrowserContext();const q=await c.newPage();q.__errs=[];q.on('pageerror',e=>q.__errs.push(e.message));q.__ext=[];
+  await q.setRequestInterception(true);
+  q.on('request',r=>{const u=r.url();if(u.startsWith('file:')||u.startsWith('data:')||u.startsWith('blob:'))return r.continue();
+   if(route==='abort')return r.abort('internetdisconnected');
+   const answer=()=>{q.__ext.push({u:u.slice(0,70),t:Date.now()});r.respond((route!=='empty'&&fontReply(u))||{status:200,contentType:'text/css',body:''}).catch(()=>{});};
+   if(typeof route==='number')setTimeout(answer,route);else answer();});
+  await q.evaluateOnNewDocument(MOCK,iso);await q.evaluateOnNewDocument('try{localStorage.clear();}catch(e){}'+(seed||''));if(init)await q.evaluateOnNewDocument(init);
+  await q.setViewport({width:w||390,height:844,deviceScaleFactor:1});return {c,q};};
+ const p1go=async(q,until)=>{try{await q.goto('file://'+path.resolve('ComebackBlueprint.html'),{waitUntil:until||'load',timeout:60000});return true;}catch(e){q.__errs.push('goto '+e.message);return false;}};
+ const p1ev=async(q,fn,a)=>{try{return await q.evaluate(fn,a);}catch(e){return {err:String(e&&e.message||e).slice(0,200)};}};
+ const P1LOADED=()=>document.fonts.ready.then(()=>[...new Set([...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/['"]/g,'')))]);
+ // P1-1 the shipped files: no Google Fonts anywhere; five inlined latin faces, byte-identical to src/fonts; the OFL notice; CSP font-src data:; fallbacks in every stack
+ {const one=(doc,name)=>{const o={name,len:doc.length};o.google=/fonts\.googleapis|fonts\.gstatic/.test(doc);o.links=(doc.match(/<link[^>]*rel="?(stylesheet|preconnect|preload)/gi)||[]).length;o.imports=/@import/.test(doc);
+   const m=doc.match(/<style data-fonts>([\s\S]*?)<\/style>/g)||[];o.blocks=m.length;const css=m[0]||'';
+   const faces=[...css.matchAll(/@font-face\{font-family:'([^']+)';font-style:normal;font-weight:([0-9 ]+);font-display:swap;src:url\(data:font\/woff2;base64,([A-Za-z0-9+\/=]+)\) format\('woff2'\);unicode-range:[^}]+\}/g)];
+   o.faces=faces.map(f=>f[1]+' '+f[2]);const FILES={'IBM Plex Mono 400':'ibmplexmono-400-latin.woff2','IBM Plex Mono 500':'ibmplexmono-500-latin.woff2','IBM Plex Mono 600':'ibmplexmono-600-latin.woff2','Manrope 400 800':'manrope-latin.woff2','Space Grotesk 500 700':'spacegrotesk-latin.woff2'};
+   o.bytesOK=faces.length===5&&faces.every(f=>{const fn=FILES[f[1]+' '+f[2]];if(!fn)return false;let src=null;try{src=fs.readFileSync(path.resolve('../src/fonts/'+fn));}catch(e){}return !!src&&Buffer.from(f[3],'base64').equals(src);});
+   o.ofl=/SIL OPEN FONT LICENSE Version 1\.1/.test(css)&&/Copyright 2018 The Manrope Project Authors/.test(css)&&/Copyright 2020 The Space Grotesk Project Authors/.test(css)&&/Copyright © 2017 IBM Corp\./.test(css);
+   o.fallback=P1FAM.every(f=>(doc.match(new RegExp("@font-face\\{font-family:'"+f+" Fallback';[^}]*size-adjust:[0-9.]+%;ascent-override:[0-9.]+%;descent-override:[0-9.]+%;line-gap-override:0%;unicode-range:","g"))||[]).length===({'IBM Plex Mono':2,'Manrope':10,'Space Grotesk':10})[f]);
+   o.stacks=/--f-display:'Space Grotesk','Space Grotesk Fallback',/.test(doc)&&/--f-body:'Manrope','Manrope Fallback',/.test(doc)&&/--f-mono:'IBM Plex Mono','IBM Plex Mono Fallback',/.test(doc);return o;};
+  const a=one(P1APP,'app'),c=one(P1ART,'artifact');const csp=(P1APP.match(/http-equiv="Content-Security-Policy" content="([^"]*)"/)||[])[1]||'';
+  const ok=o=>o.len>0&&!o.google&&o.links===0&&!o.imports&&o.blocks===1&&o.faces.length===5&&o.bytesOK&&o.ofl&&o.fallback&&o.stacks;
+  T('P1-1 dist: neither file has any Google Fonts link, preconnect or @import; each inlines the five latin faces (Plex Mono 400/500/600, Manrope 400-800, Space Grotesk 500-700) byte-identical to src/fonts with font-display:swap, carries the OFL notice and the metric-matched fallback faces; the app policy is font-src data: only',
+   ok(a)&&ok(c)&&/font-src data:;/.test(csp)&&!/https:/.test(csp),P1J({a,c,csp:csp.slice(0,140)}));}
+ // P1-2 boot: with every external request held 1500 ms, Home's text is painted before any of them arrives
+ {const PROBE=()=>{window.__p1home=null;const tick=()=>{const h=document.getElementById('view-home');if(h&&!h.querySelector('.boot-ph')&&h.innerText.trim().length>80){window.__p1home=performance.now();requestAnimationFrame(()=>setTimeout(()=>{window.__p1paint=performance.now();},0));return;}requestAnimationFrame(tick);};requestAnimationFrame(tick);};
+  const {c,q}=await p1page('2026-11-28',{seed:P1DEMO,route:1500,init:PROBE});await p1go(q,'load');await P1W(2600);
+  const m=await p1ev(q,()=>({fcp:Math.round((performance.getEntriesByName('first-contentful-paint')[0]||{}).startTime||-1),home:Math.round(window.__p1home||-1),paint:Math.round(window.__p1paint||-1),origin:performance.timeOrigin}));
+  const ext=(q.__ext||[]).map(x=>Math.round(x.t-(m.origin||0)));const first=ext.length?Math.min(...ext):null;
+  T('P1-2 boot: with every external request held 1500 ms, Home text is painted (and first contentful paint happens) before any of them arrives and under 1500 ms',!m.err&&m.paint>0&&m.paint<1500&&m.fcp>0&&m.fcp<1500&&(first===null||m.paint<first),P1J({m:{fcp:m.fcp,home:m.home,paint:m.paint,err:m.err},ext,first}));await c.close();}
+ // P1-3 network cut: the three families load from the file itself
+ {const {c,q}=await p1page('2026-11-28',{route:'abort'});await p1go(q,'load');await P1W(1200);const L=await p1ev(q,P1LOADED);
+  T('P1-3 offline: with every external request refused, document.fonts reports IBM Plex Mono, Manrope and Space Grotesk loaded',Array.isArray(L)&&P1FAM.every(f=>L.includes(f))&&q.__errs.length===0,P1J({L,e:q.__errs}));await c.close();}
+ // P1-4 fallback vs real fonts: Home, Lift, the Run tab and the Lift run section (#runSec) move by under 1%, at 390, 375 and 320, empty log and demo log
+ {const meas=async(off,iso,seed,w)=>{const {c,q}=await p1page(iso,{seed,route:off?'empty':'fonts',init:off?FONTS_OFF:'',w});await p1go(q,'networkidle0');await P1W(900);
+   const r=await p1ev(q,async()=>{await document.fonts.ready;const L=[...new Set([...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/['"]/g,'')))];const bad=[...document.fonts].filter(f=>f.status==='error').map(f=>f.family+' '+f.weight);const H=()=>document.documentElement.scrollHeight;const W=ms=>new Promise(z=>setTimeout(z,ms));
+     switchView('home');await W(300);const home=H();switchView('lift');await W(300);const lift=H();const rs=document.getElementById('runSec');const runSec=rs?Math.round(rs.getBoundingClientRect().height):0;switchView('run');await W(300);const run=H();switchView('home');return {L,bad,home,lift,runSec,run};});await c.close();return r||{};};
+  const K=['home','lift','run','runSec'],rows=[];let offOK=true,realOK=true;
+  for(const [sn,iso,seed] of [['empty','2026-11-17',''],['demo','2026-11-28',P1DEMO]])for(const w of [390,375,320]){
+   const real=await meas(false,iso,seed,w),off=await meas(true,iso,seed,w);const row={sn,w};let worst=0;
+   for(const k of K){const x=real[k]>0&&off[k]>0?+((off[k]-real[k])/real[k]*100).toFixed(2):99;row[k]=x;worst=Math.max(worst,Math.abs(x));}row.worst=worst;rows.push(row);
+   offOK=offOK&&Array.isArray(off.L)&&!P1FAM.some(f=>off.L.includes(f))&&P1FAM.every(f=>off.L.includes(f+' Fallback'))&&Array.isArray(off.bad)&&off.bad.length===0;realOK=realOK&&Array.isArray(real.L)&&P1FAM.every(f=>real.L.includes(f));}
+  const worst=rows.length?Math.max(...rows.map(r=>r.worst)):99;
+  T('P1-4 fallback fonts: with the inlined faces stripped (FONTS=0), all three fallback families load (no face in error) and keep Home, Lift, the Run tab and the Lift run section (#runSec) within 1% of their height in the real fonts, at 390, 375 and 320 px, on an empty log and on the demo log',offOK&&realOK&&rows.length===6&&worst<1,P1J({worst,offOK,realOK,rows:rows.map(r=>r.sn[0]+r.w+' h'+r.home+' l'+r.lift+' r'+r.run+' s'+r.runSec)}));}
+ // P1-5 + P1-6: all eight views at 390 and 375: inputs 16 px or more, no sideways scroll; every visible text asks only for a weight that is loaded
+ {const SCAN=async()=>{const W=ms=>new Promise(z=>setTimeout(z,ms));const small=[],wide=[],odd=[];
+   const ok=(fam,w)=>fam==='IBM Plex Mono'?[400,500,600].includes(w):fam==='Manrope'?(w>=400&&w<=800):fam==='Space Grotesk'?(w>=500&&w<=700):true;
+   const look=(v)=>{const d=document.documentElement;if(d.scrollWidth>d.clientWidth+1)wide.push(v+':'+d.scrollWidth);
+    document.querySelectorAll('#view-'+v.split(':')[0]+' input,#view-'+v.split(':')[0]+' select,#view-'+v.split(':')[0]+' textarea').forEach(e=>{if(/file|checkbox|radio|range|hidden/.test(e.type))return;const f=parseFloat(getComputedStyle(e).fontSize);if(f<16)small.push(v+':'+(e.id||e.className||e.tagName)+':'+f);});
+    document.querySelectorAll('body *').forEach(e=>{if(!e.getClientRects().length)return;if(![...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()))return;const cs=getComputedStyle(e);if(cs.visibility==='hidden')return;const fam=cs.fontFamily.split(',')[0].replace(/['"]/g,'').trim();const w=+cs.fontWeight;if(!ok(fam,w))odd.push(v+'|'+fam+' '+w+'|'+(e.id||String(e.className&&e.className.baseVal!==undefined?e.className.baseVal:e.className)||e.tagName)+'|'+e.textContent.trim().slice(0,24));});};
+   const views=[...document.querySelectorAll('.tab[data-view]')].map(x=>x.dataset.view);
+   for(const v of views){switchView(v);await W(250);if(v==='track'){for(const t of document.querySelectorAll('[data-tp]')){t.click();await W(150);look(v+':'+t.dataset.tp);}}else look(v);
+    document.querySelectorAll('#view-'+v+' details:not([open])').forEach(d=>d.open=true);document.querySelectorAll('#view-'+v+' .tool:not(.open) .tool-h').forEach(h=>{try{h.click();}catch(e){}});await W(150);look(v+'+open');}
+   return {views:views.length,small:[...new Set(small)],wide:[...new Set(wide)],odd:[...new Set(odd)]};};
+  const res={};for(const w of [390,375]){const {c,q}=await p1page('2026-11-28',{seed:P1DEMO,w});await p1go(q,'networkidle0');await P1W(1200);res[w]=await p1ev(q,SCAN);await c.close();}
+  // P1-R2-2: the pre-Day-1 start banner (Sat 14 Nov) and Day 1 itself (Sun 15 Nov) show text that the demo date never shows
+  const early={};for(const iso of ['2026-11-14','2026-11-15']){const {c,q}=await p1page(iso,{w:390});await p1go(q,'networkidle0');await P1W(1200);early[iso]=await p1ev(q,SCAN);await c.close();}
+  const r3=res[390]||{},r7=res[375]||{};const eOK=['2026-11-14','2026-11-15'].every(d=>early[d]&&early[d].views===8&&Array.isArray(early[d].odd)&&early[d].odd.length===0);
+  T('P1-5 every input, select and textarea is 16 px or more and no view scrolls sideways, at 390 and at 375 px, on all eight views (Track: every pane; tools and details open)',r3.views===8&&r7.views===8&&r3.small.length===0&&r7.small.length===0&&r3.wide.length===0&&r7.wide.length===0,P1J({390:{v:r3.views,s:r3.small,w:r3.wide,e:r3.err},375:{v:r7.views,s:r7.small,w:r7.wide,e:r7.err}}));
+  T('P1-6 loaded weights only (PX12): on 28 Nov (demo log, 390 and 375) and on the pre-Day-1 and Day-1 dates (14 and 15 Nov, 390), no visible text on any of the eight views asks for IBM Plex Mono outside 400/500/600, Manrope outside 400-800 or Space Grotesk outside 500-700',r3.views===8&&Array.isArray(r3.odd)&&r3.odd.length===0&&Array.isArray(r7.odd)&&r7.odd.length===0&&eOK,P1J({odd:(r3.odd||[]).slice(0,8),e:r3.err,d14:((early['2026-11-14']||{}).odd||[]).slice(0,6),d15:((early['2026-11-15']||{}).odd||[]).slice(0,6),ev:[(early['2026-11-14']||{}).views,(early['2026-11-15']||{}).views]}));}
+ // P1-4c (integration with the game and Rewards layers): the Home body card and Track > Regions (figure, quests, Rewards card, details open) keep
+ // their real-font height within 1% when the inlined faces are stripped, on the demo log (28 Nov) and on Day 1 (15 Nov), at 390, 375 and 320
+ {const H=async()=>{const W=ms=>new Promise(z=>setTimeout(z,ms));const o={};const g=document.querySelector('#view-home [class*="gm-"]');const cd=g&&(g.closest('.card')||g);o.card=cd?cd.getBoundingClientRect().height:-1;
+   switchView('track');await W(300);const t=document.querySelector('.track-tabs button[data-tp="regions"]');if(t){t.click();await W(500);}
+   document.querySelectorAll('#view-track details:not([open])').forEach(d=>d.open=true);await W(300);const rp=document.getElementById('tp-regions');o.reg=rp?rp.getBoundingClientRect().height:-1;
+   o.rw=!!(rp&&rp.querySelector('#rwCard'));return o;};
+  const rows=[];for(const iso of ['2026-11-28','2026-11-15'])for(const w of [390,375,320]){const m={};for(const off of [0,1]){const {c,q}=await p1page(iso,{seed:iso==='2026-11-28'?P1DEMO:'',w,init:off?FONTS_OFF:null});await p1go(q,'networkidle0');await P1W(1200);m[off]=await p1ev(q,H);await c.close();}
+   const a=m[0]||{},z=m[1]||{};const pc=(x,y)=>x>0&&y>0?Math.abs(y-x)/x*100:99;rows.push({k:iso.slice(5)+'@'+w,card:+pc(a.card,z.card).toFixed(2),reg:+pc(a.reg,z.reg).toFixed(2),rw:!!a.rw});}
+  T('P1-4c fallback vs real fonts on the game and Rewards screens: the Home body card and Track > Regions (figure, quests, Rewards card) differ in height by under 1% on 28 Nov (demo) and 15 Nov at 390, 375 and 320',
+   rows.length===6&&rows.every(r=>r.card<1&&r.reg<1&&r.rw),P1J(rows));}
+ // P1-7 the counters that tick use tabular figures (the rest timer, the header boxes, the Home ring)
+ {const {c,q}=await p1page('2026-11-28',{seed:P1DEMO});await p1go(q,'networkidle0');await P1W(1000);
+  const r=await p1ev(q,()=>{switchView('home');const els=[['restTime',document.getElementById('restTime')],['cdDays',document.getElementById('cdDays')],['cdWeek',document.getElementById('cdWeek')],['cdLab',document.querySelector('.cd-lab b')]];
+   return els.map(([n,e])=>{if(!e)return {n,miss:true};const cs=getComputedStyle(e);const keep=e.textContent;e.textContent='1111';const a=e.getBoundingClientRect().width;e.textContent='0000';const z=e.getBoundingClientRect().width;e.textContent='8888';const g=e.getBoundingClientRect().width;e.textContent=keep;
+    return {n,vn:cs.fontVariantNumeric,ff:cs.fontFeatureSettings,same:Math.abs(a-z)<0.05&&Math.abs(a-g)<0.05};});});
+  T('P1-7 tabular figures: the rest timer (#restTime), the header counters (#cdDays, #cdWeek) and the Home ring number ask for tabular-nums with "tnum" on, and 1111, 0000 and 8888 take the same width in each',Array.isArray(r)&&r.length===4&&r.every(x=>!x.miss&&/tabular-nums/.test(x.vn||'')&&!/"tnum" 0/.test(x.ff||'')&&x.same),P1J(r));await c.close();}
+ // P1-8 the OFL credit is on the Guide view as plain text
+ {const {c,q}=await p1page('2026-11-28',{});await p1go(q,'networkidle0');await P1W(900);
+  const r=await p1ev(q,async()=>{switchView('guide');await new Promise(z=>setTimeout(z,300));const e=document.getElementById('fontCredit');if(!e)return {miss:true};return {t:e.textContent,a:e.querySelectorAll('a').length,vis:!!e.offsetParent,fs:parseFloat(getComputedStyle(e).fontSize)};});
+  T('P1-8 OFL credit: the Guide view names Manrope, Space Grotesk and IBM Plex Mono with their copyright holders and the SIL Open Font License 1.1, as plain text (no link), at 11 px or more',!!r&&!r.miss&&r.vis&&r.a===0&&r.fs>=11&&/Manrope Project Authors/.test(r.t)&&/Space Grotesk Project Authors/.test(r.t)&&/IBM Corp\./.test(r.t)&&/SIL Open Font License 1\.1/.test(r.t)&&!/—/.test(r.t),P1J(r));await c.close();}
+ // P1-9 the header does not move when the real faces arrive: header.app height, the brand title and the two countdown boxes are the same in both fonts (430, 390, 375)
+ {const hd=async(off,w)=>{const {c,q}=await p1page('2026-11-17',{route:off?'empty':'fonts',init:off?FONTS_OFF:'',w});await p1go(q,'networkidle0');await P1W(700);
+   const r=await p1ev(q,async()=>{await document.fonts.ready;const g=s=>{const e=document.querySelector(s);if(!e)return -1;const b=e.getBoundingClientRect();return [Math.round(b.width*100)/100,Math.round(b.height*100)/100];};const t=g('.brand-txt h1');return {hdr:g('header.app'),h1:Array.isArray(t)?t[1]:t,cd:[...document.querySelectorAll('.cd-box')].map(e=>Math.round(e.getBoundingClientRect().width*100)/100),fit:[...document.querySelectorAll('.cd-box')].every(e=>{const s=e.querySelector('small'),bb=e.querySelector('b');if(!s||!bb)return false;const r=document.createRange();r.selectNodeContents(s);return r.getBoundingClientRect().width<=e.clientWidth-16+0.5&&bb.scrollWidth<=e.clientWidth-16+0.5;}),bf:(()=>{const e=document.querySelector('.cd-box');if(!e||typeof updateHeader!=='function'||typeof bfCheck!=='function')return -1;const k=window.bfCheck;window.bfCheck=()=>({over:true});updateHeader();const x=Math.round(e.getBoundingClientRect().width);window.bfCheck=k;updateHeader();return x;})()};});await c.close();return r||{};};
+  const out=[];let ok=true;for(const w of [430,390,375]){const a=await hd(false,w),f=await hd(true,w);const fit=a.fit,bf=a.bf;delete a.fit;delete f.fit;delete a.bf;delete f.bf;const same=JSON.stringify(a)===JSON.stringify(f)&&Array.isArray(a.hdr)&&a.hdr[1]>40&&(w<380||(fit===true&&bf>40&&bf<90));ok=ok&&same;out.push({w,same,a,f});}
+  T('P1-9 header holds still: header.app, the height of the brand title and the width of both countdown boxes are the same in the fallback and the real fonts at 430, 390 and 375 px, and in the real fonts each box label and number fits inside its box (and the body-fat label lets its box size itself)',ok&&out.length===3,P1J(out.filter(x=>!x.same).concat(out.length?[]:['none'])));}
+ // P1-10 boot with the inlined fonts: no layout shift at all while the faces swap in (390 px, empty and demo log)
+ {const LS=()=>{window.__p1ls=[];try{new PerformanceObserver(l=>{for(const e of l.getEntries())if(!e.hadRecentInput)window.__p1ls.push({t:Math.round(e.startTime),v:e.value,s:(e.sources||[]).map(x=>x.node?(x.node.nodeName+'.'+String(x.node.className||'').split(' ')[0]):'?').join(',')});}).observe({type:'layout-shift',buffered:true});}catch(e){window.__p1ls=null;}};
+  const out=[];for(const [iso,seed] of [['2026-11-17',''],['2026-11-28',P1DEMO]]){const {c,q}=await p1page(iso,{seed,route:'empty',init:LS});await p1go(q,'load');await P1W(2500);
+   const r=await p1ev(q,async()=>{await document.fonts.ready;return {ls:window.__p1ls,L:[...new Set([...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/['"]/g,'')))]};});await c.close();out.push(Object.assign({iso},r));}
+  const cls=out.map(r=>Array.isArray(r.ls)?r.ls.reduce((a,x)=>a+x.v,0):99);
+  T('P1-10 boot layout shift: with the fonts inlined, a cold boot of Home at 390 px records no layout shift (CLS 0) on an empty log and on the demo log, and the three real families end up loaded',out.length===2&&cls.every(x=>x===0)&&out.every(r=>Array.isArray(r.L)&&P1FAM.every(f=>r.L.includes(f))),P1J({cls,ls:out.map(r=>r.ls),L:out.map(r=>r.L)}));}
+ // P1-11 boot cost of the fonts (P1-R2-1): the inlined faces are in document.fonts before the first frame, the fallback faces are switched off
+ // without one being looked up, and at 4x CPU Home's text is painted no later than in a copy with every font face stripped (+140 ms margin)
+ {const FIRST=()=>{window.__p1first=null;window.__p1home=null;requestAnimationFrame(()=>{try{window.__p1first={ready:document.documentElement.hasAttribute('data-fonts-ready'),L:[...new Set([...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/['"]/g,'')))]};}catch(e){window.__p1first={err:String(e)};}});
+    const tick=()=>{const h=document.getElementById('view-home');if(h&&!h.querySelector('.boot-ph')&&h.innerText.trim().length>80){window.__p1home=performance.now();return;}requestAnimationFrame(tick);};requestAnimationFrame(tick);};
+  const STRIP="(function(){var k=function(){document.querySelectorAll('style[data-fonts],style[data-fallback]').forEach(function(s){s.remove();});};k();new MutationObserver(k).observe(document,{childList:true,subtree:true});})();";
+  {const {c,q}=await p1page('2026-11-28',{seed:P1DEMO,route:'abort',init:FIRST});await p1go(q,'load');await P1W(1500);
+   const r=await p1ev(q,()=>{const fb=document.querySelector('style[data-fallback]');return {first:window.__p1first,ready:document.documentElement.hasAttribute('data-fonts-ready'),fbOff:!!(fb&&fb.disabled),fbFaces:fb?(fb.textContent.match(/@font-face/g)||[]).length:0,
+     touched:[...document.fonts].filter(f=>/Fallback/.test(f.family)&&f.status!=='unloaded').map(f=>f.family+' '+f.weight+' '+f.status),L:[...new Set([...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family.replace(/['"]/g,'')))]};});await c.close();
+   T('P1-11a fonts before the first frame: at the first animation frame the three inlined families are already loaded and html carries data-fonts-ready; the 22 fallback faces sit in style[data-fallback], which is then disabled, and not one fallback face was looked up',!r.err&&r.first&&r.first.ready===true&&Array.isArray(r.first.L)&&P1FAM.every(f=>r.first.L.includes(f))&&r.ready&&r.fbOff&&r.fbFaces===22&&Array.isArray(r.touched)&&r.touched.length===0&&P1FAM.every(f=>r.L.includes(f)),P1J(r));}
+  {const ord=d=>{const i=[d.indexOf('<style data-fonts>'),d.indexOf('<style data-fallback>'),d.indexOf('<script>/* P1-R2-1'),d.indexOf(':root{')];return i.every(x=>x>=0)&&i[0]<i[1]&&i[1]<i[2]&&i[2]<i[3]?i:null;};
+   T('P1-11c both dist files carry, in this order, the inlined faces, the fallback block, the font script and the main styles',!!ord(P1APP)&&!!ord(P1ART),P1J({app:ord(P1APP),art:ord(P1ART)}));}
+  const boot=async(strip)=>{const c=await b.createBrowserContext();const q=await c.newPage();let t=-1;try{const cdp=await q.target().createCDPSession();await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});
+    await q.setRequestInterception(true);q.on('request',r=>{const u=r.url();if(/^(file|data|blob):/.test(u))r.continue();else r.abort('internetdisconnected');});
+    await q.evaluateOnNewDocument(MOCK,'2026-11-28');await q.evaluateOnNewDocument('try{localStorage.clear();}catch(e){}'+P1DEMO);if(strip)await q.evaluateOnNewDocument(STRIP);await q.evaluateOnNewDocument(FIRST);
+    await q.setViewport({width:390,height:844,deviceScaleFactor:1});await q.goto('file://'+path.resolve('ComebackBlueprint.html'),{waitUntil:'load',timeout:60000});
+    for(let i=0;i<40&&t<0;i++){await P1W(100);t=await q.evaluate(()=>window.__p1home==null?-1:Math.round(window.__p1home));}}catch(e){t=-1;}await c.close();return t;};
+  const A=[],Z=[];for(let i=0;i<6;i++){A.push(await boot(false));Z.push(await boot(true));}
+  const med=a=>{const s=a.filter(x=>x>0).sort((x,y)=>x-y);return s.length===a.length?(s[2]+s[3])/2:-1;};const ma=med(A),mz=med(Z);
+  T('P1-11b boot time at 4x CPU (median of 6 alternating cold boots, demo log, 390 px): Home text with the fonts inlined is painted no more than 140 ms after a copy with every font face stripped (the old design, fallback faces looked up at boot, measured about 250 ms)',ma>0&&mz>0&&ma<=mz+140,P1J({ma,mz,A,Z}));}
+}
+// ===== /P1 =====
+// ===== P7. Photos and home-screen icon (polish package P7, 18 Nov 2026): step-down photo resample, WebP only when the encoder writes it, PNG touch icon and launch screens =====
+// Files are read from the repo by __dirname, so the static checks hold whatever folder the suite runs from. Each seeded or storing check has its own browser context; every step is null-safe.
+{const {LIB:P7LIB}=require('./p7photo');const P7J=o=>JSON.stringify(o).slice(0,600);
+ const P7READ=(f,bin)=>{try{return fs.readFileSync(path.join(__dirname,f),bin?null:'utf8');}catch(e){return bin?null:'';}};
+ const P7PNG=f=>{const b=P7READ(f,true);return b&&b.length>24&&b.toString('latin1',1,4)==='PNG'?[b.readUInt32BE(16),b.readUInt32BE(20)]:null;};
+ const P7TMP=path.join(require('os').tmpdir(),'cb-p7-'+process.pid+'.jpg');
+ const P7OPEN=q=>q.evaluate(()=>{switchView('track');const t=document.querySelector('.track-tabs button[data-tp="measure"]');if(t)t.click();return !!document.querySelector('[data-ph="front"]');});
+ // pick through the real file chooser; the save takes about a second headless: poll for its toast, never a fixed sleep
+ const P7PICK=async(q,pose)=>{try{const t0=await q.evaluate(()=>(document.getElementById('toast')||{}).innerText||'');const [fc]=await Promise.all([q.waitForFileChooser({timeout:5000}),q.click('[data-ph="'+pose+'"]')]);await fc.accept([P7TMP]);
+   for(let i=0;i<150;i++){await wait(100);if(await q.evaluate(t0=>{const t=(document.getElementById('toast')||{}).innerText||'';return /^(Saved|Replaced) · /.test(t)&&t!==t0;},t0))return true;}}catch(e){}return false;};
+ // the stored record, decoded as the app shows it, against the pre-P7 code on the same file in the same engine
+ const P7REC=q=>q.evaluate(async()=>{try{const a=await phAll();const r=a[0];if(!r)return {n:0};const f=__p7.file(window.__p7b64);const m=await __p7.measure(r.blob,f);const o=await __p7.oldShrink(f);const om=await __p7.measure(o.blob,f);
+   const im=document.querySelector('#phBody .ph-cmp img');return {n:a.length,rec:[r.w,r.h],type:r.type,magic:__p7.magic(r.buf),bytes:r.bytes,buf:r.buf.byteLength,m,old:{psnr:om.psnr,bytes:o.blob.size},shown:!!(im&&im.complete&&im.naturalWidth===960&&im.naturalHeight===1280),asked:window.__p7asked||null};}catch(e){return {err:String(e)};}});
+ const P7NEW=async(init)=>{const q=await ctxPage('2026-11-29',{},init||'');await q.evaluate(P7LIB);const b64=await q.evaluate(async()=>{window.__p7b64=await __p7.make();return window.__p7b64;});
+   if(!fs.existsSync(P7TMP))fs.writeFileSync(P7TMP,Buffer.from(b64,'base64'));return q;};
+ // P7-1 Chromium, the real UI: 12 MP, EXIF 6 -> 960x1280 upright, type field = the bytes' real encoding, sharper than the old code
+ {const q=await P7NEW();await P7OPEN(q);const ok=await P7PICK(q,'front');const r=ok?await P7REC(q):{pick:false};
+  T('P7-1 photo (Chromium, file chooser): a 12 MP JPEG with EXIF orientation 6 is stored 960x1280 and upright; the record type is the encoding the bytes really are (WebP here); PSNR against a box-filtered reference is not lower than the old code on the same file',
+    r.n===1&&r.rec&&r.rec[0]===960&&r.rec[1]===1280&&r.m&&r.m.src[0]===3024&&r.m.src[1]===4032&&r.m.w===960&&r.m.h===1280&&r.m.upright&&r.type==='image/webp'&&r.magic==='webp'&&r.bytes===r.buf&&r.shown&&r.m.psnr>=r.old.psnr,P7J(r));
+  await done(q);}
+ // P7-2 an encoder that answers a WebP request with PNG (Safari on the iPhone): the blob type is checked, the photo is stored as JPEG
+ {const q=await P7NEW();await q.evaluate(()=>__p7.noWebP(false));await P7OPEN(q);const ok=await P7PICK(q,'front');const r=ok?await P7REC(q):{pick:false};
+  T('P7-2 photo, encoder writes PNG when asked for WebP: the blob type decides, the record is a JPEG (type image/jpeg, JPEG bytes), 960x1280, upright, PSNR not lower than the old code',
+    r.n===1&&r.type==='image/jpeg'&&r.magic==='jpeg'&&r.rec&&r.rec[0]===960&&r.rec[1]===1280&&r.m&&r.m.upright&&r.shown&&r.m.psnr>=r.old.psnr&&(r.asked||[]).includes('image/webp'),P7J(r));
+  await done(q);}
+ // P7-2b a browser that says up front it cannot write WebP: WebP is never asked for, JPEG straight away
+ {const q=await P7NEW();const r=await q.evaluate(async()=>{try{__p7.noWebP(true);const f=__p7.file(window.__p7b64);const sh=await phShrink(f);return {type:sh.blob.type,t2:sh.type,wh:[sh.w,sh.h],asked:window.__p7asked};}catch(e){return {err:String(e)};}});
+  T('P7-2b photo, no WebP encoder: phShrink asks only for JPEG and returns image/jpeg at 960x1280',r.type==='image/jpeg'&&r.t2==='image/jpeg'&&r.wh&&r.wh[0]===960&&r.wh[1]===1280&&(r.asked||[]).join()==='image/jpeg',P7J(r));
+  await done(q);}
+ // P7-3 records saved before P7 (type image/jpeg, or no type at all) still render, beside a new WebP one; Save photos names each file by its type
+ {const q=await P7NEW();await P7OPEN(q);
+  const r=await q.evaluate(async()=>{try{const f=__p7.file(window.__p7b64);const o=await __p7.oldShrink(f);const ob=await new Response(o.blob).arrayBuffer();const n=await phShrink(f);const nb=await new Response(n.blob).arrayBuffer();
+    await phPut({id:'2026-11-15-front',date:'2026-11-15',pose:'front',w:o.w,h:o.h,type:'image/jpeg',buf:ob,bytes:ob.byteLength});
+    await phPut({id:'2026-11-15-side',date:'2026-11-15',pose:'side',w:o.w,h:o.h,buf:ob.slice(0),bytes:ob.byteLength});
+    await phPut({id:'2026-11-29-front',date:'2026-11-29',pose:'front',w:n.w,h:n.h,type:n.blob.type,buf:nb,bytes:nb.byteLength});
+    _phView='front';renderPhotos();const W=ms=>new Promise(z=>setTimeout(z,ms));let imgs=[];for(let i=0;i<40;i++){await W(100);imgs=[...document.querySelectorAll('#phBody img')];if(imgs.length>=5&&imgs.every(i=>i.complete))break;}
+    const front=[...document.querySelectorAll('#phBody .ph-cmp img')].map(i=>i.naturalWidth+'x'+i.naturalHeight);
+    const sideBtn=document.querySelector('#phBody [data-phv="side"]');if(sideBtn)sideBtn.click();let side=[];for(let i=0;i<40;i++){await W(100);side=[...document.querySelectorAll('#phBody .ph-cmp img')];if(side.length&&side.every(i=>i.complete))break;}
+    const sideOk=side.length===1&&side[0].naturalWidth===960;
+    const thumbs=[...document.querySelectorAll('#phBody .ph-th img')].every(i=>i.complete&&i.naturalWidth>0);
+    let shared=null;const nav=navigator;Object.defineProperty(nav,'canShare',{value:()=>true,configurable:true});Object.defineProperty(nav,'share',{value:async o=>{shared=o.files.map(x=>x.name+'|'+x.type);},configurable:true});await phShare();
+    return {front,sideOk,thumbs,shared,newType:n.blob.type};}catch(e){return {err:String(e)};}});
+  T('P7-3 photos saved before P7 still show: an image/jpeg record and one with no type field render beside a new WebP record (compare box and list); Save photos names files .jpg or .webp by their real type',
+    !!r.front&&r.front.join()==='960x1280,960x1280'&&r.sideOk&&r.thumbs&&r.newType==='image/webp'&&(r.shared||[]).join()==='comeback-2026-11-15-front.jpg|image/jpeg,comeback-2026-11-15-side.jpg|image/jpeg,comeback-2026-11-29-front.webp|image/webp',P7J(r));
+  // P7-5 the photo card with three photos: no sideways scroll at 390 or 375, every input on Track 16 px or more
+  const lay=[];for(const vw of [390,375]){await q.setViewport({width:vw,height:844,deviceScaleFactor:1});await wait(250);lay.push(await q.evaluate(vw=>{const ins=[...document.querySelectorAll('#view-track input,#view-track select,#view-track textarea')].filter(e=>e.type!=='file'&&e.getClientRects().length);const small=ins.filter(e=>parseFloat(getComputedStyle(e).fontSize)<16).map(e=>e.id||e.name||e.type);
+    const card=document.getElementById('phCard');const over=[...(card?card.querySelectorAll('*'):[])].filter(e=>{const b=e.getBoundingClientRect();return b.width&&(b.right>vw+0.5||b.left<-0.5);}).length;return {vw,sw:document.documentElement.scrollWidth,ins:ins.length,small,card:!!card,over};},vw));}
+  T('P7-5 photo card at 390 and 375 px: no sideways scroll, nothing in the card past the screen edge, every Track input 16 px or more',lay.length===2&&lay.every(l=>l.card&&l.sw<=l.vw&&l.over===0&&l.ins>0&&l.small.length===0),P7J(lay));
+  await done(q);}
+ // P7-4 the shell: one static PNG touch icon (no SVG data: icon), a launch screen per listed iPhone size whose PNG is exactly that size; the artifact copy carries no link
+ {const app=P7READ('../dist/ComebackBlueprint.html'),art=P7READ('../dist/artifact.html');const head=app.slice(0,Math.max(0,app.indexOf('</head>')));
+  const touch=[...head.matchAll(/<link rel="apple-touch-icon"[^>]*>/g)].map(m=>m[0]);
+  const su=[...head.matchAll(/<link rel="apple-touch-startup-image" media="\(device-width: (\d+)px\) and \(device-height: (\d+)px\) and \(-webkit-device-pixel-ratio: (\d)\) and \(orientation: portrait\)" href="([^"]+)">/g)].map(m=>({w:+m[1],h:+m[2],d:+m[3],f:m[4],png:P7PNG('../dist/'+m[4])}));
+  const anySu=(head.match(/apple-touch-startup-image/g)||[]).length;const list=(()=>{try{return JSON.parse(P7READ('../src/pwa/startup.json')).screens;}catch(e){return [];}})();
+  const icon=P7PNG('../dist/apple-touch-icon.png');
+  T('P7-4 offline file: one static apple-touch-icon pointing at the 180x180 PNG (no SVG data: icon), one launch screen per size in startup.json, each PNG exactly device size x pixel ratio; dist/artifact.html has no link tag',
+    touch.length===1&&touch[0]==='<link rel="apple-touch-icon" href="apple-touch-icon.png">'&&!/apple-touch-icon" href="data:/.test(app)&&icon&&icon[0]===180&&icon[1]===180&&list.length>=10&&su.length===list.length&&anySu===su.length&&list.every(s=>su.some(x=>x.w===s.w&&x.h===s.h&&x.d===s.dpr))&&su.every(x=>x.png&&x.png[0]===x.w*x.d&&x.png[1]===x.h*x.d)&&art.length>1000&&!/<link\b/.test(art),
+    P7J({touch,n:su.length,list:list.length,bad:su.filter(x=>!(x.png&&x.png[0]===x.w*x.d&&x.png[1]===x.h*x.d)),icon,artLink:/<link\b/.test(art)}));}
+ // P7-4b dist/artifact.html is what it would be without PX8: build.py runs again with the Home Screen step switched off (qa/p7off.py, into a
+ // temp folder) and its artifact.html must equal the real one byte for byte; the artifact also carries no link, meta or launch-screen markup
+ {const art=P7READ('../dist/artifact.html',true);const tmp=fs.mkdtempSync(path.join(require('os').tmpdir(),'cb-p7off-'));let off=null,err='';
+  try{const o=require('child_process').execFileSync('python3',[path.join(__dirname,'p7off.py'),path.join(__dirname,'..'),tmp],{encoding:'utf8',timeout:120000,stdio:['ignore','pipe','pipe']});
+      if(/OFF OK/.test(o))off=fs.readFileSync(path.join(tmp,'dist/artifact.html'));}catch(e){err=String((e.stderr||'')+(e.message||e)).split('\n').filter(Boolean).slice(-2).join(' | ').slice(0,300);}
+  try{fs.unlinkSync(path.join(tmp,'src'));}catch(e){}try{fs.rmSync(tmp,{recursive:true,force:true});}catch(e){}
+  const txt=art?art.toString('utf8'):'';const bad=['<link','<meta','apple-touch-startup-image','apple-mobile-web-app'].filter(w=>txt.includes(w));
+  T('P7-4b dist/artifact.html is byte-identical to a build with the PX8 Home Screen step switched off, and carries no link, meta or launch-screen markup',
+    !!art&&art.length>1000&&!!off&&off.length===art.length&&Buffer.compare(off,art)===0&&bad.length===0,
+    P7J({err,art:art&&art.length,off:off&&off.length,same:!!(art&&off)&&Buffer.compare(off,art)===0,bad}));}
+ // P7-6 the smoothing quality phCanvas sets is the one that resamples best in this engine: the real phShrink, PNG out, scored as shipped
+ // and with low, medium and high forced; the shipped result must be within 0.05 dB of the best (in WebKit "high" lost 3.9 dB, see webkit.js)
+ {const q=await P7NEW();const r=await q.evaluate(async()=>{try{return await __p7.quality(__p7.file(window.__p7b64));}catch(e){return {err:String(e)};}});
+  const best=r&&r.s?Math.max(r.s.low||0,r.s.medium||0,r.s.high||0):0;
+  T('P7-6 photo smoothing (Chromium): the quality phCanvas sets ("'+(r&&r.own)+'") scores within 0.05 dB of the best of low, medium and high on the 12 MP test photo',
+    !!r&&!r.err&&typeof r.app==='number'&&best>0&&r.app>=best-0.05&&r.s[r.own]>=best-0.05,P7J(r));
+  await done(q);}
+ // P7-7 a Python cache written by importing a qa helper (qa/p7off.py) is ignored by git, and none sits untracked in the tree
+ {let ig=-1,un='?';const cp=require('child_process'),root=path.join(__dirname,'..');
+  try{cp.execFileSync('git',['check-ignore','-q','qa/__pycache__/p7off.cpython-311.pyc'],{cwd:root,stdio:'ignore'});ig=0;}catch(e){ig=typeof e.status==='number'?e.status:-2;}
+  try{un=cp.execFileSync('git',['status','--porcelain','--untracked-files=all'],{cwd:root,encoding:'utf8'}).split('\n').filter(l=>/^\?\?.*(__pycache__|\.pyc$)/.test(l)).join(' ');}catch(e){un='git failed: '+String(e.message||e).slice(0,80);}
+  T('P7-7 Python caches: git ignores qa/__pycache__/*.pyc and no untracked .pyc or __pycache__ is in the tree',ig===0&&un==='',P7J({ig,un}));}
+ try{fs.unlinkSync(P7TMP);}catch(e){}
+}
+// ===== /P7 =====
+// ===== P6. Charts at the width they render (polish package P6, 18 Nov 2026): lineChart, barChart, the ETA, fast-track and roadmap charts and the gauge draw at their host's width (280-560), a width-only ResizeObserver redraws them =====
+{const P6J=o=>JSON.stringify(o).slice(0,700);const P6DEMO=fs.readFileSync(path.join(__dirname,'fixtures/demo.setup.js'),'utf8').trim().split('\n').pop();
+ const P6ev=async(q,f,a)=>{try{return await q.evaluate(f,a);}catch(e){return {err:String(e&&e.message||e).slice(0,160)};}};
+ // every chart on screen in the chart views, measured: effective text size = font-size x rendered width / viewBox width
+ const P6MEASURE=async()=>{const out={rows:[],err:null};try{
+   const one=async(v,pane)=>{switchView(v);document.querySelectorAll('#view-'+v+' .tool').forEach(t=>t.classList.add('open'));if(pane){const bt=document.querySelector('.track-tabs button[data-tp="'+pane+'"]');if(bt)bt.click();}
+    await new Promise(r=>setTimeout(r,250));
+    document.querySelectorAll('#view-'+v+' svg.chart-svg,#view-'+v+' svg.gauge-svg').forEach(s=>{const bb=s.getBoundingClientRect();if(!bb.width)return;const vb=s.viewBox.baseVal;let mn=99,mx=0;
+     s.querySelectorAll('text').forEach(t=>{if(!t.textContent.trim())return;const f=parseFloat(getComputedStyle(t).fontSize)*bb.width/vb.width;mn=Math.min(mn,f);mx=Math.max(mx,f);});
+     out.rows.push({v:v+(pane?':'+pane:''),vb:vb.width,w:Math.round(bb.width*10)/10,mn:Math.round(mn*100)/100,mx:Math.round(mx*100)/100,host:!!s.closest('.chart-host')});});};
+   for(const v of ['home','roadmap','numbers'])await one(v);for(const pn of ['weight','lifts','measure','mileage'])await one('track',pn);
+   out.over=document.documentElement.scrollWidth-innerWidth;}catch(e){out.err=String(e);}return out;};
+ // six logged runs, so the Runs tab draws its bar chart (weekly volume) and both line charts (longest run, easy pace)
+ const P6RUNS='localStorage.setItem("cb2_runs",'+JSON.stringify(JSON.stringify([{date:'2026-11-15',type:'Long',dist:6,time:2340},{date:'2026-11-17',type:'Check',dist:1,time:390},{date:'2026-11-19',type:'Easy',dist:4,time:1560},{date:'2026-11-22',type:'Long',dist:7,time:2730},{date:'2026-11-24',type:'Easy',dist:5,time:1950},{date:'2026-11-26',type:'Easy',dist:4.5,time:1755}]))+');';
+ // P6-1 effective label size at 375, 390, 820 and 1280 wide; drawn at the rendered width, 280-560; every chart in a host; no sideways scroll; the Runs tab's bar chart and two line charts are among them
+ {const q=await ctxPage('2026-11-28',{},P6DEMO+P6RUNS);const res={};
+  for(const vw of [375,390,820,1280]){try{await q.setViewport({width:vw,height:844});}catch(e){}await wait(300);res[vw]=await P6ev(q,P6MEASURE);}
+  for(const vw of [375,390,820,1280]){const m=res[vw]||{},rows=m.rows||[];
+   const bad=rows.filter(r=>!(r.mn>=10.5&&r.mx<=12.6&&r.vb>=280&&r.vb<=560&&Math.abs(r.w-r.vb)<=1.01&&r.host));
+   T('P6-1 charts at '+vw+' px: every chart label renders 10.5-12.6 px (font-size x rendered width / viewBox width), drawn at its rendered width within 280-560, no sideways scroll',
+     !m.err&&rows.length>=10&&rows.filter(r=>r.v==='track:mileage').length>=3&&bad.length===0&&m.over===0,P6J({n:rows.length,runs:rows.filter(r=>r.v==='track:mileage').length,over:m.over,err:m.err,bad,sample:rows.slice(0,10).map(r=>r.v+':'+r.vb+'/'+r.w+':'+r.mn+'-'+r.mx)}));}
+  await done(q);}
+ // P6-6 the Home fast-track chart is drawn like the rest (no fixed 284 drawing): at 390 its text matches the Track weight chart's
+ {const q=await ctxPage('2026-11-28',{},P6DEMO);const r=await P6ev(q,async()=>{switchView('home');const t=[...document.querySelectorAll('#view-home .tool')].find(x=>x.querySelector('svg[data-tip]'));if(!t)return {err:'no fast-track tool'};t.classList.add('open');
+   await new Promise(r=>setTimeout(r,300));const s=t.querySelector('svg[data-tip]'),bb=s.getBoundingClientRect(),vb=s.viewBox.baseVal.width,tx=s.querySelector('text');
+   const home={vb,w:Math.round(bb.width),fs:Math.round(parseFloat(getComputedStyle(tx).fontSize)*bb.width/vb*100)/100};
+   switchView('track');await new Promise(r=>setTimeout(r,250));const w=document.querySelector('#wChart svg[data-tip]');if(!w)return {home,err:'no weight chart'};const wb=w.getBoundingClientRect(),wv=w.viewBox.baseVal.width;
+   return {home,track:{vb:wv,w:Math.round(wb.width),fs:Math.round(parseFloat(getComputedStyle(w.querySelector('text')).fontSize)*wb.width/wv*100)/100}};});
+  T('P6-6 Home chart: the fast-track chart is drawn at its own width (not 284) and its labels match the Track weight chart (11 px)',
+    !!r&&!r.err&&r.home.vb!==284&&Math.abs(r.home.w-r.home.vb)<=1&&r.home.fs===r.track.fs&&r.home.fs===11,P6J(r));
+  await done(q);}
+ // P6-2/3/4: weight chart readout across a redraw, a height-only change and a rotation (seed as section Z's readout check)
+ {const q=await ctxPage('2026-11-28',{cb2_weight:[{date:'2026-11-14',v:88},{date:'2026-11-21',v:88.4},{date:'2026-11-27',v:88.8}]});await q.setViewport({width:390,height:844});
+  await P6ev(q,()=>{switchView('track');window.__cd=[];const o=chartDraw;window.chartDraw=function(el){window.__cd.push(el.id);return o.apply(this,arguments);};});await wait(300);
+  const W='#wChart svg[data-tip]';
+  const read=()=>P6ev(q,sel=>{const s=document.querySelector(sel);if(!s)return {r:'no chart'};const T=_tips[s.dataset.tip],e=document.getElementById(s.dataset.tip+'r'),l=s.querySelector('.ctip line');
+    return {r:e?e.innerText.trim():'no readout',vis:s.querySelector('.ctip').getAttribute('visibility'),x:l?+l.getAttribute('x1'):null,tx:T&&s._ti!=null?T.x[s._ti]:null,vb:s.viewBox.baseVal.width,w:Math.round(s.getBoundingClientRect().width),dots:s.querySelectorAll('.ctip-d circle').length,id:s.dataset.tip};},W);
+  const at=pick=>P6ev(q,([sel,pick])=>{const s=document.querySelector(sel);if(!s)return {x:0,y:0};s.scrollIntoView({block:'center'});const T=_tips[s.dataset.tip];const i=T.d.indexOf(pick);const b=s.getBoundingClientRect(),k=b.width/s.viewBox.baseVal.width;return {x:b.left+T.x[i]*k,y:b.top+b.height/2};},[W,pick]);
+  // P6-3 a scroll-sized height change (the iOS toolbar) and a scroll: no redraw, no ResizeObserver loop error
+  const n0=await P6ev(q,()=>_chartRedraws);
+  const k0=await P6ev(q,()=>{const s=document.querySelector('#wChart svg[data-tip]');window.__p6s=s;window.__p6h=s&&s.closest('.chart-host');return s?{id:s.dataset.tip,r:(document.getElementById(s.dataset.tip+'r')||{}).innerText}:null;});
+  try{await q.setViewport({width:390,height:700});await wait(150);await q.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));await wait(150);await q.evaluate(()=>window.scrollTo(0,0));await wait(150);await q.setViewport({width:390,height:844});await wait(250);}catch(e){}
+  const n1=await P6ev(q,()=>{const s=document.querySelector('#wChart svg[data-tip]');return {n:_chartRedraws,cd:window.__cd.slice(),same:!!s&&s===window.__p6s&&s.isConnected&&!!window.__p6h&&window.__p6h.isConnected,id:s&&s.dataset.tip,r:s?(document.getElementById(s.dataset.tip+'r')||{}).innerText:null};});
+  T('P6-3 charts: a height-only viewport change and a scroll cause no redraw (the same drawing node stays, same id and readout) and no ResizeObserver loop error',
+    typeof n0==='number'&&!!k0&&!k0.err&&n1.n===n0&&n1.cd.length===0&&n1.same===true&&n1.id===k0.id&&n1.r===k0.r&&(q.__errs||[]).length===0,P6J({n0,k0,n1,errs:q.__errs}));
+  // P6-2 a reading on screen survives the rotation redraw on the new drawing; touch and arrow keys read the right days after it
+  let p=await at('21 Nov');await q.mouse.click(p.x,p.y);await wait(80);const a=await read();
+  const hosts0=await P6ev(q,()=>[...document.querySelectorAll('.chart-host')].filter(h=>{const pr=h.querySelector('.chart-probe');return pr&&pr.clientWidth>0;}).map(h=>h.id));
+  try{await q.setViewport({width:844,height:390});}catch(e){}await wait(400);
+  const b2=await read();const cd1=await P6ev(q,()=>window.__cd.slice());
+  p=await at('27 Nov');await q.mouse.click(p.x,p.y);await wait(80);const c=await read();
+  await P6ev(q,sel=>{const e=document.querySelector(sel);if(e&&e.focus)e.focus();},W);try{await q.keyboard.press('ArrowLeft');await q.keyboard.press('ArrowLeft');}catch(e){}await wait(60);const k=await read();
+  T('P6-2 readout after a redraw: the reading taken at 390 stays on the 844 px drawing at the right point, and touch and arrow keys read the right days',
+    a.r==='21 Nov · 88.4 kg'&&a.vis==='visible'&&b2.id!==a.id&&b2.vb===560&&b2.w===560&&b2.r==='21 Nov · 88.4 kg'&&b2.vis==='visible'&&b2.dots===1&&b2.x===b2.tx&&b2.x!==a.x&&c.r==='27 Nov · 88.8 kg'&&k.r==='14 Nov · 88.0 kg',P6J({a,b2,c,k}));
+  // P6-4 the rotation redrew each chart on screen exactly once and nothing hidden; rotating back redraws each once more
+  const once=ids=>ids.length>0&&ids.every(id=>cd1.filter(x=>x===id).length===1)&&cd1.every(x=>ids.includes(x));
+  try{await q.setViewport({width:390,height:844});}catch(e){}await wait(400);const cd2=await P6ev(q,()=>window.__cd.slice());const back=cd2.slice(cd1.length);
+  T('P6-4 rotation: turning the phone redraws each visible chart once (and no hidden one); turning back redraws each once more',
+    Array.isArray(hosts0)&&Array.isArray(cd1)&&once(hosts0)&&back.length===hosts0.length&&hosts0.every(id=>back.filter(x=>x===id).length===1),P6J({hosts0,cd1,back}));
+  await done(q);}
+ // P6-5 a chart in a collapsed card measures 0: a rotation leaves it alone, and opening the card redraws it once at the new width
+ {const q=await ctxPage('2026-11-28',{},P6DEMO);
+  // open it first so it has a width, then close it: the close (width to 0) and the rotation while closed must not redraw it
+  await P6ev(q,()=>{switchView('home');const t=[...document.querySelectorAll('#view-home .tool')].find(x=>x.querySelector('svg[data-tip]'));if(t){t.classList.add('open');t.id='p6ft';}});await wait(300);
+  const r0=await P6ev(q,()=>{const t=document.getElementById('p6ft');if(!t)return {err:'no fast-track tool'};t.classList.remove('open');
+   window.__cd=[];const o=chartDraw;window.chartDraw=function(el){window.__cd.push(el.id);return o.apply(this,arguments);};const h=t.querySelector('.chart-host');return {host:h&&h.id,pw:h?h.querySelector('.chart-probe').clientWidth:-1,cw0:h&&+h.dataset.cw,vb:t.querySelector('svg[data-tip]').viewBox.baseVal.width};});
+  try{await q.setViewport({width:844,height:390});}catch(e){}await wait(400);
+  const r1=await P6ev(q,()=>({cd:window.__cd.slice()}));
+  await P6ev(q,()=>{const t=document.getElementById('p6ft');if(t)t.querySelector('.tool-h').click();});await wait(400);
+  const r2=await P6ev(q,()=>{const t=document.getElementById('p6ft'),s=t&&t.querySelector('svg[data-tip]');if(!s)return {err:'gone'};const bb=s.getBoundingClientRect();return {open:t.classList.contains('open'),cd:window.__cd.slice(),vb:s.viewBox.baseVal.width,w:Math.round(bb.width),tip:!!_tips[s.dataset.tip]};});
+  T('P6-5 hidden chart: a collapsed chart (width 0) is not redrawn by a rotation; opening it redraws it once, at its new width with its readout',
+    !!r0&&!r0.err&&r0.pw===0&&r0.cw0===324&&!!r1&&Array.isArray(r1.cd)&&!r1.cd.includes(r0.host)&&!!r2&&!r2.err&&r2.open&&r2.cd.filter(x=>x===r0.host).length===1&&r2.vb===560&&r2.w===560&&r2.tip,P6J({r0,r1,r2}));
+  await done(q);}
+ // P6-7 a window drag (one redraw per 3 px step) replaces each chart's _tips entry instead of adding one, so the hidden Lifts chart keeps its readout
+ {const q=await ctxPage('2026-11-28',{},P6DEMO);await P6ev(q,()=>switchView('track'));await wait(300);
+  const t0=await P6ev(q,()=>({n:_chartRedraws,orph:Object.keys(_tips).filter(id=>!document.querySelector('svg[data-tip="'+id+'"]')).length}));
+  for(let vw=700;vw>=390;vw-=3){try{await q.setViewport({width:vw,height:844});}catch(e){}await wait(25);}
+  try{await q.setViewport({width:390,height:844});}catch(e){}await wait(300);
+  await P6ev(q,()=>{const bt=document.querySelector('.track-tabs button[data-tp="lifts"]');if(bt)bt.click();});await wait(300);
+  const s=await P6ev(q,()=>{const s=document.querySelector('#tp-lifts svg[data-tip]');if(!s)return {err:'no lifts chart'};s.scrollIntoView({block:'center'});const b=s.getBoundingClientRect();
+   return {id:s.dataset.tip,has:!!_tips[s.dataset.tip],n:_chartRedraws,orph:Object.keys(_tips).filter(id=>!document.querySelector('svg[data-tip="'+id+'"]')).length,x:b.left+b.width*0.6,y:b.top+b.height/2};});
+  if(s&&!s.err){try{await q.mouse.click(s.x,s.y);}catch(e){}await wait(100);s.read=await P6ev(q,id=>{const e=document.getElementById(id+'r');return e?e.innerText.trim():'no readout';},s.id);}
+  T('P6-7 window drag: 100+ width redraws leave no orphaned _tips entries and the hidden Lifts chart still reads 21 Nov at 130 kg when shown',
+    !!t0&&!t0.err&&!!s&&!s.err&&s.n-t0.n>=60&&s.orph<=t0.orph&&s.has&&s.read==='21 Nov · 130 kg',P6J({t0,s}));
+  await done(q);}
+ // P6-8 a chart whose _tips entry is gone (evicted while its pane was hidden) is redrawn when the pane shows, even at the same width
+ {const q=await ctxPage('2026-11-28',{},P6DEMO);await P6ev(q,()=>switchView('track'));await wait(300);
+  const r0=await P6ev(q,()=>{const s=document.querySelector('#tp-lifts svg[data-tip]');if(!s)return {err:'no lifts chart'};const id=s.dataset.tip;delete _tips[id];return {id,n:_chartRedraws};});
+  await P6ev(q,()=>{const bt=document.querySelector('.track-tabs button[data-tp="lifts"]');if(bt)bt.click();});await wait(400);
+  const s=await P6ev(q,()=>{const s=document.querySelector('#tp-lifts svg[data-tip]');if(!s)return {err:'gone'};s.scrollIntoView({block:'center'});const b=s.getBoundingClientRect();return {id:s.dataset.tip,has:!!_tips[s.dataset.tip],n:_chartRedraws,vb:s.viewBox.baseVal.width,w:Math.round(b.width),x:b.left+b.width*0.6,y:b.top+b.height/2};});
+  if(s&&!s.err){try{await q.mouse.click(s.x,s.y);}catch(e){}await wait(100);s.read=await P6ev(q,id=>{const e=document.getElementById(id+'r');return e?e.innerText.trim():'no readout';},s.id);}
+  T('P6-8 lost readout: a hidden chart whose _tips entry was evicted is redrawn once when its pane shows (same width) and reads 21 Nov at 130 kg',
+    !!r0&&!r0.err&&!!s&&!s.err&&s.id!==r0.id&&s.n-r0.n===1&&s.has&&s.vb===s.w&&s.read==='21 Nov · 130 kg',P6J({r0,s}));
+  await done(q);}
+}
+// ===== /P6 =====
 await b.close();
 const pass=R.filter(x=>x.ok).length;console.log(R.filter(x=>!x.ok).map(x=>'FAIL: '+x.name+' → '+String(x.detail||'').replace(/\s+/g,' ').slice(0,400)).join('\n')||'ALL PASS');console.log('RESULT:',pass+'/'+R.length);fs.writeFileSync('qa_report.json',JSON.stringify(R,null,1));process.exit(pass===R.length?0:1);})().catch(e=>{const m=String(e&&e.message||e);if(/detached|Target closed|Session closed|Connection closed|Protocol error/i.test(m))console.error('QA CRASH: the browser went away mid-run ('+m.slice(0,80)+'). The suite takes about ten minutes: a foreground command with a ten-minute limit kills Chromium during section AE. Run qa/run.sh as a background job and poll its output file.');console.error('QA CRASH:',e&&e.stack||e);process.exit(2);});

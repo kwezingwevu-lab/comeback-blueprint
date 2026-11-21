@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'none'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src data:; img-src 'self' data: blob:; connect-src 'none'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>The Comeback Blueprint — Muscle, Strength, Health</title>
 <meta name="theme-color" content="#0A0D14">
@@ -11,10 +11,44 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Comeback">
 <meta name="description" content="Pure-muscle training, fuel and progress app: six-day push/pull/legs with a Legs &amp; Back focus, auto-progression, an FFMI-25 engine, logging and a two-year roadmap.">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230A0D14'/%3E%3Cpath d='M40 138L70 70l22 36 22-50 36 82' fill='none' stroke='%23FFC53D' stroke-width='14' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'"><noscript><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!-- STARTUP IMAGES: build.py links the iPhone launch screens in src/pwa/startup.json here (PX8) -->
+<!-- FONT FACES: build.py inlines the woff2 files in src/fonts here, so no font ever comes from the network -->
+<style data-fallback>
+/* Metric-matched fallbacks (P1): until the inlined faces are decoded, text draws in Arial (Liberation Sans on Linux) or Menlo/Courier New
+   scaled to the real face's widths and line metrics, so nothing moves when the real face arrives. Latin only, like the real faces.
+   They sit in their own block so the script below can switch them off once the real faces are in (P1-R2-1). */
+@font-face{font-family:'Manrope Fallback';font-style:normal;font-weight:400;src:local('Arial'),local('ArialMT'),local('Liberation Sans'),local('LiberationSans');size-adjust:97.35%;ascent-override:109.49%;descent-override:30.81%;line-gap-override:0%;unicode-range:U+0000-001F,U+0021-002F,U+003A-0040,U+005B-0060,U+007B-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Manrope Fallback';font-style:normal;font-weight:400;src:local('Arial'),local('ArialMT'),local('Liberation Sans'),local('LiberationSans');size-adjust:71.99%;ascent-override:148.07%;descent-override:41.66%;line-gap-override:0%;unicode-range:U+0020}
+@font-face{font-family:'Manrope Fallback';font-style:normal;font-weight:400;src:local('Arial'),local('ArialMT'),local('Liberation Sans'),local('LiberationSans');size-adjust:101.70%;ascent-override:104.82%;descent-override:29.49%;line-gap-override:0%;unicode-range:U+0030-0039}
+@font-face{font-family:'Manrope Fallback';font-style:normal;font-weight:400;src:local('Arial'),local('ArialMT'),local('Liberation Sans'),local('LiberationSans');size-adjust:94.99%;ascent-override:112.22%;descent-override:31.58%;line-gap-override:0%;unicode-range:U+0041-005A}
+@font-face{font-family:'Manrope Fallback';font-style:normal;font-weight:400;src:local('Arial'),local('ArialMT'),local('Liberation Sans'),local('LiberationSans');size-adjust:106.89%;ascent-override:99.73%;descent-override:28.06%;line-gap-override:0%;unicode-range:U+0061-007A}
+@font-face{font-family:'Manrope Fallback';font-style:normal;font-weight:700;src:local('Arial Bold'),local('Arial-BoldMT'),local('Liberation Sans Bold'),local('LiberationSans-Bold'),local('Arial'),local('Liberation Sans');size-adjust:100.38%;ascent-override:106.19%;descent-override:29.89%;line-gap-override:0%;unicode-range:U+0000-001F,U+0021-002F,U+003A-0040,U+005B-0060,U+007B-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Manrope Fallback';font-style:normal;font-weight:700;src:local('Arial Bold'),local('Arial-BoldMT'),local('Liberation Sans Bold'),local('LiberationSans-Bold'),local('Arial'),local('Liberation Sans');size-adjust:71.99%;ascent-override:148.08%;descent-override:41.67%;line-gap-override:0%;unicode-range:U+0020}
+@font-face{font-family:'Manrope Fallback';font-style:normal;font-weight:700;src:local('Arial Bold'),local('Arial-BoldMT'),local('Liberation Sans Bold'),local('LiberationSans-Bold'),local('Arial'),local('Liberation Sans');size-adjust:105.22%;ascent-override:101.31%;descent-override:28.51%;line-gap-override:0%;unicode-range:U+0030-0039}
+@font-face{font-family:'Manrope Fallback';font-style:normal;font-weight:700;src:local('Arial Bold'),local('Arial-BoldMT'),local('Liberation Sans Bold'),local('LiberationSans-Bold'),local('Arial'),local('Liberation Sans');size-adjust:96.35%;ascent-override:110.63%;descent-override:31.14%;line-gap-override:0%;unicode-range:U+0041-005A}
+@font-face{font-family:'Manrope Fallback';font-style:normal;font-weight:700;src:local('Arial Bold'),local('Arial-BoldMT'),local('Liberation Sans Bold'),local('LiberationSans-Bold'),local('Arial'),local('Liberation Sans');size-adjust:103.11%;ascent-override:103.38%;descent-override:29.09%;line-gap-override:0%;unicode-range:U+0061-007A}
+@font-face{font-family:'Space Grotesk Fallback';font-style:normal;font-weight:400;src:local('Arial'),local('ArialMT'),local('Liberation Sans'),local('LiberationSans');size-adjust:100.76%;ascent-override:97.66%;descent-override:28.98%;line-gap-override:0%;unicode-range:U+0000-001F,U+0021-002F,U+003A-0040,U+005B-0060,U+007B-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Space Grotesk Fallback';font-style:normal;font-weight:400;src:local('Arial'),local('ArialMT'),local('Liberation Sans'),local('LiberationSans');size-adjust:100.76%;ascent-override:97.66%;descent-override:28.98%;line-gap-override:0%;unicode-range:U+0020}
+@font-face{font-family:'Space Grotesk Fallback';font-style:normal;font-weight:400;src:local('Arial'),local('ArialMT'),local('Liberation Sans'),local('LiberationSans');size-adjust:105.25%;ascent-override:93.50%;descent-override:27.74%;line-gap-override:0%;unicode-range:U+0030-0039}
+@font-face{font-family:'Space Grotesk Fallback';font-style:normal;font-weight:400;src:local('Arial'),local('ArialMT'),local('Liberation Sans'),local('LiberationSans');size-adjust:94.76%;ascent-override:103.84%;descent-override:30.81%;line-gap-override:0%;unicode-range:U+0041-005A}
+@font-face{font-family:'Space Grotesk Fallback';font-style:normal;font-weight:400;src:local('Arial'),local('ArialMT'),local('Liberation Sans'),local('LiberationSans');size-adjust:100.76%;ascent-override:97.66%;descent-override:28.98%;line-gap-override:0%;unicode-range:U+0061-007A}
+@font-face{font-family:'Space Grotesk Fallback';font-style:normal;font-weight:700;src:local('Arial Bold'),local('Arial-BoldMT'),local('Liberation Sans Bold'),local('LiberationSans-Bold'),local('Arial'),local('Liberation Sans');size-adjust:92.22%;ascent-override:106.69%;descent-override:31.67%;line-gap-override:0%;unicode-range:U+0000-001F,U+0021-002F,U+003A-0040,U+005B-0060,U+007B-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Space Grotesk Fallback';font-style:normal;font-weight:700;src:local('Arial Bold'),local('Arial-BoldMT'),local('Liberation Sans Bold'),local('LiberationSans-Bold'),local('Arial'),local('Liberation Sans');size-adjust:91.42%;ascent-override:107.63%;descent-override:31.94%;line-gap-override:0%;unicode-range:U+0020}
+@font-face{font-family:'Space Grotesk Fallback';font-style:normal;font-weight:700;src:local('Arial Bold'),local('Arial-BoldMT'),local('Liberation Sans Bold'),local('LiberationSans-Bold'),local('Arial'),local('Liberation Sans');size-adjust:105.07%;ascent-override:93.65%;descent-override:27.79%;line-gap-override:0%;unicode-range:U+0030-0039}
+@font-face{font-family:'Space Grotesk Fallback';font-style:normal;font-weight:700;src:local('Arial Bold'),local('Arial-BoldMT'),local('Liberation Sans Bold'),local('LiberationSans-Bold'),local('Arial'),local('Liberation Sans');size-adjust:91.71%;ascent-override:107.29%;descent-override:31.84%;line-gap-override:0%;unicode-range:U+0041-005A}
+@font-face{font-family:'Space Grotesk Fallback';font-style:normal;font-weight:700;src:local('Arial Bold'),local('Arial-BoldMT'),local('Liberation Sans Bold'),local('LiberationSans-Bold'),local('Arial'),local('Liberation Sans');size-adjust:102.17%;ascent-override:96.30%;descent-override:28.58%;line-gap-override:0%;unicode-range:U+0061-007A}
+@font-face{font-family:'IBM Plex Mono Fallback';font-style:normal;font-weight:400;src:local('Menlo Regular'),local('Menlo-Regular'),local('Courier New'),local('CourierNewPSMT'),local('Liberation Mono'),local('LiberationMono');size-adjust:99.66%;ascent-override:102.85%;descent-override:27.59%;line-gap-override:0%;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'IBM Plex Mono Fallback';font-style:normal;font-weight:700;src:local('Menlo Bold'),local('Menlo-Bold'),local('Courier New Bold'),local('CourierNewPS-BoldMT'),local('Liberation Mono Bold'),local('LiberationMono-Bold'),local('Menlo'),local('Liberation Mono');size-adjust:99.66%;ascent-override:102.85%;descent-override:27.59%;line-gap-override:0%;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+</style>
+<script>/* P1-R2-1: hand the inlined faces to document.fonts as bytes, so they are ready before the first layout; once they are, the
+   fallback faces are switched off (they cover only what the real faces cover, so nothing moves) and no engine spends time looking them up */
+(function(){try{var d=document,st=d.querySelector('style[data-fonts]'),fb=d.querySelector('style[data-fallback]');if(!st||!window.FontFace||!d.fonts||!window.atob)return;
+var re=/@font-face\{font-family:'([^']+)';font-style:(\w+);font-weight:([\d ]+);font-display:\w+;src:url\(data:font\/woff2;base64,([^)]+)\) format\('woff2'\);unicode-range:([^}]+)\}/g,m,all=[],ok=0;
+while(m=re.exec(st.textContent)){var b=atob(m[4]),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
+var f=new FontFace(m[1],u.buffer,{style:m[2],weight:m[3],unicodeRange:m[5],display:'swap'});d.fonts.add(f);all.push(f);if(f.status==='loaded')ok++;}
+var off=function(){if(fb)fb.disabled=true;d.documentElement.setAttribute('data-fonts-ready','');};
+if(all.length&&ok===all.length)off();else if(all.length)Promise.all(all.map(function(f){return f.loaded;})).then(off,function(){});}catch(e){}})();</script>
 <style>
 :root{
   --ink:#0A0D14;--ink-2:#0E121B;--panel:#141925;--panel-2:#1A2030;--panel-3:#222A3D;
@@ -22,9 +56,9 @@
   --gold:#FFC53D;--gold-2:#FFD970;--gold-deep:#E0A012;          /* STRENGTH pillar */
   --cyan:#3FD8C8;--cyan-2:#6FE9DC;--cyan-deep:#23A99B;          /* ENDURANCE pillar */
   --go:#42D77D;--warn:#F0883E;--danger:#F65B5B;--bad:#FF6B7A;--bad-2:#FF7A88;--violet:#9D8CFF;
-  --f-display:'Space Grotesk',-apple-system,system-ui,sans-serif;
-  --f-body:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
-  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --f-display:'Space Grotesk','Space Grotesk Fallback',-apple-system,system-ui,sans-serif;
+  --f-body:'Manrope','Manrope Fallback',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --f-mono:'IBM Plex Mono','IBM Plex Mono Fallback',ui-monospace,Menlo,monospace;
   --r-sm:9px;--r:13px;--r-lg:18px;--r-xl:24px;
   --sh:0 6px 24px rgba(0,0,0,.4);--sh-lg:0 16px 50px rgba(0,0,0,.55);
   --glow-gold:0 0 0 1px rgba(255,197,61,.3),0 10px 30px rgba(255,197,61,.22);
@@ -49,7 +83,12 @@ header.app{position:sticky;top:0;z-index:50;padding-top:env(safe-area-inset-top,
 .brand-txt span{font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--text-3);font-weight:700}
 .cd{display:flex;gap:7px;flex:none}
 .cd-box{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:6px 8px;text-align:center;min-width:50px}
-.cd-box b{font-family:var(--f-mono);font-size:16px;font-weight:600;color:var(--cyan);display:block;line-height:1.1}
+/* the two header boxes keep the width the real faces give their default labels (.cd-free, set with the body-fat label, lets the first size itself), so the header does not move when the inlined fonts replace the fallback */
+.cd-box:first-child{width:96.0625px}
+.cd-box:nth-child(2){width:77.140625px}
+.cd-box small{white-space:nowrap}
+.cd-box.cd-free{width:auto}
+.cd-box b{font-family:var(--f-mono);font-size:16px;font-weight:600;color:var(--cyan);display:block;line-height:1.1;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
 .cd-box small{font-size:10px;letter-spacing:.4px;text-transform:uppercase;color:var(--text-3);font-weight:700}
 
 nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:60;background:linear-gradient(0deg,var(--ink-2),rgba(14,18,27,.95));backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--line);display:flex;justify-content:flex-start;gap:2px;padding:8px 2px calc(8px + env(safe-area-inset-bottom));overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;scroll-behavior:smooth}
@@ -84,7 +123,7 @@ nav.tabs .tab{flex:1 0 12.5%}
 .cd-ring{flex:none;position:relative;width:104px;height:104px}
 .cd-ring svg{transform:rotate(-90deg)}
 .cd-lab{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.cd-lab b{font-family:var(--f-mono);font-size:26px;font-weight:700;line-height:1;color:var(--cyan)}
+.cd-lab b{font-family:var(--f-mono);font-size:26px;font-weight:600;line-height:1;color:var(--cyan);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
 .cd-lab small{font-size:10px;line-height:1.25;letter-spacing:1px;text-align:center;text-transform:uppercase;color:var(--text-3);font-weight:700;margin-top:3px}
 
 .pillars{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
@@ -163,7 +202,7 @@ nav.tabs .tab{flex:1 0 12.5%}
 /* exercise card (lift) */
 .ex{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);margin-bottom:13px;overflow:hidden}
 .ex-h{display:flex;gap:12px;padding:14px 16px 11px;align-items:flex-start}
-.ex-n{flex:none;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-family:var(--f-display);font-size:16px;background:var(--panel-3);color:var(--gold);border:1px solid var(--line-2)}
+.ex-n{flex:none;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-family:var(--f-display);font-weight:500;font-size:16px;background:var(--panel-3);color:var(--gold);border:1px solid var(--line-2)}
 .ex-ti{flex:1;min-width:0}
 .ex-nm{font-size:15.5px;font-weight:700;line-height:1.25}
 .ex-tag{font-size:11.5px;margin-top:2px}
@@ -175,7 +214,7 @@ nav.tabs .tab{flex:1 0 12.5%}
 .chip.rir{background:rgba(246,91,91,.1);border-color:rgba(246,91,91,.25);color:#ffb3b3}
 .chip.rir b{color:#ff8a8a}
 .lastt{margin:0 16px 12px;padding:8px 11px;border-radius:var(--r-sm);background:rgba(255,197,61,.07);border:1px solid rgba(255,197,61,.18);font-size:12px;color:var(--text-2)}
-.lastt b{color:var(--gold);font-family:var(--f-mono)}
+.lastt b{color:var(--gold);font-family:var(--f-mono);font-weight:600}
 .hw-tog{display:flex;align-items:center;gap:6px;margin:-4px 16px 6px;cursor:pointer;font-family:var(--f-body);font-size:12px;font-weight:600;color:var(--text-2);background:none;border:0;padding:8px 0;min-height:36px}
 .hw-tog svg{width:14px;height:14px;transition:transform .2s}
 .hw-tog.open svg{transform:rotate(90deg)}
@@ -190,7 +229,7 @@ nav.tabs .tab{flex:1 0 12.5%}
 .set-grid{width:100%;border-collapse:collapse}
 .set-grid th{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-2);font-weight:700;padding:4px 5px;text-align:center}
 .set-row td{padding:4px 4px}
-.set-no{font-family:var(--f-display);font-size:15px;color:var(--text-3);text-align:center;width:30px}
+.set-no{font-family:var(--f-display);font-weight:500;font-size:15px;color:var(--text-3);text-align:center;width:30px}
 .set-row.done .set-no{color:var(--go)}
 .cell{width:100%;background:var(--panel-3);border:1px solid var(--line);border-radius:8px;color:var(--text);font-family:var(--f-mono);font-size:16px;font-weight:600;text-align:center;padding:9px 3px;-moz-appearance:textfield}
 input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
@@ -244,7 +283,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .rc-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px}
 .rc-badge{font-size:10px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:var(--cyan)}
 .racecallout.key .rc-badge{color:var(--gold)}.racecallout.goal .rc-badge{color:var(--go)}.racecallout.taper .rc-badge{color:var(--warn)}
-.rc-when{font-family:var(--f-mono);font-size:11px;color:var(--text-3);font-weight:700;flex:none}
+.rc-when{font-family:var(--f-mono);font-size:11px;color:var(--text-3);font-weight:600;flex:none}
 .rc-name{font-size:14.5px;font-weight:700;margin-bottom:2px}
 .rc-meta{font-size:12px;color:var(--text-2);margin-bottom:6px}
 .rc-advice{font-size:12px;color:var(--text-2);line-height:1.55}
@@ -308,6 +347,9 @@ select option{background:var(--panel-2);color:var(--text)}
 .chart-head h3{font-size:14px;font-weight:700}
 .chart-head .chs{font-size:11.5px;color:var(--text-3);font-family:var(--f-mono)}
 .chart-svg{width:100%;height:auto;display:block;overflow:visible}
+.chart-host{position:relative}
+.chart-probe{display:block;height:0;width:100%;pointer-events:none}
+.chart-in{margin:0 auto}
 /* progress photos */
 .ph-add{display:flex;gap:8px;margin:12px 0 6px}
 .ph-add .mini{flex:1}
@@ -415,7 +457,7 @@ nav.tabs .tab{padding:6px 0}
 /* ---- start banner / completion ---- */
 .startban{background:linear-gradient(135deg,rgba(63,216,200,.14),rgba(255,197,61,.10));border:1px solid var(--cyan-deep);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px}
 .startban .sb-d{flex:none;width:54px;height:54px;border-radius:14px;background:var(--ink-2);border:1px solid var(--cyan-deep);display:flex;flex-direction:column;align-items:center;justify-content:center}
-.startban .sb-d b{font-family:var(--f-mono);font-size:20px;color:var(--cyan);line-height:1}
+.startban .sb-d b{font-family:var(--f-mono);font-size:20px;font-weight:600;color:var(--cyan);line-height:1}
 .startban .sb-d small{font-size:8px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-3);font-weight:700;margin-top:2px}
 .startban .sb-t h4{font-size:15px;font-weight:800}
 .startban .sb-t p{font-size:12.5px;color:var(--text-2);margin-top:2px}
@@ -463,7 +505,7 @@ nav.tabs .tab{padding:6px 0}
 .plate-row .field{flex:1;margin:0}
 .plate-out{margin-top:6px}
 .plate-vis{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;padding:14px;background:var(--ink-2);border:1px solid var(--line);border-radius:var(--r);min-height:64px}
-.plate{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:4px;color:#0A0D14;font-family:var(--f-mono);font-weight:700;font-size:12px}
+.plate{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:4px;color:#0A0D14;font-family:var(--f-mono);font-weight:600;font-size:12px}
 .bar-stub{width:26px;height:8px;background:linear-gradient(180deg,#cfd6e4,#8b94a8);border-radius:2px}
 .plate-txt{text-align:center;font-family:var(--f-mono);font-size:13px;color:var(--text-2);margin-top:10px}
 .plate-txt b{color:var(--gold)}
@@ -479,7 +521,7 @@ nav.tabs .tab{padding:6px 0}
 #restTimer #restEnd{width:40px;padding:7px 0;color:var(--text-2)}
 .rt-mid{display:flex;align-items:center;gap:9px}
 .rt-lab{font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--cyan);font-weight:700}
-#restTime{font-family:var(--f-mono);font-size:22px;font-weight:600;color:var(--text);min-width:54px;text-align:center}
+#restTime{font-family:var(--f-mono);font-size:22px;font-weight:600;color:var(--text);min-width:54px;text-align:center;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
 @media(min-width:760px){#restTimer{bottom:24px}}
 /* ---- round-2 audit (27 Sep 2026) ---- */
 @media(max-width:420px){.macro-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -531,7 +573,7 @@ nav.tabs .tab{padding:6px 0}
 .pt-head{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;padding:9px 12px;background:var(--panel-3);font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-3);font-weight:700}
 .pt-head span:nth-child(2),.pt-head span:nth-child(3){text-align:right;min-width:62px}
 .pt-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;padding:11px 12px;border-top:1px solid var(--line);align-items:center}
-.pt-n{font-size:13px;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.pt-n{font-size:13px;font-weight:600;min-width:0;overflow-wrap:anywhere}.pt-n b{font-weight:800}
 .pt-n small{display:block;font-size:11px;color:var(--text-3);font-weight:400;margin-top:2px}
 .tk-best .tk-price{font-size:13.5px;font-weight:600;margin-top:2px}
 .tk-best .tk-m{font-size:13px;color:var(--text-2)}
@@ -543,7 +585,7 @@ nav.tabs .tab{padding:6px 0}
 .gr-row .pt-p{max-width:104px;overflow-wrap:anywhere;font-size:12px}
 .why-row .skip-n{color:#8ce6ad}
 .pt-p{font-family:var(--f-mono);font-size:13px;color:var(--text);text-align:right;min-width:62px}
-.pt-g{font-family:var(--f-mono);font-size:13px;color:var(--go);text-align:right;min-width:62px}
+.pt-g{font-family:var(--f-mono);font-size:13px;color:var(--go);text-align:right;min-width:62px}.pt-g b{font-weight:600}
 .meal-grid{display:grid;gap:10px}
 .mealcard{background:var(--ink-2);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px}
 .meal-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px}
@@ -565,7 +607,7 @@ nav.tabs .tab{padding:6px 0}
 .tblk-items{display:grid;gap:9px}
 .tblk > .tblk-item + .tblk-items{margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.06)}
 .ev-live{box-shadow:0 0 0 1px rgba(66,215,125,.45),0 0 18px rgba(66,215,125,.12)}
-#view-run .ev-now{background:var(--go);color:var(--ink)!important;font-weight:700;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.3px}
+#view-run .ev-now{background:var(--go);color:var(--ink)!important;font-weight:600;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.3px}
 .tblk-item{padding-top:9px;border-top:1px solid rgba(255,255,255,.06)}
 .tblk-item:first-child{padding-top:0;border-top:0}
 .ti-n{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px}
