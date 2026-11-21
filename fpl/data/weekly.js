@@ -70,19 +70,19 @@ const WEEKLY = {
     // holds only free agents to sign before the deadline, each with the drop that costs least, in this order; next_run holds the
     // locked players worth a claim at the next waiver run, each drop taken from the roster those signings leave.
     pool: "api",
-    pool_note: "League 46148: the ins are players in the league's own feed, and the waiver model reproduces the league's claim log (qa/waiver_log.cjs). Waivers for GW11 have settled, so a free agent is signed instantly until the deadline and a player dropped in that run is locked until the next. 4 players to sign now; 3 claims for the next waiver run, Thu 26 Nov 20:30 SAST, where you claim 1 of 8. Held back because the player is flagged (re-check after the pressers): N.Williams for Affengruber (status d, 75%).",
+    pool_note: "League 46148: the ins are players in the league's own feed, and the waiver model reproduces the league's claim log (qa/waiver_log.cjs). Waivers for GW11 have settled, so a free agent is signed instantly until the deadline and a player dropped in that run is locked until the next. 4 players to sign now; 3 claims for the next waiver run, Thu 26 Nov 20:30 SAST, where you claim 1st or 2nd of 8 (the order is the table after GW11, bottom first, and GW11 is still to be played). Held back because the player is flagged (re-check after the pressers): N.Williams for Mukiele (status d, 75%).",
     claims: [
-      { out: 169528, in: 200834, why: "Mukiele for Robinson (DEF), +7.9 Draft expected points to GW20 on your roster, sign now (a free agent until the GW11 deadline)" },
-      { out: 577725, in: 432714, why: "McAtee for King (MID), +6.1 Draft expected points to GW20 on your roster, sign now (a free agent until the GW11 deadline)" },
-      { out: 84450, in: 204580, why: "Janelt for Xhaka (MID), +3.1 Draft expected points to GW20 on your roster, sign now (a free agent until the GW11 deadline)" },
-      { out: 477555, in: 432422, why: "Tonali for Bobb (MID), +2.4 Draft expected points to GW20 on your roster, sign now (a free agent until the GW11 deadline)" }
+      { out: 169528, in: 200834, why: "Mukiele for Robinson (DEF), +7.9 Draft expected points to GW20 on your roster if kept, sign now (a free agent until the GW11 deadline)" },
+      { out: 577725, in: 432714, why: "McAtee for King (MID), +6.1 Draft expected points to GW20 on your roster if kept, sign now (a free agent until the GW11 deadline)" },
+      { out: 84450, in: 204580, why: "Janelt for Xhaka (MID), +3.1 Draft expected points to GW20 on your roster if kept (a next-run claim below swaps him out after GW11), sign now (a free agent until the GW11 deadline)" },
+      { out: 477555, in: 432422, why: "Tonali for Bobb (MID), +2.4 Draft expected points to GW20 on your roster if kept (a next-run claim below swaps him out after GW11), sign now (a free agent until the GW11 deadline)" }
     ],
     next_run: {
-      gw: 12, waivers: "2026-11-26T18:30:00Z", place: 1, of: 8,
+      gw: 12, waivers: "2026-11-26T18:30:00Z", place_min: 1, place_max: 2, order_after: 11, place_known: true, of: 8,
       claims: [
-        { out: 432422, in: 222531, why: "Gibbs-White for Tonali (MID), +11.4 Draft expected points from GW12 to GW20, locked until the next waiver run, Thu 26 Nov 20:30 SAST, so lodge it as a claim then" },
-        { out: 442299, in: 480455, why: "Branthwaite for Affengruber (DEF), +2.2 Draft expected points from GW12 to GW20, locked until the next waiver run, Thu 26 Nov 20:30 SAST, so lodge it as a claim then" },
-        { out: 204580, in: 513418, why: "Schade for Janelt (MID), +0.6 Draft expected points from GW12 to GW20, locked until the next waiver run, Thu 26 Nov 20:30 SAST, so lodge it as a claim then" }
+        { out: 432422, in: 222531, why: "Gibbs-White for Tonali (MID), +11.4 Draft expected points from GW12 to GW20, locked until the next waiver run, Thu 26 Nov 20:30 SAST, so lodge it as a claim before then" },
+        { out: 442299, in: 480455, why: "Branthwaite for Affengruber (DEF), +2.2 Draft expected points from GW12 to GW20, locked until the next waiver run, Thu 26 Nov 20:30 SAST, so lodge it as a claim before then" },
+        { out: 204580, in: 513418, why: "Schade for Janelt (MID), +0.6 Draft expected points from GW12 to GW20, locked until the next waiver run, Thu 26 Nov 20:30 SAST, so lodge it as a claim before then" }
       ]
     },
     // The best eleven of the roster the sign-now lines leave (src/mc_engine.js bestXI for GW11): 4-5-1, Tzolakis, Silva, Hill, Murillo, Mukiele, Tonali, Gomez, Janelt, McAtee, Cunha, N.Jackson.

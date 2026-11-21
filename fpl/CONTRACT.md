@@ -155,9 +155,12 @@ const WEEKLY = {
                                                         // 21 Nov 2026 (E-203): after the week's waiver run
                                                         // claims holds only the free agents to sign now, in
                                                         // order, each why saying "sign now", and the block adds
-    next_run: { gw, waivers: "<ISO>", place, of,        // the next waiver run (null after the re-draft): its
-      claims: [ {out:<code>, in:<code>, why:"…"}, … ] },// time, the manager's place and the locked players
-                                                        // worth a claim. Absent before the run.
+    next_run: { gw, waivers: "<ISO>", place_min, place_max,// the next waiver run (null after the re-draft): its
+      order_after, place_known, of,                     // time, the manager's place as the range the table after
+      claims: [ {out:<code>, in:<code>, why:"…"}, … ] },// GW order_after allows (E-205: this league orders each
+                                                        // run by that table, bottom first, so today's waiver_pick
+                                                        // is last run's order; exact once that gameweek is played)
+                                                        // and the locked players worth a claim. Absent before the run.
     xi: { formation: "3-5-2", gk: <code>, def: [...], mid: [...], fwd: [...] },
     watchlist: [ …codes with three starts… ]
   },

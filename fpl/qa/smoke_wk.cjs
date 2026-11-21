@@ -905,9 +905,12 @@ async function main() {
       claims.length + " written claims checked against the " + (draftFresh ? "live draft API" : "snapshot (offline)") + ", gains to GW" + dHorizon + " by src/mc_engine.js, the sheet line for line and one content hash" + "; src/engine.js draftEV (five gameweeks) disagrees on " + disagree.length + (disagree.length ? " (" + disagree.join(", ") + ")" : "") + "; shortfalls named on screen: " + (notes.join("; ") || "none") + (bad.length ? " — invalid: " + bad.join("; ") : "") + (shownIssues.length !== notes.length ? " — a shortfall is not shown in the waivers panel" : ""));
   }
 
-  // ---- 28b · E-203 (21 Nov 2026): the next waiver run's claims carry the league's own waiver time and the manager's place
-  // (waiver_pick), and every drop is on the roster the sign-now lines leave, position for position. All values are read
-  // from data/live.json; none is typed.
+  // ---- 28b · E-203 (21 Nov 2026): the next waiver run's claims carry the league's own waiver time and the manager's place,
+  // and every drop is on the roster the sign-now lines leave, position for position. All values are read from
+  // data/live.json; none is typed. The place (re-stated 21 Nov 2026, E-205): this league orders each run by the table after
+  // the previous gameweek, bottom first, so today's waiver_pick is the order of the run just gone. The range is worked out
+  // here on its own from the raw feed's standings and matches: every result of every unplayed match before the run, a tie
+  // on points counting both ways while points for can still move.
   {
     const D = WEEKLY.draft || {}, settled = !!(LIVE.draft && LIVE.draft.game && LIVE.draft.game.waivers_processed);
     if (settled) {
@@ -917,13 +920,36 @@ async function main() {
       const own = {}; ((LIVE.draft && LIVE.draft.ownership) || []).forEach((o) => { own[o.code] = o; });
       const cl = D.claims || [], ins = {}, outs = {}; cl.forEach((c) => { ins[c.in] = true; outs[c.out] = true; });
       const etype = (code) => { const r = E.draftEl(code, ctx); return r ? r.element_type : null; };
+      const placeRange = (runGw) => {
+        const pts = {}, pf = {};
+        (LIVE.draft.standings || []).forEach((st) => { pts[st.leagueEntry] = st.total; pf[st.leagueEntry] = st.pointsFor; });
+        if (!(meId in pts)) return null;
+        const open = (LIVE.draft.matches || []).filter((m) => m.event < runGw && !m.finished && (m.entry1 in pts) && (m.entry2 in pts));
+        let lo = Infinity, hi = -Infinity;
+        const go = (i, p) => {
+          if (i === open.length) {
+            let below = 0, level = 0;
+            Object.keys(p).forEach((k) => { if (Number(k) === meId) return; if (p[k] < p[meId]) below++; else if (p[k] === p[meId]) { if (open.length) level++; else if (pf[k] < pf[meId]) below++; } });
+            lo = Math.min(lo, below + 1); hi = Math.max(hi, below + level + 1); return;
+          }
+          const m = open[i];
+          [[3, 0], [1, 1], [0, 3]].forEach(([u, v]) => { const q = Object.assign({}, p); q[m.entry1] += u; q[m.entry2] += v; go(i + 1, q); });
+        };
+        go(0, Object.assign({}, pts));
+        return { min: lo, max: hi };
+      };
       const rules = (x) => {
         const bad = [];
         if (!ev) { if (x !== null) bad.push("a next_run is written but the feed has no gameweek " + run); return bad; }
         if (!x) { bad.push("no next_run although the feed has gameweek " + run); return bad; }
         if (x.gw !== run) bad.push("gw " + x.gw + " is not " + run);
         if (x.waivers !== ev.waivers_time) bad.push("waivers " + x.waivers + " is not the feed's " + ev.waivers_time);
-        if (!mine || x.place !== mine.waiverPick) bad.push("place " + x.place + " is not waiver_pick " + (mine ? mine.waiverPick : "?"));
+        const R = placeRange(run);
+        if (!R) bad.push("the feed's standings do not name the manager, so no place can be checked");
+        else if (x.place_min !== R.min || x.place_max !== R.max) bad.push("place " + x.place_min + "–" + x.place_max + " is not the table's " + R.min + "–" + R.max);
+        if (x.order_after !== run - 1) bad.push("order_after " + x.order_after + " is not GW" + (run - 1));
+        if (x.place_known !== true) bad.push("place_known is not true although the standings name the manager");
+        if ("place" in x) bad.push("a single place is written (today's waiver_pick is last run's order)");
         if (x.of !== ents.length) bad.push("of " + x.of + " is not " + ents.length + " entries");
         const usedDrop = {};
         (x.claims || []).forEach((c) => {
@@ -935,12 +961,16 @@ async function main() {
       };
       const bad = rules(nr === undefined ? null : nr);
       assert("draft-next-run-claims-carry-the-league's-own-waiver-time-and-place", !bad.length,
-        (nr ? "GW" + nr.gw + " " + nr.waivers + ", place " + nr.place + " of " + nr.of + ", " + nr.claims.length + " claims" : "no next run") + (bad.length ? " — " + bad.join("; ") : ""));
+        (nr ? "GW" + nr.gw + " " + nr.waivers + ", place " + nr.place_min + (nr.place_max !== nr.place_min ? " to " + nr.place_max : "") + " of " + nr.of + " (the table after GW" + nr.order_after + "), " + nr.claims.length + " claims" : "no next run") + (bad.length ? " — " + bad.join("; ") : ""));
       if (nr && ev) {
         const thisWeek = (evs.find((e) => e.id === Number(g.next_event)) || {}).waivers_time;
         const m1 = Object.assign({}, nr, { waivers: thisWeek });
         const m2 = cl.length && nr.claims.length ? Object.assign({}, nr, { claims: [Object.assign({}, nr.claims[0], { out: cl[0].out })].concat(nr.claims.slice(1)) }) : null;
         assert("E203-mutation-this-week's-waiver-time-on-the-next-run-goes-red", rules(m1).length > 0, rules(m1).slice(0, 1).join(""));
+        const m3 = Object.assign({}, nr, { place_max: nr.place_max < nr.of ? nr.place_max + 1 : nr.place_max - 1 });
+        assert("E205-mutation-a-place-the-table-does-not-allow-goes-red", rules(m3).length > 0, rules(m3).slice(0, 1).join(""));
+        const m4 = Object.assign({}, nr, { place: mine ? mine.waiverPick : 1 });
+        assert("E205-mutation-today's-waiver-pick-written-as-the-place-goes-red", rules(m4).length > 0, rules(m4).slice(0, 1).join(""));
         if (m2) assert("E203-mutation-a-next-run-drop-already-dropped-by-a-signing-goes-red", rules(m2).length > 0, rules(m2).slice(0, 1).join(""));
       }
     }

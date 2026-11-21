@@ -284,8 +284,11 @@ const roster = M.draftRoster(), mine = new Set(roster.map((p) => p.id)), poolIds
     const r2 = replay(S.next.claims, r1.after, locked, run);
     ok("next waiver run (" + S.next.claims.length + " claims): each is a fit locked player, the best claim left from GW" + run + " on the roster the signings leave",
       r2.bad.length === 0 && S.next.claims.every((l) => fit(Ps[l.add]) && Ps[l.add].ds === "l"), r2.bad.slice(0, 3).join("; "));
-    ok("the next run is GW" + run + " at the league's waiver time, and the place is waiver_pick (" + S.next.place + " of " + S.next.of + ")",
-      S.next.gw === run && S.next.wv === ev.wv && S.next.place === order.indexOf(MCs.draft.me) + 1 && S.next.of === order.length, "");
+    // E-205 (21 Nov 2026): the place is the range the table after GW(run-1) allows, not today's waiver_pick
+    const pr = AN.waiverPlaceRange(MCs, run);
+    ok("the next run is GW" + run + " at the league's waiver time, and the place is the range the table after GW" + (run - 1) + " allows (" + S.next.placeMin + " to " + S.next.placeMax + " of " + S.next.of + ")",
+      S.next.gw === run && S.next.wv === ev.wv && !!pr && S.next.placeMin === pr.min && S.next.placeMax === pr.max && S.next.orderAfter === run - 1 &&
+        S.next.placeKnown === true && S.next.of === order.length && !("place" in S.next), "");
     if (S.now.length && S.next.claims.length) {
       const mut = [Object.assign({}, S.next.claims[0], { drop: S.now[0].drop })].concat(S.next.claims.slice(1));
       ok("mutation: a next-run claim that drops a player a signing has already dropped is caught", replay(mut, r1.after, locked, run).bad.length > 0, "");
@@ -294,6 +297,39 @@ const roster = M.draftRoster(), mine = new Set(roster.map((p) => p.id)), poolIds
   const inParts = new Set(S.now.map((l) => l.add).concat(S.next ? S.next.claims.map((l) => l.add) : []));
   ok("every held-back player is flagged and in neither part (" + S.heldBack.map((h) => who(Ps[h.add]) + " " + h.status).join(", ") + ")",
     S.heldBack.every((h) => Ps[h.add] && Ps[h.add].st !== "a" && !inParts.has(h.add)), "");
+  // E-205: each is priced on the roster BOTH parts leave, from the week he could arrive, and listed only while he adds MIN
+  let lastR = r1.after.slice();
+  if (S.next) S.next.claims.forEach((l) => { lastR = lastR.map((p) => (p.id === l.drop ? Ps[l.add] : p)); });
+  const heldRule = (H, roster) => H.every((h) => {
+    const best = Ms.draftMoves(roster, h.from, hz, { pool: [Ps[h.add]] })[0];
+    return !!best && best.drop.id === h.drop && Math.abs(best.gain - h.gain) < 1e-9 && h.gain >= MIN && roster.some((p) => p.id === h.drop) && h.from <= hz;
+  });
+  ok("every held-back player is priced on the roster both parts leave, from the week he could arrive, and adds at least +" + MIN,
+    heldRule(S.heldBack, lastR), S.heldBack.map((h) => who(Ps[h.add]) + " for " + who(Ps[h.drop]) + " " + f2(h.gain) + " from GW" + h.from).join(", "));
+  if (S.heldBack.length && S.next && S.next.claims.length) {
+    const first = S.heldBack.map((h) => { const b = Ms.draftMoves(r1.after, h.from, hz, { pool: [Ps[h.add]] })[0]; return Object.assign({}, h, { drop: b ? b.drop.id : h.drop, gain: b ? b.gain : h.gain }); });
+    const differs = first.some((h, i) => h.drop !== S.heldBack[i].drop);
+    if (differs) ok("mutation: held-back players priced on the roster part one leaves (the first version) fail the rule", !heldRule(first, lastR), "");
+  }
+  // the order rule itself, on fixtures: bottom on 7 against 9 in an unplayed match is 1st or 2nd; with every match played
+  // it is exact, a tie on points broken by points for; a match in the run's own gameweek does not count
+  {
+    const fx = (st, ms) => ({ draft: { me: "Y", standings: st, matches: ms } });
+    const ST = [{ name: "A", pts: 24, pf: 508 }, { name: "B", pts: 12, pf: 418 }, { name: "U", pts: 9, pf: 399 }, { name: "Y", pts: 7, pf: 405 }];
+    const open = [{ gw: 11, a: "Y", b: "U", fin: false }, { gw: 11, a: "A", b: "B", fin: false }];
+    const done = open.map((m) => Object.assign({}, m, { fin: true }));
+    const r = AN.waiverPlaceRange(fx(ST, open), 12);
+    ok("waiverPlaceRange: last on 7 against 9 in an unplayed match is 1st or 2nd of 4 (" + JSON.stringify(r) + ")", !!r && r.min === 1 && r.max === 2 && r.of === 4 && r.after === 11 && r.open === 2, "");
+    const r2 = AN.waiverPlaceRange(fx(ST, done), 12);
+    ok("waiverPlaceRange: with every match played the place is exact", !!r2 && r2.min === 1 && r2.max === 1, JSON.stringify(r2));
+    const tie = (pfU) => AN.waiverPlaceRange(fx(ST.map((x) => (x.name === "U" ? Object.assign({}, x, { pts: 7, pf: pfU }) : x)), done), 12);
+    ok("waiverPlaceRange: level on points with every match played, points for decides (U ahead on 410: 1st; U behind on 400: 2nd)",
+      tie(410).min === 1 && tie(410).max === 1 && tie(400).min === 2 && tie(400).max === 2, JSON.stringify([tie(410), tie(400)]));
+    ok("waiverPlaceRange: a match in the run's own gameweek does not move the place",
+      JSON.stringify(AN.waiverPlaceRange(fx(ST, open.concat([{ gw: 12, a: "Y", b: "A", fin: false }])), 12)) === JSON.stringify(r), "");
+    ok("mutation: today's waiver_pick as the place (1 and 1) is not the range", !(r.min === 1 && r.max === 1), "");
+    ok("waiverPlaceRange: no standings for the manager gives null", AN.waiverPlaceRange(fx(ST.filter((x) => x.name !== "Y"), open), 12) === null, "");
+  }
   if (S.now.length) {
     const firstId = S.now[0].add, MCf = clone(true); MCf.players.forEach((p) => { if (p.id === firstId) { p.st = "d"; p.cop = 75; } });
     const Mf = ENG.create(MCf), Sf = AN.buildDraftSheet(Mf, MCf, PLAN.draft.pairs, { fitOnly: true });

@@ -261,10 +261,41 @@ function claimablePairs(M, pairs) {
            Each line's drop is the one that costs least for that add (E-200: never the solver's list-order pairing).
      next  fit locked players worth a claim at the next waiver run, the same way, from the gameweek after this one, on the
            roster the signings leave (so a drop can be a player signed above), with the run's time and the manager's place.
-   Flagged players are still held back (heldBack), each priced on the same roster from the week he could first arrive.
+           The place is a range, not today's waiver_pick: this league orders each run by the table after the gameweek
+           before it, bottom first, so while that gameweek is unplayed the place can still move (waiverPlaceRange; 21 Nov
+           2026, the pre-ship review: today's pick 1 becomes 2 if the manager wins his GW11 match).
+   Flagged players are still held back (heldBack), each priced on the roster both parts leave, from the week he could
+   first arrive, and only while he would still add MC_SIGN_MIN_GAIN before the horizon (never the solver's list-order drop).
    Before waivers process the function returns buildClaimSheet's object untouched, so that phase is byte for byte today's
    and parity B7 is untouched. The greedy choice is checked against an exhaustive search in qa/mc_optimisers.cjs. */
-const MC_SIGN_MIN_GAIN = 0.25, MC_SIGN_PER_POS = 14;
+const MC_SIGN_MIN_GAIN = 0.25, MC_SIGN_PER_POS = 14, MC_PLACE_MAX_OPEN = 8;
+/* The manager's place at the waiver run before gameweek `run`, as {min, max, of, after, open}. The league's own log shows each
+   run processed in reverse order of the table after the previous gameweek (points, then points for): GW2 to GW11, no exception
+   but two exact ties. While matches up to gameweek run-1 are unplayed every win, draw and loss is tried; a tie on points
+   counts both ways, because the unplayed matches still move points for. With every match played the place is exact. Null
+   when the standings do not name the manager or too many matches are open to enumerate. */
+function waiverPlaceRange(DATA, run) {
+  const d = DATA && DATA.draft; if (!d || !Array.isArray(d.standings)) return null;
+  const me = d.me, pts = {}, pf = {};
+  d.standings.forEach(function (x) { if (x && typeof x.name === "string") { pts[x.name] = Number(x.pts) || 0; pf[x.name] = Number(x.pf) || 0; } });
+  if (!(me in pts)) return null;
+  const open = (Array.isArray(d.matches) ? d.matches : []).filter(function (m) { return m && m.gw < run && !m.fin && (m.a in pts) && (m.b in pts); });
+  if (open.length > MC_PLACE_MAX_OPEN) return null;
+  const names = Object.keys(pts);
+  let lo = Infinity, hi = -Infinity;
+  for (let k = 0, n = Math.pow(3, open.length); k < n; k++) {
+    const p = Object.assign({}, pts); let c = k;
+    open.forEach(function (m) { const r = c % 3; c = (c - r) / 3; if (r === 0) p[m.a] += 3; else if (r === 1) { p[m.a] += 1; p[m.b] += 1; } else p[m.b] += 3; });
+    let below = 0, level = 0;
+    names.forEach(function (x) {
+      if (x === me) return;
+      if (p[x] < p[me]) below++;
+      else if (p[x] === p[me]) { if (open.length) level++; else if (pf[x] < pf[me]) below++; }
+    });
+    lo = Math.min(lo, below + 1); hi = Math.max(hi, below + level + 1);
+  }
+  return { min: lo, max: hi, of: names.length, after: run - 1, open: open.length };
+}
 function greedySwaps(M, roster, pool, g0, g1) {
   let cur = roster.slice();
   const start = new Set(roster.map(function (p) { return p.id; })), dropped = new Set(), added = new Set(), lines = [];
@@ -288,11 +319,16 @@ function buildDraftSheet(M, DATA, pairs, opts) {
   const fit = function (p) { return !!p && p.st === "a"; };
   const one = greedySwaps(M, M.draftRoster(), M.freeAgents().filter(fit), next, dEnd);
   const run = next + 1, evs = DATA.draft.events || {}, ev = evs[String(run)] || {};
-  let nx = null;
+  let nx = null, last = one.after;
   if (run <= dEnd && typeof ev.wv === "string") {
-    const order = M.waiverOrder();
+    const order = M.waiverOrder(), pr = waiverPlaceRange(DATA, run);
     const two = greedySwaps(M, one.after, M.lockedFreeAgents().filter(fit), run, dEnd);
-    nx = { gw: run, wv: ev.wv, place: order.indexOf(DATA.draft.me) + 1, of: order.length, claims: two.lines };
+    nx = { gw: run, wv: ev.wv, placeMin: pr ? pr.min : 1, placeMax: pr ? pr.max : order.length, orderAfter: run - 1, of: order.length,
+      placeKnown: !!pr, claims: two.lines };
+    last = two.after;
+    // a signing the next run swaps out again is kept only to the gameweek before that run: say so on the line
+    const out2 = new Set(two.lines.map(function (l) { return l.drop; }));
+    one.lines.forEach(function (l) { if (out2.has(l.add)) l.until = run - 1; });
   }
   const used = new Set(one.lines.map(function (l) { return l.add; }).concat(nx ? nx.claims.map(function (l) { return l.add; }) : []));
   out.phase = "free";
@@ -300,9 +336,10 @@ function buildDraftSheet(M, DATA, pairs, opts) {
   out.next = nx;
   out.heldBack = (out.held || []).filter(function (h) { return !used.has(h.add) && P[h.add]; }).map(function (h) {
     const a = P[h.add], how = M.howToGet(a), from = how === "free" ? next : run;
-    const best = from <= dEnd ? M.draftMoves(one.after, from, dEnd, { pool: [a] })[0] : null;
-    return { add: h.add, drop: best ? best.drop.id : h.drop, status: h.status, chance: h.chance, gain: best ? best.gain : null, from: from, how: how };
-  });
+    const best = from <= dEnd ? M.draftMoves(last, from, dEnd, { pool: [a] })[0] : null;
+    return best && best.gain >= MC_SIGN_MIN_GAIN
+      ? { add: h.add, drop: best.drop.id, status: h.status, chance: h.chance, gain: best.gain, from: from, how: how } : null;
+  }).filter(Boolean);
   out.valueAfter = M.squadValue(one.after, next, dEnd, false);
   return out;
 }
@@ -324,7 +361,8 @@ if (typeof module !== "undefined" && module.exports) {
     mcHorizon: mcHorizon, buildClaimSheet: buildClaimSheet, findTrades: findTrades, tradeGroups: tradeGroups,
     classicReviewSummary: classicReviewSummary, draftReviewSummary: draftReviewSummary, reviewSummary: reviewSummary,
     classicGameweekSim: classicGameweekSim, headToHead: headToHead, greedyTransfers: greedyTransfers, claimability: claimability, claimablePairs: claimablePairs,
-    buildDraftSheet: buildDraftSheet, sheetLines: sheetLines, greedySwaps: greedySwaps, MC_SIGN_MIN_GAIN: MC_SIGN_MIN_GAIN, MC_SIGN_PER_POS: MC_SIGN_PER_POS,
+    buildDraftSheet: buildDraftSheet, sheetLines: sheetLines, greedySwaps: greedySwaps, waiverPlaceRange: waiverPlaceRange,
+    MC_SIGN_MIN_GAIN: MC_SIGN_MIN_GAIN, MC_SIGN_PER_POS: MC_SIGN_PER_POS, MC_PLACE_MAX_OPEN: MC_PLACE_MAX_OPEN,
     MC_SIM_DRAWS: MC_SIM_DRAWS, MC_SIM_SEED: MC_SIM_SEED, MC_H2H_DRAWS: MC_H2H_DRAWS, MC_H2H_SEED: MC_H2H_SEED,
     MC_CLAIM_RUNS: MC_CLAIM_RUNS, MC_CLAIM_SEED: MC_CLAIM_SEED, MC_PILOT_RUNS: MC_PILOT_RUNS, MC_PILOT_SEED: MC_PILOT_SEED,
     MC_RIVAL_TOP: MC_RIVAL_TOP, MC_BACKUP_MIN_GAIN: MC_BACKUP_MIN_GAIN, MC_TRADE: MC_TRADE, MC_REVIEW_WEEKS: MC_REVIEW_WEEKS, MC_REVIEW_FLAGS: MC_REVIEW_FLAGS

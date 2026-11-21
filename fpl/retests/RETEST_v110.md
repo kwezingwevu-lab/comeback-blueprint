@@ -1082,3 +1082,65 @@ The manager sent four more screenshots (taken at about 16:46Z, read at about 18:
   - Part two has no rival model: with pick 1 the first claim is safe, and lower places are not modelled.
   - E-200 stays open for the sheet before a waiver run.
   - E-202 (start rates for new starters) is open.
+
+## 21 Nov 2026, from about 07:30Z: the pre-ship review of the two-part sheet, version 34 live, then E-205 (version 35)
+
+- **Version 34.** CI run 75 on 20351fc was green at 07:43Z. A read-only workflow checked the build before it went live:
+  - Live Draft at 07:32Z: all four sign-now players at status a and unowned; all four drops on the roster; Gibbs-White, Branthwaite and Schade at status l; the roster identical to the block; no ownership change since 06:41Z.
+  - Live Classic at 07:34Z: no status, chance, news or price changed across all 672 players; no GW11 transfer made; bank £2.7m.
+  - Render: the page's lines match data/weekly.js line for line, with no "first choice" or "backup". Draft first paint 334 words, landing 95.
+
+  Version 34 was republished at 07:46Z and read back: the published page holds the local build, df-signnow, the 06:41:54Z data and plan 64cda385a664778d.
+- **The review.** 11 findings, each sent to two skeptics told to refute it; 9 survived (E-205). The two that matter for the manager:
+  - The place at Thursday's run is 1st or 2nd of 8, not 1st. It is 2nd if he beats Unique Stars in GW11; the app's head-to-head gives that 48.4%.
+  - The next-run claims disappeared at the GW11 deadline.
+- **The fix, built in a scratch worktree** while the skeptics read the committed tree, then applied:
+  - src/mc_analysis.js: waiverPlaceRange, the held-back rule, and an `until` marker on a signing the next run swaps out.
+  - pipeline/weekly.cjs and pipeline/partm.cjs: the place range and "lodge it as a claim before then".
+  - src/ui.jsx: the nextonly state, stricter line checks, the title worked out while the section is closed, the landing total said to be a total, held-back players in the flag watch, empty-case headings, the held-back note out of the next-run panel, the next run's checklist item, and the phase paragraph saying how the next order is set.
+
+  The outputs rebuilt in the main checkout match the worktree's byte for byte, except dist/index.html, where the worktree's build carried the symlinked node_modules path in esbuild's comments. The main checkout's build is the one shipped. Plan, weekly and export hashes are unchanged; no pull, bake or solve.
+- **What the Draft tab says now.**
+  - Sign now: Mukiele for Robinson +7.9; McAtee for King +6.1; Janelt for Xhaka +3.1, to GW11; Tonali for Bobb +2.4, to GW11.
+  - Locked until Thu 26 Nov 20:30 SAST, where he claims 1st or 2nd of 8: Gibbs-White for Tonali +11.4; Branthwaite for Affengruber +2.2; Schade for Janelt +0.6.
+  - Held back: N.Williams, now priced for Mukiele at +3.6 from GW12 on the roster both parts leave. It was previously priced for Affengruber at +4.5, but Affengruber is the drop for the Branthwaite claim.
+- **Gate, local.**
+
+| Suite | Result |
+  |---|---|
+  | components | 348/348 |
+  | smoke_wk | 49/49 |
+  | mc_optimisers | 59/59 |
+  | unit_engine | 279/279 |
+  | mc_rules | 46/46 |
+  | mc_separation | 45/45 |
+  | smoke | 73/73 |
+  | verify | 34/34 |
+  | plan_legality | 61/61 and 67/67 (reference) |
+  | privacy | 27/27 |
+  | browser | 185/185 |
+
+  37 of 39 steps green. The two red steps are webkit and ios: WebKit is not installed in this container, and CI runs both.
+
+- **browser.py (E-201).** A section probe compared version 34 with the fix, all sections open at 390 px:
+  - Draft grew from 6634 to 6724 px; df-claims went from 949 to 1040, 274 to 336 words.
+  - Now grew from 4621 to 4817 (the next-run checklist item and the longer landing line).
+  - Squad and Plan were unchanged.
+
+  The baseline was re-recorded with `--write-baseline`, and the tolerance is unchanged. Results:
+  - plain run: 185/185;
+  - `--mutate invert`: all 36 picture checks fire (Draft dark signature 208.20 against 40);
+  - `--mutate reflow`: no picture check fires.
+- **Word counts on first paint, 390×844.**
+
+  | | Landing (gate 110) | Draft tab (gate 500) |
+  |---|---|---|
+  | Now | 97 | 396 |
+  | At 14:00Z, after the deadline (page clock set) | 41 | 344 |
+
+  Screenshots before and after the deadline show, after it, the closed sign-now note, the three claims under "Claims for the next waiver run", and the place as 1st or 2nd of 8.
+
+- **Still open.**
+  - After the deadline the landing shows the match-day card, not the Draft line; the claims are on the Draft tab and in the checklist.
+  - The routine still runs after the Thursday waiver run (E-198), so the claims are not refreshed before it. The manager re-checks flags before lodging.
+  - E-200 stays open for the sheet before a waiver run; E-202 is open.

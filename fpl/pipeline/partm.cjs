@@ -109,9 +109,15 @@ let draft = "**Draft GW" + gw + ": " + (cl.length ? cl.length + (MC.draft.waiver
         // after the run (E-203): weekly.cjs writes the free agents to sign now in claims, and the locked players worth a
         // claim at the next run in next_run, each drop taken from the roster the signings leave
         const nr = WEEKLY.draft.next_run, nx = nr && Array.isArray(nr.claims) ? nr.claims.map((c) => c.why ? c.why.split(",")[0] : "") : [];
+        // the place is a range until the gameweek before the run is played: this league orders each run by the table
+        // after the previous gameweek, bottom first (waiverPlaceRange in src/mc_analysis.js)
+        const ordN = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" })[n % 10] || "th");
+        const where = !nr ? "" : nr.place_known !== true ? "your place is not known yet"
+          : "you claim " + (nr.place_min === nr.place_max ? ordN(nr.place_min) : ordN(nr.place_min) + (nr.place_max === nr.place_min + 1 ? " or " : " to ") + ordN(nr.place_max)) + " of " + nr.of +
+            (nr.place_min === nr.place_max ? "" : ", set by the table after GW" + nr.order_after);
         const worth = cs && isFinite(cs.valueAfter) && isFinite(cs.valueNow) ? " Roster " + f1(cs.valueNow) + " today, " + f1(cs.valueAfter) + " after the signings (Draft expected points to GW" + M.CFG.draftEnd + ")." : "";
         return (cl.length ? "Sign now, as free agents, in this order: " + cl.join("; ") + "." + worth + " " : "Nothing to sign now: no fit free agent improves the roster to GW" + M.CFG.draftEnd + ". ") +
-          (nr ? (nx.length ? "Cannot be signed this week, so claim at the next waiver run (" + sast(nr.waivers) + ", you claim " + nr.place + ({ 1: "st", 2: "nd", 3: "rd" }[nr.place % 10 === 0 || (nr.place % 100 >= 11 && nr.place % 100 <= 13) ? 0 : nr.place % 10] || "th") + " of " + nr.of + "; each drop assumes the signings above): " + nx.join("; ") + ". "
+          (nr ? (nx.length ? "Cannot be signed this week, so claim at the next waiver run (" + sast(nr.waivers) + ", " + where + "; each drop assumes the signings above): " + nx.join("; ") + ". "
                            : "Nobody locked is worth a claim at the next waiver run (" + sast(nr.waivers) + "). ")
               : "The next waiver run falls after the re-draft. ");
       })()

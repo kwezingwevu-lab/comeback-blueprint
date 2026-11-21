@@ -170,11 +170,18 @@ if (settled !== (LN.phase === "free")) refuse("the Draft sheet's phase (" + LN.p
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], MONS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const sastDay = (iso) => { const d = new Date(Date.parse(iso) + 2 * 3600000); return DAYS[d.getUTCDay()] + " " + d.getUTCDate() + " " + MONS[d.getUTCMonth()] + " " + String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0"); };
 const NR = settled ? sheet.next : null;   // the next waiver run (null after the re-draft)
+// The place at that run is a range until the gameweek before it is played (waiverPlaceRange in src/mc_analysis.js): this
+// league orders each run by the table after the previous gameweek, bottom first, so today's waiver_pick is last run's order.
+const ordN = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" })[n % 10] || "th");
+const placeText = (nr) => !nr.placeKnown ? "a place not yet known of " + nr.of
+  : (nr.placeMin === nr.placeMax ? ordN(nr.placeMin) : nr.placeMax === nr.placeMin + 1 ? ordN(nr.placeMin) + " or " + ordN(nr.placeMax) : "between " + ordN(nr.placeMin) + " and " + ordN(nr.placeMax)) +
+    " of " + nr.of + (nr.placeMin === nr.placeMax ? "" : " (the order is the table after GW" + nr.orderAfter + ", bottom first, and GW" + nr.orderAfter + " is still to be played)");
 // E-203: after the run every written line can be carried out as written. "sign now" lines first; locked players only
 // under next_run, each with a drop taken from the roster those signings leave.
 const claims = settled ? LN.now.map((c) => ({
   out: code(c.drop), in: code(c.add),
-  why: nm(c.add) + " for " + nm(c.drop) + " (" + POS[P[c.add].p] + "), +" + f1(c.gain) + " Draft expected points to GW" + dEnd + " on your roster, sign now (a free agent until the GW" + next + " deadline)"
+  why: nm(c.add) + " for " + nm(c.drop) + " (" + POS[P[c.add].p] + "), +" + f1(c.gain) + " Draft expected points to GW" + dEnd + " on your roster if kept" +
+    (c.until ? " (a next-run claim below swaps him out after GW" + c.until + ")" : "") + ", sign now (a free agent until the GW" + next + " deadline)"
 })) : sheet.sheet.map((c) => ({
   out: code(c.drop), in: code(c.add),
   why: nm(c.add) + " for " + nm(c.drop) + " (" + POS[P[c.add].p] + "), " + (c.kind === "backup" ? "backup for " + nm(c.of) : "first choice") +
@@ -183,7 +190,7 @@ const claims = settled ? LN.now.map((c) => ({
 }));
 const nextClaims = NR ? NR.claims.map((c) => ({
   out: code(c.drop), in: code(c.add),
-  why: nm(c.add) + " for " + nm(c.drop) + " (" + POS[P[c.add].p] + "), +" + f1(c.gain) + " Draft expected points from GW" + NR.gw + " to GW" + dEnd + ", locked until the next waiver run, " + sastDay(NR.wv) + " SAST, so lodge it as a claim then"
+  why: nm(c.add) + " for " + nm(c.drop) + " (" + POS[P[c.add].p] + "), +" + f1(c.gain) + " Draft expected points from GW" + NR.gw + " to GW" + dEnd + ", locked until the next waiver run, " + sastDay(NR.wv) + " SAST, so lodge it as a claim before then"
 })) : [];
 const rosterNow = M.draftRoster().map((p) => p.id);
 const after = rosterNow.slice();
@@ -312,7 +319,7 @@ L("    pool_note: " + J("League " + MC.draft.league.id + ": the ins are " + (set
   (settled
     ? "Waivers for GW" + next + " have settled, so a free agent is signed instantly until the deadline and a player dropped in that run is locked until the next. " +
       claims.length + (claims.length === 1 ? " player to sign now" : " players to sign now") +
-      (NR ? "; " + nextClaims.length + (nextClaims.length === 1 ? " claim" : " claims") + " for the next waiver run, " + sastDay(NR.wv) + " SAST, where you claim " + NR.place + " of " + NR.of + "." : "; the next waiver run falls after the re-draft.")
+      (NR ? "; " + nextClaims.length + (nextClaims.length === 1 ? " claim" : " claims") + " for the next waiver run, " + sastDay(NR.wv) + " SAST, where you claim " + placeText(NR) + "." : "; the next waiver run falls after the re-draft.")
     : sheet.sheet.length + " claims, " + sheet.sheet.filter((c) => c.kind === "backup").length + " of them backups.") +
   (heldText ? " Held back because the player is flagged (re-check after the pressers): " + heldText + "." : "")) + ",");
 L("    claims: [");
@@ -321,7 +328,7 @@ L("    ],");
 if (settled) {
   if (NR) {
     L("    next_run: {");
-    L("      gw: " + NR.gw + ", waivers: " + J(NR.wv) + ", place: " + NR.place + ", of: " + NR.of + ",");
+    L("      gw: " + NR.gw + ", waivers: " + J(NR.wv) + ", place_min: " + NR.placeMin + ", place_max: " + NR.placeMax + ", order_after: " + NR.orderAfter + ", place_known: " + NR.placeKnown + ", of: " + NR.of + ",");
     L("      claims: [");
     nextClaims.forEach((c, i) => L("        { out: " + c.out + ", in: " + c.in + ", why: " + J(c.why) + " }" + (i < nextClaims.length - 1 ? "," : "")));
     L("      ]");
@@ -365,7 +372,7 @@ console.log("weekly.cjs · v" + OPT.version + " GW" + next + " · plan " + PLAN.
   " · fallback " + fbMoves.map((m) => nm(m.out) + "→" + nm(m.in)).join(", ") + " (captain " + nm(fbCap) + ", from " + (fbSource.indexOf("transferProtocol") >= 0 ? "the app's protocol" : "the optimiser") + ")" +
   " · Draft " + claims.length + " claims (" + sheet.strategy + "), mean " + (sheet.meanValue !== undefined ? f1(sheet.meanValue) : "-") + " p10 " + (sheet.p10 !== undefined ? f1(sheet.p10) : "-") + " p90 " + (sheet.p90 !== undefined ? f1(sheet.p90) : "-") + ", stress " + f1(sheet.valueStress) + ", all first " + f1(sheet.valueAll) + ", now " + f1(sheet.valueNow));
 claims.forEach((c, i) => console.log("  " + (i + 1) + ". " + c.why));
-if (settled) console.log(NR ? "next waiver run GW" + NR.gw + " " + sastDay(NR.wv) + " SAST, place " + NR.place + " of " + NR.of + ", " + nextClaims.length + " claim(s), roster " + f1(sheet.valueNow) + " → " + f1(sheet.valueAfter) + " to GW" + dEnd : "next waiver run: after the re-draft");
+if (settled) console.log(NR ? "next waiver run GW" + NR.gw + " " + sastDay(NR.wv) + " SAST, place " + placeText(NR) + ", " + nextClaims.length + " claim(s), roster " + f1(sheet.valueNow) + " → " + f1(sheet.valueAfter) + " to GW" + dEnd : "next waiver run: after the re-draft");
 nextClaims.forEach((c, i) => console.log("  next " + (i + 1) + ". " + c.why));
 if (CP.held.length) console.log("held back (flagged): " + (settled ? sheet.heldBack : CP.held).map((h) => nm(h.add) + " for " + nm(h.drop) + " " + h.status + (h.chance !== null ? " " + h.chance + "%" : "")).join(", "));
 if (notes5.length) console.log("note: src/engine.js draftEV (five gameweeks) scores " + notes5.length + " of the claims as no gain: " + notes5.join(", "));

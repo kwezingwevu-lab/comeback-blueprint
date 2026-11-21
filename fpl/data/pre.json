@@ -1,5 +1,5 @@
 {
- "at": "2026-11-21T06:48:22.312Z",
+ "at": "2026-11-21T08:01:34.608Z",
  "hash": "64cda385a664778d",
  "claims": {
   "game": "draft",
@@ -215,19 +215,24 @@
    {
     "add": 98,
     "drop": 544,
-    "gain": 3.0598530314088066
+    "gain": 3.0598530314088066,
+    "until": 11
    },
    {
     "add": 455,
     "drop": 264,
-    "gain": 2.3949006015511713
+    "gain": 2.3949006015511713,
+    "until": 11
    }
   ],
   "next": {
    "gw": 12,
    "wv": "2026-11-26T18:30:00Z",
-   "place": 1,
+   "placeMin": 1,
+   "placeMax": 2,
+   "orderAfter": 11,
    "of": 8,
+   "placeKnown": true,
    "claims": [
     {
      "add": 480,
@@ -249,10 +254,10 @@
   "heldBack": [
    {
     "add": 469,
-    "drop": 650,
+    "drop": 533,
     "status": "d",
     "chance": 75,
-    "gain": 4.500229751295308,
+    "gain": 3.5645769159473844,
     "from": 12,
     "how": "waiver"
    }
@@ -1118,6 +1123,7 @@
   "The heavy searches (the claims stress test, the Draft trades and moves, the Classic transfer search, the Classic gameweek simulation, the Draft head-to-head and the review) run once when the app is built, so the phone opens without waiting for them.",
   "Odds and Review are new tabs: Odds for the match prices behind every projection and any price you type in yourself, Review for the transfers made and the bench points that were avoidable, each game on its own.",
   "Rival managers' personal names are removed at the source; the app keeps team names and entry numbers only.",
-  "Once the week's Draft waivers have run, the Draft sheet has two parts: the free agents you can sign now, best first, each with the player to drop, and under them the locked players worth a claim at the next waiver run, with its day, time and your place in the order."
+  "Once the week's Draft waivers have run, the Draft sheet has two parts: the free agents you can sign now, best first, each with the player to drop, and under them the locked players worth a claim at the next waiver run, with its day, time and your place in the order.",
+  "After this gameweek's deadline the Draft tab keeps the next waiver run's claims on screen until that run, and gives your place in it as the range the table still allows, because the league sets each run's order from the table after the gameweek before it."
  ]
 }

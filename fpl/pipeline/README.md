@@ -125,7 +125,9 @@ claims with the sheet line for line and requires one content hash across the blo
 After the week's Draft waiver run (21 Nov 2026, ERRORS.md E-203) the same call, `buildDraftSheet`, returns two
 parts: `claims` is written with only the free agents to sign before the deadline, each with the drop that costs
 least on the roster, and `next_run` with the locked players worth a claim at the next waiver run (its time, the
-manager's place, each drop taken from the roster the signings leave). `pipeline/precompute.cjs` refuses to write
+manager's place as a range, each drop taken from the roster the signings leave). The place is `waiverPlaceRange`
+(src/mc_analysis.js): this league orders each run by the table after the previous gameweek, bottom first, so while
+that gameweek is unplayed every result is tried and the place can be a range (ERRORS.md E-205). `pipeline/precompute.cjs` refuses to write
 `data/pre.json` when either part differs from `data/weekly.js` on the same hash.
 
 ## 8. Build — `node build.cjs` (`npm run build`)

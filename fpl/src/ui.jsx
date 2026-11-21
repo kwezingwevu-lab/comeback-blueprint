@@ -1131,16 +1131,23 @@ function draftClaimsView(mc, now, overrides) {
     view.state = dv.claims.state;
     const C = isO(mc.PRE) && isO(mc.PRE.claims) ? mc.PRE.claims : {};
     const lines = Array.isArray(dv.claims.lines) ? dv.claims.lines : [];
-    if (view.state === "signnow") {
-      // E-203: after the waiver run the landing counts the signings that can be made now, and the claims that wait
-      const sl = Array.isArray(dv.claims.signLines) ? dv.claims.signLines : [], k = fin(dv.claims.nextCount) ? dv.claims.nextCount : 0;
-      view.count = sl.length;
-      view.first = sl.length ? sl[0].add + " for " + sl[0].drop : "";
-      view.line = (sl.length
-        ? sl.length + " to sign now, first " + view.first +
-          (fin(C.valueAfter) && fin(C.valueNow) ? ": " + sgn(C.valueAfter - C.valueNow) + " Draft points to " + (dv.toHz || "the re-draft") + "." : ".")
-        : "Nothing to sign now.") +
-        (k && dv.claims.nextAt ? " " + k + (k === 1 ? " claim waits" : " claims wait") + " for the waiver run " + dv.claims.nextAt + " SAST." : "");
+    if (view.state === "signnow" || view.state === "nextonly") {
+      // E-203: after the waiver run the landing counts the signings that can be made now, and the claims that wait; once the
+      // deadline passes only the claims are left (the pre-ship review, 21 Nov 2026). The total is said to be a total.
+      const sl = Array.isArray(dv.claims.signLines) ? dv.claims.signLines : [], nl = Array.isArray(dv.claims.nextLines) ? dv.claims.nextLines : [];
+      const k = nl.length;
+      view.count = view.state === "signnow" ? sl.length : 0;
+      view.first = view.state === "signnow" && sl.length ? sl[0].add + " for " + sl[0].drop : "";
+      view.nextCount = k;
+      view.nextFirst = k ? nl[0].add + " for " + nl[0].drop : "";
+      view.nextAt = dv.claims.nextAt || "";
+      view.line = view.state === "nextonly"
+        ? (k ? k + (k === 1 ? " Draft claim" : " Draft claims") + " to lodge before the waiver run " + dv.claims.nextAt + " SAST, first " + view.nextFirst + "." : "")
+        : (sl.length
+          ? sl.length + " to sign now, first " + view.first + " (" + sl[0].gain + ")" +
+            (fin(dv.claims.gainAll) ? (sl.length > 1 ? "; together " : ": ") + sgn(dv.claims.gainAll) + " Draft points to " + (dv.toHz || "the re-draft") + "." : ".")
+          : "Nothing to sign now.") +
+          (k && dv.claims.nextAt ? " " + k + (k === 1 ? " claim waits" : " claims wait") + " for the waiver run " + dv.claims.nextAt + " SAST." : "");
     } else if (view.state === "sheet" && lines.length) {
       const all = fin(C.valueAll) ? C.valueAll : C.allFirst;
       view.count = lines.length;
@@ -1703,7 +1710,12 @@ function commandView(mc, ctx, lv) {
         : L.state === "solved" && txt(L.todo) ? L.todo : "Carry out the instruction on the card above, captain and vice included");
       add("draftxi", "Draft", dl, cv.state === "signnow"
         ? (cv.count ? "Sign the " + cv.count + " Draft " + (cv.count === 1 ? "free agent" : "free agents") + " on the Draft tab, first " + cv.first + ", then set the Draft eleven" : "Nothing to sign in Draft this week; set the Draft eleven")
+        : cv.state === "nextonly" ? "Set the Draft eleven (the sign-now lines closed at the deadline)"
         : "Once waivers settle, sign any free agent still worth it and set the Draft eleven");
+      // the next run's claims have their own due time: the waiver run, not this gameweek's deadline
+      if ((cv.state === "signnow" || cv.state === "nextonly") && cv.nextCount && isO(mc.PRE) && isO(mc.PRE.claims) && isO(mc.PRE.claims.next) && typeof mc.PRE.claims.next.wv === "string") {
+        add("draftnext", "Draft", mc.PRE.claims.next.wv, "Lodge the " + cv.nextCount + " Draft " + (cv.nextCount === 1 ? "claim" : "claims") + " for the next waiver run, in the Draft tab's order, first " + cv.nextFirst);
+      }
       const done = isO(ctx.state) && isO(ctx.state.done) ? ctx.state.done : {};
       view.next.items = items.map(function (x, i) { return { x: x, i: i }; })
         .sort(function (a, b) { return Date.parse(a.x.due) - Date.parse(b.x.due) || a.i - b.i; })
@@ -1734,7 +1746,8 @@ function commandView(mc, ctx, lv) {
         (Array.isArray(ctx.squadIds) ? ctx.squadIds : []).concat((Array.isArray(roster) ? roster : []).map(function (p) { return isO(p) ? p.id : null; }), Array.isArray(L.squadIds) ? L.squadIds : [],
           isO(PRE.claims) && Array.isArray(PRE.claims.sheet) ? PRE.claims.sheet.map(function (q) { return isO(q) ? q.add : null; }) : [],
           isO(PRE.claims) && Array.isArray(PRE.claims.now) ? PRE.claims.now.map(function (q) { return isO(q) ? q.add : null; }) : [],
-          isO(PRE.claims) && isO(PRE.claims.next) && Array.isArray(PRE.claims.next.claims) ? PRE.claims.next.claims.map(function (q) { return isO(q) ? q.add : null; }) : []).forEach(function (id) { if (fin(id)) mine[id] = true; });
+          isO(PRE.claims) && isO(PRE.claims.next) && Array.isArray(PRE.claims.next.claims) ? PRE.claims.next.claims.map(function (q) { return isO(q) ? q.add : null; }) : [],
+          isO(PRE.claims) && Array.isArray(PRE.claims.heldBack) ? PRE.claims.heldBack.map(function (q) { return isO(q) ? q.add : null; }) : []).forEach(function (id) { if (fin(id)) mine[id] = true; });
         const hit = pr.filter(function (x) { return mine[x.id]; }).map(function (x) { return pName(x.id) + " " + cash(x.from) + " to " + cash(x.to); })
           .concat(fl.filter(function (x) { return mine[x.id]; }).map(function (x) { return pName(x.id) + ": " + (txt(x.news) || "flag cleared"); }));
         view.flags.delta = "Since the last build (" + sastDate(d.since) + " SAST): " + pr.length + plural(pr.length, " price change", " price changes") + " and " +
@@ -3029,7 +3042,7 @@ function draftTabView(mc, now, overrides) {
     game: "draft", league: "", horizon: "", toHz: "the horizon", phase: "",
     claims: { state: "absent", note: "The Draft claims sheet is not in this build's data, so there is nothing to lodge from here until the next rebuild." + QUICK,
       head: "", lines: [], strip: [], stress: "", held: "", orderings: [], rivals: [], activity: "", runs: "",
-      signHead: "", signLines: [], signEmpty: "", nextHead: "", nextLines: [], nextEmpty: "", nextAt: "", nextCount: 0 },
+      signHead: "", signLines: [], signEmpty: "", signClosed: "", nextHead: "", nextLines: [], nextEmpty: "", nextAt: "", nextCount: 0, gainAll: null },
     solved: { state: "absent", note: "The best Draft roster is not solved for this data, so this panel stays empty until the next rebuild.", head: "", pairs: [], ifTaken: "" },
     trades: { state: "absent", note: "The Draft trade search is not in this build's data, so this panel stays empty until the next rebuild.", both: [], ask: [], more: "" }
   };
@@ -3087,7 +3100,7 @@ function draftTabView(mc, now, overrides) {
     const processed = D.waiversProcessed === true;
     view.phase = processed
       ? "Draft waivers for GW" + next + " have settled. Anyone unclaimed can be signed instantly " + until + "; anyone dropped since is locked until the next waiver run." +
-        (list ? " The order for that run: " + list + "." + place : "")
+        (list ? " The order for that run: " + list + "." + place + " The next run's order is set by the table after GW" + next + ", bottom first." : "")
       : (wv ? "Draft waivers settle " + wv + " SAST. Until then every move is a claim" : "Until Draft waivers settle every move is a claim") +
         (list ? ", and claims settle in rounds in this order: " + list + "." + place : ".") +
         " Once they settle, anyone unclaimed can be signed instantly " + until + ".";
@@ -3117,28 +3130,51 @@ function draftTabView(mc, now, overrides) {
       const nowL = C.now.filter(isO), nxL = C.next ? C.next.claims.filter(isO) : [];
       const nev = C.next && isO(evs[String(C.next.gw)]) ? evs[String(C.next.gw)] : {};
       const distinct = function (a, k) { const s0 = {}; return a.every(function (q) { const v = q[k]; if (s0[v]) return false; s0[v] = true; return true; }); };
+      // a sign-now player must be a free agent nobody owns, you included, and each next-run drop must be on the roster the
+      // signings leave (21 Nov 2026, the pre-ship review: the first version let an owned player through)
+      const nowAdds = nowL.map(function (q) { return q.add; }), nowDrops = nowL.map(function (q) { return q.drop; });
+      const rosterAfter = owned.filter(function (id) { return nowDrops.indexOf(id) < 0; }).concat(nowAdds);
       const okNow = nowL.length === C.now.length && distinct(nowL, "add") && distinct(nowL, "drop") && nowL.every(function (q) {
-        const a = pl(q.add); return !!a && same(q.add, q.drop) && howF(a) === "free" && a.st === "a" && owned.indexOf(q.drop) >= 0 && fin(q.gain);
+        const a = pl(q.add); return !!a && same(q.add, q.drop) && howF(a) === "free" && a.ds === "a" && a.st === "a" && owned.indexOf(q.add) < 0 && owned.indexOf(q.drop) >= 0 && fin(q.gain);
       });
-      const okNext = !C.next || (nxL.length === C.next.claims.length && distinct(nxL, "add") && distinct(nxL, "drop") && typeof C.next.wv === "string" && C.next.wv === nev.wv &&
-        C.next.place === at && C.next.of === order.length && nxL.every(function (q) { const a = pl(q.add); return !!a && same(q.add, q.drop) && a.ds === "l" && a.st === "a" && fin(q.gain); }));
+      // the place is a range (waiverPlaceRange): the league orders each run by the table after the gameweek before it
+      const nx0 = C.next;
+      const intIn = function (v, lo, hi) { return fin(v) && Math.floor(v) === v && v >= lo && v <= hi; };
+      const okNext = !nx0 || (nxL.length === nx0.claims.length && distinct(nxL, "add") && distinct(nxL, "drop") && typeof nx0.wv === "string" && nx0.wv === nev.wv &&
+        nx0.of === order.length && intIn(nx0.placeMin, 1, order.length) && intIn(nx0.placeMax, nx0.placeMin, order.length) && nx0.orderAfter === nx0.gw - 1 && typeof nx0.placeKnown === "boolean" &&
+        nxL.every(function (q) { const a = pl(q.add); return !!a && same(q.add, q.drop) && a.ds === "l" && a.st === "a" && nowAdds.indexOf(q.add) < 0 && rosterAfter.indexOf(q.drop) >= 0 && fin(q.gain); }));
+      const nwvMs = nx0 && typeof nx0.wv === "string" ? Date.parse(nx0.wv) : NaN;
+      const pastDl = isFinite(dlMs) && isFinite(t) && t >= dlMs;
+      // after the deadline the sign-now part is closed, but the next run's claims still apply until that run (the review:
+      // hiding them left nothing to lodge between Saturday and the Thursday run, with no rebuild in between)
+      const claimsLive = !!nx0 && nxL.length > 0 && isFinite(nwvMs) && isFinite(t) && t < nwvMs;
       if (!okNow || !okNext) {
         view.claims.state = "stale";
         view.claims.note = "The Draft sheet in this build no longer matches the league's ownership, so it is hidden until the next rebuild." + QUICK;
-      } else if (isFinite(dlMs) && isFinite(t) && t >= dlMs) {
+      } else if (pastDl && !claimsLive) {
         view.claims.state = "stale";
         view.claims.note = "The GW" + next + " deadline has passed, so this Draft sheet is out of date until the next rebuild." + QUICK;
       } else {
-        view.claims.state = "signnow";
-        const line = function (q, i, g) { return { key: g + i + "-" + f0(q.add), n: String(i + 1), add: name(q.add), drop: name(q.drop), pos: posOf(q.add), gain: sgn(q.gain) }; };
-        view.claims.signHead = "Free agents you can sign before the GW" + next + " deadline" + (dl ? ", " + dl + " SAST" : "") + ", in this order. Gain: Draft points to " + toHz + " on your roster, with the lines above already done.";
+        view.claims.state = pastDl ? "nextonly" : "signnow";
+        const kept = function (q) { return fin(q.until) ? " · to GW" + q.until : ""; };
+        const line = function (q, i, g) { return { key: g + i + "-" + f0(q.add), n: String(i + 1), add: name(q.add), drop: name(q.drop), pos: posOf(q.add) + (g === "sn" ? kept(q) : ""), gain: sgn(q.gain) }; };
+        const anyKept = nowL.some(function (q) { return fin(q.until); });
+        view.claims.signHead = nowL.length ? "Free agents you can sign before the GW" + next + " deadline" + (dl ? ", " + dl + " SAST" : "") + ", in this order. Gain: Draft points to " + toHz +
+          " on your roster if kept, with the lines above already done." + (anyKept ? " A line marked \u201cto GW" + (next) + "\u201d is swapped out again by a claim below." : "") : "";
         view.claims.signLines = nowL.map(function (q, i) { return line(q, i, "sn"); });
         view.claims.signEmpty = "Nothing to sign now: no fit free agent improves your roster to " + toHz + ".";
-        if (C.next) {
-          view.claims.nextAt = sastDay(C.next.wv);
-          view.claims.nextHead = "Locked until the next waiver run, " + view.claims.nextAt + " SAST, where you claim " + ord(C.next.place) + " of " + C.next.of +
-            ". Lodge these as claims then, in this order. Each drop assumes the signings above are done. Gain: Draft points from GW" + C.next.gw + " to " + toHz + ", on today's flags.";
-          view.claims.nextEmpty = "Nobody locked is worth a claim at the next waiver run.";
+        view.claims.signClosed = pastDl ? "The GW" + next + " deadline has passed, so the sign-now lines are closed." + (nowL.length ? " The claims below assume you made " +
+          (nowL.length === 1 ? "that signing" : "those " + nowL.length + " signings") + "; if you did not, a drop below may not be on your roster." : "") : "";
+        if (fin(C.valueAfter) && fin(C.valueNow) && nowL.length) view.claims.gainAll = C.valueAfter - C.valueNow;
+        if (nx0) {
+          view.claims.nextAt = sastDay(nx0.wv);
+          const placeS = !nx0.placeKnown ? "a place not yet known" : nx0.placeMin === nx0.placeMax ? ord(nx0.placeMin)
+            : ord(nx0.placeMin) + (nx0.placeMax === nx0.placeMin + 1 ? " or " : " to ") + ord(nx0.placeMax);
+          view.claims.nextHead = nxL.length ? "Locked until the next waiver run, " + view.claims.nextAt + " SAST, where you claim " + placeS + " of " + nx0.of +
+            (nx0.placeKnown && nx0.placeMin !== nx0.placeMax ? " (the order is the table after GW" + nx0.orderAfter + ", bottom first, so it moves with that gameweek's results)" : "") +
+            ". Lodge these as claims before then, in this order." + (nowL.length ? " Each drop assumes the signings above are done." : "") +
+            " Gain: Draft points from GW" + nx0.gw + " to " + toHz + ", on today's flags." : "";
+          view.claims.nextEmpty = "Nobody locked is worth a claim at the next waiver run, " + view.claims.nextAt + " SAST.";
         } else {
           view.claims.nextEmpty = "The next waiver run falls after the re-draft, so there is nothing to claim for this roster.";
         }
@@ -3147,11 +3183,11 @@ function draftTabView(mc, now, overrides) {
         const hb = Array.isArray(C.heldBack) ? C.heldBack.filter(function (h) { return isO(h) && pl(h.add) && pl(h.drop); }) : [];
         view.claims.held = hb.length ? "Held back because flagged: " + hb.map(function (h) {
           return name(h.add) + " for " + name(h.drop) + (txt(h.status) ? ", status " + h.status : "") + (fin(h.chance) ? " at " + Math.round(h.chance) + "%" : "") +
-            (h.how === "waiver" ? ", locked until the next waiver run" : "") + (fin(h.gain) ? ", " + sgn(h.gain) + (fin(h.from) ? " from GW" + h.from : "") : "");
-        }).join("; ") + ". Re-check once the team news is in." : "";
+            (h.how === "waiver" ? ", locked until the next waiver run" : ", a free agent") + (fin(h.gain) ? ", " + sgn(h.gain) + (fin(h.from) ? " from GW" + h.from : "") : "");
+        }).join("; ") + ". Each is priced on the roster both parts leave. Re-check once the team news is in." : "";
         const s1 = [];
         if (fin(C.valueNow)) s1.push({ k: "Roster today", v: f0(C.valueNow), sub: "Draft points to " + toHz });
-        if (fin(C.valueAfter)) s1.push({ k: "After signing", v: f0(C.valueAfter), sub: fin(C.valueNow) ? sgn(C.valueAfter - C.valueNow) : "" });
+        if (fin(C.valueAfter) && nowL.length) s1.push({ k: "After signing", v: f0(C.valueAfter), sub: fin(C.valueNow) ? sgn(C.valueAfter - C.valueNow) : "" });
         view.claims.strip = s1;
       }
     } else if (processed || (isFinite(wvMs) && isFinite(t) && t >= wvMs)) {
@@ -3317,6 +3353,13 @@ function TabDraft(props) {
   const dRev = ui && ui.reveals && typeof ui.reveals === "object" ? ui.reveals : {};
   const dOpen = sec("df-claims") || sec("df-solved") || sec("df-trades"), poolOpen = sec("df-pool");
   const clock = ctx ? Number(ctx.now) : NaN;
+  const dfTitle = (function () {
+    const settledPre = isMcObj(mc.MC.draft) && mc.MC.draft.waiversProcessed === true && isMcObj(mc.PRE) && isMcObj(mc.PRE.claims) && mc.PRE.claims.phase === "free";
+    if (!settledPre) return "Claims to lodge, in this order";
+    const nx = Number(mc.MC.gw && mc.MC.gw.next), evs = isMcObj(mc.MC.draft) && isMcObj(mc.MC.draft.events) ? mc.MC.draft.events : {};
+    const e = isMcObj(evs[String(nx)]) ? evs[String(nx)] : {}, dlT = typeof e.dl === "string" ? Date.parse(e.dl) : NaN;
+    return isFinite(dlT) && isFinite(clock) && clock >= dlT ? "Claims for the next waiver run" : "Sign now, then claims for the next run";
+  })();
   const dv = React.useMemo(function () {
     return dOpen ? draftTabView(mc, clock, mktCount) : null;
   }, [dOpen, mc, clock, mktCount]);
@@ -3357,17 +3400,18 @@ function TabDraft(props) {
         <div className="note note-w">The league answers, but your fifteen is {roster.length} of 15.</div>
       ) : null}
 
-      <Section id="df-claims" title={dv && dv.claims.state === "signnow" ? "Sign now, then claims for the next run" : "Claims to lodge, in this order"} open={sec("df-claims")} onToggle={on.sec}>
+      <Section id="df-claims" title={dfTitle} open={sec("df-claims")} onToggle={on.sec}>
         {dv ? (
           <div className="dfv" data-testid="df-claims">
             <div className="dim" data-testid="df-horizon"><span className="tag">Draft</span> {dv.horizon}</div>
             <div className="note" data-testid="df-phase">{dv.phase}</div>
-            {dv.claims.state === "signnow" ? (
+            {dv.claims.state === "signnow" || dv.claims.state === "nextonly" ? (
               <div className="dfv">
                 <div className="tbl" data-testid="df-signnow">
                   <div className="panel-v"><span className="tag">Draft</span> <b>Sign now</b></div>
-                  <div className="dim">{dv.claims.signHead}</div>
-                  {dv.claims.signLines.length ? (
+                  {dv.claims.signClosed ? <div className="note note-w" data-testid="df-signnow-closed">{dv.claims.signClosed}</div> : null}
+                  {dv.claims.signHead && !dv.claims.signClosed ? <div className="dim">{dv.claims.signHead}</div> : null}
+                  {dv.claims.signClosed ? null : dv.claims.signLines.length ? (
                     <div>
                       <Row head cols="20px minmax(0,1fr) 46px"><span>#</span><span>Sign: add for drop</span><span className="rt">Gain</span></Row>
                       {dv.claims.signLines.map(function (c) {
@@ -3399,8 +3443,8 @@ function TabDraft(props) {
                       })}
                     </div>
                   ) : <div className="dim">{dv.claims.nextEmpty}</div>}
-                  {dv.claims.held ? <div className="note note-w">{dv.claims.held}</div> : null}
                 </div>
+                {dv.claims.held ? <div className="note note-w" data-testid="df-held">{dv.claims.held}</div> : null}
                 {dv.claims.strip.length ? (
                   <div className="pstrip">
                     {dv.claims.strip.map(function (c) {
