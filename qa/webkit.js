@@ -273,7 +273,7 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
 // after each turn, the bars' colours exactly, one role="img" per slot, a lost context with and without a restore, and 20 rounds of view changes with
 // at most one live WebGL context per figure slot and no "too many active WebGL contexts".
 {const CT="window.__ctx=[];(function(){var g=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(t){var x=g.apply(this,arguments);if(x&&/webgl/.test(String(t))&&window.__ctx.indexOf(x)<0)window.__ctx.push(x);return x;};})();";
- const g=await gctx('real',CT);const q=g.q;const cons=[];q.on('console',m=>cons.push(m.text()));
+ const g=await gctx('real',CT);const q=g.q;await q.waitForFunction(()=>!!document.querySelector('#gmFig-home canvas'),null,{timeout:10000}).catch(()=>{});const cons=[];q.on('console',m=>cons.push(m.text()));
  const until=async(f,ms)=>{const t0=Date.now();while(Date.now()-t0<(ms||8000)){if(await q.evaluate(f))return true;await wait(150);}return false;};
  const still=()=>until(()=>!!(_gm.h&&_gm.h.track)&&!_gm.h.track.debug().running,8000);
  await q.evaluate(async()=>{switchView('track');await new Promise(r=>setTimeout(r,200));document.querySelector('.track-tabs button[data-tp="regions"]').click();document.getElementById('gmTop').scrollIntoView();});
