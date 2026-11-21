@@ -74,6 +74,7 @@ function checkKey(k,v,strict){
       else if(isStr(x)||isNum(x)||typeof x==="boolean")out[f]=x;});
     return drop&&strict?{err:drop+" field"+(drop===1?"":"s")+" in the wrong form"}:{v:out,drop};}
   if(k==="cb2_health")return healthOK(v,strict);
+  if(k==="cb2_rewards")return rwOK(v,strict);
   if(ENUMS[k])return ENUMS[k].includes(v)?{v,drop:0}:{err:"not a known option"};
   if(k==="cb2_ceilbf")return isNum(v)&&v>=3&&v<=60?{v,drop:0}:{err:"not a body-fat number"};
   if(k==="cb2_radius")return isNum(v)&&v>=1&&v<=500?{v,drop:0}:{err:"not a distance"};
@@ -960,7 +961,7 @@ function renderRegionsPane(){const el=document.getElementById("tp-regions");if(!
   /* the bars call the game only through these: a throw there draws the bars by the base rule (review V4) */
   const _pct=(d,p)=>{try{return gmPct(d,p);}catch(e){return p?Math.min(100,Math.round(d/p*100)):0;}},_col=p=>{try{return gmBarCol(p);}catch(e){return p>=100?"var(--go)":p>=60?"var(--gold)":"var(--steel)";}},
     _aria=r=>{try{return gmRowAria(r,_s);}catch(e){return r;}},_note=()=>{try{return gmBlockNote(ws);}catch(e){return "";}};
-  el.innerHTML=`${_top}<div class="chart-card"><div class="chart-head"><h3>Hard sets per region — week ${planWeek()}</h3><span class="chs">overlapping · logged / planned</span></div>${order.map(r=>{const p=plan[r]||0,d=done[r]||0,pct=_pct(d,p);return `<div class="rg${_sel===r?" sel":""}" data-rg="${r}" ${_on?`role="button" tabindex="0" aria-pressed="${_sel===r?"true":"false"}" aria-label="${esc(_aria(r))}"`:""} style="margin:10px 0"><div style="display:flex;justify-content:space-between;gap:8px;font-size:13px"><b style="text-transform:capitalize">${r}</b><span style="font-family:var(--f-mono);color:var(--text-2)">${d} / ${p}${pump[r]?" + "+pump[r]+" pump":""}${prev[r]?" · last week "+prev[r]:""}</span></div><div style="height:8px;border-radius:4px;background:var(--panel-3);margin-top:5px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${_col(pct)}"></div></div></div>`;}).join("")}${_up}</div>
+  el.innerHTML=`${_top}${typeof rewardsCardHTML==="function"?rewardsCardHTML():""}<div class="chart-card"><div class="chart-head"><h3>Hard sets per region — week ${planWeek()}</h3><span class="chs">overlapping · logged / planned</span></div>${order.map(r=>{const p=plan[r]||0,d=done[r]||0,pct=_pct(d,p);return `<div class="rg${_sel===r?" sel":""}" data-rg="${r}" ${_on?`role="button" tabindex="0" aria-pressed="${_sel===r?"true":"false"}" aria-label="${esc(_aria(r))}"`:""} style="margin:10px 0"><div style="display:flex;justify-content:space-between;gap:8px;font-size:13px"><b style="text-transform:capitalize">${r}</b><span style="font-family:var(--f-mono);color:var(--text-2)">${d} / ${p}${pump[r]?" + "+pump[r]+" pump":""}${prev[r]?" · last week "+prev[r]:""}</span></div><div style="height:8px;border-radius:4px;background:var(--panel-3);margin-top:5px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${_col(pct)}"></div></div></div>`;}).join("")}${_up}</div>
   <div class="calc-note"><b>How it counts:</b> every set you logged with reps and weight in this plan week (Saturday to Friday). A compound counts for each region it trains — a Romanian deadlift is hamstrings, glutes and lower back, so these are overlapping counts: the regions add up to more than the sets you did, and they will not match the Guide’s per-muscle totals, which count each exercise once. Extras sets are light pump work (RIR 2), so they show as “+ pump” and do not count toward the hard-set plan. Green = the planned dose is done; gold = most of it (60% or more); steel = not there yet this week. No red: an empty bar is a week still to come, not a fault.${_note()}</div>${walkTrackLine(ws)}${_rules}`;
   if(_on)try{gmWireTrack(el);}catch(e){}}
 function coachText(){const p=DB.profile,c=compute(),g=gainModel("hyper"),mc=macros("hyper"),wk=planWeek(),ws=weekStartISO(wk),we=dateAdd(ws,7),r=weeklyReview();
@@ -991,7 +992,7 @@ function scanBF(){const rows=(DB.measure||[]).filter(x=>x&&x.scanBf!=null).sort(
 function applyScanBF(){const g=id=>document.getElementById(id);const di=g("scanDate"),d=(di&&di.value)||todayISO(),k=(g("scanKind")&&g("scanKind").value)||"DEXA";const v=numOK(g("scanBf"),"Scan body fat",3,60,"%");if(v==null||!dateOK(di,d))return;const prev=scanBF(),newest=!prev||d>=prev.date;const m=DB.measure.find(x=>x.date===d);if(m){m.scanBf=v;m.scanKind=k;}else DB.measure.push({date:d,scanBf:v,scanKind:k});if(newest)DB.profile.bf=v;DB.save();logToast(newest?"Body fat set to "+v+"% from "+k+" ("+fmtDM(d)+")":"Stored "+k+" "+v+"% ("+fmtDM(d)+") for the record — your newer scan still sets body fat",true);if(typeof renderNumbers==="function")renderNumbers();updateHeader();}
 function scanBFHTML(){const sc=scanBF();return `<div class="calc-note" id="scanCard" style="margin-top:8px"><b>Scan result — DEXA, InBody or Bod Pod.</b> ${sc?"Last scan: <b>"+sc.bf+"%</b> ("+sc.kind+", "+fmtDM(sc.date)+"). ":""}A DEXA is the most precise body-fat number routinely available; the tape formula carries a few points of error. ${todayISO()<=DAY1_ISO?"One scan on Day 1 gives the body-fat baseline, and the tapes keep it honest.":"One scan at the end of each cut keeps the body-fat number honest between checks."}<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px"><select id="scanKind" aria-label="Scan type" style="min-width:0;padding:9px;border-radius:9px;background:var(--panel-3);color:var(--text);border:1px solid var(--line)"><option>DEXA</option><option>InBody</option><option>Bod Pod</option></select><input id="scanBf" aria-label="Scan body fat %" type="text" inputmode="decimal" autocomplete="off" placeholder="body fat %" style="min-width:0;padding:9px;border-radius:9px;background:var(--panel-3);color:var(--text);border:1px solid var(--line)"><input id="scanDate" aria-label="Scan date" type="date" min="2020-01-01" max="${todayISO()}" value="${todayISO()}" style="min-width:0;padding:9px;border-radius:9px;background:var(--panel-3);color:var(--text);border:1px solid var(--line)"><button class="btn btn-gold" id="scanApply" style="width:100%;padding:9px 12px" onclick="applyScanBF()">Use scan</button></div></div>`;}
 /* ===== HOME ===== */
-var BACKUP_KEYS=["cb2_profile","cb2_sessions","cb2_runs","cb2_weight","cb2_measure","cb2_lifts","cb2_bulk","cb2_ceilbf","cb2_pure","cb2_ts","cb2_march","cb2_focuslb","cb2_radius","cb2_sleep","cb2_rhr","cb2_steps","cb2_loc","cb2_fuelq","cb2_wakelock","cb2_health","cb2_meals"];function backupJSON(){const keys=BACKUP_KEYS;const o={};keys.forEach(k=>{const v=load(k,null);if(v!=null)o[k]=v;});return JSON.stringify(o);}
+var BACKUP_KEYS=["cb2_profile","cb2_sessions","cb2_runs","cb2_weight","cb2_measure","cb2_lifts","cb2_bulk","cb2_ceilbf","cb2_pure","cb2_ts","cb2_march","cb2_focuslb","cb2_radius","cb2_sleep","cb2_rhr","cb2_steps","cb2_loc","cb2_fuelq","cb2_wakelock","cb2_health","cb2_meals","cb2_rewards"];function backupJSON(){const keys=BACKUP_KEYS;const o={};keys.forEach(k=>{const v=load(k,null);if(v!=null)o[k]=v;});return JSON.stringify(o);}
 function showDataBox(val,forRestore){const box=document.getElementById("dataBox"),ta=document.getElementById("dataTa"),ap=document.getElementById("dataApply");box.style.display="block";
   // a copy box is not a restore form: the picker, its label and the "or paste" line only show for Restore
   ["dataLbl","dataFileWrap","dataOr"].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=forRestore?"":"none";});const cn=document.getElementById("dataCopyNote");if(cn)cn.style.display=forRestore?"none":"block";
@@ -3573,6 +3574,294 @@ document.addEventListener("input",function(e){const t=e.target;if(!t||!t.id)retu
 document.addEventListener("change",function(e){const t=e.target;if(!t||!t.id)return;
   if((t.id==="aiLogFile"||t.id==="aiMealFile")&&!t.onchange){const f=t.files&&t.files[0];if(!f)return;if(t.id==="aiLogFile")aiLogRead(f);else aiMealRead(f);}
   else if(t.id==="aiLogDate"){_ai.log.date=t.value;if(t.value)_ai.log.dnote="";aiPaint();}});
+/* ===== Rewards (17 Nov 2026, rewards design): what the planned week is worth in the programmes Kwezi belongs to. It only reads: nothing here
+   changes GYM, RUN_PLAN, doses, phases or the game's numbers. One settings key, cb2_rewards (in BACKUP_KEYS, validated by rwOK in checkKey; it is
+   not in DATA_ARR, so settings alone never make a device "not empty" nor let an empty device write over the account copy). Figures come only from
+   REWARD_RULES (each rule with the date it was checked) and his own log; heart-rate points are never counted. No hyperlinks, no confirm(). ===== */
+var _rw={open:{},hit:null};
+KEYLABEL.cb2_rewards="rewards settings";
+var RW_PROGS=["vitality","sanlam","strava","adiclub","sweatcoin","clicks","dischem"];
+var RW_NAME={vitality:"Discovery Vitality",sanlam:"Sanlam Reality",strava:"Strava challenges",adiclub:"adiClub (adidas Running)",sweatcoin:"Sweatcoin",clicks:"Clicks ClubCard",dischem:"Dis-Chem Better Rewards"};
+var RW_SHORT={vitality:"Vitality",sanlam:"Sanlam",strava:"Strava",adiclub:"adiClub",sweatcoin:"Sweatcoin",clicks:"Clicks",dischem:"Dis-Chem"};
+function RW_DEF(){return {v:1,on:{vitality:true,sanlam:true,strava:false,adiclub:false,sweatcoin:false,clicks:false,dischem:false},
+  vit:{route:null,product:null,bankTile:null,garminDirect:null,goal:null,endurance:false,hfWoolies:null,ageDone:null,hcDone:null,raceClaim:null},
+  san:{option:null,single:null,product:null,entrytime:null,principal:null,raceClaim:null,medicalDone:null,wellnessDone:null},at:0};}
+// rwOK(v,strict): strict (a backup restore) refuses any field in the wrong form; lenient (boot, vault, account copy) resets that field to unknown and counts it.
+// Only literals here: checkKey can call it before the rest of this block has run.
+function rwOK(v,strict){
+  if(!isObj(v))return {err:"not a set of settings"};
+  const out=RW_DEF();let drop=0,err="";const bad=w=>{drop++;err=err||w;};
+  const real=x=>isStr(x)&&ISO_RE.test(x)&&isoLocal(new Date(x+"T12:00:00"))===x;
+  const pick=(s,o,f,ok,w)=>{if(!Object.prototype.hasOwnProperty.call(s,f)||s[f]===undefined)return;const x=s[f];if(ok.some(a=>a===x))o[f]=x;else bad(w);};
+  const date=(s,o,f)=>{if(s[f]==null)return;if(!real(s[f]))bad("a date in the wrong form");else if(s[f]>todayISO())bad("a date in the future");else o[f]=s[f];};
+  if(v.v!=null&&v.v!==1)bad("an unknown version");
+  if(v.on!=null){if(!isObj(v.on))bad("programme switches in the wrong form");else ["vitality","sanlam","strava","adiclub","sweatcoin","clicks","dischem"].forEach(k=>{if(v.on[k]==null)return;if(typeof v.on[k]==="boolean")out.on[k]=v.on[k];else bad("a programme switch in the wrong form");});}
+  if(v.vit!=null){if(!isObj(v.vit))bad("Vitality settings in the wrong form");else{const s=v.vit,o=out.vit;
+    pick(s,o,"route",[null,"bank","health","life","group"],"how you hold Vitality");pick(s,o,"product",[null,"active","premium"],"the Vitality product");
+    pick(s,o,"bankTile",[null,0,500,1000,1500],"the bank tile cap");pick(s,o,"garminDirect",[null,true,false],"the Garmin link");pick(s,o,"hfWoolies",[null,true,false],"the HealthyFood partner");
+    if(s.endurance!=null){if(typeof s.endurance==="boolean")o.endurance=s.endurance;else bad("the Endurance setting");}
+    if(s.goal!=null){const g=s.goal;if(Number.isInteger(g)&&g>=50&&g<=(o.endurance?1200:900))o.goal=g;else bad("a weekly goal out of range");}
+    ["ageDone","hcDone","raceClaim"].forEach(f=>date(s,o,f));}}
+  if(v.san!=null){if(!isObj(v.san))bad("Sanlam settings in the wrong form");else{const s=v.san,o=out.san;
+    pick(s,o,"option",[null,"plus","core","club","wbl"],"the Sanlam option");pick(s,o,"single",[null,true,false],"single or family");
+    pick(s,o,"product",[null,true,false],"the Sanlam product");pick(s,o,"entrytime",[null,true,false],"the Entrytime setting");pick(s,o,"principal",[null,true,false],"the principal-member setting");
+    ["raceClaim","medicalDone","wellnessDone"].forEach(f=>date(s,o,f));}}
+  if(v.at!=null){if(isNum(v.at)&&v.at>=0)out.at=v.at;else bad("a time stamp in the wrong form");}
+  if(err&&strict)return {err};
+  return {v:out,drop};}
+function rwLoad(){const v=load("cb2_rewards",null);return v&&isObj(v.on)?v:RW_DEF();}
+function rwSave(st){st.at=Date.now();const c=rwOK(st,true);if(c.err)return false;setPref("cb2_rewards",c.v);return true;}
+function rwOn(st,p){return !!(st&&st.on&&st.on[p]);}
+/* The rules, as data. Each carries the programme, its own document and the date it was checked. A {field} in a text is filled from the record
+   (a date is written out, a number gets its thousands mark), so no date or figure is typed twice. */
+var REWARD_RULES=[
+  {prog:"vitality",id:"vitHr",text:"Heart-rate workouts score the whole session’s average heart rate against 220 minus your age, by length: 15-29 min at 70% or more = 100; 30-59 min at 60-69% = 100, at 70-79% = 200; 30 min or more at 80% or more = 300; 60-89 min at 60-69% = 200; 60 min or more at 70% or more = 300; 90 min or more at 60% or more = 300. Only a Garmin linked directly in the Discovery app carries heart rate; a home session earns no gym-visit points.",
+    bands:[[15,29,70,100],[30,59,60,100],[30,59,70,200],[30,0,80,300],[60,89,60,200],[60,0,70,300],[90,0,60,300]],doc:"Vitality fitness points table, Oct 2026",checked:"2026-11-17"},
+  {prog:"vitality",id:"vitOne",text:"Only one activity a day counts, the higher one. The goal week runs Saturday to Friday.",doc:"Vitality rewards benefit guide, 7 Aug 2026",checked:"2026-11-17"},
+  {prog:"vitality",id:"vitSpeed",text:"A walk or run of {min} min or more at an average of {kmh} km/h or faster earns {pts} (running above {max} km/h does not qualify). Strava, the Apple Health app and the Garmin all carry speed.",min:30,kmh:5.5,max:25,pts:100,doc:"Vitality points summary, 7 Oct 2026",checked:"2026-11-17"},
+  {prog:"vitality",id:"vitSteps",text:"Steps: 10,000 or more = 100 a day; 5,000-9,999 = 50; only on a day nothing higher is recorded. Through the Garmin direct link or the Apple Health app.",bands:[[10000,100],[5000,50]],doc:"Vitality points summary, 7 Oct 2026",checked:"2026-11-17"},
+  {prog:"vitality",id:"vitRace",text:"A timed event, claimed with a certificate or a results screenshot: 5-9 km = 300, 10-20 km = 600, 21-41 km = 1,500, 42 km or more = 3,000. To count toward the weekly goal, submit by {at} on the Friday after the event; later submissions still count as fitness points.",bands:[[42,3000],[21,1500],[10,600],[5,300]],subDays:7,at:"17:00",doc:"Vitality points table, 7 Oct 2026, and the race-events help page",checked:"2026-11-17"},
+  {prog:"vitality",id:"vitGoal",text:"The weekly goal is personal and moves week to week; it tops out at {max} ({endurance} in the Endurance and High Performance category, by application). One reward a week: an instant reward or a gameboard play.",max:900,endurance:1200,min:50,doc:"Vitality rewards benefit guide, 7 Aug 2026",checked:"2026-11-17"},
+  {prog:"vitality",id:"vitMiles",text:"{per} Discovery Miles = R1.",per:10,doc:"Discovery Miles FAQ, Mar 2026",checked:"2026-11-17"},
+  {prog:"vitality",id:"vitTile",text:"With the Discovery Bank app, a met exercise goal pays the week’s points back at 1 Mile a point, capped at 500, 1,000 or 1,500 Miles by bank product. Without the bank app the gameboard values are not published.",caps:[500,1000,1500],doc:"Discovery Bank guide, 2024",checked:"2026-11-17"},
+  {prog:"vitality",id:"vitCoffee",text:"Instant reward: a coffee or drink at a partner (a Mall coffee is {miles} Miles, R20 face; Miles FAQ, Mar 2026).",miles:200,doc:"Vitality rewards benefit guide, 7 Aug 2026",checked:"2026-11-17"},
+  {prog:"vitality",id:"vitSleep",text:"Sleep Rewards: a separate weekly sleep goal from the Garmin; {miles} Miles (R20 face) a week it is met. The app does not score sleep for Vitality.",miles:200,doc:"Vitality Sleep Rewards page, read 17 Nov 2026",checked:"2026-11-17"},
+  {prog:"vitality",id:"vitHc",text:"Vitality Health Check up to {hc} points; Vitality Age {age}. Both together lift HealthyFood from 10% to 25%. They can be your yearly check-up.",hc:22500,age:1500,doc:"Vitality points summary, 7 Oct 2026",checked:"2026-11-17"},
+  {prog:"vitality",id:"vitHf",text:"HealthyFood at Woolworths: 10% back on activation, {pct}% with a valid Vitality Age and Health Check, on qualifying items up to R{base} a month (Vitality Active single). Minimum R{min} a month per channel. Up to 75% with a qualifying Discovery Bank product and Vitality Money (cap not read).",base:1250,pct:25,min:200,doc:"HealthyFood benefit guide, 3 Nov 2026",checked:"2026-11-17"},
+  {prog:"vitality",id:"vitStrava",text:"A 12-month Strava subscription is a Vitality Mall reward valued at R599 (Miles price not published).",doc:"Vitality rewards guide, 22 May 2026",checked:"2026-11-17"},
+  {prog:"vitality",id:"vitFee",text:"If you are on Vitality Active, a fee you already pay: R159 a month in 2026, R199 from {from}.",from:"2027-01-01",doc:"Vitality programme guide, 29 Jul 2026, and Vitality News, Nov 2026",checked:"2026-11-17"},
+  {prog:"sanlam",id:"sanNone",text:"Sanlam Reality pays nothing for home sessions, runs or steps. No Sanlam Reality document mentions Garmin, Strava, Apple Health or steps; its only feeds are gym-recorded visits at a contracted Planet Fitness or JustGym, outdoor events claimed on Entrytime, and pharmacy Basic Medical results.",doc:"Sanlam Reality pages, terms and gym booklet (June 2026)",checked:"2026-11-17"},
+  {prog:"sanlam",id:"sanRace",text:"An official running event under {underKm} km = {pts} tier points (Easy), claimed on Entrytime within {months} months; results must be on an official website (whether a Peak Timing page counts is not stated). Plus or Core; two official documents also need a qualifying Sanlam product.",pts:2000,underKm:15,months:3,doc:"Sanlam Reality earn-points page and tier terms",checked:"2026-11-17"},
+  {prog:"sanlam",id:"sanMedical",text:"Basic Medical at Clicks, Alpha Pharm, Arrie Nel or The Local Choice: four tests, each 2,500 (ideal), 2,000 (almost ideal) or 1,000 (not ideal), up to {max} a year. BMI ideal: above 22 and below 26; almost ideal: 18-22 or 26-30.",tiers:[2500,2000,1000],max:10000,ideal:[22,26],almost:[18,30],doc:"Sanlam Reality earn-points page",checked:"2026-11-17"},
+  {prog:"sanlam",id:"sanWellness",text:"Online Wellness Check: {pts} a year, principal member only.",pts:3000,doc:"Sanlam Reality earn-points page",checked:"2026-11-17"},
+  {prog:"sanlam",id:"sanGym",text:"Gym visits: 150 points a visit and 20-80% off a contracted gym fee, only at a contracted Planet Fitness or JustGym. You train at home; the app does not suggest a gym for points.",doc:"Sanlam Reality gym booklet, June 2026",checked:"2026-11-17"},
+  {prog:"sanlam",id:"sanClub",text:"Only Reality Plus and Core earn tier points. Club earns none, and Wealth Bonus Lifestyle carries no tier points.",doc:"Sanlam Reality membership terms",checked:"2026-11-17"},
+  {prog:"sanlam",id:"sanTier",text:"Tier points have no stated rand value. Tier status pays only a discount on Sanlam Premier risk cover for Reality Plus (Bronze 7.5%, Silver 15%, Gold 30%, on the first R3,000 of life premium; a new Premier product or a 20% premium increase).",doc:"Sanlam Reality benefit pages and tier terms",checked:"2026-11-17"},
+  {prog:"sanlam",id:"sanFee",text:"A fee you already pay, single option: Plus R305, Core R135, Club R62 a month since {from}.",from:"2026-08-01",doc:"Sanlam Reality fee page, 29 Jun 2026",checked:"2026-11-17"},
+  {prog:"strava",id:"stravaRule",text:"Any activity the Garmin already sends to Strava counts if it meets the challenge’s own rule (private activities count for rewards). Worth: cannot be stated; none was confirmed prize-eligible in South Africa when checked, and most rewards are discounts that need a purchase. Read each challenge’s own page for South Africa.",doc:"Strava challenge and support pages",checked:"2026-11-15"},
+  {prog:"adiclub",id:"adiRule",text:"Runs recorded live with GPS in the adidas Running app earn adiClub points. Points have no cash value; 200 sign-up and 200 profile points and a welcome voucher. A second recorder on the phone; useful only if you buy adidas kit anyway.",doc:"adiClub South Africa pages",checked:"2026-11-15"},
+  {prog:"sweatcoin",id:"sweatRule",text:"iPhone steps only (not the Garmin): at most {coins} coins a 10,000-step day, spent on vouchers; no cash. Free plan only; never the SWEAT token.",coins:9.5,doc:"Sweatcoin FAQ and subscription pages",checked:"2026-11-15"},
+  {prog:"clicks",id:"clicksRule",text:"Shopping, not exercise: 2% cash back at Clicks (R250 or more a month). Useful only if your supplements come from Clicks.",doc:"Clicks ClubCard pages",checked:"2026-11-15"},
+  {prog:"dischem",id:"dischemRule",text:"Shopping, not exercise: 10% off listed brands. Useful only if your supplements come from Dis-Chem.",doc:"Dis-Chem Better Rewards pages",checked:"2026-11-15"}];
+var RW_WARN=[
+  {text:"Own money at stake (step and workout wagers): StepBet (US$40 typical stake, 15% house cut, PayPal; South Africa not confirmed), WayBetter games (stakes per game; running games set their own pace and schedule), Cadoo (the only wager app that names South Africa; 25% of losers’ stakes, and 3.5% + US$2 deposit and 10% + US$2 withdrawal fees make small games near break-even; camera rep games bring unplanned volume), FitStake, Steppa, HealthBlocks, PaidToGo (paid subscription plus stakes). The app never presents any wager as legal in South Africa; no regulator page was read."},
+  {text:"Pay-if-you-miss pledges (earn nothing): Beeminder, stickK, Forfeit."},
+  {text:"Crypto: STEPN (buy an NFT sneaker; its own warning reads “only invest money in crypto that you can afford to lose”; its speed bands fight your paces). The SWEAT token and Sweat Wallet end in their present form on {end}.",end:"2026-12-30"},
+  {text:"Pay for a medal: The Conqueror virtual challenges (about US$33.99; a cost, not a reward)."},
+  {text:"Not confirmed for South Africa: WeWard, Mooney."},
+  {text:"Data: every programme here receives your activity, heart-rate or health data; none on the shortlist sells it as a product, and this app sends nothing to any of them."}];
+var RW_OUT=[
+  {text:"HealthyWage, DietBet: they pay for weight lost, and you are gaining. HealthyWage does not list Africa."},
+  {text:"Momentum Multiply, Fedhealth Health Rewards, Liberty Wellness Bonus, Old Mutual Rewards: they need a medical scheme or a life policy you are not known to hold, and changing cover for points is a far larger decision than the reward. Old Mutual’s fitness rule is unpublished."},
+  {text:"Discovery Bank Vitality Money and Dynamic Interest: they reward money behaviour, not exercise."},
+  {text:"Virgin Active Rewards, Planet Fitness with Smart Shopper, and the Sanlam Reality gym discount as a reason to join a gym: you train at home, and paying for a gym to earn points changes the plan."},
+  {text:"parkrun as a points source (300 Vitality points): a Saturday 5 km on Legs A day is a run the plan does not have, so it is not suggested. If you choose to run one, its points count like any logged event."},
+  {text:"HYROX, SAPF powerlifting meets, the Randburg Harriers Club Championships and Thursday time trial: races the plan does not have, or a peaked programme."},
+  {text:"Team Vitality (R665 a year, 25% back on selected race entries): it needs R2,660 of qualifying entries to break even, and {race} is not confirmed on its calendar."},
+  {text:"Goal-race prize money: a fact for the race card, never a target here."},
+  {text:"Garmin Connect badges, Nike Membership, Charity Miles: no material benefit to you."},
+  {text:"Closed or not in South Africa: Fitcoin, Stride, Pact, RunBet, Stepler, Macadam, Evidation, BetterPoints, Winwalk, CashWalk."}];
+function rwR(id){return REWARD_RULES.find(r=>r.id===id)||{};}
+function rwY(iso){return fmtShort(iso)+" "+String(iso).slice(0,4);}
+function rwDay(iso){return DOW[new Date(iso+"T12:00:00").getDay()]+" "+fmtShort(iso);}
+function rwText(r){return String(r.text||"").replace(/\{(\w+)\}/g,(m,k)=>{const x=r[k];if(isStr(x)&&ISO_RE.test(x))return rwY(x);if(k==="race"){const g=goalRace();return g?g.name:"the goal race";}return isNum(x)?(Number.isInteger(x)?thou(x):String(x)):String(x==null?"":x);});}
+function rwRand(miles){return thou(Math.floor(miles/rwR("vitMiles").per));}
+function rwPlain(t){return String(t||"").replace(/\s*[—–]\s*/g,", ");}
+function rwAddMonths(iso,n){const y=+iso.slice(0,4),m=+iso.slice(5,7)-1+n,d=+iso.slice(8,10),Y=y+Math.floor(m/12),M=((m%12)+12)%12,last=new Date(Y,M+1,0).getDate();return Y+"-"+String(M+1).padStart(2,"0")+"-"+String(Math.min(d,last)).padStart(2,"0");}
+function rwWs(iso){if(!iso)return weekStartISO(planWeek());return weekStartISO(Math.max(1,Math.floor(dayDiff(START_ISO,iso)/7)+1));}
+/* ----- Vitality arithmetic ----- */
+function vitAge(){const a=Math.round(+(DB.profile&&DB.profile.age));return a>=5&&a<=120?a:PROFILE_DEF.age;}
+// 60/70/80% of 220 minus age, rounded up: 110/128/146 at 38, which matches Vitality's own table for that age
+function vitHR(pct){return Math.ceil(pct*(220-vitAge())/100);}
+function vitHRPts(min,bpm){const m=Math.floor(+min||0),b=+bpm||0;let p=0;(rwR("vitHr").bands||[]).forEach(x=>{if(m>=x[0]&&(!x[1]||m<=x[1])&&b>=vitHR(x[2]))p=Math.max(p,x[3]);});return p;}
+function vitSpeedPts(r){const R=rwR("vitSpeed"),d=+r.dist,t=+r.time;if(!(d>0&&t>0))return 0;const kmh=d/(t/3600);return t>=R.min*60&&kmh>=R.kmh&&kmh<=R.max?R.pts:0;}
+function vitRacePts(km){const b=(rwR("vitRace").bands||[]).find(x=>+km>=x[0]);return b?b[1]:0;}
+function vitStepPts(n){const b=(rwR("vitSteps").bands||[]).find(x=>+n>=x[0]);return b?b[1]:0;}
+// The highest proven floor for one day (one activity a day counts, as Vitality does): a logged race, a logged run by speed, or logged steps. No heart rate.
+function vitDayFloor(iso){let best={pts:0,src:""};const up=(p,s)=>{if(p>best.pts)best={pts:p,src:s};};
+  (DB.runs||[]).forEach(r=>{if(!r||r.date!==iso)return;if(r.type==="Race")up(vitRacePts(r.dist),"race");up(vitSpeedPts(r),"run");});
+  (DB.steps||[]).forEach(s=>{if(s&&s.date===iso&&isNum(s.n))up(vitStepPts(s.n),s.n>=10000?"steps10":"steps5");});
+  return best;}
+function vitCap(st){const G=rwR("vitGoal");return st&&st.vit&&st.vit.endurance?G.endurance:G.max;}
+function vitWeek(ws,st){st=st||rwLoad();const days=[];let sum=0;for(let i=0;i<7;i++){const iso=dateAdd(ws,i),f=vitDayFloor(iso);days.push(Object.assign({iso},f));sum+=f.pts;}
+  const cap=vitCap(st),shown=Math.min(sum,cap),goal=st.vit.goal!=null?Math.min(st.vit.goal,cap):null;
+  return {ws,days,sum,shown,cap,capped:sum>cap,goal,met:goal!=null&&sum>=goal};}
+// Heart-rate wording for a length: the bands that apply, merged ("200 if the whole session averages 110-127 bpm, 300 at 128 bpm or more")
+function vitHRBands(min){const T=[vitHR(60),vitHR(70),vitHR(80)],P=T.map(t=>vitHRPts(min,t)),seg=[];
+  T.forEach((t,i)=>{if(!P[i])return;if(seg.length&&seg[seg.length-1].p===P[i])return;seg.push({p:P[i],lo:t});});
+  seg.forEach((s,i)=>{s.hi=i<seg.length-1?seg[i+1].lo-1:null;});return seg;}
+function vitHRTxt(min,lead){const seg=vitHRBands(min);if(!seg.length)return "";
+  return seg.map((s,i)=>i===0?thou(s.p)+(lead||" if the whole session averages ")+s.lo+(s.hi?"-"+s.hi+" bpm":" bpm or more"):thou(s.p)+" at "+s.lo+(s.hi?"-"+s.hi+" bpm":" bpm or more")).join(", ");}
+function rwLiftMin(key){try{const e=sessionTimeEstimate(key);return e?e.full:0;}catch(e){return 0;}}
+function rwRaceRun(ws){for(let i=0;i<7;i++){const iso=dateAdd(ws,i),P=dayPlan(iso);if(P.kind==="race")return {iso,run:P.run};}return null;}
+function rwRaceKm(run){const k=+(run&&run.km);return k>0?k:10;}
+function vitLiftTxt(key,st){const m=rwLiftMin(key);
+  if(st.vit.garminDirect===false)return "Vitality: nothing from the lift. You have said the Garmin is not linked directly in the Discovery app, and that link is the only route that scores a home session. Your steps count instead ("+vitStepPts(10000)+" at 10,000).";
+  const seg=vitHRBands(m),b=seg.length?vitHRTxt(m):"nothing at this length";
+  return "Vitality: "+b+". That needs the Garmin, linked directly in the Discovery app"+(st.vit.garminDirect==null?" (not yet set: is yours?)":"")+"."+(seg.length?" Under "+seg[0].lo+": nothing from the lift; your steps count instead ("+vitStepPts(10000)+" at 10,000).":"")+" Which Garmin activity type passes heart rate is not published; Strava and Apple Health carry no heart rate.";}
+function vitRunTxt(run,iso,st){const R=rwR("vitSpeed"),slow=fmtPace(Math.floor(3600/R.kmh));
+  let s="Vitality: at least "+R.pts+" if it lasts "+R.min+" min or more at "+R.kmh+" km/h or faster (slower than "+slow+" per km does not qualify); it reaches Vitality through Strava or the Garmin.";
+  if(st.vit.garminDirect===false)s+=" Heart-rate points need the Garmin direct link, which you have marked as not set up.";
+  else s+=" More only by heart rate on the Garmin direct link: "+(run&&run.t==="long"?"for 60-89 min, "+vitHRTxt(60," at ")+"; for 90 min or more, "+vitHRTxt(90," at "):"for 30-59 min, "+vitHRTxt(30," at "))+".";
+  const L=(DB.runs||[]).filter(r=>r&&r.date===iso&&r.type!=="Race"&&+r.dist>0&&+r.time>0);
+  L.forEach(r=>{const p=vitSpeedPts(r),kmh=+r.dist/(+r.time/3600);s+=" Logged: "+(+r.dist)+" km in "+fmtPace(+r.time)+", "+(Math.round(kmh*10)/10)+" km/h, so "+(p?"at least "+p+" by speed":"0 by speed ("+(+r.time<R.min*60?"under "+R.min+" min":"under "+R.kmh+" km/h")+")")+".";});
+  return s;}
+function vitRaceTxt(iso,run){const R=rwR("vitRace"),p=vitRacePts(rwRaceKm(run)),sub=dateAdd(iso,R.subDays);
+  return "Vitality: "+thou(p)+" with the certificate or results screenshot; submit by "+R.at+" on "+rwDay(sub)+" to count toward this goal week (confirm with Vitality).";}
+function vitSessionLine(iso,st){st=st||rwLoad();if(!rwOn(st,"vitality"))return "";const P=dayPlan(iso);
+  if(P.kind==="race")return vitRaceTxt(iso,P.run);
+  if(P.kind==="lift")return vitLiftTxt(P.key,st)+(P.run&&P.run.t!=="walk"?" On a day with a run as well, only the higher of the two counts.":"");
+  if((P.kind==="run"||P.kind==="ramp")&&P.run)return vitRunTxt(P.run,iso,st);
+  return "";}
+/* ----- Sanlam Reality ----- */
+function sanEligTxt(st){const o=st.san.option;if(o==="club")return "Club earns no tier points";if(o==="wbl")return "Wealth Bonus Lifestyle carries no tier points";return "";}
+/* The Sanlam race rule, one place: "no" (Club, Wealth Bonus Lifestyle, or no Sanlam product), "yes" (Plus or Core and a Sanlam product marked held),
+   else "unknown" (not counted: two official documents need a product, and the source says to confirm it in writing). */
+function sanRaceElig(st){const S=st.san;if(sanEligTxt(st)||S.product===false)return "no";return (S.option==="plus"||S.option==="core")&&S.product===true?"yes":"unknown";}
+function sanRaceDeadline(iso){return rwAddMonths(iso,rwR("sanRace").months);}
+function sanRaceTxt(iso,run,st){const R=rwR("sanRace"),no=sanEligTxt(st);if(no)return "Sanlam Reality: nothing; "+no+".";
+  if(!(rwRaceKm(run)<R.underKm))return "Sanlam Reality: this distance is not in the under-"+R.underKm+" km band the app knows.";
+  return "Sanlam Reality: "+thou(R.pts)+" tier points if claimed on Entrytime by "+rwY(sanRaceDeadline(iso))+" and you are eligible."+(st.san.product===false?" Two official documents also need a qualifying Sanlam product, which you have marked as not held.":"")+(st.san.entrytime===false?" You have marked Entrytime as not registered yet.":"");}
+function sanSessionLine(iso,st){st=st||rwLoad();if(!rwOn(st,"sanlam"))return "";const P=dayPlan(iso);
+  if(P.kind==="race")return sanRaceTxt(iso,P.run,st);
+  if(P.kind==="lift")return "Sanlam Reality: nothing (home session).";
+  if((P.kind==="run"||P.kind==="ramp")&&P.run)return "Sanlam Reality: nothing (not an event).";
+  return "";}
+function sanBMI(){const W=(DB.weight||[]).filter(x=>x&&isNum(x.v)&&isStr(x.date)).sort((a,b)=>a.date.localeCompare(b.date)),w=W.length?W[W.length-1].v:+DB.profile.weight,h=+DB.profile.height;
+  if(!(w>0&&h>0))return null;const bmi=w/Math.pow(h/100,2),M=rwR("sanMedical");let i=2;if(bmi>M.ideal[0]&&bmi<M.ideal[1])i=0;else if(bmi>=M.almost[0]&&bmi<=M.almost[1])i=1;
+  return {bmi:Math.round(bmi*10)/10,pts:M.tiers[i],band:["Ideal","Almost ideal","Not ideal"][i],w,h};}
+/* ----- the other programmes' lines (only when switched on) ----- */
+function rwOtherLines(kind,st){const o=[];
+  if(kind==="run"&&rwOn(st,"strava"))o.push({p:"strava",t:"Strava challenges: counts only if the run meets a challenge’s own rule; worth cannot be stated."});
+  if(kind==="run"&&rwOn(st,"adiclub"))o.push({p:"adiclub",t:"adiClub: points only if recorded live in the adidas Running app; no cash value."});
+  if(kind==="steps"&&rwOn(st,"sweatcoin"))o.push({p:"sweatcoin",t:"Sweatcoin: iPhone steps only, at most "+rwR("sweatRule").coins+" coins a 10,000-step day."});
+  return o;}
+/* ----- the week's lines: one per planned session (dayPlan), then steps ----- */
+function rwWeekRows(ws,st){const rows=[];
+  for(let i=0;i<7;i++){const iso=dateAdd(ws,i),P=dayPlan(iso);if(!(P.kind==="lift"||P.kind==="race"||((P.kind==="run"||P.kind==="ramp")&&P.run)))continue;
+    let kind=P.kind==="ramp"?"run":P.kind,title="";
+    if(P.kind==="lift"){const m=rwLiftMin(P.key),nm=(GYM[P.key]&&GYM[P.key].name)||P.key,logged=(DB.sessions||[]).some(s=>s&&s.dateISO===iso&&s.day===P.key);
+      title=nm+", about "+m+" min (plan estimate)"+(logged?" · logged":"");if(P.run&&P.run.t!=="walk"){title+="; "+rwPlain(P.run.title);kind="lift run";}}
+    else if(P.kind==="race"){const g=goalRace();title=(g&&g.iso===iso?g.name:rwPlain(P.run.title))+", "+rwRaceKm(P.run)+" km";}
+    else title=rwPlain(P.run.title);
+    const L=[];const v=vitSessionLine(iso,st),s=sanSessionLine(iso,st);if(v)L.push({p:"vitality",t:v});if(s)L.push({p:"sanlam",t:s});
+    if(/run/.test(kind)&&P.kind!=="race")rwOtherLines("run",st).forEach(x=>L.push(x));
+    rows.push({iso,kind,title,lines:L,floor:vitDayFloor(iso)});}
+  const SL=[];if(rwOn(st,"vitality"))SL.push({p:"vitality",t:"Vitality: "+rwText(rwR("vitSteps")).replace(/^Steps: /,"")});
+  if(rwOn(st,"sanlam"))SL.push({p:"sanlam",t:"Sanlam Reality: nothing (steps)."});rwOtherLines("steps",st).forEach(x=>SL.push(x));
+  if(SL.length)rows.push({iso:"steps",kind:"steps",title:"Steps, every day",lines:SL,floor:null});
+  return rows;}
+/* ----- chips on the game layer's quest lines (Lifts, Runs, Step days); a tap opens that session's row in the Rewards card ----- */
+var RW_QLINE={"Lifts":"lift","Runs":"run","Step days":"steps"};
+function rwChips(kind,ws,st){const c=[],race=rwRaceRun(ws);
+  if(kind==="lift"){if(rwOn(st,"vitality")){let m=0;for(let i=0;i<7;i++){const P=dayPlan(dateAdd(ws,i));if(P.kind==="lift")m=Math.max(m,rwLiftMin(P.key));}
+      const seg=vitHRBands(m),top=seg.length?seg[seg.length-1].p:0;c.push(st.vit.garminDirect===false||!top?"Vitality: 0 from a lift":"Vitality: up to "+top+" (heart rate)");}
+    if(rwOn(st,"sanlam"))c.push("Sanlam: 0");}
+  if(kind==="run"){if(race){if(rwOn(st,"vitality"))c.push("Vitality: race "+thou(vitRacePts(rwRaceKm(race.run))));if(rwOn(st,"sanlam")){const e=sanRaceElig(st);c.push(e==="no"?"Sanlam: 0":e==="yes"?"Sanlam: race "+thou(rwR("sanRace").pts):"Sanlam: race, if eligible");}}
+    else{const R=rwR("vitSpeed");if(rwOn(st,"vitality"))c.push("Vitality: "+R.pts+" a run of "+R.min+"+ min");if(rwOn(st,"sanlam"))c.push("Sanlam: 0");}
+    if(rwOn(st,"strava"))c.push("Strava: per challenge");if(rwOn(st,"adiclub"))c.push("adiClub: points, no cash");}
+  if(kind==="steps"){if(rwOn(st,"vitality"))c.push("Vitality: "+vitStepPts(10000)+" at 10,000");if(rwOn(st,"sanlam"))c.push("Sanlam: 0");if(rwOn(st,"sweatcoin"))c.push("Sweatcoin: up to "+rwR("sweatRule").coins+" coins");}
+  return c;}
+function rewardChipsHTML(iso,line){let kind=null,c=[];try{kind=typeof RW_QLINE!=="undefined"&&RW_QLINE?RW_QLINE[line]:null;if(!kind)return "";c=rwChips(kind,rwWs(iso),rwLoad());}catch(e){c=[];}if(!kind)return "";
+  return `<div class="rw-chipw" data-rwq="${kind}" data-rwline="${esc(line)}"${iso?` data-rwiso="${esc(iso)}"`:""}>${c.length?`<button type="button" class="rw-chips" data-rwgo="${kind}" aria-label="${esc("Rewards for "+line.toLowerCase()+": "+c.join("; ")+". Opens the Rewards card on Track.")}">${c.map(x=>`<span class="rw-chip">${esc(x)}</span>`).join("")}</button>`:""}</div>`;}
+/* ----- the card ----- */
+function rwSel(id,path,label,opts,cur){const enc=x=>x===null||x===undefined?"":x===true?"1":x===false?"0":String(x);
+  return `<div class="rw-f"><label for="${id}">${label}</label><select class="sel" id="${id}" data-rw="${path}">${opts.map(o=>`<option value="${enc(o[0])}"${enc(o[0])===enc(cur)?" selected":""}>${esc(o[1])}</option>`).join("")}</select></div>`;}
+function rwDateIn(id,path,label,cur){return `<div class="rw-f"><label for="${id}">${label}</label><input type="date" id="${id}" data-rw="${path}" min="2020-01-01" max="${todayISO()}" value="${cur?esc(cur):""}"></div>`;}
+var RW_UNK="Unknown (not set)";
+function rwProgHTML(st){const sw=p=>`<label class="rw-sw" for="rw-on-${p}"><input type="checkbox" role="switch" id="rw-on-${p}" data-rw="on.${p}"${rwOn(st,p)?" checked":""}><span>${RW_NAME[p]}</span></label>`,v=st.vit,s=st.san,YN=[[null,RW_UNK],[true,"Yes"],[false,"No"]];
+  const vit=rwOn(st,"vitality")?`<div class="rw-set">${rwSel("rw-vit-route","vit.route","How do you hold Vitality?",[[null,RW_UNK],["bank","Through Discovery Bank"],["health","Through Discovery Health"],["life","Through Discovery Life"],["group","Through work"]],v.route)}
+    ${rwSel("rw-vit-product","vit.product","Which product?",[[null,RW_UNK],["active","Vitality Active"],["premium","Vitality Premium"]],v.product)}
+    ${rwSel("rw-vit-tile","vit.bankTile","Discovery Bank exercise tile cap",[[null,RW_UNK],[0,"No bank app"],[500,"500 Miles a week"],[1000,"1,000 Miles a week"],[1500,"1,500 Miles a week"]],v.bankTile)}
+    ${rwSel("rw-vit-garmin","vit.garminDirect","Garmin Connect linked directly in the Discovery app?",YN,v.garminDirect)}
+    <div class="rw-f"><label for="rw-vit-goal">Your weekly goal as the Discovery app shows it (points)</label><input type="text" inputmode="numeric" autocomplete="off" id="rw-vit-goal" data-rw="vit.goal" placeholder="unknown" value="${v.goal!=null?v.goal:""}"></div>
+    <label class="rw-sw rw-sw-s" for="rw-vit-end"><input type="checkbox" id="rw-vit-end" data-rw="vit.endurance"${v.endurance?" checked":""}><span>I am in the Endurance and High Performance category (goal up to ${thou(rwR("vitGoal").endurance)})</span></label>
+    ${rwSel("rw-vit-hf","vit.hfWoolies","Woolworths is your HealthyFood partner, MyDifference card linked?",YN,v.hfWoolies)}
+    ${rwDateIn("rw-vit-age","vit.ageDone","Vitality Age last done on",v.ageDone)}${rwDateIn("rw-vit-hc","vit.hcDone","Health Check last done on",v.hcDone)}</div>`:"";
+  const san=rwOn(st,"sanlam")?`<div class="rw-set">${rwSel("rw-san-option","san.option","Which Sanlam Reality option?",[[null,RW_UNK],["plus","Reality Plus"],["core","Reality Core"],["club","Reality Club"],["wbl","Wealth Bonus Lifestyle"]],s.option)}
+    ${rwSel("rw-san-single","san.single","Single or family?",[[null,RW_UNK],[true,"Single"],[false,"Family"]],s.single)}
+    ${rwSel("rw-san-product","san.product","Do you hold a Sanlam product (life or health cover, for example)?",YN,s.product)}
+    ${rwSel("rw-san-entry","san.entrytime","Registered on Entrytime?",YN,s.entrytime)}
+    ${rwSel("rw-san-principal","san.principal","Are you the principal member?",YN,s.principal)}</div>`:"";
+  const other=p=>`<div class="rw-prog" data-rwprog="${p}">${sw(p)}${rwOn(st,p)?`<p class="rw-ln">${esc(rwText(REWARD_RULES.find(r=>r.prog===p)))} <span class="rw-chk">Checked ${rwY(REWARD_RULES.find(r=>r.prog===p).checked)}.</span></p>`:""}</div>`;
+  return `<div class="rw-prog" data-rwprog="vitality">${sw("vitality")}${vit}</div><div class="rw-prog" data-rwprog="sanlam">${sw("sanlam")}${san}</div>
+    <p class="rw-ln rw-sub">Free extras, off unless you open them:</p>${["strava","adiclub","sweatcoin","clicks","dischem"].map(other).join("")}`;}
+function rwWeekHTML(ws,st){const rows=rwWeekRows(ws,st);if(!rows.length)return `<p class="rw-ln">No planned sessions this week.</p>`;
+  return rows.map(r=>`<div class="rw-row" id="rwRow-${r.iso}" data-rwk="${r.kind}" tabindex="-1"><div class="rw-when"><b>${r.iso==="steps"?"Every day":rwDay(r.iso)}</b><small>${esc(r.title)}</small></div><div class="rw-what">${r.lines.length?r.lines.map(l=>`<p class="rw-ln" data-rwp="${l.p}">${esc(l.t)}</p>`).join(""):`<p class="rw-ln">No switched-on programme pays for this.</p>`}${r.floor&&r.floor.pts&&rwOn(st,"vitality")?`<p class="rw-ln rw-proof">Proven from your log: at least ${r.floor.pts} (${rwSrcTxt(r.floor.src)}).</p>`:""}</div></div>`).join("");}
+function rwSrcTxt(s){return {race:"a race, with the certificate",run:"a run of 30 min or more at 5.5 km/h or faster",steps10:"10,000 steps or more",steps5:"5,000-9,999 steps"}[s]||"";}
+function rwTallyHTML(ws,st){const o=[];
+  if(rwOn(st,"vitality")){const W=vitWeek(ws,st),G=rwR("vitGoal");
+    o.push(`<p class="rw-tl" id="rwVitTally">Vitality: at least <span id="rwVitN">${thou(W.shown)}</span> points ${todayISO()<ws?"in the week from":"this week,"} ${rwDay(ws)} to ${rwDay(dateAdd(ws,6))}${W.capped?` (the weekly goal tops out at ${thou(W.cap)}, so the app counts no further)`:""}.</p>`);
+    if(W.goal!=null)o.push(`<p class="rw-tl" id="rwVitGoal">At least ${thou(W.shown)} of your goal of ${thou(W.goal)}${W.met?": goal met on what the app can prove.":"."}</p>`);
+    else o.push(`<p class="rw-ln">Your weekly goal: unknown. Enter the goal the Discovery app shows you under Your programmes.</p>`);
+    if(W.goal!=null&&!W.met)o.push(`<p class="rw-ln" id="rwRest">${st.vit.garminDirect===false?"The app cannot prove the rest. Lift points would need the Garmin linked directly in the Discovery app.":"The app cannot prove the rest; heart rate on the Garmin direct link is the main source."} The plan is not changed for points.</p>`);
+    o.push(`<p class="rw-ln rw-days">At least, by day: ${W.days.map(d=>DOW[new Date(d.iso+"T12:00:00").getDay()]+" "+d.pts).join(" · ")}</p>`);
+    o.push(`<p class="rw-ln">Counted: logged races, runs of ${rwR("vitSpeed").min} min or more at ${rwR("vitSpeed").kmh} km/h or faster, and logged steps, the highest one a day. Heart-rate points are never counted here: the app does not record heart rate for lifts, and only Vitality knows what the Garmin direct link delivered.</p>`);
+    const we=dateAdd(ws,7);(DB.runs||[]).filter(r=>r&&r.src==="strava"&&isNum(r.hr)&&r.hr>0&&r.date>=ws&&r.date<we&&+r.time>0).sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(r=>{const p=vitHRPts(+r.time/60,r.hr);
+      o.push(`<p class="rw-ln rw-read">A reading, not counted: on ${rwDay(r.date)} the Garmin’s average was ${r.hr} bpm for ${Math.round(+r.time/60)} min. On the Garmin direct link that band is ${p?thou(p):"nothing"}. Vitality’s own app is the record.</p>`);});
+    if(W.met){const t=st.vit.bankTile,M=rwR("vitMiles").per;if(t>0){const mi=Math.min(W.shown,t);o.push(`<p class="rw-ln">On your bank app’s exercise tile that is at least ${thou(mi)} Miles (R${rwRand(mi)} face).</p>`);}
+      else if(t===0)o.push(`<p class="rw-ln">Without the bank app the gameboard values are not published, so the rand value cannot be stated.</p>`);
+      else o.push(`<p class="rw-ln">What a met goal pays depends on how you hold Vitality (set it under Your programmes).</p>`);}
+    o.push(`<p class="rw-ln">${esc(rwText(rwR("vitSleep")))}</p>`);}
+  if(rwOn(st,"sanlam")){const race=rwRaceRun(ws),yr=todayISO().slice(0,4),no=sanEligTxt(st);
+    o.push(`<p class="rw-ln rw-sanwk" id="rwSanWeek">Sanlam Reality: ${(()=>{const e=sanRaceElig(st);return !race||e==="no"?"0 this week.":e==="yes"?"the race can earn "+thou(rwR("sanRace").pts)+" once claimed on Entrytime; nothing else this week.":"the race can earn "+thou(rwR("sanRace").pts)+" once claimed on Entrytime, if you are on Plus or Core and hold a Sanlam product; nothing else this week.";})()} It pays for gym visits at a contracted gym and for claimed events, not for home sessions, runs or steps.</p>`);
+    const S=st.san,tier=S.option==="plus"||S.option==="core";let n=0;const g=goalRace();
+    if(tier){if(sanRaceElig(st)==="yes"&&S.raceClaim&&g&&S.raceClaim>=g.iso&&S.raceClaim<=sanRaceDeadline(g.iso)&&S.raceClaim.slice(0,4)===yr)n+=rwR("sanRace").pts;if(S.principal===true&&S.wellnessDone&&S.wellnessDone.slice(0,4)===yr)n+=rwR("sanWellness").pts;}
+    o.push(`<p class="rw-tl" id="rwSanYear">Sanlam Reality tier points the app can prove for ${yr}: at least <span id="rwSanN">${thou(n)}</span>${no?" ("+no+")":!tier?" (nothing is counted until your option is set to Plus or Core)":" (a race claimed on Entrytime within "+rwR("sanRace").months+" months of the race, counted once you mark that you hold a Sanlam product, as two official documents require; the Wellness Check if you are the principal member; Basic Medical points depend on your results)"}.</p>`);}
+  if(!o.length)return "";
+  return `<div class="rw-tally" id="rwTally" aria-live="polite">${o.join("")}</div>`;}
+function rwOnceHTML(st){const o=[],g=goalRace(),riso=(g&&g.iso)||RACE_ISO,rr=rwRaceRun(rwWs(riso)),rrun=rr?rr.run:null;
+  if(rwOn(st,"vitality")){const v=st.vit,H=rwR("vitHf"),mo=H.base*H.pct/100;
+    o.push(`<div class="rw-once" id="rwOnceHc"><b>Health Check and Vitality Age.</b> ${esc(rwText(rwR("vitHc")))} ${v.hcDone?"Health Check marked done on "+rwY(v.hcDone)+".":"Health Check: not marked done."} ${v.ageDone?"Vitality Age marked done on "+rwY(v.ageDone)+".":"Vitality Age: not marked done."}${typeof checkupLogged==="function"&&checkupLogged()&&DB.health.hc.last?" Your yearly check-up is logged for "+rwY(DB.health.hc.last)+".":""}</div>`);
+    o.push(`<div class="rw-once" id="rwOnceHf"><b>HealthyFood.</b> ${esc(rwText(H))} ${H.pct}% of R${thou(H.base)} = R${mo.toFixed(2)} a month, R${thou(mo*12)} a year face (our arithmetic), only if you spend that much on qualifying items, Woolworths is your primary partner and your MyDifference card is linked. ${v.hfWoolies===true?"You have marked Woolworths and MyDifference as set up.":v.hfWoolies===false?"You have marked Woolworths and MyDifference as not set up.":"Woolworths and MyDifference: unknown."}${v.product==="premium"?" On Vitality Premium the cap differs; this is the Vitality Active figure.":""}</div>`);
+    o.push(`<div class="rw-once" id="rwOnceVitRace"><b>Race claim, Vitality.</b> ${esc(vitRaceTxt(riso,rrun).replace(/^Vitality: /,""))}${rwDateIn("rw-vit-race","vit.raceClaim","Vitality race claim submitted on",v.raceClaim)}</div>`);
+    o.push(`<div class="rw-once"><b>Miles and fees.</b> ${esc(rwText(rwR("vitMiles")))} ${esc(rwText(rwR("vitTile")))} ${esc(rwText(rwR("vitCoffee")))} ${esc(rwText(rwR("vitStrava")))} ${esc(rwText(rwR("vitFee")))}</div>`);}
+  if(rwOn(st,"sanlam")){const s=st.san,B=sanBMI(),M=rwR("sanMedical");
+    o.push(`<div class="rw-once" id="rwOnceSanRace"><b>Race claim, Sanlam Reality.</b> ${esc(sanRaceTxt(riso,rrun,st).replace(/^Sanlam Reality: /,""))}${rwDateIn("rw-san-race","san.raceClaim","Entrytime claim made on",s.raceClaim)}</div>`);
+    o.push(`<div class="rw-once" id="rwOnceMed"><b>Basic Medical.</b> ${esc(rwText(M))} It pairs with your yearly check-up.${B?` From your height and latest weight your BMI is about ${B.bmi}, which the BMI test scores ${thou(B.pts)} (${B.band}; our arithmetic). Body-composition goals clash with this scoring; the app reports it and never suggests a weight for points.`:""}${rwDateIn("rw-san-med","san.medicalDone","Basic Medical done on",s.medicalDone)}</div>`);
+    o.push(`<div class="rw-once" id="rwOnceWell"><b>Wellness Check.</b> ${esc(rwText(rwR("sanWellness")))}${rwDateIn("rw-san-well","san.wellnessDone","Wellness Check done on",s.wellnessDone)}</div>`);
+    o.push(`<div class="rw-once"><b>Tier and fees.</b> ${esc(rwText(rwR("sanNone")))} ${esc(rwText(rwR("sanGym")))} ${esc(rwText(rwR("sanClub")))} ${esc(rwText(rwR("sanTier")))} ${esc(rwText(rwR("sanFee")))}</div>`);}
+  return o.length?o.join(""):`<p class="rw-ln">Switch on a programme to see its once-a-year items.</p>`;}
+function rwSrcHTML(st){const R=REWARD_RULES.filter(r=>rwOn(st,r.prog));if(!R.length)return `<p class="rw-ln">No programme is switched on.</p>`;
+  return `<ul class="rw-list">${R.map(r=>`<li><b>${esc(RW_SHORT[r.prog])}:</b> ${esc(rwText(r))} <span class="rw-chk">${esc(r.doc)}; checked ${rwY(r.checked)}.</span></li>`).join("")}</ul>`;}
+function rwChecked(){return REWARD_RULES.filter(r=>r.prog==="vitality"||r.prog==="sanlam").map(r=>r.checked).sort().pop()||"";}
+function rwSec(k,title,body){return `<details class="rw-sec" id="rwSec-${k}" data-rwsec="${k}"${_rw.open[k]?" open":""}><summary>${title}</summary><div class="rw-body">${body}</div></details>`;}
+function rewardsCardHTML(){let st,ws;try{st=rwLoad();ws=rwWs();}catch(e){return "";}const any=RW_PROGS.some(p=>rwOn(st,p));
+  return `<div class="card rw-card" id="rwCard"><div role="heading" aria-level="3" class="card-t"><span class="ic">${ICON.target||""}</span>Rewards</div>
+  <p class="calc-note">What your planned week is worth in the programmes you belong to. It reads the plan and your log; nothing here changes the plan.</p>
+  ${rwSec("prog","Your programmes",rwProgHTML(st))}
+  ${rwSec("week",(todayISO()<ws?"The week from ":"This week, ")+rwDay(ws)+" to "+rwDay(dateAdd(ws,6)),any?rwWeekHTML(ws,st):`<p class="rw-ln">Every programme is switched off.</p>`)}
+  ${rwTallyHTML(ws,st)}
+  ${rwSec("once","Once a year and one-offs",rwOnceHTML(st))}
+  ${rwSec("warn","Listed with a warning",`<ul class="rw-list">${RW_WARN.map(x=>`<li>${esc(rwText(x))}</li>`).join("")}</ul>`)}
+  ${rwSec("out","Left out, and why",`<ul class="rw-list">${RW_OUT.map(x=>`<li>${esc(rwText(x))}</li>`).join("")}</ul>`)}
+  ${rwSec("src","Where the figures come from",rwSrcHTML(st))}
+  <p class="rw-record" id="rwRecord">Each programme’s own app is the record. This app cannot log in to Discovery, Sanlam or any other programme, and sends them nothing. Figures are worked out from the programme’s published rules and your own log, checked ${rwY(rwChecked())}.</p></div>`;}
+/* Repaint the card and every chip row in place; focus comes back to the control that had it. */
+function rwRepaintLight(){const t=document.getElementById("rwTally");if(t){const w=document.createElement("div");let st;try{st=rwLoad();w.innerHTML=rwTallyHTML(rwWs(),st);}catch(e){}if(w.firstElementChild)t.replaceWith(w.firstElementChild);}
+  document.querySelectorAll(".rw-chipw").forEach(x=>{const w=document.createElement("div");w.innerHTML=rewardChipsHTML(x.dataset.rwiso||null,x.dataset.rwline);if(w.firstElementChild)x.replaceWith(w.firstElementChild);});}
+function rwRepaint(){const a=document.activeElement,fid=a&&a.id&&a.closest&&a.closest("#rwCard")?a.id:null;
+  const c=document.getElementById("rwCard");if(c){const t=document.createElement("div");t.innerHTML=rewardsCardHTML();if(t.firstElementChild)c.replaceWith(t.firstElementChild);}
+  document.querySelectorAll(".rw-chipw").forEach(w=>{const t=document.createElement("div");t.innerHTML=rewardChipsHTML(w.dataset.rwiso||null,w.dataset.rwline);if(t.firstElementChild)w.replaceWith(t.firstElementChild);});
+  if(fid){const e=document.getElementById(fid);if(e)try{e.focus({preventScroll:true});}catch(x){}}}
+function rwSet(st,path,val){const [a,b]=path.split(".");if(a==="on"){st.on[b]=val;return;}st[a][b]=val;}
+function rwOnChange(e){const el=e.target;if(!el||!el.closest||!el.closest("#rwCard")||!el.dataset||!el.dataset.rw)return;const path=el.dataset.rw,st=rwLoad();
+  if(el.type==="checkbox"){rwSet(st,path,!!el.checked);if(path==="vit.endurance"&&!el.checked&&st.vit.goal!=null&&st.vit.goal>rwR("vitGoal").max){st.vit.goal=null;toast("Weekly goal cleared: above "+rwR("vitGoal").max+" needs the Endurance category",false,true);}}
+  else if(el.tagName==="SELECT"){const x=el.value;rwSet(st,path,x===""?null:path==="vit.bankTile"?+x:x==="1"?true:x==="0"?false:x);}
+  else if(el.type==="date"){const d=el.value;if(d&&!dateOK(el,d))return;rwSet(st,path,d||null);}
+  else if(path==="vit.goal"){const raw=String(el.value||"").trim();if(!raw)st.vit.goal=null;else{if(/^\d{1,3}[ , ]\d{3}$/.test(raw))el.value=raw.replace(/[ , ]/,"");const G=rwR("vitGoal"),v=numOK(el,"Weekly goal",G.min,vitCap(st)," points");if(v==null)return;if(!Number.isInteger(v)){el.classList.add("bad");toast("Whole points only, nothing saved",false,true);return;}st.vit.goal=v;}}
+  else return;
+  if(!rwSave(st)){toast("Not saved: that setting is not one the app knows",false,true);return;}
+  toast("Rewards settings saved",true);if(el.type==="text")rwRepaintLight();else rwRepaint();}
+function rwGo(kind){try{if(typeof switchView==="function")switchView("track");const b=document.querySelector('.track-tabs button[data-tp="regions"]');if(b)b.click();
+  _rw.open.week=true;rwRepaint();const d=document.getElementById("rwSec-week");if(d)d.open=true;
+  const r=document.querySelector('#rwCard .rw-row[data-rwk~="'+kind+'"]')||document.getElementById("rwCard");if(!r)return;
+  document.querySelectorAll("#rwCard .rw-hit").forEach(x=>x.classList.remove("rw-hit"));if(r.classList.contains("rw-row"))r.classList.add("rw-hit");
+  try{r.scrollIntoView({block:"center"});}catch(e){}try{r.focus({preventScroll:true});}catch(e){}}catch(e){}}
+document.addEventListener("change",rwOnChange,true);
+document.addEventListener("click",e=>{const g=e.target&&e.target.closest&&e.target.closest("[data-rwgo]");if(g){e.preventDefault();rwGo(g.dataset.rwgo);}});
+document.addEventListener("toggle",e=>{const d=e.target;if(d&&d.dataset&&d.dataset.rwsec)_rw.open[d.dataset.rwsec]=d.open;},true);
+/* ===== end of the Rewards block ===== */
 /* ===== The body is the game (17 Nov 2026; design v2, after the independent review) =====
    Ten muscle groups fill as the week's hard sets are logged; each has a level from the sets logged so far; the week's quests are the plan's own
    sessions; a moment is a plain fact the plan or the log already holds (a top set earned, a week complete). Rules: every number is a function of
@@ -3730,7 +4019,7 @@ function fmtDow(iso){const d=new Date(iso+"T12:00:00");return DOW[d.getDay()]+" 
 function gmAriaTxt(s){s=s||gmSnapshot();return "Muscle map"+(s.lastWeek?", showing last week":"")+". "+s.groups.map(g=>g.short+" "+(s.lastWeek?g.prevDone:g.done)+" of "+g.planned+" sets, Level "+g.level).join("; ")+".";}
 /* a quest never reads past its target ("Weigh-ins 3/3", not 4/3: review B-N8); the counters above the card still show every one logged */
 function gmFrac(d,n){return Math.min(d,n)+"/"+n;}
-function gmQuestHTML(s){const q=s.quests;if(!q)return "";const it=(l,v,ok)=>`<div class="gm-qi${ok?" ok":""}"><span>${l}</span><b>${v}</b></div>`;
+function gmQuestHTML(s){const q=s.quests;if(!q)return "";const it=(l,v,ok)=>`<div class="gm-qi${ok?" ok":""}"><span>${l}</span><b>${v}</b></div>${typeof rewardChipsHTML==="function"?rewardChipsHTML(null,l):""}`;
   return `<div class="gm-q" id="gmQuests">${it("Lifts",gmFrac(q.lifts.done,q.lifts.planned),q.lifts.done>=q.lifts.planned)}${q.runs?it("Runs",gmFrac(q.runs.done,q.runs.planned),q.runs.done>=q.runs.planned):""}${it("Weigh-ins",gmFrac(q.weigh.done,3),q.weigh.done>=3)}${it("Step days",gmFrac(q.steps.done,7),q.steps.done>=7)}${it("Waist tape",q.waist?"done":"not yet",q.waist)}</div>`;}
 function gmWeeksHTML(s){const w=s.weeks;return `<div class="gm-wk" id="gmWeeks"><b>Weeks complete: ${w.n}</b><small>In a row: ${w.row} · best ${w.best}</small>${w.fresh&&w.best>0?`<small>A new count starts this week.</small>`:""}${s.complete?`<small class="gm-done">This week is complete.</small>`:""}</div>`;}
 function gmNextHTML(s){const n=s.groups.filter(g=>g.planned>0||g.credited>0).slice().sort((a,b)=>a.toNext-b.toNext||GM_GROUPS.findIndex(x=>x.key===a.key)-GM_GROUPS.findIndex(x=>x.key===b.key)).slice(0,2);
