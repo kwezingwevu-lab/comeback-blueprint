@@ -232,6 +232,9 @@ Each is pinned by a section AU check that fails under its own mutation.
 
 - **K37 Restore reload can lose the restore (pre-existing, found 17 Nov 2026, confirmed 21 Nov on two builds).** In headless Chromium on file://, Restore writes localStorage and reloads 600 ms later; in some runs the new page reads storage from before the restore, and with the IndexedDB vault hidden the restore is lost (3 of 16 runs). Over http it never happened (0 of 16). The vault normally repairs it. Fix to build: read back what Restore wrote and only reload once it reads true; check it on the iPhone file and in the artifact viewer.
 - **K38 One Rewards check crashes instead of failing (RW19).** With the card hook removed it throws reading `.vit.goal` instead of printing a FAIL line; make the step null-safe.
+- **K39 content-visibility (SPD-6) not shipped.** It moved Lift scroll targets and Fuel/Guide shots. It needs a measured fixed size per block, or render-once-then-enable, plus shot and scroll-target checks.
+- **K40 Vault and the abrupt close (Polish B trade-off).** In Safari's engine an abrupt close can lose the last 0.5 s of typing from the vault (local storage keeps it). Check on a real iPhone, together with the 46 px header under the 47 px top inset and the tab bar over the home indicator.
+- **K41 A carried row with only an RPE typed.** `{rpe}` stays in entries; after a reload the row shows only that RPE and not the carried reps and kg. Decide whether a reload should keep the suggestion.
 
 ## L. Not possible from a web app (and the honest alternative)
 

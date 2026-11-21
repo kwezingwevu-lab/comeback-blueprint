@@ -53,9 +53,16 @@ await p.evaluate(()=>switchView('home'));await wait(300);
 fs.mkdirSync(path.resolve(__dirname,'shots'),{recursive:true});await p.screenshot({path:path.resolve(__dirname,'shots/webkit-home-390.png'),fullPage:false});
 await p.evaluate(()=>switchView('lift'));await wait(300);await p.screenshot({path:path.resolve(__dirname,'shots/webkit-lift-390.png'),fullPage:false});
 await p.evaluate(()=>switchView('home'));await wait(200);
-T('webkit tech: rest timer finishes from wall-clock time after the phone was away',await p.evaluate(async()=>{startRest(90);const f=Date.now();Date.now=()=>f+95000;document.dispatchEvent(new Event('visibilitychange'));await new Promise(r=>setTimeout(r,100));const ok=document.getElementById('restTime').textContent==='Go!'&&(window.__beeps||0)>=1;Date.now=()=>f;return ok;}));
+T('webkit tech: rest timer finishes from wall-clock time after the phone was away',await p.evaluate(async()=>{startRest(90);const f=Date.now();Date.now=()=>f+95000;document.dispatchEvent(new Event('visibilitychange'));await new Promise(r=>setTimeout(r,100));const ok=/^\+0:0\d$/.test(document.getElementById('restTime').textContent)&&document.getElementById('restTimer').classList.contains('over')&&(window.__beeps||0)>=1;Date.now=()=>f;if(typeof restStop==='function')restStop();return ok;}));
+T('webkit P3: the rest pill counts over time in gold, -15 and +15 move the end, End hides it; the Set-up accordion holds the Lift toggles; the plate field takes 102,5',await p.evaluate(async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const o={};switchView('lift');await W(250);
+  const t=document.getElementById('liftSet'),b=t&&t.querySelector(':scope > .tool-b');o.closed=!!b&&getComputedStyle(b).display==='none'&&!!document.getElementById('locSeg')&&b.contains(document.getElementById('locSeg'));
+  startRest(60);const e0=_restEnd;document.getElementById('restMinus').click();o.m=Math.round((e0-_restEnd)/1000);document.getElementById('restPlus').click();o.p=Math.round((_restEnd-e0)/1000);
+  const f=Date.now();Date.now=()=>f+70000;restTick();o.txt=document.getElementById('restTime').textContent;o.over=document.getElementById('restTimer').classList.contains('over');o.show=document.getElementById('restTimer').classList.contains('show');Date.now=()=>f;
+  document.getElementById('restEnd').click();o.end=!document.getElementById('restTimer').classList.contains('show');
+  const h=document.querySelector('#toolPlate .tool-h');if(h)h.click();const w=document.getElementById('plW');w.value='102,5';w.dispatchEvent(new Event('input',{bubbles:true}));o.plates=document.querySelectorAll('#plateOut .plate').length;o.type=w.type;if(h)h.click();switchView('home');
+  return o.closed&&o.m===15&&o.p===0&&/^\+0:1\d$/.test(o.txt)&&o.over&&o.show&&o.end&&o.plates===3&&o.type==='text';}));
 T('webkit tech: weekly check-in text for Claude builds',await p.evaluate(()=>/Weekly check-in from The Comeback Blueprint/.test(coachText())&&/Use only the numbers above/.test(coachText())));
-T('webkit tech: Track Lifts and Regions panes render (7 regions, then chest, delts and arms counted once)',await p.evaluate(async()=>{switchView('track');await new Promise(r=>setTimeout(r,150));return document.querySelectorAll('#tp-regions .rg:not(.rg-up)').length===7&&document.querySelectorAll('#tp-regions .rg.rg-up').length===3&&!!document.getElementById('tp-lifts');}));
+T('webkit tech: Track Lifts and Regions panes render (7 regions, then chest, delts and arms counted once)',await p.evaluate(async()=>{switchView('track');await new Promise(r=>setTimeout(r,150));const _rb=document.querySelector('.track-tabs button[data-tp="regions"]');if(_rb)_rb.click();await new Promise(r=>setTimeout(r,150));return document.querySelectorAll('#tp-regions .rg:not(.rg-up)').length===7&&document.querySelectorAll('#tp-regions .rg.rg-up').length===3&&!!document.getElementById('tp-lifts');}));
 T('webkit tech: no manifest or service worker on file:// (install layer is http-only)',await p.evaluate(()=>!document.querySelector('link[rel=manifest]')&&!window.__swReg));
 // Safari zooms the page when a field under 16 px takes focus; every field in the app must be 16 px or more, and selects draw their own chevron.
 {const z=await p.evaluate(()=>{const small=[];for(const v of [...document.querySelectorAll('.tab[data-view]')].map(x=>x.dataset.view)){switchView(v);if(v==='track')document.querySelectorAll('[data-tp]').forEach(x=>x.click());document.querySelectorAll('#view-'+v+' input,#view-'+v+' select,#view-'+v+' textarea').forEach(e=>{if(/file|checkbox|radio|range|hidden/.test(e.type))return;const f=parseFloat(getComputedStyle(e).fontSize);if(f<16)small.push(v+':'+(e.id||e.tagName)+':'+f);});}
@@ -176,9 +183,9 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  await c.addInitScript(MOCKS('2026-11-30')+'try{localStorage.clear();}catch(e){}'+DEMO);
  const pg=await c.newPage();const perr=[];pg.on('pageerror',e=>perr.push(e.message));pg.on('console',m=>{if(m.type()==='error')perr.push(m.text());});
  await pg.goto('file://'+file,{waitUntil:'load'});await wait(1200);
- // tab bar layout: eight equal columns edge to edge (the tablist wrapper must not change the layout)
+ // tab bar layout: eight columns edge to edge (the tablist wrapper must not change the layout). Since P4b a tab is never narrower than its label, so a long label (Roadmap, Numbers) may take a little more than an equal share; every tab stays 48 px+ at 390
  const lay=await safe(pg,()=>{const r=[...document.querySelectorAll('nav.tabs .tab')].map(t=>t.getBoundingClientRect());return {n:r.length,w:r.map(x=>Math.round(x.width*10)/10),first:Math.round(r[0].left),last:Math.round(r[r.length-1].right),navH:Math.round(document.querySelector('nav.tabs').getBoundingClientRect().height)};});
- T('webkit a11y: the tab bar is still eight equal columns across the full width',!!lay&&lay.n===8&&lay.w.every(x=>Math.abs(x-lay.w[0])<=1)&&lay.first<=1&&lay.last>=389,JSON.stringify(lay));
+ T('webkit a11y: the tab bar is still eight columns across the full width, each 48 px or wider (equal shares, a long label a little wider)',!!lay&&lay.n===8&&lay.w.every(x=>x>=48)&&Math.max(...lay.w)-Math.min(...lay.w)<=6&&lay.first<=1&&lay.last>=389,JSON.stringify(lay));
  // keyboard on the tab bar
  await safe(pg,()=>document.getElementById('tab-home').focus());await pg.keyboard.press('ArrowRight');await wait(300);
  const k1=await safe(pg,()=>({ae:document.activeElement.id,act:(document.querySelector('.view.active')||{}).id,sel:(document.querySelector('[role=tab][aria-selected=true]')||{}).id,title:document.title}));
@@ -193,11 +200,12 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  T('webkit a11y: Enter opens and Space closes a supplement accordion (role=button div), aria-expanded in step, focus kept',!!a1&&a1.exp==='true'&&a1.open&&a1.kept&&!!a2&&a2.exp==='false'&&a2.kept,JSON.stringify({a1,a2}));
  // the focus ring in Safari
  await pg.keyboard.press('Tab');
- const ring=await safe(pg,async()=>{const out=[],W=ms=>new Promise(r=>setTimeout(r,ms));const chk=async(v,sel)=>{switchView(v);await W(250);const e=[...document.querySelectorAll(sel)].find(x=>x.getClientRects().length);if(!e){out.push('missing '+sel);return;}e.focus();await W(320);const cs=getComputedStyle(e);if(cs.outlineStyle!=='solid'||parseFloat(cs.outlineWidth)<2||cs.outlineColor!=='rgb(255, 197, 61)')out.push(sel+' '+cs.outlineStyle+' '+cs.outlineWidth+' '+cs.outlineColor);};
+ const ring=await safe(pg,async()=>{const out=[],W=ms=>new Promise(r=>setTimeout(r,ms));const chk=async(v,sel)=>{switchView(v);await W(250);if(v==='lift'){const t=document.getElementById('liftSet'),h=document.getElementById('liftSetH');if(t&&h&&!t.classList.contains('open'))h.click();await W(60);}const e=[...document.querySelectorAll(sel)].find(x=>x.getClientRects().length);if(!e){out.push('missing '+sel);return;}e.focus();await W(320);const cs=getComputedStyle(e);if(cs.outlineStyle!=='solid'||parseFloat(cs.outlineWidth)<2||cs.outlineColor!=='rgb(255, 197, 61)')out.push(sel+' '+cs.outlineStyle+' '+cs.outlineWidth+' '+cs.outlineColor);};
    await chk('lift','#locSeg button');await chk('lift','#liftBody .chk');await chk('lift','#dayPills .pill');await chk('fuel','.supp-h');await chk('track','#tp-weight .del');await chk('track','.track-tabs button');await chk('home','.card[role=link]');return out;});
  T('webkit a11y: segment buttons, ticks, pills, accordions, deletes and links show a 2 px gold focus ring in Safari (not the default 2.94:1 one)',Array.isArray(ring)&&ring.length===0,JSON.stringify(ring));
  // the Lift toggles keep the page in place when tapped
  await safe(pg,()=>switchView('lift'));await wait(400);
+ await safe(pg,()=>{const t=document.getElementById('liftSet'),h=document.getElementById('liftSetH');if(t&&h&&!t.classList.contains('open'))h.click();});await wait(150);
  const s0=await safe(pg,()=>{const e=document.querySelector('#locSeg');e.scrollIntoView({block:'center'});return {y:Math.round(scrollY),top:Math.round(e.getBoundingClientRect().top)};});await wait(150);
  await pg.click('#locSeg button[data-loc="home"]');await wait(500);
  const s1=await safe(pg,()=>({y:Math.round(scrollY),top:Math.round(document.querySelector('#locSeg').getBoundingClientRect().top),pressed:document.querySelector('#locSeg button[data-loc="home"]').getAttribute('aria-pressed')}));
@@ -393,7 +401,7 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
    const rd=document.getElementById(s.dataset.tip+'r');return {vb,w:Math.round(bb.width),mn:Math.min(...fs),mx:Math.max(...fs),r:rd?rd.innerText.trim():'',id:s.dataset.tip};});
   await pg.evaluate(()=>{switchView('track');window.__cd=[];const o=chartDraw;window.chartDraw=function(el){window.__cd.push(el.id);return o.apply(this,arguments);};});await wait(400);
   await pg.evaluate(()=>{const s=document.querySelector('#wChart svg[data-tip]');if(s)tipAt(s,1);});const a=await m();
-  await pg.evaluate(()=>{window.__p6s=document.querySelector('#wChart svg[data-tip]');});
+  await pg.evaluate(()=>{window.__p6s=document.querySelector('#wChart svg[data-tip]');window.__cd=[];}); /* polish B (P2) draws the Track pane's chart once after switchView; count from here */
   await pg.setViewportSize({width:390,height:700});await wait(300);await pg.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));await wait(200);await pg.evaluate(()=>window.scrollTo(0,0));await pg.setViewportSize({width:390,height:844});await wait(300);
   const h=await pg.evaluate(()=>{const s=document.querySelector('#wChart svg[data-tip]');return (s&&s===window.__p6s&&s.isConnected)?window.__cd.length:'node replaced';});
   await pg.setViewportSize({width:844,height:390});await wait(600);const b2=await m();const cd=await pg.evaluate(()=>window.__cd.slice());
@@ -416,6 +424,90 @@ T('webkit tech: no manifest or service worker on file:// (install layer is http-
  const ok=(L,max)=>Array.isArray(L)&&L.length===3&&L.every(x=>!x.none&&x.host&&Math.abs(x.vb-x.w)<=1&&x.vb>=280&&x.vb<=max&&x.mn>=10.5&&x.mx<=12.6);
  T('webkit P6 Runs tab: the bar chart and both line charts draw at their rendered width (560 at 820), labels 10.5-12.6 px at 390 and 820',
    !!r&&!r.err&&ok(r.a,560)&&ok(r.z,560)&&r.z.every(x=>x.vb===560)&&e7.length===0,JSON.stringify({r,e7}).slice(0,500));}
+// P2 (persistence and render cost) on Safari's engine: a set typed and the page reloaded 150 ms later is still in local storage and on the grid;
+// a pending vault change is written when the page is hidden; Track draws the Lifts pane on its first tab click.
+{const MOCKS=iso=>"(function(){var R=Date;var base=new R('"+iso+"T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(base);else super(...a);}static now(){return base;}}window.Date=M;})();";
+ const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
+ await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
+ const DEMO=fs.readFileSync(path.resolve(__dirname,'fixtures/demo.setup.js'),'utf8').trim().split('\n').pop();
+ await c.addInitScript(MOCKS('2026-11-28')+'if(!sessionStorage.getItem("wkp2")){sessionStorage.setItem("wkp2","1");localStorage.clear();'+DEMO+'}');
+ const pg=await c.newPage();const perr=[];pg.on('pageerror',e=>perr.push(e.message));
+ await pg.goto('file://'+file,{waitUntil:'load'});await wait(1500);
+ let a=null,z=null,h=null;
+ try{a=await pg.evaluate(async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('lift');await W(300);const i=document.querySelector('#liftBody input.cell[data-f="r"]'),w=i&&i.closest('tr').querySelector('input.cell[data-f="w"]');if(!i||!w)return {missing:true};
+   i.value='7';i.dispatchEvent(new Event('input',{bubbles:true}));w.value='42,5';w.dispatchEvent(new Event('input',{bubbles:true}));return {ex:i.dataset.ex,i:+i.dataset.i,day:curDay,iso:todayISO()};});
+  await wait(150);await pg.reload({waitUntil:'load'});await wait(1200);
+  z=await pg.evaluate(async t=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const ls=JSON.parse(localStorage.getItem('cb2_sessions')||'[]').find(x=>x.dateISO===t.iso&&x.day===t.day);const st=ls&&ls.entries[t.ex]&&ls.entries[t.ex][t.i];switchView('lift');await W(300);
+   const cell=f=>document.querySelector('#liftBody input.cell[data-ex="'+t.ex+'"][data-i="'+t.i+'"][data-f="'+f+'"]');return {st:st||null,ui:[(cell('r')||{}).value,(cell('w')||{}).value]};},a||{});
+  h=await pg.evaluate(async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const has=v=>v.indexOf('"w":"37.5"')>=0;const w=document.querySelector('#liftBody input.cell[data-f="w"]');if(!w)return {missing:true};const put=v=>{w.value=v;w.dispatchEvent(new Event('input',{bubbles:true}));};
+   put('37');await _idbLast;put('37,5');await W(250);const o={early:has(await idbLoad()||'')};Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>'hidden'});try{document.dispatchEvent(new Event('visibilitychange'));}finally{delete document.visibilityState;}
+   await W(400);o.hidden=has(await idbLoad()||'');switchView('track');await W(200);const L=document.getElementById('tp-lifts');o.l0=L?L.innerHTML.length:-1;const tb=document.querySelector('.track-tabs button[data-tp="lifts"]');if(tb)tb.click();await W(200);o.l1=L?L.innerHTML.length:-1;return o;});}catch(e){perr.push('P2 '+String(e&&e.message||e).slice(0,120));}
+ T('webkit P2: a set typed and the page reloaded 150 ms later is in local storage and on the Lift grid; a pending vault change is written when the page is hidden; Track draws the Lifts pane on its first tab click',
+  !!a&&!a.missing&&!!z&&!!z.st&&String(z.st.r)==='7'&&String(z.st.w)==='42.5'&&z.ui[0]==='7'&&z.ui[1]==='42.5'&&!!h&&h.early===false&&h.hidden===true&&h.l0===0&&h.l1>200&&perr.length===0,JSON.stringify({a,z,h,perr:perr.slice(0,2)}).slice(0,400));
+ errs.push(...perr);await c.close();}
+// P2V2-1: Safari's engine drops a vault write started in pagehide, so while typing goes on the vault is written at most every 0.5 s:
+// a key typed 0.6 s after the previous one, with the page closed 120 ms later, is in the vault when a new page opens.
+{const MOCKS=iso=>"(function(){var R=Date;var base=new R('"+iso+"T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(base);else super(...a);}static now(){return base;}}window.Date=M;})();";
+ const c=await b.newContext({viewport:{width:390,height:844},timezoneId:'Africa/Johannesburg'});
+ await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
+ const DEMO=fs.readFileSync(path.resolve(__dirname,'fixtures/demo.setup.js'),'utf8').trim().split('\n').pop();
+ await c.addInitScript(MOCKS('2026-11-28')+'if(!sessionStorage.getItem("wkp2v")){sessionStorage.setItem("wkp2v","1");localStorage.clear();'+DEMO+'}');
+ const pg=await c.newPage();const perr=[];pg.on('pageerror',e=>perr.push(e.message));let t=null,v=null;
+ try{await pg.goto('file://'+file,{waitUntil:'load'});await wait(1500);
+  t=await pg.evaluate(async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));switchView('lift');await W(300);const i=document.querySelector('#liftBody input.cell[data-f="w"]');if(!i)return {missing:true};
+   i.value='44';i.dispatchEvent(new Event('input',{bubbles:true}));await W(600);i.value='44,5';i.dispatchEvent(new Event('input',{bubbles:true}));return {ex:i.dataset.ex,i:+i.dataset.i,day:curDay,iso:todayISO()};});
+  await wait(120);await pg.close({runBeforeUnload:false});const p2=await c.newPage();p2.on('pageerror',e=>perr.push(e.message));await p2.goto('file://'+file,{waitUntil:'load'});await wait(1500);
+  v=await p2.evaluate(async t=>{const raw=await idbLoad();let s=null;try{s=JSON.parse(raw).data.cb2_sessions.find(x=>x.dateISO===t.iso&&x.day===t.day);}catch(e){}const st=s&&s.entries[t.ex]&&s.entries[t.ex][t.i];return st?String(st.w):null;},t||{});}catch(e){perr.push('P2V '+String(e&&e.message||e).slice(0,120));}
+ T('webkit P2: a key typed 0.6 s after the previous one and the page closed 120 ms later is in the vault when a new page opens (Safari drops a vault write started in pagehide)',!!t&&!t.missing&&v==='44.5'&&perr.length===0,JSON.stringify({t,v,perr:perr.slice(0,2)}).slice(0,300));
+ errs.push(...perr);await c.close();}
+// P4a: hairline borders in Safari's engine (0.333 px at 3x, 1 px at 1x, inputs 1 px), colour scheme dark, and the dither breaking up the body glow's bands at 3x.
+for(const dsf of [3,1]){let r=null;const perr=[];const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:dsf,timezoneId:'Africa/Johannesburg'});
+ await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill({status:200,contentType:'text/css',body:''}));
+ try{const pg=await c.newPage();pg.on('pageerror',e=>perr.push(e.message));await pg.goto('file://'+file,{waitUntil:'load'});await wait(1200);
+  r=await pg.evaluate(()=>{const bw=s=>{const e=document.querySelector(s);return e?getComputedStyle(e).borderTopWidth:null;};switchView('lift');const o={card:bw('#view-lift .card'),tool:bw('#view-lift .tool'),cell:bw('#view-lift input.cell'),scheme:getComputedStyle(document.documentElement).colorScheme};switchView('home');return o;});
+  if(dsf===3){await pg.addStyleTag({content:'body>*{visibility:hidden!important}'});await wait(300);const png=(await pg.screenshot()).toString('base64');
+   r.band=await pg.evaluate(async d=>{const img=new Image();img.src='data:image/png;base64,'+d;await img.decode();const cv=document.createElement('canvas');cv.width=img.width;cv.height=img.height;const x=cv.getContext('2d');x.drawImage(img,0,0);const row=x.getImageData(0,180,cv.width,1).data;let runs=[],cur=0,prev=null;for(let i=0;i<row.length;i+=4){const k=row[i]+','+row[i+1]+','+row[i+2];if(k===prev)cur++;else{if(prev!==null)runs.push(cur);cur=1;prev=k;}}runs.push(cur);return Math.max(...runs);},png);}}catch(e){perr.push('P4a '+String(e&&e.message||e).slice(0,120));}
+ const near=(v,x)=>v!=null&&Math.abs(parseFloat(v)-x)<0.01;
+ if(dsf===3)T('webkit P4a: at 3x the card and tool borders compute to 0.333 px while inputs keep 1 px, the root is color-scheme dark, and the body glow has no flat band longer than 24 device pixels (157 before the dither)',!!r&&near(r.card,1/3)&&near(r.tool,1/3)&&r.cell==='1px'&&r.scheme==='dark'&&r.band>0&&r.band<=24&&perr.length===0,JSON.stringify({r,perr:perr.slice(0,2)}).slice(0,300));
+ else T('webkit P4a: at 1x the card border stays 1 px',!!r&&r.card==='1px'&&r.cell==='1px'&&perr.length===0,JSON.stringify({r,perr:perr.slice(0,2)}).slice(0,300));
+ await c.close();}
+// P4b: the slim chrome in Safari's engine with the real typefaces: header 44-48 px, fixed chrome 100 px or less, every tab 44 px+ tall and 48 px+ wide at 390, labels uncut at 320; touch sizes where WebKit reports pointer: coarse.
+{const {fontReply:WKF}=require('./fontroute');const res={};const perr=[];
+ for(const [w,touch] of [[390,false],[320,false],[390,true]]){const c=await b.newContext({viewport:{width:w,height:844},deviceScaleFactor:1,timezoneId:'Africa/Johannesburg',hasTouch:touch,isMobile:touch});
+  await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill(WKF(r.request().url())||{status:200,contentType:'text/css',body:''}));
+  try{const pg=await c.newPage();pg.on('pageerror',e=>perr.push(e.message));await pg.goto('file://'+file,{waitUntil:'load'});await wait(1200);
+   res[w+(touch?'t':'')]=await pg.evaluate(()=>{switchView('lift');const h=document.querySelector('header.app'),n=document.querySelector('nav.tabs');if(!h||!n)return null;const hr=h.getBoundingClientRect(),nr=n.getBoundingClientRect();
+    const tabs=[...n.querySelectorAll('.tab')].map(t=>{const r=t.getBoundingClientRect(),s=t.querySelector('span'),sr=s?s.getBoundingClientRect():r;return {w:r.width,h:r.height,clip:!s||s.scrollWidth>s.clientWidth+0.5||sr.left<r.left-0.5||sr.right>r.right+0.5};});
+    const cells=[...document.querySelectorAll('#liftBody .cell')].filter(e=>e.getClientRects().length).map(e=>e.getBoundingClientRect().height);
+    return {hH:hr.height,fixed:hr.height+nr.height,hp:getComputedStyle(h).position,np:getComputedStyle(n).position,tabs:tabs.length,minH:Math.min(...tabs.map(t=>t.h)),minW:Math.min(...tabs.map(t=>t.w)),clip:tabs.filter(t=>t.clip).length,coarse:matchMedia('(pointer:coarse)').matches,cell:cells.length?Math.min(...cells):0};});}
+  catch(e){perr.push('P4b '+String(e&&e.message||e).slice(0,120));}await c.close();}
+ const a=res['390'],s=res['320'],t=res['390t'];
+ T('webkit P4b: at 390 the sticky header is 44-48 px, header + tab bar 100 px or less, every tab 44 px+ tall and 48 px+ wide, and at 320 no tab label is cut off (real fonts)',!!a&&!!s&&a.hp==='sticky'&&a.np==='fixed'&&a.hH>=44&&a.hH<=48&&a.fixed<=100&&a.tabs===8&&a.minH>=44&&a.minW>=48&&a.clip===0&&s.clip===0&&perr.length===0,JSON.stringify({a,s,perr:perr.slice(0,2)}).slice(0,400));
+ T('webkit P4b: on a touch context set cells are 44 px+ where WebKit reports pointer: coarse (and 40 px on a mouse context)',!!t&&!!a&&a.cell>=39&&a.cell<44&&(t.coarse?t.cell>=44:t.cell===a.cell),JSON.stringify({t,a:a&&{cell:a.cell,coarse:a.coarse}}).slice(0,300));}
+// P5 (FEEL-07, FEEL-14): scroll memory by tab tap in Safari's engine, switchView() from code still at the top, and the ask sheet's inert #main; real typefaces for the 320 px strip fit
+{const {fontReply:P5F}=require('./fontroute');const MOCKS=iso=>"(function(){var R=Date;var base=new R('"+iso+"T09:00:00+02:00').getTime();class M extends R{constructor(...a){if(a.length===0)super(base);else super(...a);}static now(){return base;}}window.Date=M;})();";
+ const c=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,timezoneId:'Africa/Johannesburg'});
+ const DEMO=fs.readFileSync(path.resolve(__dirname,'fixtures/demo.setup.js'),'utf8').trim().split('\n').pop();
+ await c.route(u=>!(u.protocol==='file:'||u.protocol==='data:'||u.protocol==='blob:'),r=>r.fulfill(P5F(r.request().url())||{status:200,contentType:'text/css',body:''}));
+ await c.addInitScript(MOCKS('2026-11-23')+'localStorage.clear();'+DEMO);
+ const pg=await c.newPage();const perr=[];pg.on('pageerror',e=>perr.push(e.message));let o={};
+ try{await pg.goto('file://'+file,{waitUntil:'load'});await wait(1500);await pg.evaluate(()=>{window.__p5s=e=>new Promise(res=>{const t0=performance.now();const f=()=>{const busy=document.getAnimations().some(x=>x.playState==='running'&&x.effect&&x.effect.target&&x.effect.target.contains&&x.effect.target.contains(e));if(busy&&performance.now()-t0<1500)setTimeout(f,40);else res();};f();});}); // readings wait for the card entrance slide to end (WebKit ran it past 400 ms)
+  for(const [v,x] of [['home','fuel'],['fuel','roadmap']]){await pg.click('#tab-'+v);await wait(400);
+   const a=await pg.evaluate(async v=>{const L=[...document.querySelectorAll('#view-'+v+' .card,#view-'+v+' .chart-card')].filter(e=>e.getClientRects().length);const e=L[Math.min(3,L.length-1)];await window.__p5s(e);window.scrollTo(0,e.getBoundingClientRect().top+scrollY-130);return {i:L.indexOf(e),top:Math.round(e.getBoundingClientRect().top),y:Math.round(scrollY)};},v);
+   await wait(150);await pg.click('#tab-'+x);await wait(400);await pg.click('#tab-'+v);await wait(400);
+   const r=await pg.evaluate(async a=>{const L=[...document.querySelectorAll('#view-'+a[0]+' .card,#view-'+a[0]+' .chart-card')].filter(e=>e.getClientRects().length);const e=L[a[1]];if(e)await window.__p5s(e);return e?Math.round(e.getBoundingClientRect().top):null;},[v,a.i]);o[v]={a,r,d:r==null?null:Math.abs(r-a.top)};}
+  for(const tp of ['weight','mileage']){await pg.click('#tab-track');await wait(400);await pg.evaluate(tp=>document.querySelector('.track-tabs button[data-tp="'+tp+'"]').click(),tp);await wait(300);
+   const a=await pg.evaluate(async tp=>{const L=[...document.querySelectorAll('#tp-'+tp+' .chart-card')].filter(e=>e.getClientRects().length);const e=L[Math.min(1,L.length-1)];await window.__p5s(e);window.scrollTo(0,e.getBoundingClientRect().top+scrollY-130);return {top:Math.round(e.getBoundingClientRect().top),y:Math.round(scrollY),h:e.querySelector('h3').textContent};},tp);
+   await wait(150);await pg.click('#tab-fuel');await wait(400);await pg.click('#tab-track');await wait(400);
+   o['tr_'+tp]={a,r:await pg.evaluate(async a=>{const h=[...document.querySelectorAll('#view-track .track-pane.on h3')].find(x=>x.textContent===a.h);if(h)await window.__p5s(h);return {pane:document.querySelector('#view-track .track-pane.on').id,y:Math.round(scrollY),top:h?Math.round(h.closest('.chart-card').getBoundingClientRect().top):null};},a)};}
+  await pg.setViewportSize({width:320,height:844});await pg.evaluate(()=>switchView('home'));await wait(400);o.fonts=await pg.evaluate(async()=>{if(!document.fonts)return -1;await document.fonts.ready;return [...document.fonts].filter(f=>f.status==='loaded').length;});
+  o.strip=await pg.evaluate(()=>[...document.querySelectorAll('.weekstrip .wd')].map(t=>{const r=t.getBoundingClientRect(),l=t.querySelector('.wdl');const g=document.createRange();g.selectNodeContents(l);const lr=g.getBoundingClientRect();return lr.right>r.right-1||lr.left<r.left+1?l.textContent+' '+Math.round(lr.right)+'/'+Math.round(r.right):null;}).filter(Boolean));
+  await pg.setViewportSize({width:390,height:844});await wait(200);
+  await pg.click('#tab-fuel');await wait(300);await pg.evaluate(()=>switchView('home'));await wait(300);o.prog=await pg.evaluate(()=>Math.round(scrollY));
+  o.ask=await pg.evaluate(()=>new Promise(res=>{const ib=document.getElementById('tab-home');ib.focus();askOK('Sure?','Yes',v=>res({v,ae:document.activeElement&&document.activeElement.id,inert:document.getElementById('main').inert,node:!!document.querySelector('.ask-wrap'),wasInert}),{page:true});const wasInert=document.getElementById('main').inert;const b=document.querySelector('.ask-wrap [data-a="0"]');setTimeout(()=>b&&b.click(),50);}));
+ }catch(e){perr.push('P5 '+String(e&&e.message||e).slice(0,120));}
+ T('webkit P5: scrolled Home and Fuel, away by a tab tap and back by a tab tap, the anchor card is within 4 px; Track keeps a Weight-pane card and comes back at the top after a Runs-pane scroll; at 320 (real typefaces) every week-strip label sits inside its tile; switchView() from code still starts at the top; the ask sheet makes #main inert and on Cancel focus is back on the opener with #main live',['home','fuel'].every(v=>o[v]&&o[v].a&&o[v].a.y>500&&o[v].d!=null&&o[v].d<=4)&&o.prog===0&&!!o.tr_weight&&o.tr_weight.r.pane==='tp-weight'&&o.tr_weight.r.top!=null&&Math.abs(o.tr_weight.r.top-o.tr_weight.a.top)<=4&&!!o.tr_mileage&&o.tr_mileage.a.y>300&&o.tr_mileage.r.y===0&&o.fonts>0&&Array.isArray(o.strip)&&o.strip.length===0&&!!o.ask&&o.ask.wasInert===true&&o.ask.v===false&&o.ask.ae==='tab-home'&&o.ask.inert===false&&o.ask.node===false&&perr.length===0,JSON.stringify({o,perr:perr.slice(0,2)}).slice(0,400));
+ errs.push(...perr);await c.close();}
 // AI layer (LEDGER 36) on Safari's engine: the viewer-like frame with a mock "sample" capability (qa/ai_webkit.js)
 try{await require('./ai_webkit')((n,ok,d)=>T('webkit AI: '+n,ok,d));}catch(e){T('webkit AI: the checks ran to the end',false,String(e&&e.stack||e).slice(0,300));}
 T('webkit: no page/console errors',errs.length===0,errs.join('|').slice(0,300));
