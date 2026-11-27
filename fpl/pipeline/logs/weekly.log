@@ -1,13 +1,7 @@
-weekly.cjs · v110 GW11 · plan 64cda385a664778d · hold (wildcard GW19) · 0 transfer(s), 0 hit(s), FT 3→4, bank 2.7 · captain Haaland, vice Gomez · chips BB GW16, WC GW19 · locks Rogers, Verbruggen, De Cuyper, Haaland · cost £96.5m of £99.2m · fallback  (captain Haaland, from the optimiser) · Draft 4 claims (firsts), mean 444.7 p10 443.3 p90 446.1, stress 443.3, all first 448.4, now 418.9
-  1. Mukiele for Robinson (DEF), +7.9 Draft expected points to GW20 on your roster, sign now (a free agent until the GW11 deadline)
-  2. McAtee for King (MID), +6.1 Draft expected points to GW20 on your roster, sign now (a free agent until the GW11 deadline)
-  3. Janelt for Xhaka (MID), +3.1 Draft expected points to GW20 on your roster, sign now (a free agent until the GW11 deadline)
-  4. Tonali for Bobb (MID), +2.4 Draft expected points to GW20 on your roster, sign now (a free agent until the GW11 deadline)
-next waiver run GW12 Thu 26 Nov 20:30 SAST, place 1 of 8, 3 claim(s), roster 418.9 → 438.4 to GW20
-  next 1. Gibbs-White for Tonali (MID), +11.4 Draft expected points from GW12 to GW20, locked until the next waiver run, Thu 26 Nov 20:30 SAST, so lodge it as a claim then
-  next 2. Branthwaite for Affengruber (DEF), +2.2 Draft expected points from GW12 to GW20, locked until the next waiver run, Thu 26 Nov 20:30 SAST, so lodge it as a claim then
-  next 3. Schade for Janelt (MID), +0.6 Draft expected points from GW12 to GW20, locked until the next waiver run, Thu 26 Nov 20:30 SAST, so lodge it as a claim then
-held back (flagged): N.Williams for Affengruber d 75%
-note: src/engine.js draftEV (five gameweeks) scores 2 of the claims as no gain: Mukiele for Robinson -0.48, McAtee for King -1.43
-note: kept but flagged (bench or held, legal in a transfer week): Guéhi d 75%, Brobbey i 0%, Saka i 0%
-wrote data/weekly.js (9793 chars)
+weekly.cjs · v110 GW12 · plan d124125fa8a15576 · hold (wildcard GW19) · 0 transfer(s), 0 hit(s), FT 4→5, bank 2.7 · captain Gomez, vice Mbeumo · chips BB GW16, WC GW19 · locks Rogers, Verbruggen, De Cuyper, Haaland · cost £96.6m of £99.3m · fallback  (captain Gomez, from the optimiser) · Draft 3 claims (firsts), mean 406.1 p10 405.6 p90 406.5, stress 405.6, all first 409.1, now 403.1
+  1. N.Williams for Affengruber (DEF), +2.5 Draft expected points to GW20 on your roster if kept, sign now (a free agent until the GW12 deadline)
+  2. Anderson for Tonali (MID), +1.9 Draft expected points to GW20 on your roster if kept, sign now (a free agent until the GW12 deadline)
+  3. Roefs for Arrizabalaga (GKP), +1.7 Draft expected points to GW20 on your roster if kept, sign now (a free agent until the GW12 deadline)
+next waiver run GW13 Mon 30 Nov 20:30 SAST, place between 1st and 3rd of 8 (the order is the table after GW12, bottom first, and GW12 is still to be played), 0 claim(s), roster 403.1 → 409.1 to GW20
+note: kept but flagged (bench or held, legal in a transfer week): Tarkowski s 0%, Saka i 0%, Brobbey i 0%
+wrote data/weekly.js (9095 chars)

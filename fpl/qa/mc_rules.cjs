@@ -285,7 +285,9 @@ const roster = M.draftRoster(), mine = new Set(roster.map((p) => p.id));
 {
   /* No club limit in Draft: a roster already holding three of one club is offered a fourth by the Draft search,
      and the Classic swap rule refuses the same player. The roster and the pool are built here from the block. */
-  const club = MC.teams.map((t) => t.s).find((s) => MC.players.filter((p) => p.t === s && p.p === 3).length >= 4);
+  /* re-stated 26 Nov 2026 (E-207): the club is one the roster holds nobody from, so the built roster carries exactly three
+     of it (on 26 Nov the first such club was Arsenal, and Arrizabalaga, signed that week, made it four) */
+  const club = MC.teams.map((t) => t.s).find((s) => MC.players.filter((p) => p.t === s && p.p === 3).length >= 4 && !roster.some((p) => p.t === s));
   const mids = MC.players.filter((p) => p.t === club && p.p === 3).slice(0, 4);
   const built = roster.slice(); let k = 0;
   built.forEach((p, i) => { if (p.p === 3 && k < 3) built[i] = mids[k++]; });

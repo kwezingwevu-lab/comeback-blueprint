@@ -376,6 +376,18 @@ if (PF.timing && PF.timing.now && PF.timing.later && PF.timing.never) {
   ok("timing: 'now' is the kept plan (or, by the manager's choice, the GW19 wildcard plan is), 'later' plays the wildcard after the first week, 'never' plays none",
     keptIsNow && wcOf(T.later).every((g) => g > PF.plan.weeks[0].gw) && wcOf(T.never).length === 0,
     "now " + T.now.total + "/" + PF.plan.total + " · later wildcard " + wcOf(T.later).join(",") + " · never wildcard " + wcOf(T.never).join(","));
+  /* E-206 (26 Nov 2026). Under the manager's rules (the never case keeps GW19 free of any chip, E-181) the plan of record
+     must be his GW19 wildcard plan (E-179). On 26 Nov latest_wildcard.py refused once GW19 entered the solved window, and
+     plan.cjs then kept the solver's GW13 wildcard plan with every check above still green. One function, so the check and
+     its mutation run the same code. */
+  const rulesOn = (TT) => !!TT && !!TT.never && !!TT.never.params && Array.isArray(TT.never.params.noChip) && TT.never.params.noChip.indexOf(19) >= 0;
+  const choiceKept = (pf) => !rulesOn(pf.timing) || (pf.plan.managerChoice === "wildcard GW19" && wcOf(pf.plan).join() === "19");
+  ok("E-206: under the manager's rules the plan of record is his GW19 wildcard plan, never the solver's own pick (E-179)",
+    choiceKept(PF), "rules " + rulesOn(T) + " · choice " + PF.plan.managerChoice + " · plan wildcard " + wcOf(PF.plan).join(","));
+  if (rulesOn(T)) {
+    const mut = Object.assign({}, PF, { plan: Object.assign({}, T.now, { managerChoice: undefined }) });
+    ok("E-206 mutation: the solver's own plan (wildcard GW" + wcOf(T.now).join(",") + ") kept as the plan of record goes red", !choiceKept(mut), "");
+  }
   /* E-129. The timing verdict compares three solves, so each must carry its own proof: a scenario stopped by the
      240 s clock at 6% or 11% (the 28 Sep refresh: 5.8% and 11.3%, on problems that prove to 0.4% in 250 to 430 s) makes
      the verdict a comparison of noise. The kept plan ('now') is held by the certified-gap check above; 'later' and 'never'

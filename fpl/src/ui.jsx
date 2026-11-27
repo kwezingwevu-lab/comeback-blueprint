@@ -2117,7 +2117,9 @@ function solvedPlanView(mc, now, setting) {
         /* First paint carries one short sentence (Part G: the Plan tab stays under 500 words); the reasoning sits behind a reveal. */
         latest = "Played as late as the rules allow, GW" + (lwk && fin(lwk.gw) ? lwk.gw : cEnd) + ": " + f0(LT.total) +
           (behind > 0 ? ", at most " + f1(behind + tol) + " behind once the tolerance is added." : ", not below the plan above.");
-        latestMore = "The last deadline before set one expires. Keep the no-wildcard plan to the week before, then rebuild the fifteen for that week" +
+        // in the GW19 run itself the wildcard week is the window's first, so there is no week before it (27 Nov 2026, E-206)
+        const ltFirst = !!lwk && Array.isArray(LT.weeks) && isO(LT.weeks[0]) && LT.weeks[0].gw === lwk.gw;
+        latestMore = "The last deadline before set one expires. " + (ltFirst ? "Rebuild the fifteen this week, from the squad as it stands" : "Keep the no-wildcard plan to the week before, then rebuild the fifteen for that week") +
           (rs && fin(rs.changes) ? " (" + rs.changes + (rs.changes === 1 ? " change" : " changes") + ")" : "") + ". That plan is worth " + f0(LT.total) + ", " +
           (behind > 0 ? f1(behind) + " below the plan above, so waiting to the end costs at most " + f1(behind + tol) + " points once the proof tolerance of about " + tol + " is added" : "not below the plan above") +
           ". It is a plan you could play, checked against the rules, and a floor: planning around the late wildcard might add a little. Points are counted only to GW" + cEnd +
@@ -3096,11 +3098,20 @@ function draftTabView(mc, now, overrides) {
     const wv = sastDay(ev.wv), dl = sastDay(ev.dl) || (gwEv ? sastDay(gwEv.dl) : "");
     const list = order.map(function (s, i) { return (i + 1) + ". " + s; }).join(", ");
     const place = at > 0 ? " You are " + ord(at) + " of " + order.length + "." : "";
+    // E-205 (27 Nov 2026): after the run, today's waiver_pick is the order of the run just gone, never the next run's
+    const placeWas = at > 0 ? " You were " + ord(at) + " of " + order.length + " there." : "";
+    // what the paragraph says about the next run follows the sheet's own next run (27 Nov 2026, the fix-round review): a range
+    // only while it is one, the exact place once the table fixes it, and nothing about an order after the re-draft
+    const nxP = isO(PRE.claims) && isO(PRE.claims.next) ? PRE.claims.next : null, noNext = isO(PRE.claims) && PRE.claims.next === null;
+    const nextOrderS = noNext ? " The next waiver run falls after the re-draft."
+      : " The next run's order is set by the table after GW" + next + ", bottom first" +
+        (!nxP || !nxP.placeKnown ? "." : nxP.placeMin !== nxP.placeMax ? ", so your place there is a range until GW" + next + " is played."
+          : ", so you pick " + ord(nxP.placeMin) + " of " + nxP.of + " there.");
     const until = dl ? "until the GW" + next + " deadline, " + dl + " SAST" : "until the GW" + next + " deadline";
     const processed = D.waiversProcessed === true;
     view.phase = processed
       ? "Draft waivers for GW" + next + " have settled. Anyone unclaimed can be signed instantly " + until + "; anyone dropped since is locked until the next waiver run." +
-        (list ? " The order for that run: " + list + "." + place + " The next run's order is set by the table after GW" + next + ", bottom first." : "")
+        (list ? " The order at the run just gone: " + list + "." + placeWas + nextOrderS : "")
       : (wv ? "Draft waivers settle " + wv + " SAST. Until then every move is a claim" : "Until Draft waivers settle every move is a claim") +
         (list ? ", and claims settle in rounds in this order: " + list + "." + place : ".") +
         " Once they settle, anyone unclaimed can be signed instantly " + until + ".";
@@ -3168,13 +3179,14 @@ function draftTabView(mc, now, overrides) {
         if (fin(C.valueAfter) && fin(C.valueNow) && nowL.length) view.claims.gainAll = C.valueAfter - C.valueNow;
         if (nx0) {
           view.claims.nextAt = sastDay(nx0.wv);
-          const placeS = !nx0.placeKnown ? "a place not yet known" : nx0.placeMin === nx0.placeMax ? ord(nx0.placeMin)
-            : ord(nx0.placeMin) + (nx0.placeMax === nx0.placeMin + 1 ? " or " : " to ") + ord(nx0.placeMax);
-          view.claims.nextHead = nxL.length ? "Locked until the next waiver run, " + view.claims.nextAt + " SAST, where you claim " + placeS + " of " + nx0.of +
+          const placeS = nx0.placeMin === nx0.placeMax ? ord(nx0.placeMin) : ord(nx0.placeMin) + (nx0.placeMax === nx0.placeMin + 1 ? " or " : " to ") + ord(nx0.placeMax);
+          const whereS = function (verb) { return !nx0.placeKnown ? "where your place is not known yet" : "where you " + verb + " " + placeS + " of " + nx0.of; };
+          view.claims.nextHead = nxL.length ? "Locked until the next waiver run, " + view.claims.nextAt + " SAST, " + whereS("claim") +
             (nx0.placeKnown && nx0.placeMin !== nx0.placeMax ? " (the order is the table after GW" + nx0.orderAfter + ", bottom first, so it moves with that gameweek's results)" : "") +
             ". Lodge these as claims before then, in this order." + (nowL.length ? " Each drop assumes the signings above are done." : "") +
             " Gain: Draft points from GW" + nx0.gw + " to " + toHz + ", on today's flags." : "";
-          view.claims.nextEmpty = "Nobody locked is worth a claim at the next waiver run, " + view.claims.nextAt + " SAST.";
+          view.claims.nextEmpty = "Nobody locked is worth a claim at the next waiver run, " + view.claims.nextAt + " SAST, " + whereS("pick") +
+            (nx0.placeKnown && nx0.placeMin !== nx0.placeMax ? " (the order is the table after GW" + nx0.orderAfter + ", bottom first)" : "") + ".";
         } else {
           view.claims.nextEmpty = "The next waiver run falls after the re-draft, so there is nothing to claim for this roster.";
         }

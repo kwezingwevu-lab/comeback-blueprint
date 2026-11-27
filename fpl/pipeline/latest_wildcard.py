@@ -23,7 +23,14 @@ The wildcard week keeps the free-transfer count, spends nothing and adds nothing
 week is no better than the held one, the wildcard is played with the same fifteen: legal, and it says so.
 
 It refuses, naming why, when the timing file was solved on other data, has no "never" plan, or the never plan already
-plays a chip in the last week."""
+plays a chip in the last week.
+
+GW19 inside the solved window (26 Nov 2026, ERRORS.md E-206). From GW12 the window (GW12-GW19) is no longer than the
+optimiser's eight detailed weeks, so GW19 is a solved week of the never plan, not a held one, and the never plan may
+make transfers in it. The wildcard week is then built the same way from the squad as it stands after GW18 (its selling
+values plus GW18's bank): the never plan's own GW19 moves are replaced by the wildcard, which can reach any fifteen they
+could. The weeks before GW19 stay the never plan's own, so plan.cjs still folds the result. Before this the script
+refused ("not a held week") and plan.cjs kept the solver's GW13 wildcard plan, against the manager's choice."""
 import json, sys, os, solve
 
 path = solve.ARGS.timing
@@ -52,13 +59,20 @@ tl = W.index(solve.SET1_LAST)
 last = weeks[tl]
 if last.get("chip"):
     sys.exit("the never plan already plays %s in GW%d, so a wildcard cannot share the week" % (last["chip"], last["gw"]))
-if not last.get("held"):
-    sys.exit("GW%d of the never plan is not a held week; nothing to rebuild" % last["gw"])
+# E-206: a held GW19 starts from its own (held) squad; a solved GW19 starts from the squad GW18 leaves, before any GW19 move.
+# When GW19 is the first week of the window (the GW19 run itself), the squad it starts from is the input squad, at its selling
+# values, with the input bank (27 Nov 2026, the pre-ship review of E-206).
+if last.get("held"):
+    base_row = last
+elif tl >= 1:
+    base_row = weeks[tl - 1]
+else:
+    base_row = {"squad": list(C["squad"]), "bank": C["bank"]}
 
 own = set(C["squad"])
 sellv = lambda i: C["sell"].get(str(i), P[i]["pr"]) if i in own else P[i]["pr"]
-held_sq = list(last["squad"]); prev_sq = set(held_sq)
-budget = round(sum(sellv(i) for i in held_sq) + last["bank"], 1)
+held_sq = list(base_row["squad"]); prev_sq = set(held_sq)
+budget = round(sum(sellv(i) for i in held_sq) + base_row["bank"], 1)
 sold = set()
 for w in weeks[:tl]:
     sold.update(w["out"])
@@ -74,8 +88,8 @@ if best is None:
     sys.exit("no feasible fifteen for GW%d under a budget of %.1f" % (last["gw"], budget))
 
 held_ep = last["ep"]
-if best["ep"] <= held_ep + 1e-9:          # no better than keeping the squad: play the wildcard with the same fifteen
-    sq = held_sq; xi = list(last["xi"]); cap = last["cap"]; ep = held_ep; same = True
+if best["ep"] <= held_ep + 1e-9:          # no better than the never plan's own GW19: play the wildcard with that fifteen
+    sq = list(last["squad"]); xi = list(last["xi"]); cap = last["cap"]; ep = held_ep; same = True
 else:
     sq = best["squad"]; xi = best["xi"]; cap = best["cap"]; ep = best["ep"]; same = False
 def week_row(t, sq, xi, cap, ep, chip, ins, outs, base):
@@ -85,7 +99,7 @@ def week_row(t, sq, xi, cap, ep, chip, ins, outs, base):
     return {"gw": W[t], "chip": chip, "xi": xi, "bench": bench, "gk2": gk2[0] if gk2 else None, "cap": cap, "vice": vice, "in": ins, "out": outs,
             "ftBefore": base["ftBefore"], "used": 0, "hits": 0, "bank": base["bank"], "ep": round(ep, 2), "epNet": round(ep, 2), "squad": list(sq), "held": chip is None}
 ins = [i for i in sq if i not in prev_sq]; outs = [i for i in prev_sq if i not in sq]
-bank = round(last["bank"] + sum(sellv(i) for i in outs) - sum(P[i]["pr"] for i in ins), 1)
+bank = round(base_row["bank"] + sum(sellv(i) for i in outs) - sum(P[i]["pr"] for i in ins), 1)
 if bank < -1e-9:
     sys.exit("internal error: the rebuilt fifteen overspends (bank %.1f)" % bank)
 weeks[tl] = week_row(tl, sq, xi, cap, ep, "wildcard", ins, outs, dict(last, bank=bank))
@@ -105,7 +119,9 @@ total = round(sum(w["epNet"] for w in weeks), 2)
 res = {"ok": True, "constructed": True, "from": "never", "total": total, "weeks": weeks, "wcGw": last["gw"],
        "reshuffle": {"gw": last["gw"], "budget": budget, "heldEp": round(held_ep, 2), "newEp": round(ep, 2), "gain": round(ep - held_ep, 2),
                      "changes": len(ins), "sameFifteen": same, "excludedRebuys": len(saved)},
-       "note": "the never plan to GW%d, then the wildcard in GW%d (the set-1 limit), the new fifteen held after: %s" % (W[tl - 1], last["gw"], "the same fifteen (nothing better under the budget)" if same else "%d changes for %+.2f points that week" % (len(ins), ep - held_ep))}
+       "note": ("the never plan to GW%d, then the wildcard in GW%d (the set-1 limit)" % (W[tl - 1], last["gw"]) if tl >= 1 else
+                "the wildcard in GW%d (the set-1 limit) from the squad as it stands" % last["gw"]) +
+               ", the new fifteen held after: %s" % ("the same fifteen (nothing better under the budget)" if same else "%d changes for %+.2f points that week" % (len(ins), ep - held_ep))}
 # read-modify-write, hash-checked again just before writing (another solve may have written the file in the meantime)
 t = json.load(open(path))
 if t.get("hash") != solve.IN.get("hash"):

@@ -2,10 +2,10 @@
 // change the inputs and re-run it after pipeline/plan.cjs. Classic entries are FPL element ids; Draft entries are
 // player codes (join on code, never on id). The figures in the comments and the why lines are the plan's own at
 // the moment of writing; the app's engines recompute every figure it shows.
-// Plan 64cda385a664778d (the manager's choice: wildcard GW19 (built from the never plan)), block baked 2026-11-21T06:41:57.602Z, live snapshot 2026-11-21T06:41:54Z.
+// Plan d124125fa8a15576 (the manager's choice: wildcard GW19 (built from the never plan)), block baked 2026-11-27T07:15:00.505Z, live snapshot 2026-11-27T07:14:57Z.
 const WEEKLY = {
-  version: 110, gw: 11, written: "2026-11-21", hash: "64cda385a664778d",
-  source: "pipeline/plan.cjs on data/mc_data.json baked 2026-11-21T06:41:57.602Z (export hash 64cda385a664778d); data/live.json fetched 2026-11-21T06:41:54Z",
+  version: 110, gw: 12, written: "2026-11-27", hash: "d124125fa8a15576",
+  source: "pipeline/plan.cjs on data/mc_data.json baked 2026-11-27T07:15:00.505Z (export hash d124125fa8a15576); data/live.json fetched 2026-11-27T07:14:57Z",
 
   // The plan this block replaces, recorded rather than deleted (v89 rule). `previous` carries the one before it.
   superseded: {
@@ -29,39 +29,39 @@ const WEEKLY = {
 
   classic: {
     plan: "hold",                                   // "wildcard" | "transfers" | "hold"
-    // data/plan.json weeks[0].squad: Verbruggen, De Cuyper, Guéhi, Tarkowski, Gomez, Mbeumo, Rogers, Janelt, Brobbey, Calvert-Lewin, Haaland, Kinsky, Saka, Diop, van Ewijk.
+    // data/plan.json weeks[0].squad: Verbruggen, De Cuyper, van Ewijk, Tarkowski, Guéhi, Gomez, Mbeumo, Rogers, Janelt, Calvert-Lewin, Haaland, Kinsky, Diop, Saka, Brobbey.
     // Buys ; sells .
-    wildcard15: [109, 115, 388, 229, 127, 427, 40, 98, 552, 346, 411, 496, 12, 259, 175],
+    wildcard15: [109, 115, 175, 229, 388, 127, 427, 40, 98, 346, 411, 496, 259, 12, 552],
     // Rule C1.6's only exemption, declared (smoke_wk reads it): the fifteen's players at or over the 60% rival-ownership
     // gate. The plan keeps them because they maximise expected points (v110 §1.2).
     locks: [40, 109, 115, 411],
     // The fifteen's cost at today's prices, recorded so the Plan tab reads it out of the block (E-088).
-    wildcard15_cost_written: 965,
-    captain: 411, vice: 127,                            // Haaland, Gomez — the plan's own armband for GW11
-    // Without the chip: the plan of record's own GW11 week (no chip is played in it).
+    wildcard15_cost_written: 966,
+    captain: 127, vice: 427,                            // Gomez, Mbeumo — the plan's own armband for GW12
+    // Without the chip: the plan of record's own GW12 week (no chip is played in it).
     fallback: {
       moves: [],
-      captain: 411, vice: 127                            // Haaland, Gomez
+      captain: 127, vice: 427                            // Gomez, Mbeumo
     },
     chip: null,
     // The week's own ledger, replayed from the rules (data/plan.json replay), never the solver's variables (E-180).
     transfers: [],
-    hits: 0, ft_before: 3, ft_after: 4, bank_after: 27,
+    hits: 0, ft_before: 4, ft_after: 5, bank_after: 27,
     manager_choice: "wildcard GW19",
     notes: [
-      "The plan of record is the manager's choice (wildcard GW19): the optimiser's no-wildcard plan (pipeline/solve.py, HiGHS), proved within 0.40% of the best plan without a wildcard, with the fifteen rebuilt in GW19: 560.14 Classic expected points from GW11 to GW19, 0 hits.",
-      "Chips in the plan: BB GW16, WC GW19; the best free-hit week is GW15 at +5.97, not taken.",
-      "Free transfers come from the replayed ledger (data/plan.json replay), never the solver's own variables: 3 into GW11, 4 after it.",
+      "The plan of record is the manager's choice (wildcard GW19): the optimiser's no-wildcard plan (pipeline/solve.py, HiGHS), proved within 0.39% of the best plan without a wildcard, with the fifteen rebuilt in GW19: 509.32 Classic expected points from GW12 to GW19, 1 hits.",
+      "Chips in the plan: BB GW16, WC GW19; the best free-hit week is GW15 at +5.37, not taken.",
+      "Free transfers come from the replayed ledger (data/plan.json replay), never the solver's own variables: 4 into GW12, 5 after it.",
       "No chip before GW13 (the manager's rule of 22 Oct 2026: chips are kept for his last-man-standing league too) and Wildcard 1 in GW19 (his choice of 20 Oct 2026).",
-      "Kept but flagged, so not in the eleven unless cleared: Guéhi d 75%, Brobbey i 0%, Saka i 0%.",
+      "Kept but flagged, so not in the eleven unless cleared: Tarkowski s 0%, Saka i 0%, Brobbey i 0%.",
       "Rogers, Verbruggen, De Cuyper, Haaland are at or over the 60% rival-ownership gate and kept on purpose; the rule-pure search on the Plan tab prices the difference."
     ],
     why: [
-      "The cost of the manager's rules: the solver's own best plan under the GW13 rule plays the wildcard in GW13 for 581.87 Classic expected points to GW19; the plan of record (wildcard GW19) is 560.14, 21.73 less.",
-      "Timing (data/plan.json timing): wildcard at the solver's week (GW13) 581.87, later (GW14) 582.15, never 557.30 Classic expected points to GW19.",
-      "The wildcard as late as the rules allow, GW19 (the last deadline before set one expires): the no-wildcard plan to the week before, then the fifteen rebuilt for that week (8 changes, 2.84 that week), worth 560.14 Classic expected points, which is 0.00 below the plan, so waiting to the end costs at most that plus the proof tolerance. It is a plan built from a proven one and replayed against the rules, and a floor, not a proved best. Points are counted only to GW19, so a wildcard played in the last week is credited with that week alone and none after it: the cost is what waiting gives up, not the whole comparison.",
-      "Without the wildcard the best plan found is 576.97, so the chip is worth -16.83 over the window.",
-      "The app's own timing model (src/engine.js wildcardTiming) puts the five-gameweek deficit of the current fifteen at 21.2 and the break-even for waiting at 34.5 by GW19."
+      "The cost of the manager's rules: the solver's own best plan under the GW13 rule plays the wildcard in GW13 for 527.87 Classic expected points to GW19; the plan of record (wildcard GW19) is 509.32, 18.55 less.",
+      "Timing (data/plan.json timing): wildcard at the solver's week (GW13) 527.87, later (GW14) 524.92, never 507.17 Classic expected points to GW19.",
+      "The wildcard as late as the rules allow, GW19 (the last deadline before set one expires): the no-wildcard plan to the week before, then the fifteen rebuilt for that week (6 changes, 2.15 that week), worth 509.32 Classic expected points, which is 0.00 below the plan, so waiting to the end costs at most that plus the proof tolerance. It is a plan built from a proven one and replayed against the rules, and a floor, not a proved best. Points are counted only to GW19, so a wildcard played in the last week is credited with that week alone and none after it: the cost is what waiting gives up, not the whole comparison.",
+      "Without the wildcard the best plan found is 516.77, so the chip is worth -7.45 over the window.",
+      "The app's own timing model (src/engine.js wildcardTiming) puts the five-gameweek deficit of the current fifteen at 39.7 and the break-even for waiting at 63.9 by GW19."
     ]
   },
 
@@ -70,28 +70,24 @@ const WEEKLY = {
     // holds only free agents to sign before the deadline, each with the drop that costs least, in this order; next_run holds the
     // locked players worth a claim at the next waiver run, each drop taken from the roster those signings leave.
     pool: "api",
-    pool_note: "League 46148: the ins are players in the league's own feed, and the waiver model reproduces the league's claim log (qa/waiver_log.cjs). Waivers for GW11 have settled, so a free agent is signed instantly until the deadline and a player dropped in that run is locked until the next. 4 players to sign now; 3 claims for the next waiver run, Thu 26 Nov 20:30 SAST, where you claim 1st or 2nd of 8 (the order is the table after GW11, bottom first, and GW11 is still to be played). Held back because the player is flagged (re-check after the pressers): N.Williams for Mukiele (status d, 75%).",
+    pool_note: "League 46148: the ins are players in the league's own feed, and the waiver model reproduces the league's claim log (qa/waiver_log.cjs). Waivers for GW12 have settled, so a free agent is signed instantly until the deadline and a player dropped in that run is locked until the next. 3 players to sign now; 0 claims for the next waiver run, Mon 30 Nov 20:30 SAST, where you claim between 1st and 3rd of 8 (the order is the table after GW12, bottom first, and GW12 is still to be played).",
     claims: [
-      { out: 169528, in: 200834, why: "Mukiele for Robinson (DEF), +7.9 Draft expected points to GW20 on your roster if kept, sign now (a free agent until the GW11 deadline)" },
-      { out: 577725, in: 432714, why: "McAtee for King (MID), +6.1 Draft expected points to GW20 on your roster if kept, sign now (a free agent until the GW11 deadline)" },
-      { out: 84450, in: 204580, why: "Janelt for Xhaka (MID), +3.1 Draft expected points to GW20 on your roster if kept (a next-run claim below swaps him out after GW11), sign now (a free agent until the GW11 deadline)" },
-      { out: 477555, in: 432422, why: "Tonali for Bobb (MID), +2.4 Draft expected points to GW20 on your roster if kept (a next-run claim below swaps him out after GW11), sign now (a free agent until the GW11 deadline)" }
+      { out: 442299, in: 215136, why: "N.Williams for Affengruber (DEF), +2.5 Draft expected points to GW20 on your roster if kept, sign now (a free agent until the GW12 deadline)" },
+      { out: 432422, in: 215379, why: "Anderson for Tonali (MID), +1.9 Draft expected points to GW20 on your roster if kept, sign now (a free agent until the GW12 deadline)" },
+      { out: 109745, in: 498016, why: "Roefs for Arrizabalaga (GKP), +1.7 Draft expected points to GW20 on your roster if kept, sign now (a free agent until the GW12 deadline)" }
     ],
     next_run: {
-      gw: 12, waivers: "2026-11-26T18:30:00Z", place_min: 1, place_max: 2, order_after: 11, place_known: true, of: 8,
+      gw: 13, waivers: "2026-11-30T18:30:00Z", place_min: 1, place_max: 3, order_after: 12, place_known: true, of: 8,
       claims: [
-        { out: 432422, in: 222531, why: "Gibbs-White for Tonali (MID), +11.4 Draft expected points from GW12 to GW20, locked until the next waiver run, Thu 26 Nov 20:30 SAST, so lodge it as a claim before then" },
-        { out: 442299, in: 480455, why: "Branthwaite for Affengruber (DEF), +2.2 Draft expected points from GW12 to GW20, locked until the next waiver run, Thu 26 Nov 20:30 SAST, so lodge it as a claim before then" },
-        { out: 204580, in: 513418, why: "Schade for Janelt (MID), +0.6 Draft expected points from GW12 to GW20, locked until the next waiver run, Thu 26 Nov 20:30 SAST, so lodge it as a claim before then" }
       ]
     },
-    // The best eleven of the roster the sign-now lines leave (src/mc_engine.js bestXI for GW11): 4-5-1, Tzolakis, Silva, Hill, Murillo, Mukiele, Tonali, Gomez, Janelt, McAtee, Cunha, N.Jackson.
+    // The best eleven of the roster the sign-now lines leave (src/mc_engine.js bestXI for GW12): 5-3-2, Roefs, Hill, Silva, Murillo, Mukiele, N.Williams, Gomez, McAtee, Cunha, N.Jackson, McBurnie.
     xi: {
-      formation: "4-5-1",
-      gk: 473284,
-      def: [483067, 463981, 575476, 200834],
-      mid: [432422, 514254, 204580, 432714, 430871],
-      fwd: [517052]
+      formation: "5-3-2",
+      gk: 498016,
+      def: [463981, 483067, 575476, 200834, 215136],
+      mid: [514254, 432714, 430871],
+      fwd: [517052, 169432]
     },
     watchlist: []
   },
@@ -104,9 +100,9 @@ const WEEKLY = {
   },
 
   // tournament(live) on data/live.json: notes only; the engine recomputes them every render.
-  tournament: { leader: "player_xg", transitions: 9, promote_at_gw: 11 },
+  tournament: { leader: "player_xg", transitions: 10, promote_at_gw: 12 },
 
   // wildcardTiming(ctx) — the app engine's note; `solved` is the optimiser's (data/plan.json timing).
-  timing: { now_vs_later: { by_gw19: 34, by_gw38: 36, breakeven_double_gw17: null, breakeven_later_value: 34 },
-    solved: { now: 581.87, later: 582.15, later_gw: 14, never: 557.3, latest: 560.14, latest_gw: 19 } }
+  timing: { now_vs_later: { by_gw19: 64, by_gw38: 73, breakeven_double_gw17: null, breakeven_later_value: 64 },
+    solved: { now: 527.87, later: 524.92, later_gw: 14, never: 507.17, latest: 509.32, latest_gw: 19 } }
 };

@@ -437,19 +437,47 @@ assert("review-the-fallback-computed-in-the-tab-equals-PRE.review-built-by-preco
   assert("review-the-tab's-window-and-flag-thresholds-are-mc_analysis's-own", !!ref && !!CFG && CFG.reviewWeeks === ref.weeks && deepEq(CFG.flags, ref.flags),
     "MC_UI_CFG " + JSON.stringify(CFG) + " · mc_analysis " + JSON.stringify(ref && { weeks: ref.weeks, flags: ref.flags }));
 })();
+/* Re-stated 26 Nov 2026 (ERRORS.md E-207, the E-193/E-194 class). The rule was "avoidable never exceeds what the bench
+   scored". That is false when a starter's score is negative: in GW11 Tarkowski scored -4 (sent off) and Kinsky scored 7 on
+   the bench, so the best eleven gains 5 + 4 = 9 against 7 scored. The true bound: a better eleven can gain at most what the
+   bench scored plus the minus points of the starters it replaces, read per gameweek from the block's own picks. */
+/* re-stated again 27 Nov 2026 (E-207, the pre-ship review): "the bench scored" is the bench's NET score, and a bench player's
+   own minus points lower it without lowering what a better eleven could gain. The bound is per pick: every bench player's
+   points above zero plus every starter's points below zero (a swap gains at most max(0, in) + max(0, -out)). */
+const boundFromPicks = function (picks) {
+  return (picks || []).reduce(function (a, k) { const v = Number(k.pts) || 0; return a + (k.pos > 11 ? Math.max(0, v) : Math.max(0, -v)); }, 0);
+};
+const picksOf = function (game, gw) {
+  const rows = game === "classic" ? (MC.classic && MC.classic.gws) || [] : (MC.draft && MC.draft.myGws) || [];
+  const g = rows.filter(function (x) { return x && x.gw === gw; })[0];
+  return g ? g.picks || [] : null;
+};
+const boundOf = function (game, gw, benchNet) { const pk = picksOf(game, gw); return pk ? boundFromPicks(pk) : benchNet; };
+const withinBound = function (avoid, bound) { return typeof avoid === "number" && avoid >= 0 && isFinite(bound) && avoid <= bound; };
 (function () {
   const bad = [];
+  let negC = 0, negD = 0;
   (RV ? [["PRE", RV], ["tab", MINE]] : [["tab", MINE]]).forEach(function (x) {
     const r = x[1]; if (!r) { bad.push(x[0] + " missing"); return; }
-    r.classic.rows.forEach(function (g) { if (!(g.leftOnBench <= g.bench)) bad.push(x[0] + " Classic GW" + g.gw + " avoidable " + g.leftOnBench + " > bench " + g.bench); });
+    let nC = 0, nD = 0;
+    r.classic.rows.forEach(function (g) { const n = boundOf("classic", g.gw, g.bench); nC += n; if (!withinBound(g.leftOnBench, n)) bad.push(x[0] + " Classic GW" + g.gw + " avoidable " + g.leftOnBench + " > bound " + n + " (bench net " + g.bench + ")"); });
     r.draft.rows.forEach(function (g) {
-      const w = (r.draft.perWeek || []).filter(function (p) { return p.gw === g.gw; })[0];
-      if (!w || !(g.leftOnBench <= w.benchScored)) bad.push(x[0] + " Draft GW" + g.gw + " avoidable " + g.leftOnBench + " > bench " + (w ? w.benchScored : "?"));
+      const w = (r.draft.perWeek || []).filter(function (p) { return p.gw === g.gw; })[0], n = boundOf("draft", g.gw, w ? w.benchScored : NaN); nD += n;
+      if (!w || !withinBound(g.leftOnBench, n)) bad.push(x[0] + " Draft GW" + g.gw + " avoidable " + g.leftOnBench + " > bound " + n + " (bench net " + (w ? w.benchScored : "?") + ")");
     });
-    if (!(r.classic.avoidable <= r.classic.benchScored) || !(r.draft.avoidable <= r.draft.benchScored)) bad.push(x[0] + " totals");
+    if (!withinBound(r.classic.avoidable, nC) || !withinBound(r.draft.avoidable, nD)) bad.push(x[0] + " totals");
+    negC = nC; negD = nD;
   });
-  assert("review-avoidable-never-exceeds-what-the-bench-scored-on-any-row-in-either-game", bad.length === 0 && !!MINE,
-    bad.length ? bad.join("; ") : "Classic " + MINE.classic.avoidable + " of " + MINE.classic.benchScored + " · Draft " + MINE.draft.avoidable + " of " + MINE.draft.benchScored);
+  assert("review-avoidable-never-exceeds-the-bench's-points-above-zero-plus-the-starters'-minus-points-in-either-game", bad.length === 0 && !!MINE,
+    bad.length ? bad.join("; ") : "Classic " + MINE.classic.avoidable + " against a bound of " + negC + " (bench net " + MINE.classic.benchScored + ") · Draft " + MINE.draft.avoidable + " against " + negD + " (bench net " + MINE.draft.benchScored + ")");
+  // mutation: one row's avoidable one point past its bound must go red
+  const g0 = MINE && MINE.classic.rows[0];
+  if (g0) { const n0 = boundOf("classic", g0.gw, g0.bench); assert("review-mutation-an-avoidable-past-the-bound-goes-red", !withinBound(n0 + 1, n0), "GW" + g0.gw + " bound " + n0); }
+  // the reviewer's case: bench 6 and -1 (net 5), a 0-point starter; the best eleven gains 6, which the bound must allow and the
+  // net-bench rule of 26 Nov refused
+  const pk = [{ pos: 1, pts: 2 }, { pos: 5, pts: 0 }, { pos: 12, pts: 0 }, { pos: 13, pts: 6 }, { pos: 14, pts: -1 }, { pos: 15, pts: 0 }];
+  assert("review-a-bench-player's-own-minus-points-do-not-lower-the-bound", withinBound(6, boundFromPicks(pk)) && !(6 <= 5 + 0),
+    "bound " + boundFromPicks(pk) + " against a net bench of 5");
 })();
 
 const V1 = tryRender("TabReview", { ctx: CTX, ui: uiFirst("review"), on: ON, mc: MCP });
@@ -471,11 +499,11 @@ assert("review-every-section-open-renders-clean", VA.ok && residues(vaHtml).leng
   const cRows = (RV || MINE).classic.rows, dRows = (RV || MINE).draft.rows, per = (RV || MINE).draft.perWeek;
   const badC = cRows.filter(function (g) {
     const e = c.filter(function (x) { return Number(x.attrs["data-gw"]) === g.gw; })[0];
-    return !e || Number(e.attrs["data-bench"]) !== g.bench || Number(e.attrs["data-avoid"]) !== g.leftOnBench || Number(e.attrs["data-avoid"]) > Number(e.attrs["data-bench"]);
+    return !e || Number(e.attrs["data-bench"]) !== g.bench || Number(e.attrs["data-avoid"]) !== g.leftOnBench || !withinBound(Number(e.attrs["data-avoid"]), boundOf("classic", g.gw, Number(e.attrs["data-bench"])));
   });
   const badD = dRows.filter(function (g) {
     const e = d.filter(function (x) { return Number(x.attrs["data-gw"]) === g.gw; })[0], w = per.filter(function (p) { return p.gw === g.gw; })[0];
-    return !e || !w || Number(e.attrs["data-bench"]) !== w.benchScored || Number(e.attrs["data-avoid"]) !== g.leftOnBench || Number(e.attrs["data-avoid"]) > Number(e.attrs["data-bench"]) ||
+    return !e || !w || Number(e.attrs["data-bench"]) !== w.benchScored || Number(e.attrs["data-avoid"]) !== g.leftOnBench || !withinBound(Number(e.attrs["data-avoid"]), boundOf("draft", g.gw, Number(e.attrs["data-bench"]))) ||
       e.attrs["data-flip"] !== String(!!g.flip);
   });
   assert("review-the-Classic-table-draws-one-row-per-gameweek-with-bench-scored-and-avoidable-as-computed", c.length === cRows.length && cRows.length > 0 && badC.length === 0,

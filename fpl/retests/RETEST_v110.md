@@ -1144,3 +1144,110 @@ The manager sent four more screenshots (taken at about 16:46Z, read at about 18:
   - After the deadline the landing shows the match-day card, not the Draft line; the claims are on the Draft tab and in the checklist.
   - The routine still runs after the Thursday waiver run (E-198), so the claims are not refreshed before it. The manager re-checks flags before lodging.
   - E-200 stays open for the sheet before a waiver run; E-202 is open.
+
+## 26–27 Nov 2026: GW12, a run that never shipped, a second pull at 07:14Z, E-206 and E-207 (version 36)
+
+- **The Thursday waiver run (26 Nov 18:30Z), against E-205.**
+  - The manager beat Unique Stars 73–34 in GW11, finished the gameweek 7th on 10 points and picked **2nd**. That is inside the range the app had said, "1st or 2nd of 8".
+  - His one lodged claim, Arrizabalaga for Sels, landed. Gibbs-White, Branthwaite and Schade were not lodged.
+  - Gibbs-White went to Saka Potatoes, who picked 6th. Unique Stars, at 1st, did not claim him, so a claim from 2nd would have landed.
+  - Branthwaite and Schade became plain free agents.
+- **GW11 Classic** was played as planned: no transfer, Haaland captain, 34 points against the game's 35, 7 on the bench.
+- **The first run, 26 Nov.**
+  - Pulled at 19:28:21Z, an hour after the waiver run, with `waivers_processed` true. Plan 8c00d89b3c15f1dd, 508.47 to GW19.
+  - The chain stopped at latest_wildcard.py: GW19 is now inside the solved window, so the manager's GW19 wildcard plan would have been dropped silently. This is E-206, fixed in the script, with a plan_legality check and its mutation.
+  - The first full gate went red on three checks that rested on the day's data, one of them a false rule about avoidable points. This is E-207: each check was re-stated as its rule, with a mutation where it had none, and the Review copy was corrected.
+- **Overnight.** A container restart stopped the second gate and the pre-ship workflow before anything was committed. The working tree and the scratchpad survived.
+- **27 Nov, 07:05Z, read-only live check.**
+  - Classic:
+    - ten prices moved, four of them in the squad (De Cuyper 5.5 to 5.6, Haaland 15.8 to 15.7, Kinsky 4.4 to 4.5, Brobbey 5.7 to 5.6);
+    - no status changed on any of the fifteen;
+    - the feed filled `chance_of_playing_next_round` (null to 0 or 100) for about 390 players without changing their status;
+    - two new d flags (Kroupi.Jr, Methalie), neither owned.
+  - Draft: the three sign-now targets were still unowned at status a, and the three drops were on the roster. Another team signed Okafor overnight; he is not on the sheet.
+  - verify.sh's `live-prices-exact-for-every-squad-and-plan-player` could not pass on the 19:28Z block, in the gate or in CI, and E-199 forbids republishing before CI is green.
+  - The manager was offered a fresh pull or no pull, and chose the fresh pull. It overrides the one-run rule for this gameweek, as on 21 Nov. It is not an E-184 case: no flag moved on the captain or the vice.
+- **Pull at 07:14:57Z** (78 feeds), after today's price change; the next one falls after the deadline.
+  - Plan **d124125fa8a15576**, 509.32 Classic expected points to GW19 with the manager's GW19 wildcard.
+  - The solver's own plan plays the wildcard in GW13 for 527.87. Never: 507.17. Best free-hit week GW15, +5.37.
+  - The hold (E-195) was re-pinned for its last week: 4 free transfers into GW12, 5 into GW13.
+  - Part M was rewritten with `--replaced` from HEAD. The unshipped 19:28Z plan is recorded there as never shipped.
+- **Classic GW12: no transfer.**
+  - 4-4-2: Verbruggen; De Cuyper, Diop, Guéhi, van Ewijk; Gomez, Mbeumo, Janelt, Rogers; Calvert-Lewin, Haaland.
+  - Bench: Kinsky; Tarkowski (s, until 13 Dec), Saka (i, back 20 Dec), Brobbey (i). None of the three outfield subs can come on.
+  - Captain Gomez, vice Mbeumo, by src/engine.js `captainPick` (Gomez xp1 6.41, EV 12.28; Mbeumo 8.68; Calvert-Lewin 8.57; Haaland 8.42).
+  - The season model (src/mc_engine.js `ep`, GW12) ranks Calvert-Lewin 4.98, Haaland 4.61, Mbeumo 4.50 and Gomez 3.96. The reply states both, and the plan of record follows C1 rule 2.
+  - The hold's cost on the model: the best plan without a wildcard is 516.77 against never's 507.17, about 9.6 points to GW19. It is a lens, not advice: the manager's rule stands.
+- **Draft GW12: unchanged from the 19:28Z run, line for line.**
+  - Sign now: N.Williams for Affengruber +2.5; Anderson for Tonali +1.9; Roefs for Arrizabalaga +1.7. Gains are Draft expected points to GW20; the roster goes from 403.1 to 409.1.
+  - Next run: Mon 30 Nov 18:30Z (20:30 SAST), place 1st to 3rd of 8, set by the table after GW12. No claims.
+  - As is, with no signings (the app's df-asis: the engine's best legal eleven on GW12 expected points): 4-4-2, Tzolakis; Hill, Silva, Murillo, Mukiele; Gomez, Janelt, McAtee, Cunha; McBurnie, N.Jackson. Bench: Arrizabalaga, Affengruber, Tonali, Isidor. Against the manager's saved 4-5-1, that means McBurnie in for Tonali.
+  - Correction: this morning's reply said to start Affengruber and McBurnie for Tonali and Janelt. That came from a figure worked by hand on 26 Nov (5-3-2, 46.40 against 45.31) that the app does not reproduce. The reply corrects it to the app's eleven.
+- **Gate, local.**
+
+| Suite | Result |
+  |---|---|
+  | components | 350/350 |
+  | mc_render | 67/67 |
+  | mc_rules | 46/46 |
+  | plan_legality | 61/61 on data/plan.json and 68/68 (reference) |
+  | smoke | 73/73 |
+  | smoke_wk | 48/48 |
+  | unit_engine | 279/279 |
+  | mc_optimisers | 57/57 |
+  | verify | 34/34 |
+  | waiver_log | 13/13 · 127/127 claims across 11 gameweeks |
+  | privacy | 27/27 · 173 files · 24484240 bytes |
+  | visual | 56/56 |
+  | browser | 185/185 (in the gate, on the baseline re-recorded at 07:45Z) |
+  | mc_full / mc_all | 3000 iterations / 1,000,000 iterations, green |
+
+  Gate 13 (08:27Z to 08:43Z): 37 of 39 steps green. The two red steps are webkit and ios: WebKit is not installed in this container, and CI runs both (E-170). Gates 11 (07:27Z) and 12 (08:04Z) ran on the two earlier states of the tree, also 37 of 39.
+
+- **browser.py (E-201).** The section probe compared the committed page (21 Nov data) with the new one, all sections open, at 390 px, clock 27 Nov:
+  - Plan grew from 4473 to 6807 px, because the committed page, read on 27 Nov, shows only a short stale note where the new one draws the GW12–19 plan.
+  - Review gained the GW11 rows (2595 to 2707 px).
+  - Draft changed with the sheet (df-claims 374 to 675 px).
+  - Command, Squad, Rivals, Chips and Lab moved with the day's data. Odds was unchanged.
+
+  The baseline was re-recorded with `--write-baseline` at 07:45Z, and again at 08:45Z on the final paint, after the two fix rounds changed Review and Draft copy. The tolerance is unchanged. On the final baseline:
+  - plain run: 185/185;
+  - `--mutate invert`: all 36 picture checks fire (Draft dark: signature mean 208.12 against a tolerance of 40, histogram 85.98 pp against 4.5);
+  - `--mutate reflow`: no picture check fires, while the overflow walk fires four times on the Squad tab, as designed.
+
+  A 390×844 screenshot of the Draft tab shows the phase paragraph naming the run just gone, the three sign-now lines, and the empty next-run panel with "1st to 3rd of 8".
+
+- **The pre-ship review** (a read-only workflow, 07:28Z to 07:49Z, 8 agents):
+  - **Live Draft at 07:28Z.**
+    - The three targets are at status a and unowned. The 15-man roster is identical to the block.
+    - No ownership or status changed anywhere in the league since 07:14:57Z. Gibbs-White is owned by Saka Potatoes.
+    - The GW13 waiver run is Mon 30 Nov 18:30Z. All 81 GW12 results were enumerated: the manager's place at that run can be 1st, 2nd or 3rd and nothing else. The GW12 opponent is Saka Potatoes.
+  - **Live Classic at 07:28Z.**
+    - Nothing changed on any of the fifteen since the block. No GW12 transfer was made, the bank is £2.7m, and the GW13 deadline is 2026-12-01T18:30Z.
+    - The eleven is forced: there are ten fit outfielders.
+    - Watch item: Mbeumo, the vice, started GW11 but played 21 minutes. He carried no flag at 07:28Z; re-check him after Manchester United's press conference.
+  - **Render.**
+    - The page carries hash d124125fa8a15576 and data time 07:14:57Z.
+    - The Classic eleven and armband, and the df-signnow lines and gains, match data/weekly.js.
+    - The Review tab has its GW11 rows.
+    - First paint: landing 85 words, Draft 265.
+  - **Found:**
+    - E-208: the phase paragraph gave a single place for the next run, and the empty next-run panel gave no range.
+    - The code review returned five findings. Two were verified by two skeptics each: the GW19 run in E-206, and the "avoidable bench points" notes. Three were judged inline: the net-bench bound, the skipped GW20 fixture and the pluralisation. All are fixed.
+- **The fix-round review** (08:05Z to 08:16Z, 10 agents):
+  - Verified by two skeptics each:
+    - the Review tab's Draft footer;
+    - the E-208 check resting on the day's sheet, a finding both reviewers raised;
+    - the E-205 mutation, which could never fail.
+  - Judged inline:
+    - the phase paragraph when the place is exact or there is no next run;
+    - the unknown-place wording;
+    - the grammar of the stop notes;
+    - the GW19-run wildcard wording on the Plan tab and in the weekly block.
+  - All are fixed, with checks on constructed copies and mutations that run the same predicates (E-207, E-208 addenda).
+
+- **Lesson.** A run started at the deadline minus 23 hours must be committed and green before the overnight price change (about 01:30Z), or it needs a second pull. The routine stays at the deadline minus 23 hours, because it lands an hour after the Draft waiver run and the free agents go to whoever signs first.
+- **Still open.**
+  - E-200 stays open for the sheet before a waiver run.
+  - E-202, start rates for new starters, is open.
+  - The landing after a deadline still shows the match-day card rather than the Draft line.

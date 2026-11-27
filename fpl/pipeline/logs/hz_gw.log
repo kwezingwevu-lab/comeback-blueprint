@@ -1,1 +1,1 @@
-gameweek: Optimization terminated successfully. (HiGHS Status 7: Optimal) · 75.1 s · gap 0.004952774616843621 · GW11 55.32 · November (GW10-12) 110.63 · to GW19 578.73 · written to /home/user/comeback-blueprint/fpl/data/solver_horizons.json
+gameweek: Optimization terminated successfully. (HiGHS Status 7: Optimal) · 172.3 s · gap 0.0049990015332315365 · GW12 51.47 · November (GW10-12) 51.47 · to GW19 519.01 · written to /home/user/comeback-blueprint/fpl/data/solver_horizons.json

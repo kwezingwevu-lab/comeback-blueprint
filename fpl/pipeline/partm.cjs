@@ -118,7 +118,7 @@ let draft = "**Draft GW" + gw + ": " + (cl.length ? cl.length + (MC.draft.waiver
         const worth = cs && isFinite(cs.valueAfter) && isFinite(cs.valueNow) ? " Roster " + f1(cs.valueNow) + " today, " + f1(cs.valueAfter) + " after the signings (Draft expected points to GW" + M.CFG.draftEnd + ")." : "";
         return (cl.length ? "Sign now, as free agents, in this order: " + cl.join("; ") + "." + worth + " " : "Nothing to sign now: no fit free agent improves the roster to GW" + M.CFG.draftEnd + ". ") +
           (nr ? (nx.length ? "Cannot be signed this week, so claim at the next waiver run (" + sast(nr.waivers) + ", " + where + "; each drop assumes the signings above): " + nx.join("; ") + ". "
-                           : "Nobody locked is worth a claim at the next waiver run (" + sast(nr.waivers) + "). ")
+                           : "Nobody locked is worth a claim at the next waiver run (" + sast(nr.waivers) + (where ? ", where " + where.replace(/^you claim/, "you pick") : "") + "). ")
               : "The next waiver run falls after the re-draft. ");
       })()
     : (cl.length ? "Lodge in this order: " + cl.join("; ") + ". " : "") +

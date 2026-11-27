@@ -182,6 +182,47 @@ try {
   }
   MCP_SETTLED = { MC: MCs, PLAN: MCB.PLAN, PRE: PREs, E: MCB.MCEngine.create(MCs) };
 } catch (e) { MCP_SETTLED = null; }
+/* E-207 (26 Nov 2026): the settled panels that only some weeks reach (a held-back player, df-held; a next-run claim, and so
+   the after-deadline state with df-signnow-closed) are reached every week through a constructed copy: one fit free agent the
+   signings do not take is turned locked and claimed for a roster player of his position the signings leave, and one flagged
+   unowned player is held back against another. Built from the block, nothing typed; the real-data variants stay as they are.
+   On 26 Nov the week had neither, and the testid coverage check went red on data, not on the app. */
+/* 27 Nov 2026 (the pre-ship review): a week whose next waiver run falls after the re-draft has no claims.next at all (the GW20
+   build), and the copy was then skipped. It now stands in a next run three days after the deadline with an empty claim list,
+   and a second copy built from a sheet with next set to null proves the stand-in renders. */
+const richFrom = function (claimsIn) {
+  try {
+    if (!(MCP_SETTLED && claimsIn)) return null;
+    const MCr = JSON.parse(JSON.stringify(MCP_SETTLED.MC)), Er0 = MCB.MCEngine.create(MCr), C0 = JSON.parse(JSON.stringify(claimsIn));
+    if (!C0.next) {
+      // the stand-in must pass the view's own checks: its waiver time is the league's for that gameweek (written into the
+      // copy's events when the block has none), and "of" is the length of the waiver order
+      const evs = (MCr.draft.events = MCr.draft.events || {}), nx = Number(MCr.gw.next), ev = evs[String(nx)] || {}, dlMs = Date.parse(ev.dl);
+      if (!isFinite(dlMs)) return null;
+      const ev2 = evs[String(nx + 1)] || {}, wv = typeof ev2.wv === "string" ? ev2.wv : new Date(dlMs + 3 * 864e5).toISOString();
+      evs[String(nx + 1)] = Object.assign({}, ev2, { wv: wv });
+      const ord = typeof Er0.waiverOrder === "function" ? Er0.waiverOrder() : [];
+      C0.next = { gw: nx + 1, wv: wv, placeMin: 1, placeMax: 2, orderAfter: nx, of: ord.length || (MCr.draft.entries || []).length, placeKnown: true, claims: [] };
+    }
+    const nowAdds = C0.now.map(function (q) { return q.add; }), nowDrops = C0.now.map(function (q) { return q.drop; });
+    const after = Er0.draftRoster().map(function (p) { return p.id; }).filter(function (id) { return nowDrops.indexOf(id) < 0; }).concat(nowAdds);
+    const usedDrops = C0.next.claims.map(function (q) { return q.drop; });
+    const posOf = function (id) { const q = MCr.players.filter(function (x) { return x.id === id; })[0]; return q ? q.p : null; };
+    const dropFor = function (pos, not) { return after.filter(function (id) { return posOf(id) === pos && not.indexOf(id) < 0; })[0]; };
+    const fa = MCr.players.filter(function (x) { return x.ds === "a" && x.st === "a" && x.did && !x.do && nowAdds.indexOf(x.id) < 0 && dropFor(x.p, usedDrops) !== undefined; })[0];
+    const fl = MCr.players.filter(function (x) { return x.st !== "a" && x.did && !x.do && x.ds !== "o" && (!fa || x.id !== fa.id); })[0];
+    if (fa && fl) {
+      fa.ds = "l";
+      const d1 = dropFor(fa.p, usedDrops), d2 = dropFor(fl.p, usedDrops.concat([d1]));
+      C0.next.claims = C0.next.claims.concat([{ add: fa.id, drop: d1, gain: 1 }]);
+      C0.heldBack = [{ add: fl.id, drop: d2 === undefined ? d1 : d2, status: fl.st, chance: fl.cop, gain: 1, from: C0.next.gw, how: fl.ds === "l" ? "waiver" : "free" }];
+      return { MC: MCr, PLAN: MCP_SETTLED.PLAN, PRE: Object.assign({}, MCP_SETTLED.PRE, { claims: C0 }), E: MCB.MCEngine.create(MCr) };
+    }
+    return null;
+  } catch (e) { return null; }
+};
+const MCP_SETTLED_RICH = MCP_SETTLED ? richFrom(MCP_SETTLED.PRE.claims) : null;
+const MCP_SETTLED_RICH_NONEXT = MCP_SETTLED ? richFrom(Object.assign({}, MCP_SETTLED.PRE.claims || {}, { next: null })) : null;
 assert("components-the-mc-engine-data-plan-and-precomputed-blocks-are-in-scope",
   !!(MCP && MCP.MC && Array.isArray(MCP.MC.players) && MCP.PLAN && MCP.PRE && MCP.E && typeof MCP.E.ep === "function" &&
     typeof MCP.PLAN.hash === "string" && MCP.PLAN.hash === MCP.PRE.hash),
@@ -510,6 +551,11 @@ const FIX = {
       .concat(MCP_SETTLED ? [{ ctx: CTX, ui: uiFor("draft", true), on: ON, state: baseState, onLeague: noop, mc: MCP_SETTLED }] : [])
       // E-205: after the deadline the sign-now part closes and the next run's claims stay (df-signnow-closed)
       .concat(MCP_SETTLED && CTX_AFTER_DL ? [{ ctx: CTX_AFTER_DL, ui: uiFor("draft", true), on: ON, state: baseState, onLeague: noop, mc: MCP_SETTLED }] : [])
+      // E-207: the constructed settled copy, before and after the deadline, so df-held and df-signnow-closed render every week
+      .concat(MCP_SETTLED_RICH ? [{ ctx: CTX, ui: uiFor("draft", true), on: ON, state: baseState, onLeague: noop, mc: MCP_SETTLED_RICH }] : [])
+      .concat(MCP_SETTLED_RICH && CTX_AFTER_DL ? [{ ctx: CTX_AFTER_DL, ui: uiFor("draft", true), on: ON, state: baseState, onLeague: noop, mc: MCP_SETTLED_RICH }] : [])
+      // and the copy built from a sheet with no next run (the GW20 week), after the deadline
+      .concat(MCP_SETTLED_RICH_NONEXT && CTX_AFTER_DL ? [{ ctx: CTX_AFTER_DL, ui: uiFor("draft", true), on: ON, state: baseState, onLeague: noop, mc: MCP_SETTLED_RICH_NONEXT }] : [])
   },
   TabChips: { props: { ctx: CTX, ui: uiFor("chips", true), on: ON, plan: PLAN, onConfirm: noop, mc: MCP }, text: [],
     fuzz: { ctx: CTX, ui: uiFor("chips", false), on: ON, plan: PLAN, onConfirm: noop, mc: MCP } },
@@ -1527,9 +1573,8 @@ console.log("--- v110 D3 · the Draft tab ---");
       C.now.forEach(function (q) { if (nrT.indexOf(nmS(q.add) + " for ") >= 0) bad.push(nmS(q.add) + " is signed now and also claimed"); });
       if (C.next) {
         // the place is the range the table after the previous gameweek allows (waiverPlaceRange), never today's waiver_pick
-        const placeS = !C.next.placeKnown ? "a place not yet known" : C.next.placeMin === C.next.placeMax ? ordS(C.next.placeMin)
-          : ordS(C.next.placeMin) + (C.next.placeMax === C.next.placeMin + 1 ? " or " : " to ") + ordS(C.next.placeMax);
-        const head = "Locked until the next waiver run, " + sday(C.next.wv) + " SAST, where you claim " + placeS + " of " + C.next.of;
+        const placeS = C.next.placeMin === C.next.placeMax ? ordS(C.next.placeMin) : ordS(C.next.placeMin) + (C.next.placeMax === C.next.placeMin + 1 ? " or " : " to ") + ordS(C.next.placeMax);
+        const head = "Locked until the next waiver run, " + sday(C.next.wv) + " SAST, " + (C.next.placeKnown ? "where you claim " + placeS + " of " + C.next.of : "where your place is not known yet");
         if (C.next.claims.length && nrT.indexOf(head) < 0) bad.push("the part-two head does not carry «" + head + "»");
         if (C.next.claims.length && C.next.placeMin !== C.next.placeMax && nrT.indexOf("the table after GW" + C.next.orderAfter) < 0) bad.push("a place range is not explained by the table after GW" + C.next.orderAfter);
         if (C.next.claims.length ? !inOrder(nrT, C.next.claims.map(lineOf)) : nrT.indexOf("Nobody locked is worth a claim") < 0) bad.push("next-run rows are not the sheet's, in order");
@@ -2559,6 +2604,74 @@ console.log("--- v110 D6 · the Lab tab: method, limits, dated sources ---");
     assert("D6-the-lab-sections-degrade-to-one-honest-line-with-no-solved-plan-or-no-engine", bad.length === 0, bad.join("; "));
   }
 })();
+
+/* 27 Nov 2026 (E-207, E-208; the pre-ship review and the fix-round review). Every check here runs on constructed copies, so no
+   branch depends on what the day's sheet holds:
+   - the constructed settled copies are always built, with and without a next run in the day's sheet, and the copy with no
+     next run still draws the after-deadline sign-now note and the held-back player;
+   - after the run the phase paragraph names today's order as the run just gone, never says "You are", and says of the next
+     run only what the sheet's next run supports (a range, an exact place, or that it falls after the re-draft);
+   - the next-run panel gives the place in words with claims and without, and reads "where your place is not known yet" when
+     it is unknown. Each predicate is a function, and each mutation runs the same function on the 26 Nov wording. */
+{
+  const hasId = function (html, id) { return html.indexOf('data-testid="' + id + '"') >= 0; };
+  const textOf = function (html) { return String(html).replace(/<[^>]*>/g, " ").replace(/&#x27;|&#39;/g, "'").replace(/\s+/g, " "); };
+  const o = function (n) { const m = n % 100; return n + (m >= 11 && m <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" })[n % 10] || "th"); };
+  const rngOf = function (nx) { return nx.placeMin === nx.placeMax ? o(nx.placeMin) : o(nx.placeMin) + (nx.placeMax === nx.placeMin + 1 ? " or " : " to ") + o(nx.placeMax); };
+  const withClaims = function (fx, mut) {
+    const MCc = fx.MC, Cc = JSON.parse(JSON.stringify(fx.PRE.claims)); mut(Cc);
+    return { MC: MCc, PLAN: fx.PLAN, PRE: Object.assign({}, fx.PRE, { claims: Cc }), E: fx.E };
+  };
+  const draw = function (fx, ctx) { return tryRender("TabDraft", { ctx: ctx || CTX, ui: uiFor("draft", true), on: ON, state: baseState, onLeague: noop, mc: fx }); };
+  const phaseOf = function (html) { const i = html.indexOf('data-testid="df-phase"'); return i < 0 ? "" : textOf(html.slice(i, html.indexOf("</", i))); };
+  const phaseOk = function (ph, claims) {
+    const nx = claims && claims.next;
+    if (ph.indexOf("The order at the run just gone") < 0 || ph.indexOf("You are ") >= 0) return false;
+    if (claims && claims.next === null) return ph.indexOf("The next waiver run falls after the re-draft.") >= 0 && ph.indexOf("is a range") < 0;
+    if (!nx || !nx.placeKnown) return ph.indexOf("is a range") < 0 && ph.indexOf("so you pick") < 0;
+    return nx.placeMin !== nx.placeMax ? /so your place there is a range until GW\d+ is played/.test(ph)
+      : ph.indexOf("so you pick " + o(nx.placeMin) + " of " + nx.of + " there") >= 0 && ph.indexOf("is a range") < 0;
+  };
+  const panelOk = function (txt, nx) {
+    if (!nx.placeKnown) return txt.indexOf("where your place is not known yet") >= 0 && txt.indexOf("a place not yet known") < 0;
+    return txt.indexOf((nx.claims.length ? "where you claim " : "where you pick ") + rngOf(nx) + " of " + nx.of) >= 0;
+  };
+  assert("E-207-the-constructed-settled-copies-are-built-with-and-without-a-next-run",
+    !MCP_SETTLED || (!!MCP_SETTLED_RICH && !!MCP_SETTLED_RICH_NONEXT),
+    MCP_SETTLED ? "with " + !!MCP_SETTLED_RICH + " · without " + !!MCP_SETTLED_RICH_NONEXT : "no settled block today");
+  if (MCP_SETTLED_RICH_NONEXT && CTX_AFTER_DL) {
+    const r = draw(MCP_SETTLED_RICH_NONEXT, CTX_AFTER_DL);
+    assert("E-207-a-week-with-no-next-run-still-draws-df-signnow-closed-and-df-held-from-the-stand-in",
+      r.ok && hasId(r.html, "df-signnow-closed") && hasId(r.html, "df-held"), r.ok ? "closed " + hasId(r.html, "df-signnow-closed") + " · held " + hasId(r.html, "df-held") : r.err && r.err.message);
+  }
+  if (MCP_SETTLED_RICH) {
+    const base = MCP_SETTLED_RICH.PRE.claims.next;
+    const cases = [
+      ["a range", function (C2) { C2.next.placeMin = 1; C2.next.placeMax = 3; C2.next.placeKnown = true; }],
+      ["an exact place", function (C2) { C2.next.placeMin = 2; C2.next.placeMax = 2; C2.next.placeKnown = true; }],
+      ["an unknown place", function (C2) { C2.next.placeKnown = false; }],
+      ["no next run", function (C2) { C2.next = null; }],
+    ];
+    const bad = [];
+    cases.forEach(function (c) {
+      const fx = withClaims(MCP_SETTLED_RICH, c[1]), r = draw(fx), ph = r.ok ? phaseOf(r.html) : "";
+      if (!r.ok || !phaseOk(ph, fx.PRE.claims)) bad.push(c[0] + ": «" + ph.slice(-220) + "»");
+    });
+    assert("E-205-E-208-after-the-run-the-phase-paragraph-names-the-run-just-gone-and-says-only-what-the-next-run-supports", bad.length === 0, bad.join(" · ") || cases.length + " constructed cases");
+    const old = "The order for that run: 1. A, 2. B. You are 2nd of 8. The next run's order is set by the table after GW12, bottom first.";
+    assert("E-205-mutation-the-26-Nov-phase-wording-fails-the-same-predicate", !phaseOk(old, { next: { placeKnown: true, placeMin: 1, placeMax: 2, of: 8 } }), "refused");
+    const bad2 = [];
+    [["with claims", function () {}], ["without claims", function (C2) { C2.next.claims = []; }],
+     ["an exact place", function (C2) { C2.next.claims = []; C2.next.placeMin = 2; C2.next.placeMax = 2; }],
+     ["an unknown place", function (C2) { C2.next.placeKnown = false; }]].forEach(function (c) {
+      const fx = withClaims(MCP_SETTLED_RICH, c[1]), r = draw(fx), txt = r.ok ? textOf(r.html) : "";
+      if (!r.ok || !panelOk(txt, fx.PRE.claims.next)) bad2.push(c[0]);
+    });
+    assert("E-208-the-next-run-panel-gives-the-place-in-words-with-claims-without-and-when-unknown", bad2.length === 0 && !!base, bad2.join(", ") || "4 constructed cases");
+    const old2 = "Nobody locked is worth a claim at the next waiver run, Mon 30 Nov 20:30 SAST.";
+    assert("E-208-mutation-the-26-Nov-empty-panel-fails-the-same-predicate", !panelOk(old2, { placeKnown: true, placeMin: 1, placeMax: 3, of: 8, claims: [] }), "refused");
+  }
+}
 
 // ---------------------------------------------------------------- 7. pass B — degraded contexts
 

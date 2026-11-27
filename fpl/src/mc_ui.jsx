@@ -506,8 +506,8 @@ function mcReviewNotes(review, MC, PLAN, E, ledger) {
       else C.stop.push("You trail the gameweek average by " + (-c.vsAverage) + " points across " + n + " gameweeks.");
       if (c.captainBest >= Math.ceil(n / 2)) C.repeat.push("The captain was the best pick in the squad in " + c.captainBest + " of " + n + " gameweeks. Keep following the expected-points order.");
       if (c.flags && c.flags.captain) C.stop.push("Captain choices cost " + c.captainGap + " points against the best captain in the squad. Captain from the expected-points order, not instinct.");
-      if (c.flags && c.flags.bench) C.stop.push(c.avoidable + " avoidable bench points in " + n + " gameweeks: set the eleven from the best-eleven view every week, and check it again after Friday's press conferences.");
-      else C.repeat.push("Team selection was tight: the bench scored " + c.benchScored + ", of which " + c.avoidable + " was avoidable.");
+      if (c.flags && c.flags.bench) C.stop.push(c.avoidable + " avoidable " + plural(c.avoidable, "point", "points") + " in " + n + " " + plural(n, "gameweek", "gameweeks") + " (what a better legal eleven would have added, a starter's minus points included): set the eleven from the best-eleven view every week, and check it again after Friday's press conferences.");
+      else C.repeat.push("Team selection was tight: the bench scored " + c.benchScored + ", and " + c.avoidable + " " + plural(c.avoidable, "point was", "points were") + " avoidable.");
       const next = Number(MC && MC.gw && MC.gw.next), cap = Number(MC && MC.classic && MC.classic.maxFt);
       const wk = PLAN && PLAN.replay && Array.isArray(PLAN.replay.weeks) ? PLAN.replay.weeks.filter(function (w) { return w && Number(w.gw) === next; })[0] : null;
       const ft = wk ? Number(wk.ftBefore) : NaN;
@@ -530,9 +530,9 @@ function mcReviewNotes(review, MC, PLAN, E, ledger) {
       }
       if (d.flags && d.flags.bench) {
         const close = rows.filter(function (g) { return g && g.res === "L" && Number(g.opp) - Number(g.mine) <= MC_UI_CFG.closeLoss; }).length;
-        D.stop.push(d.avoidable + " avoidable bench points in " + n + " gameweeks" +
+        D.stop.push(d.avoidable + " avoidable " + plural(d.avoidable, "point", "points") + " in " + n + " " + plural(n, "gameweek", "gameweeks") + " (what a better legal eleven would have added, a starter's minus points included)" +
           (close ? ", and " + close + " of your " + d.losses + " " + plural(d.losses, "loss was", "losses were") + " by " + MC_UI_CFG.closeLoss + " points or fewer." : "."));
-      } else D.repeat.push("Draft selection was efficient: the bench scored " + d.benchScored + ", of which " + d.avoidable + " was avoidable.");
+      } else D.repeat.push("Draft selection was efficient: the bench scored " + d.benchScored + ", and " + d.avoidable + " " + plural(d.avoidable, "point was", "points were") + " avoidable.");
       const end = Number(E && E.CFG && E.CFG.draftEnd);
       D.repeat.push("Work the free-agent list every week." + (isFinite(end) ? " The league re-drafts after GW" + end + ", so a player's value after that is nothing: hold the fifteen who score most until then." : ""));
     }
@@ -590,7 +590,7 @@ function TabReview(props) {
         {c.rows.length ? (
           <div>
             <p data-testid="rw-c-sum">{"Classic, " + cSpan + ": the bench scored " + c.benchScored + " points, and " + c.avoidable +
-              " of them were avoidable, points a better legal eleven would have had on the pitch."}</p>
+              (c.avoidable === 1 ? " was" : " were") + " avoidable: what a better legal eleven would have added (a starter's minus points count too, so this can exceed what the bench scored)."}</p>
             {notes.classic.repeat.length || notes.classic.stop.length ? <div className="panel" data-testid="rw-c-notes">{lists(notes.classic)}</div> : null}
             <Row head cols={MC_RW_C_COLS}><span>GW</span><span>You v average</span><span className="rt">Bench scored</span><span className="rt">Avoidable</span></Row>
             {c.rows.map(function (g) {
@@ -637,7 +637,7 @@ function TabReview(props) {
         {d.rows.length ? (
           <div>
             <p data-testid="rw-d-sum">{"Draft, " + dSpan + ": won " + d.wins + ", drew " + d.draws + ", lost " + d.losses + ". The bench scored " + d.benchScored +
-              " points, and " + d.avoidable + " of them were avoidable." +
+              " points, and " + d.avoidable + (d.avoidable === 1 ? " was" : " were") + " avoidable (a starter's minus points count too)." +
               (d.flipped.length ? " The best eleven would have won " + d.flipped.map(function (g) { return "GW" + g; }).join(" and ") + "." : " The best eleven would not have changed a result.")}</p>
             {notes.draft.repeat.length || notes.draft.stop.length ? <div className="panel" data-testid="rw-d-notes">{lists(notes.draft)}</div> : null}
             <Row head cols={MC_RW_D_COLS}><span>GW</span><span>Result</span><span className="rt">Avoidable</span></Row>
@@ -657,7 +657,7 @@ function TabReview(props) {
                 </Row>
               );
             })}
-            <div className="dim">Avoidable points are bench points the best legal eleven would have played. Draft has no captain.</div>
+            <div className="dim">Avoidable points are what a better legal eleven would have added: its bench players' points, plus any starter's minus points. Draft has no captain.</div>
           </div>
         ) : <p className="dim">Draft: no finished gameweek to review yet.</p>}
       </Section>

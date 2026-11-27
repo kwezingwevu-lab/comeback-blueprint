@@ -1,6 +1,6 @@
-plan Optimization terminated successfully. (HiGHS Status 7: Optimal) 60.5 s · gap 0.004661514183132521 · total 582.85
-no-wildcard 17.7 s · gap 0.004829619197795941 · total 576.97
-free hit [(13, 4.19), (14, 2.76), (15, 3.6), (16, 3.63), (17, 1.18), (18, 1.29), (19, 1.56)]
-draft 0.0 s · value 456.27 base 418.89 [('N.Williams', 'Robinson'), ('Branthwaite', 'Affengruber'), ('Gibbs-White', 'Xhaka'), ('McAtee', 'King'), ('Schade', 'Bobb')]
-draft if taken 456.27 [('N.Williams', 'Robinson'), ('Branthwaite', 'Affengruber'), ('Gibbs-White', 'Xhaka'), ('McAtee', 'King'), ('Schade', 'Bobb')]
-done in 78.5 s · /home/user/comeback-blueprint/fpl/data/solver_out.json
+plan Optimization terminated successfully. (HiGHS Status 7: Optimal) 103.8 s · gap 0.004996448281910657 · total 526.08
+no-wildcard 57.6 s · gap 0.0018725088989609345 · total 516.77
+free hit [(13, 3.64), (14, 5.94), (15, 4.46), (16, 0.8), (17, 0.63), (18, 1.17), (19, 0.25)]
+draft 0.0 s · value 409.11 base 403.06 [('Roefs', 'Arrizabalaga'), ('N.Williams', 'Affengruber'), ('Anderson', 'Tonali')]
+draft if taken 406.08 [('Roefs', 'Arrizabalaga'), ('Manzambi', 'Tonali')]
+done in 161.7 s · /home/user/comeback-blueprint/fpl/data/solver_out.json

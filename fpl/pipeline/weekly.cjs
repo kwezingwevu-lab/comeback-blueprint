@@ -173,7 +173,7 @@ const NR = settled ? sheet.next : null;   // the next waiver run (null after the
 // The place at that run is a range until the gameweek before it is played (waiverPlaceRange in src/mc_analysis.js): this
 // league orders each run by the table after the previous gameweek, bottom first, so today's waiver_pick is last run's order.
 const ordN = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" })[n % 10] || "th");
-const placeText = (nr) => !nr.placeKnown ? "a place not yet known of " + nr.of
+const placeText = (nr) => !nr.placeKnown ? "not yet known (of " + nr.of + ")"
   : (nr.placeMin === nr.placeMax ? ordN(nr.placeMin) : nr.placeMax === nr.placeMin + 1 ? ordN(nr.placeMin) + " or " + ordN(nr.placeMax) : "between " + ordN(nr.placeMin) + " and " + ordN(nr.placeMax)) +
     " of " + nr.of + (nr.placeMin === nr.placeMax ? "" : " (the order is the table after GW" + nr.orderAfter + ", bottom first, and GW" + nr.orderAfter + " is still to be played)");
 // E-203: after the run every written line can be carried out as written. "sign now" lines first; locked players only
@@ -292,7 +292,7 @@ L("    notes: " + JSON.stringify([
 L("    why: " + JSON.stringify([
   choice && T.now ? "The cost of the manager's rules: the solver's own best plan under the GW13 rule plays the wildcard in GW" + wcWeek(T.now) + " for " + f2(T.now.total) + " Classic expected points to GW" + cEnd + "; the plan of record (wildcard GW19) is " + f2(PLAN.plan.total) + ", " + f2(T.now.total - PLAN.plan.total) + " less." : "No manager's choice is applied: the plan is the solver's own.",
   "Timing (data/plan.json timing): wildcard " + (choice ? "at the solver's week (GW" + wcWeek(T.now) + ") " : "now ") + f2(T.now ? T.now.total : PLAN.plan.total) + (T.later ? ", later (GW" + laterWc + ") " + f2(T.later.total) : "") + (T.never ? ", never " + f2(T.never.total) : "") + " Classic expected points to GW" + cEnd + ".",
-  LT ? "The wildcard as late as the rules allow, GW" + latestWc + " (the last deadline before set one expires): the no-wildcard plan to the week before, then the fifteen rebuilt for that week" + (LT.reshuffle ? " (" + LT.reshuffle.changes + " changes, " + f2(LT.reshuffle.gain) + " that week)" : "") + ", worth " + f2(LT.total) + " Classic expected points, which is " + f2(PLAN.plan.total - LT.total) + " below the plan, so waiting to the end costs at most that plus the proof tolerance. It is a plan built from a proven one and replayed against the rules, and a floor, not a proved best. Points are counted only to GW" + cEnd + ", so a wildcard played in the last week is credited with that week alone and none after it: the cost is what waiting gives up, not the whole comparison." : "The wildcard as late as the rules allow was not built for this data.",
+  LT ? "The wildcard as late as the rules allow, GW" + latestWc + " (the last deadline before set one expires): " + (LT.weeks && LT.weeks[0] && LT.weeks[0].gw === latestWc ? "the fifteen rebuilt this week, from the squad as it stands" : "the no-wildcard plan to the week before, then the fifteen rebuilt for that week") + (LT.reshuffle ? " (" + LT.reshuffle.changes + " changes, " + f2(LT.reshuffle.gain) + " that week)" : "") + ", worth " + f2(LT.total) + " Classic expected points, which is " + f2(PLAN.plan.total - LT.total) + " below the plan, so waiting to the end costs at most that plus the proof tolerance. It is a plan built from a proven one and replayed against the rules, and a floor, not a proved best. Points are counted only to GW" + cEnd + ", so a wildcard played in the last week is credited with that week alone and none after it: the cost is what waiting gives up, not the whole comparison." : "The wildcard as late as the rules allow was not built for this data.",
   (function () {
     // Two solves bound the no-wildcard problem (noWildcard, and the timing file's "never"); quote the better one, so the
     // chip's worth is never overstated.
@@ -319,7 +319,7 @@ L("    pool_note: " + J("League " + MC.draft.league.id + ": the ins are " + (set
   (settled
     ? "Waivers for GW" + next + " have settled, so a free agent is signed instantly until the deadline and a player dropped in that run is locked until the next. " +
       claims.length + (claims.length === 1 ? " player to sign now" : " players to sign now") +
-      (NR ? "; " + nextClaims.length + (nextClaims.length === 1 ? " claim" : " claims") + " for the next waiver run, " + sastDay(NR.wv) + " SAST, where you claim " + placeText(NR) + "." : "; the next waiver run falls after the re-draft.")
+      (NR ? "; " + nextClaims.length + (nextClaims.length === 1 ? " claim" : " claims") + " for the next waiver run, " + sastDay(NR.wv) + " SAST, " + (NR.placeKnown ? "where you claim " + placeText(NR) : "where your place is not known yet") + "." : "; the next waiver run falls after the re-draft.")
     : sheet.sheet.length + " claims, " + sheet.sheet.filter((c) => c.kind === "backup").length + " of them backups.") +
   (heldText ? " Held back because the player is flagged (re-check after the pressers): " + heldText + "." : "")) + ",");
 L("    claims: [");
